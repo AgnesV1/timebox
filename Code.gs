@@ -3,9 +3,9 @@
 
 var SECRET = 'CHANGE_ME';
 var SHEET  = '任务';
-var HEADER = ['日期', '任务内容', '预计完成时间（分钟）', '拟定顺序', '分类', '审核', '是否完成', '实际次序（自动）'];
+var HEADER = ['日期', '任务内容', '任务描述', '预计完成时间（分钟）', '拟定顺序', '分类', '审核', '是否完成', '实际次序（自动）'];
 var CATEGORIES = ['主线', '工作', '娱乐', '琐事'];
-// 同步用到的列按表头文字找，所以列可以挪位置、中间也能插自己的列（审核只给人看，脚本不读不写）
+// 同步用到的列按表头文字找，所以列可以挪位置、中间也能插自己的列（审核只给人看，脚本不读不写；分类、任务描述可以没有）
 var COLS = { date: '日期', task: '任务内容', est: '预计完成时间（分钟）', seq: '拟定顺序',
              result: '是否完成', doneSeq: '实际次序（自动）' };
 // 每天可用的分钟数，一天一行
@@ -13,10 +13,16 @@ var CAP_SHEET  = '每日时长';
 var CAP_HEADER = ['日期', '可用时长（分钟）'];
 
 // 第一次用：在编辑器顶部选 setup 点「运行」，建好「任务」「每日时长」两页并完成授权；
-// 以后改了分类再运行一次，会刷新下拉
+// 以后更新了代码再运行一次：刷新分类下拉、给老表补上「任务描述」列
 function setup() {
   var sh = sheet_();
   var names = sh.getDataRange().getValues()[0].map(function (h) { return String(h).trim(); });
+  if (names.indexOf('任务描述') < 0) {
+    sh.getRange(1, names.length + 1).setValue('任务描述');   // 补在最后一列，可以再拖到任何位置
+    names.push('任务描述');
+  }
+  // 描述设成纯文本，免得「- 第一步」这种开头被当成公式
+  sh.getRange(2, names.indexOf('任务描述') + 1, sh.getMaxRows() - 1, 1).setNumberFormat('@');
   var col = names.indexOf('分类') + 1;
   if (col) {
     sh.getRange(2, col, sh.getMaxRows() - 1, 1).setDataValidation(
@@ -57,6 +63,7 @@ function cols_(header) {
     if (c[k] < 0) return { error: '表头缺少「' + COLS[k] + '」' };
   }
   c.cat = names.indexOf('分类');   // 可以没有
+  c.desc = names.indexOf('任务描述');
   return c;
 }
 
@@ -100,6 +107,7 @@ function doGet(e) {
     rows.push({
       task: String(d[c.task]).trim(), est_min: d[c.est], seq: d[c.seq],
       category: c.cat >= 0 ? String(d[c.cat]).trim() : '',
+      desc: c.desc >= 0 ? String(d[c.desc]) : '',
       done_seq: d[c.doneSeq], result: String(d[c.result]).trim(),
       _k: Number(d[c.seq]) || 1e6 + i
     });
@@ -110,8 +118,8 @@ function doGet(e) {
   return json_({ date: date, cap: cap_(date, tz), rows: rows });
 }
 
-// 写入某一天：手机只回写「是否完成」「实际次序」，写在原来那行；计划相关的列以表为准。
-// 手机上新加的追加到末尾，手机上 ✕ 掉的删掉。按任务内容对行，同名的按先后一一对上
+// 写入某一天：手机只回写「是否完成」「实际次序」和手机上改过的「任务描述」，写在原来那行；计划相关的列以表为准。
+// 手机上新加的追加到末尾，removed 里的删掉。按任务内容对行，同名的按先后一一对上
 function doPost(e) {
   var body = JSON.parse(e.postData.contents);
   if (body.secret !== SECRET) return json_({ error: 'denied' });
@@ -145,6 +153,7 @@ function doPost(e) {
     if (i < 0) { added.push(r); return; }
     sh.getRange(i + 1, c.result + 1).setValue(r.result);
     sh.getRange(i + 1, c.doneSeq + 1).setValue(r.done_seq);
+    if (r.desc !== undefined && c.desc >= 0) sh.getRange(i + 1, c.desc + 1).setNumberFormat('@').setValue(r.desc);
   });
 
   var gone = [];
@@ -164,6 +173,7 @@ function doPost(e) {
     row[c.result] = r.result;
     row[c.doneSeq] = r.done_seq;
     sh.appendRow(row);
+    if (r.desc && c.desc >= 0) sh.getRange(sh.getLastRow(), c.desc + 1).setNumberFormat('@').setValue(r.desc);
   });
   return json_({ ok: true, count: (body.rows || []).length });
 }

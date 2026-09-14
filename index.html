@@ -35,23 +35,28 @@
   .meta{margin-top:6px;font-size:12.5px;color:var(--muted);display:flex;
     justify-content:space-between;gap:10px}
   .meta.over{color:var(--warn)}
-  .row{border-top:1px solid var(--rule);padding:13px 0;display:flex;gap:12px}
-  .est{width:40px;flex-shrink:0;text-align:right}
+  .row{border-top:1px solid var(--rule);padding:13px 0;display:flex;gap:12px;transition:transform .15s}
+  .row.dragging{position:relative;z-index:2;transition:none;background:var(--paper);box-shadow:0 6px 18px rgba(0,0,0,.14)}
+  .row.opt.dragging{background:var(--opt-bg)}
+  .est{width:40px;flex-shrink:0;text-align:right;align-self:flex-start;cursor:grab;touch-action:none;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  .grip{display:block;width:10px;height:13px;margin:4px 0 0 auto;opacity:.6;
+    background:radial-gradient(circle,var(--muted) 1.2px,transparent 1.5px) 0 0/5px 4.5px}
   .est b{display:block;font-size:21px;font-weight:300;color:var(--muted)}
   .bar{width:3px;flex-shrink:0;border-radius:2px}
   .body{flex:1;min-width:0}
-  .task{font-size:15px;line-height:1.45}
+  .task{font-size:15px;line-height:1.45;cursor:pointer}
   .task.gone{text-decoration:line-through;color:var(--muted)}
   .task.fin{color:var(--muted)}
+  .more{color:var(--muted)}
+  .desc{display:block;width:100%;min-height:84px;margin-top:8px;padding:8px 9px;resize:vertical;
+    font-size:16px;line-height:1.5;color:var(--ink);background:#F7F8F6;border:1px solid var(--rule);border-radius:3px}
   .row.opt{background:var(--opt-bg);margin:0 -10px;padding-left:10px;padding-right:10px}
   .tag{display:inline-block;margin-right:6px;padding:0 6px;font-size:11px;line-height:17px;
     color:var(--opt);border:1px solid var(--opt);border-radius:999px;vertical-align:1px}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
   .chip{padding:3px 9px;font-size:12px;border:1px solid var(--rule);border-radius:999px;
     background:none;color:var(--muted);cursor:pointer}
-  .tiny{padding:3px 7px;font-size:12px;color:var(--muted);background:none;
-    border:1px solid var(--rule);border-radius:3px;cursor:pointer}
-  .grow{flex:1}
   .add{border-top:1px solid var(--rule);padding-top:14px;display:flex;gap:8px}
   .solid{padding:8px 14px;color:var(--paper);background:var(--ink);border:none;
     border-radius:3px;cursor:pointer;white-space:nowrap}
@@ -126,9 +131,10 @@ const REASONS = ["Blocked"];
 const CATS = {"主线":"var(--main)", "工作":"var(--work)", "娱乐":"var(--fun)", "琐事":"var(--chore)"};
 const KEY = "timebox-v1";
 
-let state = { days:{}, dirty:{}, removed:{}, caps:{}, settings:{url:"",secret:"",cap:420} };
+let state = { days:{}, dirty:{}, removed:{}, caps:{}, dragged:{}, settings:{url:"",secret:"",cap:420} };
 let date = isoDate(new Date());
 let timer = null;
+let open = new Set();   // 展开了描述的任务 id
 
 function isoDate(d){
   const p = n => String(n).padStart(2,"0");
@@ -186,7 +192,8 @@ function payload(){
     secret: state.settings.secret,
     date,
     rows: tasks().map(t=>({
-      seq:t.seq ?? "", done_seq:t.doneSeq ?? "", task:t.task, est_min:t.est, result:resultOf(t)
+      seq:t.seq ?? "", done_seq:t.doneSeq ?? "", task:t.task, est_min:t.est, result:resultOf(t),
+      desc: (t.desc||"") !== (t.descRaw ?? "") ? (t.desc||"") : undefined   // 只发这台设备上改过的描述
     })),
     removed: state.removed[date] || []
   };
@@ -209,6 +216,7 @@ async function push(){
     });
     state.dirty[date] = false;
     state.removed[date] = (state.removed[date]||[]).slice(body.removed.length);  // 发送途中又 ✕ 的留到下次
+    body.rows.forEach(r => { if (r.desc !== undefined) tasks().forEach(t => { if (t.task === r.task && t.desc === r.desc) t.descRaw = r.desc; }); });
     save();
     setStatus("Synced " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
   } catch(e){
@@ -225,15 +233,25 @@ async function pull(){
     const r = await fetch(u);
     const data = await r.json();
     if (data.error) throw new Error(data.error);   // 口令或表头不对时别把本地清空
-    state.days[date] = (data.rows||[]).map((r,i)=>Object.assign({
+    let next = (data.rows||[]).map((r,i)=>Object.assign({
       id: Date.now()+i,
       task: r.task,
       est: Number(r.est_min)||30,
       category: r.category || "",
       seq: r.seq === "" || r.seq == null ? null : Number(r.seq),
       doneSeq: r.done_seq === "" || r.done_seq == null ? null : Number(r.done_seq),
+      desc: r.desc || "",
+      descRaw: r.desc || "",
       raw: r.result
     }, parseResult(r.result)));
+    // 这台设备上拖过顺序的那天：已有任务保持拖好的顺序，表里新加的按拟定顺序留在原位
+    if (state.dragged[date]){
+      const prev = tasks().map(t=>t.task);
+      const known = next.filter(t=>prev.includes(t.task)).sort((a,b)=>prev.indexOf(a.task)-prev.indexOf(b.task));
+      let k = 0;
+      next = next.map(t => prev.includes(t.task) ? known[k++] : t);
+    }
+    state.days[date] = next;
     state.dirty[date] = false;
     state.removed[date] = [];
     if (data.cap) state.caps[date] = Number(data.cap); else delete state.caps[date];
@@ -272,11 +290,47 @@ function setStatusOf(id, s){
 function patch(id, k, v){
   setTasks(tasks().map(t => t.id===id ? Object.assign({},t,{[k]:v}) : t));
 }
-function move(i, d){
-  const n = tasks().slice(), j = i+d;
-  if (j<0 || j>=n.length) return;
-  [n[i],n[j]] = [n[j],n[i]];
-  setTasks(n);
+// 按住左边的分钟数上下拖；拖到屏幕上下边缘会自动滚动
+function drag(e, i){
+  if (e.button > 0) return;
+  e.preventDefault();
+  const rows = [...document.querySelectorAll("#list .row")];
+  const row = rows[i], h = row.offsetHeight;
+  const mids = rows.map(r => { const b = r.getBoundingClientRect(); return b.top + scrollY + b.height/2; });
+  const y0 = e.clientY + scrollY;
+  let to = i, cy = e.clientY, raf = 0;
+  row.classList.add("dragging");
+  const update = () => {
+    const dy = cy + scrollY - y0;
+    row.style.transform = "translateY(" + dy + "px)";
+    to = mids.filter((m,k) => k !== i && m < mids[i] + dy).length;
+    rows.forEach((r,k) => {
+      if (k === i) return;
+      const s = k > i && k <= to ? -h : k < i && k >= to ? h : 0;
+      r.style.transform = s ? "translateY(" + s + "px)" : "";
+    });
+  };
+  const edge = () => {
+    const v = cy < 70 ? -8 : cy > innerHeight - 70 ? 8 : 0;
+    if (v) { scrollBy(0, v); update(); }
+    raf = requestAnimationFrame(edge);
+  };
+  const move = ev => { cy = ev.clientY; update(); };
+  const up = () => {
+    cancelAnimationFrame(raf);
+    removeEventListener("pointermove", move);
+    removeEventListener("pointerup", up);
+    removeEventListener("pointercancel", up);
+    if (to === i) { render(); return; }
+    const n = tasks().slice();
+    n.splice(to, 0, n.splice(i, 1)[0]);
+    state.dragged[date] = true;
+    setTasks(n);
+  };
+  addEventListener("pointermove", move);
+  addEventListener("pointerup", up);
+  addEventListener("pointercancel", up);
+  raf = requestAnimationFrame(edge);
 }
 
 /* ---------- 渲染 ---------- */
@@ -322,7 +376,8 @@ function render(){
 
     const est = document.createElement("div");
     est.className = "est num";
-    est.innerHTML = "<b>"+t.est+"</b>";
+    est.innerHTML = "<b>"+t.est+"</b><i class=\"grip\"></i>";
+    est.onpointerdown = e => drag(e, i);
     row.appendChild(est);
 
     const bar = document.createElement("div");
@@ -339,7 +394,23 @@ function render(){
     if (row.classList.contains("opt")){
       const g = document.createElement("span"); g.className = "tag"; g.textContent = "Optional"; name.prepend(g);
     }
+    const isOpen = open.has(t.id);
+    if (t.desc && !isOpen){
+      const m = document.createElement("span"); m.className = "more"; m.textContent = " ⋯"; name.appendChild(m);
+    }
+    name.onclick = () => { isOpen ? open.delete(t.id) : open.add(t.id); render(); };
     body.appendChild(name);
+    // 点任务名展开描述；边打边存，切走 App 也不会丢
+    if (isOpen){
+      const ta = document.createElement("textarea");
+      ta.className = "desc";
+      ta.placeholder = "Details";
+      ta.value = t.desc || "";
+      const fit = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+      ta.oninput = () => { fit(); t.desc = ta.value; state.dirty[date] = true; save(); queueSync(); };
+      body.appendChild(ta);
+      requestAnimationFrame(fit);
+    }
 
     const chips = document.createElement("div");
     chips.className = "chips";
@@ -355,12 +426,6 @@ function render(){
       b.onclick = ()=>setStatusOf(t.id, s);
       chips.appendChild(b);
     });
-    const grow = document.createElement("span"); grow.className="grow"; chips.appendChild(grow);
-    [["↑",()=>move(i,-1)],["↓",()=>move(i,1)],["✕",()=>{ (state.removed[date] = state.removed[date]||[]).push(t.task); setTasks(ts.filter(x=>x.id!==t.id)); }]]
-      .forEach(([txt,fn])=>{
-        const b=document.createElement("button"); b.className="tiny"; b.textContent=txt;
-        b.onclick=fn; chips.appendChild(b);
-      });
     body.appendChild(chips);
 
     if (t.status==="partial"||t.status==="deferred"||t.status==="dropped"){
@@ -424,6 +489,7 @@ document.addEventListener("visibilitychange", () => {
         new Blob([JSON.stringify(payload())], {type:"text/plain;charset=utf-8"}));
       state.dirty[date] = false;
       state.removed[date] = [];
+      tasks().forEach(t => { t.descRaw = t.desc || ""; });
       save();
     }
   }

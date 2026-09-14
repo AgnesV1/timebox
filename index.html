@@ -13,7 +13,7 @@
   :root{
     --ink:#22282B; --paper:#EFF1EE; --rule:#D9DDD8; --muted:#7E8886;
     --done:#3F7D6E; --partial:#C08A2E; --deferred:#5B7FA6; --dropped:#A8ADAB;
-    --pending:#BFC5C2; --warn:#B4532E;
+    --pending:#BFC5C2; --warn:#B4532E; --opt:#6E5E97; --opt-bg:#E7E4EF;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--paper);color:var(--ink);
@@ -43,6 +43,9 @@
   .body{flex:1;min-width:0}
   .task{font-size:15px;line-height:1.45}
   .task.gone{text-decoration:line-through;color:var(--muted)}
+  .row.opt{background:var(--opt-bg);margin:0 -10px;padding-left:10px;padding-right:10px}
+  .tag{display:inline-block;margin-right:6px;padding:0 6px;font-size:11px;line-height:17px;
+    color:var(--opt);border:1px solid var(--opt);border-radius:999px;vertical-align:1px}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
   .chip{padding:3px 9px;font-size:12px;border:1px solid var(--rule);border-radius:999px;
     background:none;color:var(--muted);cursor:pointer}
@@ -121,7 +124,7 @@ const ORDER = ["done","partial","deferred","dropped"];
 const REASONS = ["被打断","估时不足","状态不好","优先级变了","依赖没到位"];
 const KEY = "timebox-v1";
 
-let state = { days:{}, dirty:{}, settings:{url:"",secret:"",cap:420} };
+let state = { days:{}, dirty:{}, removed:{}, settings:{url:"",secret:"",cap:420} };
 let date = isoDate(new Date());
 let timer = null;
 
@@ -158,14 +161,31 @@ function setStatus(msg, bad){
 }
 
 /* ---------- 同步 ---------- */
+// 表里「是否完成」：ok / 部分｜原因｜说明 / 顺延｜… / 放弃｜…；手填的其他文字当作「部分」的说明
+function parseResult(raw){
+  const s = String(raw ?? "").trim();
+  if (!s) return {status:"pending", reason:"", note:""};
+  if (/^ok$/i.test(s)) return {status:"done", reason:"", note:""};
+  const m = s.match(/^(部分|顺延|放弃)\s*[｜|:：]?\s*(.*)$/);
+  const parts = (m ? m[2] : s).split(/\s*[｜|]\s*/).filter(Boolean);
+  const reason = REASONS.includes(parts[0]) ? parts.shift() : "";
+  return {status: m ? ORDER.find(k=>STATUS[k].label===m[1]) : "partial", reason, note: parts.join("｜")};
+}
+function resultOf(t){
+  const p = parseResult(t.raw);   // 没在手机上改过的，原样写回表里手填的文字
+  if (t.raw != null && p.status===t.status && p.reason===t.reason && p.note===t.note) return t.raw;
+  if (t.status === "pending") return "";
+  if (t.status === "done") return "ok";
+  return [STATUS[t.status].label, t.reason, t.note].filter(Boolean).join("｜");
+}
 function payload(){
   return {
     secret: state.settings.secret,
     date,
-    rows: tasks().map((t,i)=>({
-      seq:i+1, done_seq:t.doneSeq ?? "", task:t.task, est_min:t.est,
-      status:STATUS[t.status].label, reason:t.reason||"", note:t.note||""
-    }))
+    rows: tasks().map(t=>({
+      seq:t.seq ?? "", done_seq:t.doneSeq ?? "", task:t.task, est_min:t.est, result:resultOf(t)
+    })),
+    removed: state.removed[date] || []
   };
 }
 function queueSync(){
@@ -177,13 +197,15 @@ function queueSync(){
 async function push(){
   if (!state.settings.url) { setStatus("没填 Apps Script 网址", true); return; }
   setStatus("同步中");
+  const body = payload();
   try {
     await fetch(state.settings.url, {
       method:"POST",
       headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body: JSON.stringify(payload())
+      body: JSON.stringify(body)
     });
     state.dirty[date] = false;
+    state.removed[date] = (state.removed[date]||[]).slice(body.removed.length);  // 发送途中又 ✕ 的留到下次
     save();
     setStatus("已同步 " + new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"}));
   } catch(e){
@@ -199,16 +221,17 @@ async function pull(){
               "&secret=" + encodeURIComponent(state.settings.secret);
     const r = await fetch(u);
     const data = await r.json();
-    state.days[date] = (data.rows||[]).map((r,i)=>({
+    if (data.error) throw new Error(data.error);   // 口令或表头不对时别把本地清空
+    state.days[date] = (data.rows||[]).map((r,i)=>Object.assign({
       id: Date.now()+i,
       task: r.task,
       est: Number(r.est_min)||30,
-      status: Object.keys(STATUS).find(k=>STATUS[k].label===r.status) || "pending",
+      seq: r.seq === "" || r.seq == null ? null : Number(r.seq),
       doneSeq: r.done_seq === "" || r.done_seq == null ? null : Number(r.done_seq),
-      reason: r.reason || "",
-      note: r.note || ""
-    }));
+      raw: r.result
+    }, parseResult(r.result)));
     state.dirty[date] = false;
+    state.removed[date] = [];
     save(); render();
     setStatus("已和表对齐");
   } catch(e){
@@ -258,6 +281,9 @@ function render(){
   const total = ts.reduce((a,t)=>a+t.est,0);
   const doneMin = ts.filter(t=>t.status==="done").reduce((a,t)=>a+t.est,0);
   const cap = Number(state.settings.cap) || 420;
+  // 拟定顺序里最大的数 = 可选（当天至少有两种顺序才算）
+  const seqs = ts.map(t=>t.seq).filter(n=>n>0);
+  const lowest = new Set(seqs).size > 1 ? Math.max(...seqs) : null;
 
   const strip = document.getElementById("strip");
   strip.innerHTML = "";
@@ -286,7 +312,7 @@ function render(){
   ts.forEach((t,i)=>{
     const c = STATUS[t.status].color;
     const row = document.createElement("div");
-    row.className = "row";
+    row.className = "row" + (lowest !== null && t.seq === lowest ? " opt" : "");
 
     const est = document.createElement("div");
     est.className = "est num";
@@ -305,6 +331,9 @@ function render(){
     const name = document.createElement("div");
     name.className = "task" + (t.status==="dropped" ? " gone" : "");
     name.textContent = t.task;
+    if (row.classList.contains("opt")){
+      const g = document.createElement("span"); g.className = "tag"; g.textContent = "可选"; name.prepend(g);
+    }
     body.appendChild(name);
 
     const chips = document.createElement("div");
@@ -322,7 +351,7 @@ function render(){
       chips.appendChild(b);
     });
     const grow = document.createElement("span"); grow.className="grow"; chips.appendChild(grow);
-    [["↑",()=>move(i,-1)],["↓",()=>move(i,1)],["✕",()=>setTasks(ts.filter(x=>x.id!==t.id))]]
+    [["↑",()=>move(i,-1)],["↓",()=>move(i,1)],["✕",()=>{ (state.removed[date] = state.removed[date]||[]).push(t.task); setTasks(ts.filter(x=>x.id!==t.id)); }]]
       .forEach(([txt,fn])=>{
         const b=document.createElement("button"); b.className="tiny"; b.textContent=txt;
         b.onclick=fn; chips.appendChild(b);
@@ -389,6 +418,7 @@ document.addEventListener("visibilitychange", () => {
       navigator.sendBeacon(state.settings.url,
         new Blob([JSON.stringify(payload())], {type:"text/plain;charset=utf-8"}));
       state.dirty[date] = false;
+      state.removed[date] = [];
       save();
     }
   }

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Timebox</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#EFF1EE">
+<style>
+  :root{
+    --ink:#22282B; --paper:#EFF1EE; --rule:#D9DDD8; --muted:#7E8886;
+    --done:#3F7D6E; --partial:#C08A2E; --deferred:#5B7FA6; --dropped:#A8ADAB;
+    --pending:#BFC5C2; --warn:#B4532E;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"SF Pro Text",-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+    -webkit-text-size-adjust:100%}
+  body{padding:env(safe-area-inset-top) 0 calc(48px + env(safe-area-inset-bottom))}
+  .wrap{max-width:560px;margin:0 auto;padding:20px 18px}
+  .num{font-variant-numeric:tabular-nums}
+  input,button,textarea{font-family:inherit;font-size:14px}
+  input:focus-visible,button:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+  input{width:100%;padding:7px 9px;border:1px solid var(--rule);border-radius:3px;
+    background:#F7F8F6;color:var(--ink)}
+  .head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .head h1{font-size:19px;font-weight:600;margin:0}
+  .nav{padding:3px 8px;font-size:13px;color:var(--muted);background:none;
+    border:1px solid var(--rule);border-radius:3px;cursor:pointer}
+  .strip{display:flex;height:10px;gap:2px;background:#E1E5E1;border-radius:2px;overflow:hidden}
+  .strip div{flex-basis:0}
+  .meta{margin-top:6px;font-size:12.5px;color:var(--muted);display:flex;
+    justify-content:space-between;gap:10px}
+  .meta.over{color:var(--warn)}
+  .row{border-top:1px solid var(--rule);padding:13px 0;display:flex;gap:12px}
+  .est{width:40px;flex-shrink:0;text-align:right}
+  .est b{display:block;font-size:21px;font-weight:300;color:var(--muted)}
+  .est s{display:block;font-size:11px;margin-top:2px;text-decoration:none}
+  .bar{width:3px;flex-shrink:0;border-radius:2px}
+  .body{flex:1;min-width:0}
+  .task{font-size:15px;line-height:1.45}
+  .task.gone{text-decoration:line-through;color:var(--muted)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+  .chip{padding:3px 9px;font-size:12px;border:1px solid var(--rule);border-radius:999px;
+    background:none;color:var(--muted);cursor:pointer}
+  .tiny{padding:3px 7px;font-size:12px;color:var(--muted);background:none;
+    border:1px solid var(--rule);border-radius:3px;cursor:pointer}
+  .grow{flex:1}
+  .add{border-top:1px solid var(--rule);padding-top:14px;display:flex;gap:8px}
+  .solid{padding:8px 14px;color:var(--paper);background:var(--ink);border:none;
+    border-radius:3px;cursor:pointer;white-space:nowrap}
+  .ghost{padding:8px 14px;color:var(--ink);background:none;border:1px solid var(--rule);
+    border-radius:3px;cursor:pointer;white-space:nowrap}
+  .empty{padding:26px 0;color:var(--muted);font-size:14px;border-top:1px solid var(--rule);
+    line-height:1.6}
+  .panel{margin-top:16px;padding:14px;border:1px solid var(--rule);border-radius:4px;font-size:13px}
+  .panel label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  .panel p{color:var(--muted);line-height:1.6;margin:12px 0 0}
+  .foot{margin-top:26px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .status{font-size:12.5px;color:var(--muted)}
+  .status.bad{color:var(--warn)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <button class="nav" id="prev" aria-label="前一天">‹</button>
+      <h1 id="title"></h1>
+      <button class="nav" id="next" aria-label="后一天">›</button>
+    </div>
+    <button class="nav" id="cfgBtn">设置</button>
+  </div>
+
+  <div style="margin-top:14px">
+    <div class="strip" id="strip"></div>
+    <div class="meta" id="meta"></div>
+  </div>
+
+  <div class="panel" id="panel" hidden>
+    <label for="url">Apps Script 网址</label>
+    <input id="url" placeholder="https://script.google.com/macros/s/…/exec">
+    <label for="secret">口令（和脚本里的 CHANGE_ME 对上）</label>
+    <input id="secret">
+    <label for="cap">一天打算投入的分钟数</label>
+    <input id="cap" type="number" style="width:110px">
+    <p>Sheet 是唯一数据源。打开页面会先读回当天数据，本地存储只在断网时顶一下。</p>
+    <div class="foot" style="margin-top:12px">
+      <button class="ghost" id="pull">从表里重新读</button>
+      <button class="ghost" id="exportBtn">导出本地 JSON</button>
+    </div>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="add">
+    <input id="draft" placeholder="加一件今天要做的事">
+    <input id="draftMin" type="number" value="30" style="width:62px" aria-label="预估分钟">
+    <button class="solid" id="addBtn">加入</button>
+  </div>
+
+  <div class="foot">
+    <button class="ghost" id="pushBtn">立即同步</button>
+    <span class="status" id="status">本地</span>
+  </div>
+</div>
+
+<script>
+const STATUS = {
+  pending:{label:"未标",  color:"var(--pending)"},
+  done:{label:"完成",     color:"var(--done)"},
+  partial:{label:"部分",  color:"var(--partial)"},
+  deferred:{label:"顺延", color:"var(--deferred)"},
+  dropped:{label:"放弃",  color:"var(--dropped)"},
+};
+const ORDER = ["done","partial","deferred","dropped"];
+const REASONS = ["被打断","估时不足","状态不好","优先级变了","依赖没到位"];
+const KEY = "timebox-v1";
+
+let state = { days:{}, dirty:{}, settings:{url:"",secret:"",cap:420} };
+let date = isoDate(new Date());
+let timer = null;
+
+function isoDate(d){
+  const p = n => String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+}
+function shift(key, delta){
+  const [y,m,d] = key.split("-").map(Number);
+  return isoDate(new Date(y, m-1, d+delta));
+}
+function pretty(key){
+  const [y,m,d] = key.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  return m+" 月 "+d+" 日 · 星期"+"日一二三四五六"[dt.getDay()];
+}
+function tasks(){ return state.days[date] || []; }
+function setTasks(next){ state.days[date] = next; state.dirty[date] = true; save(); render(); queueSync(); }
+
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch(e){ setStatus("本地存储写不进去，检查 Safari 隐私模式", true); }
+}
+function load(){
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) state = Object.assign(state, JSON.parse(raw));
+  } catch(e){}
+}
+function setStatus(msg, bad){
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = "status" + (bad ? " bad" : "");
+}
+
+/* ---------- 同步 ---------- */
+function payload(){
+  return {
+    secret: state.settings.secret,
+    date,
+    rows: tasks().map((t,i)=>({
+      seq:i+1, done_seq:t.doneSeq ?? "", task:t.task, est_min:t.est,
+      status:STATUS[t.status].label, reason:t.reason||"", note:t.note||""
+    }))
+  };
+}
+function queueSync(){
+  clearTimeout(timer);
+  if (!state.settings.url) return;
+  setStatus("待同步");
+  timer = setTimeout(push, 3000);
+}
+async function push(){
+  if (!state.settings.url) { setStatus("没填 Apps Script 网址", true); return; }
+  setStatus("同步中");
+  try {
+    await fetch(state.settings.url, {
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify(payload())
+    });
+    state.dirty[date] = false;
+    save();
+    setStatus("已同步 " + new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"}));
+  } catch(e){
+    setStatus("同步失败，数据还在本地", true);
+  }
+}
+async function pull(){
+  if (!state.settings.url) return;
+  if (state.dirty[date]) { push(); return; }   // 本地有未同步改动，以本地为准
+  setStatus("读取中");
+  try {
+    const u = state.settings.url + "?date=" + date +
+              "&secret=" + encodeURIComponent(state.settings.secret);
+    const r = await fetch(u);
+    const data = await r.json();
+    state.days[date] = (data.rows||[]).map((r,i)=>({
+      id: Date.now()+i,
+      task: r.task,
+      est: Number(r.est_min)||30,
+      status: Object.keys(STATUS).find(k=>STATUS[k].label===r.status) || "pending",
+      doneSeq: r.done_seq === "" || r.done_seq == null ? null : Number(r.done_seq),
+      reason: r.reason || "",
+      note: r.note || ""
+    }));
+    state.dirty[date] = false;
+    save(); render();
+    setStatus("已和表对齐");
+  } catch(e){
+    setStatus("读不到表，先用本地这份", true);
+  }
+}
+
+/* ---------- 操作 ---------- */
+function addTask(){
+  const el = document.getElementById("draft");
+  const name = el.value.trim();
+  if (!name) return;
+  const min = Number(document.getElementById("draftMin").value) || 30;
+  setTasks(tasks().concat({
+    id: Date.now()+Math.random(), task:name, est:min,
+    status:"pending", doneSeq:null, reason:"", note:""
+  }));
+  el.value = ""; el.focus();
+}
+function setStatusOf(id, s){
+  const finished = tasks().filter(t=>t.doneSeq!=null).length;
+  setTasks(tasks().map(t=>{
+    if (t.id !== id) return t;
+    const off = t.status === s;
+    const isFinish = s === "done" || s === "partial";
+    return Object.assign({}, t, {
+      status: off ? "pending" : s,
+      doneSeq: off ? null : (isFinish ? (t.doneSeq ?? finished+1) : null),
+      reason: s === "done" ? "" : t.reason
+    });
+  }));
+}
+function patch(id, k, v){
+  setTasks(tasks().map(t => t.id===id ? Object.assign({},t,{[k]:v}) : t));
+}
+function move(i, d){
+  const n = tasks().slice(), j = i+d;
+  if (j<0 || j>=n.length) return;
+  [n[i],n[j]] = [n[j],n[i]];
+  setTasks(n);
+}
+
+/* ---------- 渲染 ---------- */
+function render(){
+  document.getElementById("title").textContent = pretty(date);
+  const ts = tasks();
+  const total = ts.reduce((a,t)=>a+t.est,0);
+  const doneMin = ts.filter(t=>t.status==="done").reduce((a,t)=>a+t.est,0);
+  const cap = Number(state.settings.cap) || 420;
+
+  const strip = document.getElementById("strip");
+  strip.innerHTML = "";
+  ts.forEach(t=>{
+    const d = document.createElement("div");
+    d.style.flexGrow = t.est;
+    d.style.background = STATUS[t.status].color;
+    d.title = t.task + " · " + t.est + " 分钟";
+    strip.appendChild(d);
+  });
+
+  const meta = document.getElementById("meta");
+  meta.className = "meta" + (total>cap ? " over" : "");
+  meta.innerHTML = '<span class="num">排了 '+total+' 分钟 / 打算给 '+cap+' 分钟'+
+    (total>cap?'　排多了':'')+'</span><span class="num">完成 '+doneMin+' 分钟</span>';
+
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+  if (!ts.length){
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "还没有条目。写下今天打算做的第一件事，顺序只是建议，先做哪件都行。";
+    list.appendChild(e);
+    return;
+  }
+  ts.forEach((t,i)=>{
+    const c = STATUS[t.status].color;
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const est = document.createElement("div");
+    est.className = "est num";
+    est.innerHTML = "<b>"+t.est+"</b>" +
+      (t.doneSeq!=null ? '<s style="color:'+c+'">第 '+t.doneSeq+' 件</s>' : "");
+    row.appendChild(est);
+
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    bar.style.background = c;
+    bar.style.minHeight = Math.max(20, Math.min(t.est*0.6, 90)) + "px";
+    row.appendChild(bar);
+
+    const body = document.createElement("div");
+    body.className = "body";
+    const name = document.createElement("div");
+    name.className = "task" + (t.status==="dropped" ? " gone" : "");
+    name.textContent = t.task;
+    body.appendChild(name);
+
+    const chips = document.createElement("div");
+    chips.className = "chips";
+    ORDER.forEach(s=>{
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.textContent = STATUS[s].label;
+      if (t.status === s){
+        b.style.background = STATUS[s].color;
+        b.style.borderColor = STATUS[s].color;
+        b.style.color = "#fff";
+      }
+      b.onclick = ()=>setStatusOf(t.id, s);
+      chips.appendChild(b);
+    });
+    const grow = document.createElement("span"); grow.className="grow"; chips.appendChild(grow);
+    [["↑",()=>move(i,-1)],["↓",()=>move(i,1)],["✕",()=>setTasks(ts.filter(x=>x.id!==t.id))]]
+      .forEach(([txt,fn])=>{
+        const b=document.createElement("button"); b.className="tiny"; b.textContent=txt;
+        b.onclick=fn; chips.appendChild(b);
+      });
+    body.appendChild(chips);
+
+    if (t.status==="partial"||t.status==="deferred"||t.status==="dropped"){
+      const rc = document.createElement("div");
+      rc.className = "chips";
+      REASONS.forEach(r=>{
+        const b = document.createElement("button");
+        b.className = "chip"; b.textContent = r;
+        if (t.reason === r){ b.style.borderColor="var(--ink)"; b.style.color="var(--ink)"; }
+        b.onclick = ()=>patch(t.id,"reason", t.reason===r ? "" : r);
+        rc.appendChild(b);
+      });
+      body.appendChild(rc);
+      const note = document.createElement("input");
+      note.placeholder = "补一句具体原因";
+      note.value = t.note || "";
+      note.style.marginTop = "7px";
+      note.style.fontSize = "13px";
+      note.onchange = e => patch(t.id,"note", e.target.value);
+      body.appendChild(note);
+    }
+
+    row.appendChild(body);
+    list.appendChild(row);
+  });
+}
+
+/* ---------- 启动 ---------- */
+load();
+["url","secret"].forEach(k=>{
+  const el = document.getElementById(k);
+  el.value = state.settings[k] || "";
+  el.onchange = e => { state.settings[k] = e.target.value.trim(); save(); pull(); };
+});
+document.getElementById("cap").value = state.settings.cap || 420;
+document.getElementById("cap").onchange = e => { state.settings.cap = e.target.value; save(); render(); };
+
+document.getElementById("cfgBtn").onclick = () => {
+  const p = document.getElementById("panel"); p.hidden = !p.hidden;
+};
+document.getElementById("prev").onclick = () => { date = shift(date,-1); render(); pull(); };
+document.getElementById("next").onclick = () => { date = shift(date, 1); render(); pull(); };
+document.getElementById("addBtn").onclick = addTask;
+document.getElementById("draft").addEventListener("keydown", e => { if (e.key==="Enter") addTask(); });
+document.getElementById("pushBtn").onclick = push;
+document.getElementById("pull").onclick = pull;
+document.getElementById("exportBtn").onclick = () => {
+  const blob = new Blob([JSON.stringify(state.days,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "timebox-backup.json";
+  a.click();
+};
+
+// 页面被切走/关掉时补发一次，避免 3 秒防抖还没到就退出
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && state.dirty[date]) {
+    clearTimeout(timer);
+    if (state.settings.url && navigator.sendBeacon) {
+      navigator.sendBeacon(state.settings.url,
+        new Blob([JSON.stringify(payload())], {type:"text/plain;charset=utf-8"}));
+      state.dirty[date] = false;
+      save();
+    }
+  }
+});
+
+render();
+pull();
+</script>
+</body>
+</html>

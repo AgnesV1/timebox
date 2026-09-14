@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+._*
+
+# Local tooling / scratch
+.claude/
+.vscode/
+*.bak
+*.tmp
+*.swp
+
+# Data exported from the app's "导出本地 JSON" button (personal data)
+timebox-backup*.json

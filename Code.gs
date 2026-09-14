@@ -1,17 +1,28 @@
 // 粘贴到 Google Sheet 的 扩展程序 → Apps Script
-// 改掉下面这行的口令，然后和网页设置里的「口令」填成一样的
+// 改掉下面这行的口令，然后和网页 Settings 里的 Secret 填成一样的
 
 var SECRET = 'CHANGE_ME';
 var SHEET  = '任务';
 var HEADER = ['日期', '任务内容', '预计完成时间（分钟）', '拟定顺序', '分类', '审核', '是否完成', '实际次序（自动）'];
-var CATEGORIES = ['必须', '主线', '享乐', '琐碎', '其他'];
-// 同步用到的列按表头文字找，所以列可以挪位置、中间也能插自己的列（分类、审核只给人看，脚本不读不写）
+var CATEGORIES = ['主线', '工作', '娱乐', '琐事'];
+// 同步用到的列按表头文字找，所以列可以挪位置、中间也能插自己的列（审核只给人看，脚本不读不写）
 var COLS = { date: '日期', task: '任务内容', est: '预计完成时间（分钟）', seq: '拟定顺序',
              result: '是否完成', doneSeq: '实际次序（自动）' };
+// 每天可用的分钟数，一天一行
+var CAP_SHEET  = '每日时长';
+var CAP_HEADER = ['日期', '可用时长（分钟）'];
 
-// 第一次用：在编辑器顶部选 setup 点「运行」，建好「任务」表并完成授权
+// 第一次用：在编辑器顶部选 setup 点「运行」，建好「任务」「每日时长」两页并完成授权；
+// 以后改了分类再运行一次，会刷新下拉
 function setup() {
-  sheet_();
+  var sh = sheet_();
+  var names = sh.getDataRange().getValues()[0].map(function (h) { return String(h).trim(); });
+  var col = names.indexOf('分类') + 1;
+  if (col) {
+    sh.getRange(2, col, sh.getMaxRows() - 1, 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(CATEGORIES, true).build());
+  }
+  capSheet_();
 }
 
 function sheet_() {
@@ -21,10 +32,19 @@ function sheet_() {
     sh = ss.insertSheet(SHEET);
     sh.appendRow(HEADER);
     sh.setFrozenRows(1);
-    var n = sh.getMaxRows() - 1;
-    sh.getRange(2, HEADER.indexOf('日期') + 1, n, 1).setNumberFormat('yyyy-mm-dd');
-    sh.getRange(2, HEADER.indexOf('分类') + 1, n, 1).setDataValidation(
-      SpreadsheetApp.newDataValidation().requireValueInList(CATEGORIES, true).build());
+    sh.getRange(2, HEADER.indexOf('日期') + 1, sh.getMaxRows() - 1, 1).setNumberFormat('yyyy-mm-dd');
+  }
+  return sh;
+}
+
+function capSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CAP_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(CAP_SHEET);
+    sh.appendRow(CAP_HEADER);
+    sh.setFrozenRows(1);
+    sh.getRange(2, 1, sh.getMaxRows() - 1, 1).setNumberFormat('yyyy-mm-dd');
   }
   return sh;
 }
@@ -36,6 +56,7 @@ function cols_(header) {
     c[k] = names.indexOf(COLS[k]);
     if (c[k] < 0) return { error: '表头缺少「' + COLS[k] + '」' };
   }
+  c.cat = names.indexOf('分类');   // 可以没有
   return c;
 }
 
@@ -54,6 +75,15 @@ function day_(v, tz) {
   return String(v).trim();
 }
 
+// 某天可用的分钟数；同一天填了多行取最下面那行，没填返回 null（页面用 Settings 里的默认值）
+function cap_(date, tz) {
+  var data = capSheet_().getDataRange().getValues();
+  for (var i = data.length - 1; i >= 1; i--) {
+    if (day_(data[i][0], tz) === date && Number(data[i][1]) > 0) return Number(data[i][1]);
+  }
+  return null;
+}
+
 // 读回某一天：GET …/exec?date=2026-09-12&secret=xxx
 function doGet(e) {
   if (e.parameter.secret !== SECRET) return json_({ error: 'denied' });
@@ -69,6 +99,7 @@ function doGet(e) {
     if (day_(d[c.date], tz) !== date || String(d[c.task]).trim() === '') continue;
     rows.push({
       task: String(d[c.task]).trim(), est_min: d[c.est], seq: d[c.seq],
+      category: c.cat >= 0 ? String(d[c.cat]).trim() : '',
       done_seq: d[c.doneSeq], result: String(d[c.result]).trim(),
       _k: Number(d[c.seq]) || 1e6 + i
     });
@@ -76,7 +107,7 @@ function doGet(e) {
   // 按拟定顺序排；没填顺序的按表里的行顺序排在后面
   rows.sort(function (a, b) { return a._k - b._k; });
   rows.forEach(function (r) { delete r._k; });
-  return json_({ date: date, rows: rows });
+  return json_({ date: date, cap: cap_(date, tz), rows: rows });
 }
 
 // 写入某一天：手机只回写「是否完成」「实际次序」，写在原来那行；计划相关的列以表为准。

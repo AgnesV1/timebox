@@ -8,12 +8,12 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#EFF1EE">
+<meta name="theme-color" content="#FFF6E6">
 <style>
   :root{
-    --ink:#22282B; --paper:#EFF1EE; --rule:#D9DDD8; --muted:#7E8886;
-    --main:#3F7D6E; --work:#5B7FA6; --fun:#D08433; --chore:#8A6A4F;
-    --pending:#BFC5C2; --warn:#B4532E; --opt:#6E5E97; --opt-bg:#E7E4EF;
+    --ink:#1B1B1F; --paper:#FFF6E6; --card:#FFFFFF; --muted:#716B61;
+    --main:#18C26A; --work:#3B6CFF; --fun:#FF8A00; --chore:#A8612A;
+    --pending:#CFC7B8; --warn:#FF3D7F; --accent:#FFD43B; --opt:#8A3FFC; --opt-bg:#F0E4FF;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--paper);color:var(--ink);
@@ -22,53 +22,58 @@
   body{padding:env(safe-area-inset-top) 0 calc(48px + env(safe-area-inset-bottom))}
   .wrap{max-width:560px;margin:0 auto;padding:20px 18px}
   .num{font-variant-numeric:tabular-nums}
-  input,button,textarea{font-family:inherit;font-size:14px}
-  input:focus-visible,button:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
-  input{width:100%;padding:7px 9px;border:1px solid var(--rule);border-radius:3px;
-    background:#F7F8F6;color:var(--ink)}
-  .head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
-  .head h1{font-size:19px;font-weight:600;margin:0}
-  .nav{padding:3px 8px;font-size:13px;color:var(--muted);background:none;
-    border:1px solid var(--rule);border-radius:3px;cursor:pointer}
-  .strip{display:flex;height:10px;gap:2px;background:#E1E5E1;border-radius:2px;overflow:hidden}
+  input,button,textarea{font-family:inherit;font-size:14px;color:var(--ink);-webkit-tap-highlight-color:transparent}
+  input:focus-visible,button:focus-visible,textarea:focus-visible{outline:3px solid var(--work);outline-offset:1px}
+  input,textarea{width:100%;padding:7px 9px;border:2px solid var(--ink);border-radius:8px;background:var(--card)}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .head h1{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:0}
+  .nav{padding:3px 10px;font-size:13px;font-weight:700;background:var(--card);
+    border:2px solid var(--ink);border-radius:8px;box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+  .nav:active,.ghost:active,.solid:active{transform:translate(2px,2px);box-shadow:none}
+  .strip{display:flex;height:16px;gap:2px;background:var(--ink);border:2px solid var(--ink);border-radius:999px;overflow:hidden}
   .strip div{flex-basis:0}
-  .meta{margin-top:6px;font-size:12.5px;color:var(--muted);display:flex;
-    justify-content:space-between;gap:10px}
+  .meta{margin-top:8px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;gap:10px}
   .meta.over{color:var(--warn)}
-  .row{border-top:1px solid var(--rule);padding:13px 0;display:flex;gap:12px;transition:transform .15s}
-  .row.dragging{position:relative;z-index:2;transition:none;background:var(--paper);box-shadow:0 6px 18px rgba(0,0,0,.14)}
-  .row.opt.dragging{background:var(--opt-bg)}
+  #list{margin-top:18px}
+  .row{position:relative;margin:0 -10px 12px;padding:12px 10px;display:flex;gap:12px;background:var(--card);
+    border:2px solid var(--ink);border-radius:14px;box-shadow:3px 3px 0 var(--ink);transition:transform .15s}
+  .row.opt{background:var(--opt-bg)}
+  .row.dragging{z-index:2;transition:none;box-shadow:7px 7px 0 var(--ink)}
   .est{width:40px;flex-shrink:0;text-align:right;align-self:flex-start;cursor:grab;touch-action:none;
     -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-  .grip{display:block;width:10px;height:13px;margin:4px 0 0 auto;opacity:.6;
-    background:radial-gradient(circle,var(--muted) 1.2px,transparent 1.5px) 0 0/5px 4.5px}
-  .est b{display:block;font-size:21px;font-weight:300;color:var(--muted)}
-  .bar{width:3px;flex-shrink:0;border-radius:2px}
+  .est b{display:block;font-size:22px;font-weight:800;line-height:1.1}
+  .grip{display:block;width:10px;height:13px;margin:5px 0 0 auto;
+    background:radial-gradient(circle,var(--ink) 1.3px,transparent 1.6px) 0 0/5px 4.5px}
+  .bar{width:6px;flex-shrink:0;border-radius:3px}
   .body{flex:1;min-width:0}
-  .task{font-size:15px;line-height:1.45;cursor:pointer}
-  .task.gone{text-decoration:line-through;color:var(--muted)}
+  .line{display:flex;align-items:flex-start;gap:8px}
+  .task{flex:1;min-width:0;font-size:15px;font-weight:600;line-height:1.45;cursor:pointer}
+  .task.gone{text-decoration:line-through;text-decoration-thickness:2px;color:var(--muted)}
   .task.fin{color:var(--muted)}
   .more{color:var(--muted)}
-  .desc{display:block;width:100%;min-height:84px;margin-top:8px;padding:8px 9px;resize:vertical;
-    font-size:16px;line-height:1.5;color:var(--ink);background:#F7F8F6;border:1px solid var(--rule);border-radius:3px}
-  .row.opt{background:var(--opt-bg);margin:0 -10px;padding-left:10px;padding-right:10px}
-  .tag{display:inline-block;margin-right:6px;padding:0 6px;font-size:11px;line-height:17px;
-    color:var(--opt);border:1px solid var(--opt);border-radius:999px;vertical-align:1px}
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
-  .chip{padding:3px 9px;font-size:12px;border:1px solid var(--rule);border-radius:999px;
-    background:none;color:var(--muted);cursor:pointer}
-  .add{border-top:1px solid var(--rule);padding-top:14px;display:flex;gap:8px}
-  .solid{padding:8px 14px;color:var(--paper);background:var(--ink);border:none;
-    border-radius:3px;cursor:pointer;white-space:nowrap}
-  .ghost{padding:8px 14px;color:var(--ink);background:none;border:1px solid var(--rule);
-    border-radius:3px;cursor:pointer;white-space:nowrap}
-  .empty{padding:26px 0;color:var(--muted);font-size:14px;border-top:1px solid var(--rule);
-    line-height:1.6}
-  .panel{margin-top:16px;padding:14px;border:1px solid var(--rule);border-radius:4px;font-size:13px}
-  .panel label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  .tag{display:inline-block;margin-right:6px;padding:0 7px;font-size:11px;font-weight:800;line-height:15px;
+    color:#fff;background:var(--opt);border:2px solid var(--ink);border-radius:999px;vertical-align:1px}
+  .act{display:flex;align-items:center;gap:3px;flex-shrink:0;font-size:12px;font-weight:700;color:var(--muted)}
+  .act input{width:46px;padding:0 4px;font-size:16px;font-weight:800;text-align:center;border-radius:6px;background:var(--accent)}
+  .act input:placeholder-shown{background:var(--card)}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;align-items:center}
+  .chip{padding:2px 8px;font-size:12px;font-weight:700;border:2px solid var(--ink);border-radius:999px;
+    background:var(--card);cursor:pointer}
+  .chip.on{background:var(--accent);box-shadow:2px 2px 0 var(--ink)}
+  .desc{display:block;min-height:84px;margin-top:8px;resize:vertical;font-size:16px;line-height:1.5}
+  .add{display:flex;gap:8px;margin-top:6px}
+  .solid{padding:8px 16px;color:var(--accent);background:var(--ink);border:2px solid var(--ink);
+    border-radius:10px;font-weight:800;box-shadow:3px 3px 0 var(--fun);cursor:pointer;white-space:nowrap}
+  .ghost{padding:8px 14px;background:var(--card);border:2px solid var(--ink);border-radius:10px;
+    font-weight:700;box-shadow:2px 2px 0 var(--ink);cursor:pointer;white-space:nowrap}
+  .empty{margin-bottom:12px;padding:24px 16px;font-size:14px;font-weight:600;color:var(--muted);
+    border:2px dashed var(--ink);border-radius:14px}
+  .panel{margin-top:16px;padding:14px;font-size:13px;background:var(--card);border:2px solid var(--ink);
+    border-radius:14px;box-shadow:4px 4px 0 var(--work)}
+  .panel label{display:block;font-size:12px;font-weight:700;margin:10px 0 4px}
   .panel p{color:var(--muted);line-height:1.6;margin:12px 0 0}
   .foot{margin-top:26px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .status{font-size:12.5px;color:var(--muted)}
+  .status{font-size:12.5px;font-weight:600;color:var(--muted)}
   .status.bad{color:var(--warn)}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -193,7 +198,8 @@ function payload(){
     date,
     rows: tasks().map(t=>({
       seq:t.seq ?? "", done_seq:t.doneSeq ?? "", task:t.task, est_min:t.est, result:resultOf(t),
-      desc: (t.desc||"") !== (t.descRaw ?? "") ? (t.desc||"") : undefined   // 只发这台设备上改过的描述
+      desc: (t.desc||"") !== (t.descRaw ?? "") ? (t.desc||"") : undefined,   // 描述和实际时长只发这台设备上改过的
+      actual: String(t.actual ?? "") !== String(t.actualRaw ?? "") ? (t.actual ? Number(t.actual) : "") : undefined
     })),
     removed: state.removed[date] || []
   };
@@ -216,7 +222,11 @@ async function push(){
     });
     state.dirty[date] = false;
     state.removed[date] = (state.removed[date]||[]).slice(body.removed.length);  // 发送途中又 ✕ 的留到下次
-    body.rows.forEach(r => { if (r.desc !== undefined) tasks().forEach(t => { if (t.task === r.task && t.desc === r.desc) t.descRaw = r.desc; }); });
+    body.rows.forEach(r => tasks().forEach(t => {
+      if (t.task !== r.task) return;
+      if (r.desc !== undefined && t.desc === r.desc) t.descRaw = r.desc;
+      if (r.actual !== undefined && String(t.actual ?? "") === String(r.actual)) t.actualRaw = String(r.actual);
+    }));
     save();
     setStatus("Synced " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
   } catch(e){
@@ -242,6 +252,8 @@ async function pull(){
       doneSeq: r.done_seq === "" || r.done_seq == null ? null : Number(r.done_seq),
       desc: r.desc || "",
       descRaw: r.desc || "",
+      actual: r.actual === "" || r.actual == null ? "" : String(r.actual),
+      actualRaw: r.actual === "" || r.actual == null ? "" : String(r.actual),
       raw: r.result
     }, parseResult(r.result)));
     // 这台设备上拖过顺序的那天：已有任务保持拖好的顺序，表里新加的按拟定顺序留在原位
@@ -283,7 +295,8 @@ function setStatusOf(id, s){
     return Object.assign({}, t, {
       status: off ? "pending" : s,
       doneSeq: off ? null : (isFinish ? (t.doneSeq ?? finished+1) : null),
-      reason: s === "done" ? "" : t.reason
+      reason: s === "done" ? "" : t.reason,
+      actual: !off && isFinish ? t.actual : ""
     });
   }));
 }
@@ -295,7 +308,7 @@ function drag(e, i){
   if (e.button > 0) return;
   e.preventDefault();
   const rows = [...document.querySelectorAll("#list .row")];
-  const row = rows[i], h = row.offsetHeight;
+  const row = rows[i], h = row.offsetHeight + parseFloat(getComputedStyle(row).marginBottom);
   const mids = rows.map(r => { const b = r.getBoundingClientRect(); return b.top + scrollY + b.height/2; });
   const y0 = e.clientY + scrollY;
   let to = i, cy = e.clientY, raf = 0;
@@ -334,11 +347,18 @@ function drag(e, i){
 }
 
 /* ---------- 渲染 ---------- */
+// 完成的分钟数：填了实际时长按实际算；没填的，Done 按预计、Partial 不算
+function doneMinutes(ts){
+  return ts.reduce((a,t)=>{
+    if (t.status !== "done" && t.status !== "partial") return a;
+    return a + (t.actual !== "" && t.actual != null ? Number(t.actual) : t.status === "done" ? t.est : 0);
+  }, 0);
+}
 function render(){
   document.getElementById("title").textContent = pretty(date);
   const ts = tasks();
   const total = ts.reduce((a,t)=>a+t.est,0);
-  const doneMin = ts.filter(t=>t.status==="done").reduce((a,t)=>a+t.est,0);
+  const doneMin = doneMinutes(ts);
   const cap = Number(state.caps[date]) || Number(state.settings.cap) || 420;
   // 拟定顺序里最大的数 = 可选（当天至少有两种顺序才算）
   const seqs = ts.map(t=>t.seq).filter(n=>n>0);
@@ -349,8 +369,10 @@ function render(){
   ts.forEach(t=>{
     const d = document.createElement("div");
     d.style.flexGrow = t.est;
-    d.style.background = CATS[t.category] || "var(--pending)";
-    d.style.opacity = {done:1, partial:.6}[t.status] || .3;   // 做完的实色，没做完的淡
+    // 做完的实色；部分完成粗斜纹；没做的细斜纹
+    const col = CATS[t.category] || "var(--pending)";
+    d.style.background = t.status === "done" ? col :
+      "repeating-linear-gradient(-45deg," + col + " 0 " + (t.status === "partial" ? 4 : 1.5) + "px,#fff 0 6px)";
     d.title = t.task + " · " + t.est + " min";
     strip.appendChild(d);
   });
@@ -399,7 +421,28 @@ function render(){
       const m = document.createElement("span"); m.className = "more"; m.textContent = " ⋯"; name.appendChild(m);
     }
     name.onclick = () => { isOpen ? open.delete(t.id) : open.add(t.id); render(); };
-    body.appendChild(name);
+    const line = document.createElement("div");
+    line.className = "line";
+    line.appendChild(name);
+    // 完成或部分完成时，任务名右边填实际花了多少分钟
+    if (t.status === "done" || t.status === "partial"){
+      const act = document.createElement("label");
+      act.className = "act";
+      const a = document.createElement("input");
+      a.className = "num";
+      a.inputMode = "numeric";
+      a.placeholder = "—";
+      a.setAttribute("aria-label", "Actual minutes");
+      a.value = t.actual ?? "";
+      a.oninput = () => {
+        a.value = a.value.replace(/\D/g, "").slice(0, 3);
+        t.actual = a.value; state.dirty[date] = true; save(); queueSync();
+        document.querySelector("#meta span:last-child").textContent = doneMinutes(tasks()) + " min done";
+      };
+      act.append(a, "min");
+      line.appendChild(act);
+    }
+    body.appendChild(line);
     // 点任务名展开描述；边打边存，切走 App 也不会丢
     if (isOpen){
       const ta = document.createElement("textarea");
@@ -418,11 +461,7 @@ function render(){
       const b = document.createElement("button");
       b.className = "chip";
       b.textContent = STATUS[s].label;
-      if (t.status === s){
-        b.style.background = "var(--ink)";
-        b.style.borderColor = "var(--ink)";
-        b.style.color = "#fff";
-      }
+      if (t.status === s) b.classList.add("on");
       b.onclick = ()=>setStatusOf(t.id, s);
       chips.appendChild(b);
     });
@@ -434,7 +473,7 @@ function render(){
       REASONS.forEach(r=>{
         const b = document.createElement("button");
         b.className = "chip"; b.textContent = r;
-        if (t.reason === r){ b.style.borderColor="var(--ink)"; b.style.color="var(--ink)"; }
+        if (t.reason === r) b.classList.add("on");
         b.onclick = ()=>patch(t.id,"reason", t.reason===r ? "" : r);
         rc.appendChild(b);
       });
@@ -489,7 +528,7 @@ document.addEventListener("visibilitychange", () => {
         new Blob([JSON.stringify(payload())], {type:"text/plain;charset=utf-8"}));
       state.dirty[date] = false;
       state.removed[date] = [];
-      tasks().forEach(t => { t.descRaw = t.desc || ""; });
+      tasks().forEach(t => { t.descRaw = t.desc || ""; t.actualRaw = String(t.actual ?? ""); });
       save();
     }
   }

@@ -8,88 +8,98 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#FFF2F6">
+<meta name="theme-color" content="#FFFDF8">
 <style>
   :root{
-    --ink:#4A3150; --paper:#FFF2F6; --dot:#FFDCE8; --card:#FFFFFF; --muted:#A08AA0; --shadow:#FFC4DA;
-    --main:#48C795; --work:#6C9DFF; --fun:#FF9C5B; --chore:#B98563;
-    --pending:#E8D9E3; --warn:#FF4F86; --pink:#FF7EB3; --pink-soft:#FFC9DF; --lilac:#B99CFF; --lilac-soft:#E9DEFF;
-    --butter:#FFD970; --sky:#7FC6FF; --opt-bg:#F7F0FF;
+    --paper:#FFFDF8; --card:#FFFFFF; --ink:#121212; --rule:#E2DDD2; --muted:#6E6A63;
+    --main:#00B26B; --work:#2F6BFF; --fun:#FF7A1A; --chore:#9C5B2E; --pending:#CFC9BE;
+    --pink:#FF4F9A; --lilac:#8B5CFF; --butter:#FFD23F; --sky:#2EB6FF; --warn:#E3004F; --opt-bg:#F6F1FF;
+    --serif:ui-serif,"New York","Iowan Old Style",Georgia,"Songti SC","STSong",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC",sans-serif;
   }
   *{box-sizing:border-box}
-  html{-webkit-tap-highlight-color:transparent;background-color:var(--paper);
-    background-image:radial-gradient(var(--dot) 1.6px,transparent 1.8px);background-size:22px 22px}   /* 波点铺满整屏 */
-  html,body{margin:0;color:var(--ink);
-    font-family:ui-rounded,"SF Pro Rounded","SF Pro Text",-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
-    -webkit-text-size-adjust:100%}
+  html{-webkit-tap-highlight-color:transparent;background:var(--paper)}
+  html,body{margin:0;color:var(--ink);font-family:var(--sans);-webkit-text-size-adjust:100%}
   body{padding:env(safe-area-inset-top) 0 calc(48px + env(safe-area-inset-bottom))}
   .wrap{max-width:560px;margin:0 auto;padding:20px 18px}
-  .num{font-variant-numeric:tabular-nums}
+  .num{font-variant-numeric:lining-nums tabular-nums}
   input,button,textarea{font-family:inherit;font-size:14px;color:var(--ink)}
-  input:focus-visible,button:focus-visible,textarea:focus-visible{outline:3px solid var(--pink);outline-offset:1px}
-  input,textarea{width:100%;padding:7px 10px;border:2px solid var(--ink);border-radius:12px;background:var(--card)}
-  .head{display:flex;align-items:center;justify-content:space-between;gap:12px}
-  .head h1{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:0}
-  .head h1::after{content:"\2726";margin-left:6px;font-size:15px;color:var(--pink);vertical-align:3px}
-  .nav{padding:3px 11px;font-size:13px;font-weight:700;background:var(--card);
-    border:2px solid var(--ink);border-radius:999px;box-shadow:2px 2px 0 var(--shadow);cursor:pointer}
-  .nav:active,.ghost:active,.solid:active{transform:translate(2px,2px);box-shadow:none}
-  .strip{display:flex;height:18px;gap:3px;padding:2px;background:var(--card);border:2px solid var(--ink);border-radius:999px;overflow:hidden}
-  .strip div{flex-basis:0;min-width:0;border-radius:999px}
-  .meta{margin-top:8px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;gap:10px}
+  input:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--work);outline-offset:2px}
+  input,textarea{width:100%;padding:8px 10px;border:1px solid var(--ink);border-radius:3px;background:var(--card)}
+  button{transition:background-color .2s,color .2s,transform .15s}
+  button:active{transform:scale(.96)}
+  /* 报头：衬线大标题 + 双线 */
+  .head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:3px double var(--ink)}
+  .head h1{font-family:var(--serif);font-size:26px;font-weight:700;letter-spacing:-.015em;margin:0;white-space:nowrap}
+  .head h1::after{content:"";display:inline-block;width:7px;height:7px;margin-left:4px;border-radius:50%;background:var(--pink);vertical-align:2px}
+  .nav{padding:4px 9px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:none;
+    border:1px solid var(--ink);border-radius:3px;cursor:pointer}
+  .nav:active,.ghost:active{background:var(--ink);color:var(--paper)}
+  .strip{display:flex;height:9px;gap:2px}
+  .strip div{flex-basis:0;min-width:0;border-radius:1px}
+  .meta{margin-top:8px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+    display:flex;justify-content:space-between;gap:10px}
   .meta.over{color:var(--warn)}
+  /* 任务：细线分隔的版面，不用卡片 */
   #list{margin-top:18px}
-  .row{position:relative;margin:0 -10px 14px;padding:12px 10px;display:flex;gap:12px;background:var(--card);
-    border:2px solid var(--ink);border-radius:20px;box-shadow:4px 4px 0 var(--shadow);transition:transform .15s}
-  .row.opt{background:var(--opt-bg);box-shadow:4px 4px 0 var(--lilac-soft)}
-  .row.dragging{z-index:2;transition:none;box-shadow:8px 8px 0 var(--pink-soft)}
+  .row{position:relative;display:flex;gap:12px;padding:16px 0;border-top:1px solid var(--rule);background:var(--paper)}
+  #list .row:first-child{border-top-color:var(--ink)}
+  .row.opt{margin:0 -10px;padding:16px 10px;background:var(--opt-bg)}
+  .row.dragging{z-index:2;border-radius:4px;box-shadow:0 12px 32px rgba(18,18,18,.16)}
   .est{width:40px;flex-shrink:0;text-align:right;align-self:flex-start;cursor:grab;touch-action:none;
     -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-  .est b{display:block;font-size:22px;font-weight:800;line-height:1.1}
-  .grip{display:block;width:10px;height:13px;margin:5px 0 0 auto;
-    background:radial-gradient(circle,var(--pink) 1.3px,transparent 1.6px) 0 0/5px 4.5px}
-  .bar{width:6px;flex-shrink:0;border-radius:999px}
+  .est b{display:block;font-family:var(--serif);font-size:26px;font-weight:600;line-height:1}
+  .grip{display:block;width:10px;height:13px;margin:7px 0 0 auto;opacity:.55;
+    background:radial-gradient(circle,var(--ink) 1.1px,transparent 1.4px) 0 0/5px 4.5px}
+  .bar{width:4px;flex-shrink:0;border-radius:2px}
   .body{flex:1;min-width:0}
   .line{display:flex;align-items:flex-start;gap:8px}
-  .task{flex:1;min-width:0;font-size:15px;font-weight:600;line-height:1.45;cursor:pointer}
-  .task.gone{text-decoration:line-through;text-decoration-thickness:2px;color:var(--muted)}
+  .task{flex:1;min-width:0;font-family:var(--serif);font-size:17px;font-weight:500;line-height:1.35;cursor:pointer}
+  .task.gone{text-decoration:line-through;color:var(--muted)}
   .task.fin{color:var(--muted)}
-  .more{color:var(--pink);font-weight:800}
-  .tag{display:inline-block;margin-right:6px;padding:0 7px;font-size:11px;font-weight:800;line-height:15px;
-    color:var(--ink);background:var(--lilac-soft);border:2px solid var(--ink);border-radius:999px;vertical-align:1px}
-  .act{display:flex;align-items:center;gap:3px;flex-shrink:0;font-size:12px;font-weight:700;color:var(--muted)}
-  .act input{width:46px;padding:0 4px;font-size:16px;font-weight:800;text-align:center;border-radius:999px;background:var(--butter)}
-  .act input:placeholder-shown{background:var(--card)}
-  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;align-items:center}
-  .chip{padding:2px 8px;font-size:12px;font-weight:700;border:2px solid var(--ink);border-radius:999px;
-    background:var(--card);cursor:pointer}
-  .chip.on{background:var(--pink-soft);box-shadow:2px 2px 0 var(--pink)}
-  .desc{display:block;min-height:84px;margin-top:8px;resize:vertical;font-size:16px;line-height:1.5}
-  .add{display:flex;gap:8px;margin-top:6px}
-  .solid{padding:8px 18px;color:var(--ink);background:var(--pink);border:2px solid var(--ink);
-    border-radius:999px;font-weight:800;box-shadow:3px 3px 0 var(--ink);cursor:pointer;white-space:nowrap}
-  .ghost{padding:8px 15px;background:var(--card);border:2px solid var(--ink);border-radius:999px;
-    font-weight:700;box-shadow:3px 3px 0 var(--shadow);cursor:pointer;white-space:nowrap}
-  .empty{margin-bottom:14px;padding:24px 16px;font-size:14px;font-weight:600;color:var(--muted);background:var(--card);
-    border:2px dashed var(--pink);border-radius:20px}
-  .panel{margin-top:16px;padding:14px;font-size:13px;background:var(--card);border:2px solid var(--ink);
-    border-radius:20px;box-shadow:5px 5px 0 var(--lilac-soft)}
-  .panel label{display:block;font-size:12px;font-weight:700;margin:10px 0 4px}
-  .panel p{color:var(--muted);line-height:1.6;margin:12px 0 0}
+  .more{font-family:var(--sans);color:var(--pink);font-weight:700}
+  .tag{display:inline-block;margin-right:6px;padding:1px 5px;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.08em;
+    text-transform:uppercase;line-height:14px;color:#fff;background:var(--lilac);border-radius:2px;vertical-align:2px}
+  .act{display:flex;align-items:center;gap:4px;flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .act input{width:44px;padding:1px 2px;font-family:var(--serif);font-size:17px;font-weight:600;text-align:center;
+    border:0;border-bottom:1px solid var(--ink);border-radius:0;background:var(--butter);transition:background-color .2s}
+  .act input:placeholder-shown{background:transparent}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;align-items:center}
+  .chip{padding:3px 8px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+    border:1px solid var(--ink);border-radius:3px;background:none;cursor:pointer}
+  .chip.on{background:var(--ink);color:var(--paper)}
+  .desc{display:block;min-height:84px;margin-top:10px;resize:vertical;font-family:var(--serif);font-size:16px;line-height:1.55;border-color:var(--rule)}
+  .add{display:flex;gap:8px;padding-top:16px;border-top:1px solid var(--ink)}
+  .solid{padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--paper);
+    background:var(--ink);border:1px solid var(--ink);border-radius:3px;cursor:pointer;white-space:nowrap}
+  .solid:active{background:var(--pink);border-color:var(--pink)}
+  .ghost{padding:8px 14px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:none;
+    border:1px solid var(--ink);border-radius:3px;cursor:pointer;white-space:nowrap}
+  .empty{padding:28px 0;font-family:var(--serif);font-style:italic;font-size:16px;color:var(--muted);border-top:1px solid var(--ink)}
+  .panel{margin-top:16px;padding:14px 16px 16px;font-size:13px;background:var(--card);border:1px solid var(--rule);
+    border-top:4px solid var(--work);border-radius:2px}
+  .panel label{display:block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 5px}
+  .panel p{font-family:var(--serif);color:var(--muted);line-height:1.6;margin:14px 0 0}
   .foot{margin-top:26px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .status{font-size:12.5px;font-weight:600;color:var(--muted)}
+  .status{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
   .status.bad{color:var(--warn)}
-  /* 触摸星星：纯装饰层，不接收点击。星星是深色描边 + 彩色内芯的贴纸样式 */
+  /* 动画：只用 backwards 填充，结束后不占着 transform，拖拽的位移才不会被盖住 */
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @keyframes pop{from{transform:scale(.85)}to{transform:scale(1)}}
+  .row.enter{animation:rise .5s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:calc(var(--i,0) * 45ms)}
+  .strip.enter div{transform-origin:left center;animation:grow .7s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:calc(var(--i,0) * 35ms)}
+  #title.swap{animation:rise .35s ease-out backwards}
+  .chip.pop{animation:pop .3s cubic-bezier(.3,1.6,.5,1)}
+  .desc.enter,.panel:not([hidden]){animation:rise .3s ease-out backwards}
+  /* 触摸星星：纯装饰层，不接收点击 */
   .fx{position:fixed;top:0;right:0;bottom:0;left:0;z-index:50;pointer-events:none;overflow:hidden}
   .fx i{position:absolute;display:block;will-change:transform,opacity}
-  .fx .star{--shape:polygon(50% 0,64% 36%,100% 50%,64% 64%,50% 100%,36% 64%,0 50%,36% 36%);
-    background:var(--ink);-webkit-clip-path:var(--shape);clip-path:var(--shape)}
-  .fx .star.five{--shape:polygon(50% 0,63% 34%,98% 36%,70% 58%,80% 93%,50% 73%,20% 93%,30% 58%,2% 36%,37% 34%)}
-  .fx .star::after{content:"";position:absolute;top:18%;right:18%;bottom:18%;left:18%;
-    background:var(--c);-webkit-clip-path:var(--shape);clip-path:var(--shape)}
+  .fx .star{background:var(--c);-webkit-clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);
+    clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}
   .fx .dot{border-radius:50%;background:var(--c)}
-  .fx .ring{width:40px;height:40px;margin:-20px 0 0 -20px;border:3px solid var(--pink);border-radius:50%}
-  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  .fx .ring{width:40px;height:40px;margin:-20px 0 0 -20px;border:1.5px solid var(--ink);border-radius:50%}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
@@ -154,6 +164,7 @@ let state = { days:{}, dirty:{}, removed:{}, caps:{}, dragged:{}, settings:{url:
 let date = isoDate(new Date());
 let timer = null;
 let open = new Set();   // 展开了描述的任务 id
+let seen = new Set(), shownDate = null, justSet = null, justOpened = null;   // 入场动画、按钮弹一下用
 
 function isoDate(d){
   const p = n => String(n).padStart(2,"0");
@@ -257,8 +268,9 @@ async function pull(){
     const r = await fetch(u);
     const data = await r.json();
     if (data.error) throw new Error(data.error);   // 口令或表头不对时别把本地清空
+    const olds = tasks().slice();   // 同名任务沿用原来的 id：重新读表不重播入场动画，展开的描述也不收起
     let next = (data.rows||[]).map((r,i)=>Object.assign({
-      id: Date.now()+i,
+      id: (j => j >= 0 ? olds.splice(j, 1)[0].id : Date.now()+i)(olds.findIndex(o => o.task === r.task)),
       task: r.task,
       est: Number(r.est_min)||30,
       category: r.category || "",
@@ -301,6 +313,7 @@ function addTask(){
   el.value = ""; el.focus();
 }
 function setStatusOf(id, s){
+  justSet = id + ":" + s;
   const finished = tasks().filter(t=>t.doneSeq!=null).length;
   setTasks(tasks().map(t=>{
     if (t.id !== id) return t;
@@ -368,9 +381,16 @@ function doneMinutes(ts){
     return a + (t.actual !== "" && t.actual != null ? Number(t.actual) : t.status === "done" ? t.est : 0);
   }, 0);
 }
+// 重新触发一次 CSS 动画
+function replay(el, cls){ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
 function render(){
-  document.getElementById("title").textContent = pretty(date);
+  const fresh = date !== shownDate, popKey = justSet, openKey = justOpened;
+  shownDate = date; justSet = justOpened = null;
+  const title = document.getElementById("title");
+  title.textContent = pretty(date);
+  if (fresh) replay(title, "swap");
   const ts = tasks();
+  const anyNew = ts.some(t => !seen.has(t.id));
   const total = ts.reduce((a,t)=>a+t.est,0);
   const doneMin = doneMinutes(ts);
   const cap = Number(state.caps[date]) || Number(state.settings.cap) || 420;
@@ -380,8 +400,10 @@ function render(){
 
   const strip = document.getElementById("strip");
   strip.innerHTML = "";
-  ts.forEach(t=>{
+  strip.classList.toggle("enter", anyNew);   // 有新任务（换日期、读表、新加）时进度条从左长出来
+  ts.forEach((t,k)=>{
     const d = document.createElement("div");
+    d.style.setProperty("--i", k);
     d.style.flexGrow = t.est;
     // 做完的实色；部分完成粗斜纹；没做的细斜纹
     const col = CATS[t.category] || "var(--pending)";
@@ -409,6 +431,7 @@ function render(){
     const c = CATS[t.category] || "var(--pending)";
     const row = document.createElement("div");
     row.className = "row" + (lowest !== null && t.seq === lowest ? " opt" : "");
+    if (!seen.has(t.id)){ row.classList.add("enter"); row.style.setProperty("--i", i); seen.add(t.id); }
 
     const est = document.createElement("div");
     est.className = "est num";
@@ -434,7 +457,7 @@ function render(){
     if (t.desc && !isOpen){
       const m = document.createElement("span"); m.className = "more"; m.textContent = " ⋯"; name.appendChild(m);
     }
-    name.onclick = () => { isOpen ? open.delete(t.id) : open.add(t.id); render(); };
+    name.onclick = () => { if (isOpen) open.delete(t.id); else { open.add(t.id); justOpened = t.id; } render(); };
     const line = document.createElement("div");
     line.className = "line";
     line.appendChild(name);
@@ -460,7 +483,7 @@ function render(){
     // 点任务名展开描述；边打边存，切走 App 也不会丢
     if (isOpen){
       const ta = document.createElement("textarea");
-      ta.className = "desc";
+      ta.className = "desc" + (openKey === t.id ? " enter" : "");
       ta.placeholder = "Details";
       ta.value = t.desc || "";
       const fit = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
@@ -475,7 +498,7 @@ function render(){
       const b = document.createElement("button");
       b.className = "chip";
       b.textContent = STATUS[s].label;
-      if (t.status === s) b.classList.add("on");
+      if (t.status === s){ b.classList.add("on"); if (popKey === t.id + ":" + s) b.classList.add("pop"); }
       b.onclick = ()=>setStatusOf(t.id, s);
       chips.appendChild(b);
     });
@@ -555,7 +578,7 @@ document.addEventListener("visibilitychange", () => {
   const layer = document.createElement("div");
   layer.className = "fx";
   document.body.appendChild(layer);
-  const COLORS = ["var(--pink)", "var(--lilac)", "var(--butter)", "var(--sky)", "var(--main)"];
+  const COLORS = ["var(--pink)", "var(--lilac)", "var(--butter)", "var(--sky)", "var(--main)", "var(--fun)", "var(--work)"];
   let live = 0, down = false, lx = 0, ly = 0, lt = 0;
   const spawn = (el, x, y, frames, ms, easing) => {
     el.style.left = x + "px"; el.style.top = y + "px";
@@ -567,7 +590,7 @@ document.addEventListener("visibilitychange", () => {
     if (live > 90) return;   // 同时最多这么多，防止连点卡顿
     const s = document.createElement("i"), dot = Math.random() < dotChance;
     const z = size * (.65 + Math.random() * .7) * (dot ? .4 : 1);
-    s.className = dot ? "dot" : Math.random() < .4 ? "star five" : "star";
+    s.className = dot ? "dot" : "star";
     s.style.cssText = "width:" + z + "px;height:" + z + "px;margin:" + (-z/2) + "px 0 0 " + (-z/2) + "px;--c:" +
       COLORS[Math.random() * COLORS.length | 0];
     const a = Math.random() * Math.PI * 2, d = dist * (.45 + Math.random() * .55), r = (Math.random() - .5) * 300;

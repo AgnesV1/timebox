@@ -8,97 +8,102 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#FFFDF8">
+<meta name="theme-color" content="#FFFFFF">
 <style>
   :root{
-    --paper:#FFFDF8; --card:#FFFFFF; --ink:#121212; --rule:#E2DDD2; --muted:#6E6A63;
-    --main:#00B26B; --work:#2F6BFF; --fun:#FF7A1A; --chore:#9C5B2E; --pending:#CFC9BE;
-    --pink:#FF4F9A; --lilac:#8B5CFF; --butter:#FFD23F; --sky:#2EB6FF; --warn:#E3004F; --opt-bg:#F6F1FF;
-    --serif:ui-serif,"New York","Iowan Old Style",Georgia,"Songti SC","STSong",serif;
+    --bg:#FFFFFF; --surface:#F5F5F5; --surface2:#EBEBEB; --line:#ECECEC;
+    --ink:#0F0F0F; --muted:#8C8C8C;
+    --main:#12C06A; --work:#2F6BFF; --fun:#FF7A1A; --chore:#A9683A; --pending:#D6D6D6;
+    --pink:#FF3E8C; --lilac:#8B5CFF; --butter:#FFD23F; --sky:#2EB6FF; --warn:#FF3B4E; --opt-bg:#F4F0FF;
     --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC",sans-serif;
+    --ease:cubic-bezier(.22,.9,.28,1);
   }
   *{box-sizing:border-box}
-  html{-webkit-tap-highlight-color:transparent;background:var(--paper)}
+  html{-webkit-tap-highlight-color:transparent;background:var(--bg)}
   html,body{margin:0;color:var(--ink);font-family:var(--sans);-webkit-text-size-adjust:100%}
-  body{padding:env(safe-area-inset-top) 0 calc(48px + env(safe-area-inset-bottom))}
-  .wrap{max-width:560px;margin:0 auto;padding:20px 18px}
-  .num{font-variant-numeric:lining-nums tabular-nums}
-  input,button,textarea{font-family:inherit;font-size:14px;color:var(--ink)}
-  input:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--work);outline-offset:2px}
-  input,textarea{width:100%;padding:8px 10px;border:1px solid var(--ink);border-radius:3px;background:var(--card)}
-  button{transition:background-color .2s,color .2s,transform .15s}
-  button:active{transform:scale(.96)}
-  /* 报头：衬线大标题 + 双线 */
-  .head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:3px double var(--ink)}
-  .head h1{font-family:var(--serif);font-size:26px;font-weight:700;letter-spacing:-.015em;margin:0;white-space:nowrap}
-  .head h1::after{content:"";display:inline-block;width:7px;height:7px;margin-left:4px;border-radius:50%;background:var(--pink);vertical-align:2px}
-  .nav{padding:4px 9px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:none;
-    border:1px solid var(--ink);border-radius:3px;cursor:pointer}
-  .nav:active,.ghost:active{background:var(--ink);color:var(--paper)}
-  .strip{display:flex;height:9px;gap:2px}
-  .strip div{flex-basis:0;min-width:0;border-radius:1px}
-  .meta{margin-top:8px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
-    display:flex;justify-content:space-between;gap:10px}
+  body{padding:0 0 calc(64px + env(safe-area-inset-bottom))}
+  .wrap{max-width:560px;margin:0 auto;padding:0 16px}
+  .num{font-variant-numeric:tabular-nums}
+  input,button,textarea{font-family:inherit;font-size:15px;color:var(--ink)}
+  input:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  input,textarea{width:100%;padding:11px 14px;border:0;border-radius:14px;background:var(--surface);
+    transition:background-color .2s var(--ease)}
+  input::placeholder,textarea::placeholder{color:var(--muted)}
+  button{transition:transform .18s var(--ease),background-color .2s var(--ease),color .2s var(--ease)}
+  button:active{transform:scale(.95)}
+  /* 顶栏吸顶 + 毛玻璃 */
+  .head{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:calc(12px + env(safe-area-inset-top)) 0 10px;background:rgba(255,255,255,.82);
+    -webkit-backdrop-filter:saturate(180%) blur(14px);backdrop-filter:saturate(180%) blur(14px)}
+  .head h1{font-size:19px;font-weight:700;letter-spacing:-.02em;margin:0;white-space:nowrap}
+  .head h1::after{content:"";display:inline-block;width:6px;height:6px;margin-left:5px;border-radius:50%;
+    background:var(--pink);vertical-align:3px}
+  .nav{min-width:34px;padding:6px 11px;font-size:13px;font-weight:600;background:var(--surface);
+    border:0;border-radius:999px;cursor:pointer}
+  .nav:active{background:var(--surface2)}
+  .strip{display:flex;height:6px;gap:3px}
+  .strip div{flex-basis:0;min-width:0;border-radius:999px}
+  .meta{margin-top:10px;font-size:13px;font-weight:500;color:var(--muted);display:flex;justify-content:space-between;gap:10px}
   .meta.over{color:var(--warn)}
-  /* 任务：细线分隔的版面，不用卡片 */
-  #list{margin-top:18px}
-  .row{position:relative;display:flex;gap:12px;padding:16px 0;border-top:1px solid var(--rule);background:var(--paper)}
-  #list .row:first-child{border-top-color:var(--ink)}
-  .row.opt{margin:0 -10px;padding:16px 10px;background:var(--opt-bg)}
-  .row.dragging{z-index:2;border-radius:4px;box-shadow:0 12px 32px rgba(18,18,18,.16)}
-  .est{width:40px;flex-shrink:0;text-align:right;align-self:flex-start;cursor:grab;touch-action:none;
+  #list{margin-top:10px}
+  .row{position:relative;display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--line);background:var(--bg);
+    transition:transform .2s var(--ease)}
+  #list .row:first-child{border-top:0}
+  .row.opt{margin:6px -12px;padding:14px 12px;border-top-color:transparent;border-radius:18px;background:var(--opt-bg)}
+  .row.dragging{z-index:2;transition:none;border-radius:18px;box-shadow:0 14px 34px rgba(0,0,0,.14)}
+  .est{width:38px;flex-shrink:0;text-align:right;align-self:flex-start;cursor:grab;touch-action:none;
     -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-  .est b{display:block;font-family:var(--serif);font-size:26px;font-weight:600;line-height:1}
-  .grip{display:block;width:10px;height:13px;margin:7px 0 0 auto;opacity:.55;
-    background:radial-gradient(circle,var(--ink) 1.1px,transparent 1.4px) 0 0/5px 4.5px}
-  .bar{width:4px;flex-shrink:0;border-radius:2px}
+  .est b{display:block;font-size:19px;font-weight:700;line-height:1.15}
+  .grip{display:block;width:10px;height:13px;margin:7px 0 0 auto;opacity:.5;
+    background:radial-gradient(circle,var(--muted) 1.2px,transparent 1.5px) 0 0/5px 4.5px}
+  .bar{width:4px;flex-shrink:0;border-radius:999px}
   .body{flex:1;min-width:0}
   .line{display:flex;align-items:flex-start;gap:8px}
-  .task{flex:1;min-width:0;font-family:var(--serif);font-size:17px;font-weight:500;line-height:1.35;cursor:pointer}
+  .task{flex:1;min-width:0;font-size:15.5px;font-weight:500;line-height:1.4;cursor:pointer;transition:opacity .2s var(--ease)}
+  .task:active{opacity:.5}
   .task.gone{text-decoration:line-through;color:var(--muted)}
   .task.fin{color:var(--muted)}
-  .more{font-family:var(--sans);color:var(--pink);font-weight:700}
-  .tag{display:inline-block;margin-right:6px;padding:1px 5px;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.08em;
-    text-transform:uppercase;line-height:14px;color:#fff;background:var(--lilac);border-radius:2px;vertical-align:2px}
-  .act{display:flex;align-items:center;gap:4px;flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-  .act input{width:44px;padding:1px 2px;font-family:var(--serif);font-size:17px;font-weight:600;text-align:center;
-    border:0;border-bottom:1px solid var(--ink);border-radius:0;background:var(--butter);transition:background-color .2s}
-  .act input:placeholder-shown{background:transparent}
-  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;align-items:center}
-  .chip{padding:3px 8px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
-    border:1px solid var(--ink);border-radius:3px;background:none;cursor:pointer}
-  .chip.on{background:var(--ink);color:var(--paper)}
-  .desc{display:block;min-height:84px;margin-top:10px;resize:vertical;font-family:var(--serif);font-size:16px;line-height:1.55;border-color:var(--rule)}
-  .add{display:flex;gap:8px;padding-top:16px;border-top:1px solid var(--ink)}
-  .solid{padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--paper);
-    background:var(--ink);border:1px solid var(--ink);border-radius:3px;cursor:pointer;white-space:nowrap}
-  .solid:active{background:var(--pink);border-color:var(--pink)}
-  .ghost{padding:8px 14px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:none;
-    border:1px solid var(--ink);border-radius:3px;cursor:pointer;white-space:nowrap}
-  .empty{padding:28px 0;font-family:var(--serif);font-style:italic;font-size:16px;color:var(--muted);border-top:1px solid var(--ink)}
-  .panel{margin-top:16px;padding:14px 16px 16px;font-size:13px;background:var(--card);border:1px solid var(--rule);
-    border-top:4px solid var(--work);border-radius:2px}
-  .panel label{display:block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 5px}
-  .panel p{font-family:var(--serif);color:var(--muted);line-height:1.6;margin:14px 0 0}
-  .foot{margin-top:26px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .status{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .more{color:var(--muted)}
+  .tag{display:inline-block;margin-right:6px;padding:1px 8px;font-size:11px;font-weight:700;line-height:16px;
+    color:#fff;background:var(--lilac);border-radius:999px;vertical-align:1px}
+  .act{display:flex;align-items:center;gap:5px;flex-shrink:0;font-size:12px;font-weight:500;color:var(--muted)}
+  .act input{width:54px;padding:5px 6px;font-size:16px;font-weight:600;text-align:center;border-radius:10px}
+  .act input:not(:placeholder-shown){background:var(--butter)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+  .chip{padding:6px 11px;font-size:12.5px;font-weight:600;background:var(--surface);border:0;border-radius:999px;cursor:pointer}
+  .chip.on{background:var(--ink);color:#fff}
+  .reason{margin-top:8px;padding:9px 12px;font-size:14px}
+  .desc{display:block;min-height:96px;margin-top:10px;resize:vertical;font-size:16px;line-height:1.55}
+  .add{display:flex;gap:8px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+  .solid{padding:11px 18px;font-size:14px;font-weight:700;color:#fff;background:var(--ink);border:0;
+    border-radius:999px;cursor:pointer;white-space:nowrap}
+  .ghost{padding:10px 16px;font-size:13px;font-weight:600;background:var(--surface);border:0;border-radius:999px;
+    cursor:pointer;white-space:nowrap}
+  .ghost:active{background:var(--surface2)}
+  .empty{padding:34px 0;font-size:15px;color:var(--muted)}
+  .panel{margin-top:12px;padding:14px 16px 18px;font-size:13px;background:var(--surface);border-radius:20px}
+  .panel label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 6px}
+  .panel input{background:var(--bg)}
+  .panel p{color:var(--muted);line-height:1.6;margin:14px 0 0}
+  .foot{margin-top:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .status{font-size:12.5px;color:var(--muted)}
   .status.bad{color:var(--warn)}
-  /* 动画：只用 backwards 填充，结束后不占着 transform，拖拽的位移才不会被盖住 */
-  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  /* 动画：backwards 填充，结束后不占着 transform，拖拽的位移才不会被盖住 */
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-  @keyframes pop{from{transform:scale(.85)}to{transform:scale(1)}}
-  .row.enter{animation:rise .5s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:calc(var(--i,0) * 45ms)}
-  .strip.enter div{transform-origin:left center;animation:grow .7s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:calc(var(--i,0) * 35ms)}
-  #title.swap{animation:rise .35s ease-out backwards}
-  .chip.pop{animation:pop .3s cubic-bezier(.3,1.6,.5,1)}
-  .desc.enter,.panel:not([hidden]){animation:rise .3s ease-out backwards}
+  @keyframes pop{from{transform:scale(.88)}to{transform:scale(1)}}
+  .row.enter{animation:rise .34s var(--ease) backwards;animation-delay:calc(var(--i,0) * 32ms)}
+  .strip.enter div{transform-origin:left center;animation:grow .55s var(--ease) backwards;animation-delay:calc(var(--i,0) * 28ms)}
+  #title.swap{animation:rise .3s var(--ease) backwards}
+  .chip.pop{animation:pop .26s var(--ease)}
+  .desc.enter,.reason.enter,.panel:not([hidden]){animation:rise .26s var(--ease) backwards}
   /* 触摸星星：纯装饰层，不接收点击 */
   .fx{position:fixed;top:0;right:0;bottom:0;left:0;z-index:50;pointer-events:none;overflow:hidden}
   .fx i{position:absolute;display:block;will-change:transform,opacity}
   .fx .star{background:var(--c);-webkit-clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);
     clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}
   .fx .dot{border-radius:50%;background:var(--c)}
-  .fx .ring{width:40px;height:40px;margin:-20px 0 0 -20px;border:1.5px solid var(--ink);border-radius:50%}
+  .fx .ring{width:40px;height:40px;margin:-20px 0 0 -20px;border:1.5px solid var(--muted);border-radius:50%}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -155,9 +160,9 @@ const STATUS = {
   dropped:{label:"Drop"},
 };
 const ORDER = ["done","partial","deferred","dropped"];
-const REASONS = ["Blocked"];
-// 分类 → 颜色；表里没填或填了别的就用灰色
-const CATS = {"主线":"var(--main)", "工作":"var(--work)", "娱乐":"var(--fun)", "琐事":"var(--chore)"};
+// 分类 → 颜色；表里没填或填了别的就用灰色（中文是老表的写法，一并认）
+const CATS = {Main:"var(--main)", Work:"var(--work)", Fun:"var(--fun)", Chore:"var(--chore)",
+              "主线":"var(--main)", "工作":"var(--work)", "娱乐":"var(--fun)", "琐事":"var(--chore)"};
 const KEY = "timebox-v1";
 
 let state = { days:{}, dirty:{}, removed:{}, caps:{}, dragged:{}, settings:{url:"",secret:"",cap:420} };
@@ -198,32 +203,27 @@ function setStatus(msg, bad){
 }
 
 /* ---------- 同步 ---------- */
-// 表里「是否完成」：ok / Partial｜原因 / Later｜… / Drop｜…（中文 部分/顺延/放弃 也认）；手填的其他文字当作 Partial 的原因
-const WORDS = {"部分":"partial", "partial":"partial", "顺延":"deferred", "later":"deferred", "deferred":"deferred",
-               "放弃":"dropped", "drop":"dropped", "dropped":"dropped"};
+// Status 一列只放一个词：Done / Partial / Later / Drop；老表里的 ok、中文写法、「Partial｜原因」也认，竖线后面当理由
+const WORDS = {done:"done", ok:"done", "完成":"done", partial:"partial", "部分":"partial",
+               later:"deferred", deferred:"deferred", "顺延":"deferred",
+               drop:"dropped", dropped:"dropped", "放弃":"dropped"};
 function parseResult(raw){
   const s = String(raw ?? "").trim();
-  if (!s) return {status:"pending", reason:"", note:""};
-  if (/^ok$/i.test(s)) return {status:"done", reason:"", note:""};
-  const m = s.match(/^(部分|顺延|放弃|partial|deferred|later|dropped|drop)(?![a-z])\s*[｜|:：]?\s*(.*)$/i);
-  const parts = (m ? m[2] : s).split(/\s*[｜|]\s*/).filter(Boolean);
-  const reason = REASONS.includes(parts[0]) ? parts.shift() : "";
-  return {status: m ? WORDS[m[1].toLowerCase()] : "partial", reason, note: parts.join("｜")};
+  if (!s) return {status:"pending", reason:""};
+  const [head, ...rest] = s.split(/\s*[｜|]\s*/);
+  const w = WORDS[head.toLowerCase()];
+  return w ? {status:w, reason:rest.join("｜")} : {status:"partial", reason:s};
 }
-function resultOf(t){
-  const p = parseResult(t.raw);   // 没在手机上改过的，原样写回表里手填的文字
-  if (t.raw != null && p.status===t.status && p.reason===t.reason && p.note===t.note) return t.raw;
-  if (t.status === "pending") return "";
-  if (t.status === "done") return "ok";
-  return [STATUS[t.status].label, t.reason, t.note].filter(Boolean).join("｜");
-}
+function resultOf(t){ return t.status === "pending" ? "" : STATUS[t.status].label; }
 function payload(){
   return {
     secret: state.settings.secret,
     date,
     rows: tasks().map(t=>({
       seq:t.seq ?? "", done_seq:t.doneSeq ?? "", task:t.task, est_min:t.est, result:resultOf(t),
-      desc: (t.desc||"") !== (t.descRaw ?? "") ? (t.desc||"") : undefined,   // 描述和实际时长只发这台设备上改过的
+      // 理由、描述、实际时长只发这台设备上改过的，免得盖掉电脑上后改的
+      reason: (t.reason||"") !== (t.reasonRaw ?? "") ? (t.reason||"") : undefined,
+      desc: (t.desc||"") !== (t.descRaw ?? "") ? (t.desc||"") : undefined,
       actual: String(t.actual ?? "") !== String(t.actualRaw ?? "") ? (t.actual ? Number(t.actual) : "") : undefined
     })),
     removed: state.removed[date] || []
@@ -250,6 +250,7 @@ async function push(){
     body.rows.forEach(r => tasks().forEach(t => {
       if (t.task !== r.task) return;
       if (r.desc !== undefined && t.desc === r.desc) t.descRaw = r.desc;
+      if (r.reason !== undefined && t.reason === r.reason) t.reasonRaw = r.reason;
       if (r.actual !== undefined && String(t.actual ?? "") === String(r.actual)) t.actualRaw = String(r.actual);
     }));
     save();
@@ -269,19 +270,22 @@ async function pull(){
     const data = await r.json();
     if (data.error) throw new Error(data.error);   // 口令或表头不对时别把本地清空
     const olds = tasks().slice();   // 同名任务沿用原来的 id：重新读表不重播入场动画，展开的描述也不收起
-    let next = (data.rows||[]).map((r,i)=>Object.assign({
-      id: (j => j >= 0 ? olds.splice(j, 1)[0].id : Date.now()+i)(olds.findIndex(o => o.task === r.task)),
-      task: r.task,
-      est: Number(r.est_min)||30,
-      category: r.category || "",
-      seq: r.seq === "" || r.seq == null ? null : Number(r.seq),
-      doneSeq: r.done_seq === "" || r.done_seq == null ? null : Number(r.done_seq),
-      desc: r.desc || "",
-      descRaw: r.desc || "",
-      actual: r.actual === "" || r.actual == null ? "" : String(r.actual),
-      actualRaw: r.actual === "" || r.actual == null ? "" : String(r.actual),
-      raw: r.result
-    }, parseResult(r.result)));
+    let next = (data.rows||[]).map((r,i)=>{
+      const p = parseResult(r.result);
+      const reason = r.reason || p.reason || "";   // Reason 一列为准；老表写在状态里的也捡回来
+      const actual = r.actual === "" || r.actual == null ? "" : String(r.actual);
+      return {
+        id: (j => j >= 0 ? olds.splice(j, 1)[0].id : Date.now()+i)(olds.findIndex(o => o.task === r.task)),
+        task: r.task,
+        est: Number(r.est_min)||30,
+        category: r.category || "",
+        seq: r.seq === "" || r.seq == null ? null : Number(r.seq),
+        doneSeq: r.done_seq === "" || r.done_seq == null ? null : Number(r.done_seq),
+        desc: r.desc || "", descRaw: r.desc || "",
+        actual, actualRaw: actual,
+        status: p.status, reason, reasonRaw: reason
+      };
+    });
     // 这台设备上拖过顺序的那天：已有任务保持拖好的顺序，表里新加的按拟定顺序留在原位
     if (state.dragged[date]){
       const prev = tasks().map(t=>t.task);
@@ -308,7 +312,7 @@ function addTask(){
   const min = Number(document.getElementById("draftMin").value) || 30;
   setTasks(tasks().concat({
     id: Date.now()+Math.random(), task:name, est:min,
-    status:"pending", doneSeq:null, reason:"", note:""
+    status:"pending", doneSeq:null, reason:""
   }));
   el.value = ""; el.focus();
 }
@@ -505,23 +509,12 @@ function render(){
     body.appendChild(chips);
 
     if (t.status==="partial"||t.status==="deferred"||t.status==="dropped"){
-      const rc = document.createElement("div");
-      rc.className = "chips";
-      REASONS.forEach(r=>{
-        const b = document.createElement("button");
-        b.className = "chip"; b.textContent = r;
-        if (t.reason === r) b.classList.add("on");
-        b.onclick = ()=>patch(t.id,"reason", t.reason===r ? "" : r);
-        rc.appendChild(b);
-      });
-      body.appendChild(rc);
-      const note = document.createElement("input");
-      note.placeholder = "Why?";
-      note.value = t.note || "";
-      note.style.marginTop = "7px";
-      note.style.fontSize = "13px";
-      note.onchange = e => patch(t.id,"note", e.target.value);
-      body.appendChild(note);
+      const why = document.createElement("input");
+      why.className = "reason" + (popKey === t.id + ":" + t.status ? " enter" : "");
+      why.placeholder = "Why?";
+      why.value = t.reason || "";
+      why.oninput = () => { t.reason = why.value; state.dirty[date] = true; save(); queueSync(); };
+      body.appendChild(why);
     }
 
     row.appendChild(body);
@@ -565,7 +558,7 @@ document.addEventListener("visibilitychange", () => {
         new Blob([JSON.stringify(payload())], {type:"text/plain;charset=utf-8"}));
       state.dirty[date] = false;
       state.removed[date] = [];
-      tasks().forEach(t => { t.descRaw = t.desc || ""; t.actualRaw = String(t.actual ?? ""); });
+      tasks().forEach(t => { t.descRaw = t.desc || ""; t.reasonRaw = t.reason || ""; t.actualRaw = String(t.actual ?? ""); });
       save();
     }
   }

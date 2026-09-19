@@ -11,10 +11,12 @@
 <meta name="theme-color" content="#FFFFFF">
 <style>
   :root{
-    --bg:#FFFFFF; --surface:#F5F5F5; --surface2:#EBEBEB; --line:#ECECEC;
-    --ink:#0F0F0F; --muted:#8C8C8C;
-    --main:#12C06A; --work:#2F6BFF; --fun:#FF7A1A; --chore:#A9683A; --pending:#D6D6D6;
-    --pink:#FF3E8C; --lilac:#8B5CFF; --butter:#FFD23F; --sky:#2EB6FF; --warn:#FF3B4E; --opt-bg:#F4F0FF;
+    --bg:#FFFFFF; --surface:#F6F7F9; --surface2:#EDEEF1; --line:#F0F0F3;
+    --ink:#16171A; --muted:#9A9FA6;
+    --main:#3ED598; --work:#6C9BFF; --fun:#FFA34D; --chore:#C08457; --pending:#DCDEE3;
+    --c1:#FF8FB1; --c2:#FFC24B; --c3:#3ED598; --c4:#6C9BFF; --c5:#A78BFA;
+    --warn:#FF5A76; --opt-bg:#F6F2FF;
+    --prism:linear-gradient(90deg,var(--c1),var(--c2),var(--c3),var(--c4),var(--c5));
     --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC",sans-serif;
     --ease:cubic-bezier(.22,.9,.28,1);
   }
@@ -25,24 +27,37 @@
   .wrap{max-width:560px;margin:0 auto;padding:0 16px}
   .num{font-variant-numeric:tabular-nums}
   input,button,textarea{font-family:inherit;font-size:15px;color:var(--ink)}
-  input:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  input:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--c4);outline-offset:2px}
   input,textarea{width:100%;padding:11px 14px;border:0;border-radius:14px;background:var(--surface);
     transition:background-color .2s var(--ease)}
   input::placeholder,textarea::placeholder{color:var(--muted)}
   button{transition:transform .18s var(--ease),background-color .2s var(--ease),color .2s var(--ease)}
   button:active{transform:scale(.95)}
-  /* 顶栏吸顶 + 毛玻璃 */
+  /* 顶栏吸顶 + 毛玻璃，底下压一条很细的棱镜线 */
   .head{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;
-    padding:calc(12px + env(safe-area-inset-top)) 0 10px;background:rgba(255,255,255,.82);
+    padding:calc(12px + env(safe-area-inset-top)) 0 11px;background:rgba(255,255,255,.8);
     -webkit-backdrop-filter:saturate(180%) blur(14px);backdrop-filter:saturate(180%) blur(14px)}
+  .head::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;
+    background:var(--prism);opacity:.5}
   .head h1{font-size:19px;font-weight:700;letter-spacing:-.02em;margin:0;white-space:nowrap}
-  .head h1::after{content:"";display:inline-block;width:6px;height:6px;margin-left:5px;border-radius:50%;
-    background:var(--pink);vertical-align:3px}
+  /* 迪斯科球：格子切面 + 高光，慢慢转 */
+  .ball{width:16px;height:16px;flex-shrink:0;border-radius:50%;cursor:pointer;
+    background-image:
+      radial-gradient(circle at 31% 27%, rgba(255,255,255,.95), rgba(255,255,255,0) 44%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.4) 0 1px, rgba(255,255,255,0) 1px 4px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, rgba(255,255,255,0) 1px 4px),
+      repeating-conic-gradient(var(--c1) 0 12deg, var(--c2) 12deg 24deg, var(--c3) 24deg 36deg,
+        var(--c4) 36deg 48deg, var(--c5) 48deg 60deg);
+    box-shadow:0 0 0 1px rgba(0,0,0,.05), 0 3px 10px rgba(108,155,255,.35);
+    animation:spin 9s linear infinite}
+  .ball:active{transform:scale(.9)}
   .nav{min-width:34px;padding:6px 11px;font-size:13px;font-weight:600;background:var(--surface);
     border:0;border-radius:999px;cursor:pointer}
   .nav:active{background:var(--surface2)}
-  .strip{display:flex;height:6px;gap:3px}
+  .strip{position:relative;display:flex;height:7px;gap:3px;border-radius:999px}
   .strip div{flex-basis:0;min-width:0;border-radius:999px}
+  .strip::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;border-radius:inherit;pointer-events:none;
+    background:var(--prism);opacity:.22;mix-blend-mode:multiply}
   .meta{margin-top:10px;font-size:13px;font-weight:500;color:var(--muted);display:flex;justify-content:space-between;gap:10px}
   .meta.over{color:var(--warn)}
   #list{margin-top:10px}
@@ -50,11 +65,11 @@
     transition:transform .2s var(--ease)}
   #list .row:first-child{border-top:0}
   .row.opt{margin:6px -12px;padding:14px 12px;border-top-color:transparent;border-radius:18px;background:var(--opt-bg)}
-  .row.dragging{z-index:2;transition:none;border-radius:18px;box-shadow:0 14px 34px rgba(0,0,0,.14)}
+  .row.dragging{z-index:2;transition:none;border-radius:18px;box-shadow:0 14px 34px rgba(22,23,26,.12)}
   .est{width:38px;flex-shrink:0;text-align:right;align-self:flex-start;cursor:grab;touch-action:none;
     -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   .est b{display:block;font-size:19px;font-weight:700;line-height:1.15}
-  .grip{display:block;width:10px;height:13px;margin:7px 0 0 auto;opacity:.5;
+  .grip{display:block;width:10px;height:13px;margin:7px 0 0 auto;opacity:.45;
     background:radial-gradient(circle,var(--muted) 1.2px,transparent 1.5px) 0 0/5px 4.5px}
   .bar{width:4px;flex-shrink:0;border-radius:999px}
   .body{flex:1;min-width:0}
@@ -65,18 +80,19 @@
   .task.fin{color:var(--muted)}
   .more{color:var(--muted)}
   .tag{display:inline-block;margin-right:6px;padding:1px 8px;font-size:11px;font-weight:700;line-height:16px;
-    color:#fff;background:var(--lilac);border-radius:999px;vertical-align:1px}
+    color:#fff;background:linear-gradient(120deg,var(--c5),var(--c4));border-radius:999px;vertical-align:1px}
   .act{display:flex;align-items:center;gap:5px;flex-shrink:0;font-size:12px;font-weight:500;color:var(--muted)}
   .act input{width:54px;padding:5px 6px;font-size:16px;font-weight:600;text-align:center;border-radius:10px}
-  .act input:not(:placeholder-shown){background:var(--butter)}
+  .act input:not(:placeholder-shown){background:linear-gradient(120deg,#FFE7A6,#FFD7E6)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
   .chip{padding:6px 11px;font-size:12.5px;font-weight:600;background:var(--surface);border:0;border-radius:999px;cursor:pointer}
-  .chip.on{background:var(--ink);color:#fff}
+  .chip.on{background:var(--ink);color:#fff;box-shadow:0 3px 12px rgba(108,155,255,.28)}
   .reason{margin-top:8px;padding:9px 12px;font-size:14px}
   .desc{display:block;min-height:96px;margin-top:10px;resize:vertical;font-size:16px;line-height:1.55}
   .add{display:flex;gap:8px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
-  .solid{padding:11px 18px;font-size:14px;font-weight:700;color:#fff;background:var(--ink);border:0;
-    border-radius:999px;cursor:pointer;white-space:nowrap}
+  .solid{padding:11px 18px;font-size:14px;font-weight:700;color:var(--ink);border:0;border-radius:999px;
+    cursor:pointer;white-space:nowrap;background:linear-gradient(120deg,var(--c1),var(--c2) 32%,var(--c3) 62%,var(--c4) 86%,var(--c5));
+    box-shadow:0 4px 14px rgba(108,155,255,.3)}
   .ghost{padding:10px 16px;font-size:13px;font-weight:600;background:var(--surface);border:0;border-radius:999px;
     cursor:pointer;white-space:nowrap}
   .ghost:active{background:var(--surface2)}
@@ -92,27 +108,31 @@
   @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
   @keyframes pop{from{transform:scale(.88)}to{transform:scale(1)}}
+  @keyframes spin{to{transform:rotate(360deg)}}
   .row.enter{animation:rise .34s var(--ease) backwards;animation-delay:calc(var(--i,0) * 32ms)}
   .strip.enter div{transform-origin:left center;animation:grow .55s var(--ease) backwards;animation-delay:calc(var(--i,0) * 28ms)}
   #title.swap{animation:rise .3s var(--ease) backwards}
   .chip.pop{animation:pop .26s var(--ease)}
   .desc.enter,.reason.enter,.panel:not([hidden]){animation:rise .26s var(--ease) backwards}
-  /* 触摸星星：纯装饰层，不接收点击 */
+  /* 触摸亮片：纯装饰层，不接收点击 */
   .fx{position:fixed;top:0;right:0;bottom:0;left:0;z-index:50;pointer-events:none;overflow:hidden}
   .fx i{position:absolute;display:block;will-change:transform,opacity}
   .fx .star{background:var(--c);-webkit-clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);
     clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}
+  .fx .shard{background:linear-gradient(135deg,var(--c),rgba(255,255,255,.2));
+    -webkit-clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
   .fx .dot{border-radius:50%;background:var(--c)}
-  .fx .ring{width:40px;height:40px;margin:-20px 0 0 -20px;border:1.5px solid var(--muted);border-radius:50%}
+  .fx .ring{width:40px;height:40px;margin:-20px 0 0 -20px;border:1.5px solid var(--c4);border-radius:50%}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="head">
-    <div style="display:flex;align-items:baseline;gap:10px">
+    <div style="display:flex;align-items:center;gap:10px">
       <button class="nav" id="prev" aria-label="Previous day">‹</button>
       <h1 id="title"></h1>
+      <span class="ball" id="ball" role="button" tabindex="0" aria-label="Disco"></span>
       <button class="nav" id="next" aria-label="Next day">›</button>
     </div>
     <button class="nav" id="cfgBtn">Settings</button>
@@ -571,7 +591,8 @@ document.addEventListener("visibilitychange", () => {
   const layer = document.createElement("div");
   layer.className = "fx";
   document.body.appendChild(layer);
-  const COLORS = ["var(--pink)", "var(--lilac)", "var(--butter)", "var(--sky)", "var(--main)", "var(--fun)", "var(--work)"];
+  const COLORS = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)", "var(--fun)", "var(--main)"];
+  let hue = 0;   // 轮着来，一把里凑齐彩虹
   let live = 0, down = false, lx = 0, ly = 0, lt = 0;
   const spawn = (el, x, y, frames, ms, easing) => {
     el.style.left = x + "px"; el.style.top = y + "px";
@@ -583,9 +604,9 @@ document.addEventListener("visibilitychange", () => {
     if (live > 90) return;   // 同时最多这么多，防止连点卡顿
     const s = document.createElement("i"), dot = Math.random() < dotChance;
     const z = size * (.65 + Math.random() * .7) * (dot ? .4 : 1);
-    s.className = dot ? "dot" : "star";
+    s.className = dot ? "dot" : Math.random() < .35 ? "shard" : "star";
     s.style.cssText = "width:" + z + "px;height:" + z + "px;margin:" + (-z/2) + "px 0 0 " + (-z/2) + "px;--c:" +
-      COLORS[Math.random() * COLORS.length | 0];
+      COLORS[hue++ % COLORS.length];
     const a = Math.random() * Math.PI * 2, d = dist * (.45 + Math.random() * .55), r = (Math.random() - .5) * 300;
     const dx = Math.cos(a) * d, dy = Math.sin(a) * d;
     const at = (k, f, sc, rot) => "translate(" + dx*k + "px," + (dy*k + fall*f) + "px) scale(" + sc + ") rotate(" + r*rot + "deg)";
@@ -609,6 +630,12 @@ document.addEventListener("visibilitychange", () => {
     if (!down || (Math.hypot(e.clientX - lx, e.clientY - ly) < 16 && e.timeStamp - lt < 45)) return;
     lx = e.clientX; ly = e.clientY; lt = e.timeStamp;
     star(lx, ly, 16, 13, 800, 16, .45);
+  }, {passive: true});
+  // 点迪斯科球撒一大片
+  const ball = document.getElementById("ball");
+  if (ball) ball.addEventListener("click", () => {
+    const b = ball.getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height / 2;
+    for (let k = 0; k < 20; k++) star(x, y, 120, 20, 1100, 16, .25);
   }, {passive: true});
   addEventListener("pointerup", () => { down = false; }, {passive: true});
   addEventListener("pointercancel", () => { down = false; }, {passive: true});

@@ -157,12 +157,27 @@ function cols_(header) {
   return c;
 }
 
+// Projects 的列名允许几种写法，改过表头也能认出来
+var PROJ_COLS = {
+  project:  ['Project', 'Projects', '总任务'],
+  planned:  ['Planned min', 'Planned', 'Plan min', '预期总时长'],
+  spent:    ['Spent min', 'Spent', 'Actual time spent', 'Actual min', 'Time spent', '已花时长'],
+  progress: ['Progress', '%', '完成度']
+};
 function pcols_(header) {
   var names = header.map(function (h) { return String(h).trim(); });
-  var c = { project: names.indexOf('Project'), planned: names.indexOf('Planned min'),
-            spent: names.indexOf('Spent min'), progress: names.indexOf('Progress') };
-  for (var k in c) if (c[k] < 0) return { error: 'Projects sheet has no "' + k + '" column' };
+  var c = {};
+  for (var k in PROJ_COLS) {
+    c[k] = -1;
+    PROJ_COLS[k].forEach(function (name) { if (c[k] < 0) c[k] = names.indexOf(name); });
+    if (c[k] < 0) return { error: 'Projects sheet has no "' + PROJ_COLS[k][0] + '" column (header: ' + names.join(' | ') + ')' };
+  }
   return c;
+}
+
+// 名字对齐：忽略首尾空格、大小写和中间多余的空格
+function key_(s) {
+  return String(s).trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 function json_(obj) {
@@ -192,27 +207,91 @@ function recount_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var pj = ss.getSheetByName(PROJ_SHEET);
   var sh = ss.getSheetByName(SHEET);
-  if (!pj || !sh) return;
+  if (!pj) return { error: 'no "' + PROJ_SHEET + '" sheet' };
+  if (!sh) return { error: 'no "' + SHEET + '" sheet' };
   var pdata = pj.getDataRange().getValues();
   var pc = pcols_(pdata[0]);
-  if (pc.error) return;
+  if (pc.error) return pc;
   var data = sh.getDataRange().getValues();
   var c = cols_(data[0]);
-  if (c.error) return;
+  if (c.error) return c;
 
   var spent = {};
   for (var i = 1; i < data.length; i++) {
-    var name = String(data[i][c.task]).trim();
+    var name = key_(data[i][c.task]);
     if (name) spent[name] = (spent[name] || 0) + minutes_(data[i], c);
+  }
+  var done = 0, hit = 0;
+  for (var r = 1; r < pdata.length; r++) {
+    var p = String(pdata[r][pc.project]).trim();
+    if (!p) continue;
+    var min = spent[key_(p)] || 0;
+    var planned = Number(pdata[r][pc.planned]) || 0;
+    pj.getRange(r + 1, pc.spent + 1).setValue(min);
+    pj.getRange(r + 1, pc.progress + 1).setValue(planned > 0 ? min / planned : '');
+    done++;
+    if (min > 0) hit++;
+  }
+  return { ok: true, projects: done, withTime: hit };
+}
+
+// 在编辑器里选 recount 点运行：立刻重算一次 Projects 的 Spent / Progress
+function recount() {
+  var r = recount_();
+  Logger.log(JSON.stringify(r));
+  return r;
+}
+
+// 在编辑器里选 check 点运行：打印诊断，看清楚每个 Project 为什么是这个数
+function check() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var out = ['Sheets: ' + ss.getSheets().map(function (s) { return s.getName(); }).join(', ')];
+  var sh = ss.getSheetByName(SHEET), pj = ss.getSheetByName(PROJ_SHEET);
+  if (!sh) { out.push('!! no "' + SHEET + '" sheet'); return log_(out); }
+  out.push('Tasks header: ' + head_(sh).join(' | '));
+  var data = sh.getDataRange().getValues();
+  var c = cols_(data[0]);
+  if (c.error) { out.push('!! ' + c.error); return log_(out); }
+  if (c.actual < 0) out.push('!! no "Actual min" column — 只能按 Done + Est min 算');
+  if (!pj) { out.push('!! no "' + PROJ_SHEET + '" sheet'); return log_(out); }
+  out.push('Projects header: ' + head_(pj).join(' | '));
+  var pdata = pj.getDataRange().getValues();
+  var pc = pcols_(pdata[0]);
+  if (pc.error) { out.push('!! ' + pc.error); return log_(out); }
+
+  var by = {};
+  for (var i = 1; i < data.length; i++) {
+    var name = String(data[i][c.task]).trim();
+    if (!name) continue;
+    var k = key_(name);
+    by[k] = by[k] || { min: 0, rows: [] };
+    var m = minutes_(data[i], c);
+    by[k].min += m;
+    by[k].rows.push('   "' + name + '" · status=' + (String(data[i][c.result]).trim() || '(empty)') +
+      ' · actual=' + (c.actual >= 0 ? (data[i][c.actual] === '' ? '(empty)' : data[i][c.actual]) : 'n/a') +
+      ' · est=' + (data[i][c.est] === '' ? '(empty)' : data[i][c.est]) + ' → counts ' + m + ' min');
   }
   for (var r = 1; r < pdata.length; r++) {
     var p = String(pdata[r][pc.project]).trim();
     if (!p) continue;
-    var min = spent[p] || 0;
-    var planned = Number(pdata[r][pc.planned]) || 0;
-    pj.getRange(r + 1, pc.spent + 1).setValue(min);
-    pj.getRange(r + 1, pc.progress + 1).setValue(planned > 0 ? min / planned : '');
+    var h = by[key_(p)];
+    out.push('');
+    out.push('Project "' + p + '" → ' + (h ? h.min + ' min from ' + h.rows.length + ' task row(s)' : 'no task rows match this name'));
+    if (h) out = out.concat(h.rows);
+    else {
+      var near = Object.keys(by).filter(function (k) { return k.indexOf(key_(p)) >= 0 || key_(p).indexOf(k) >= 0; });
+      out.push(near.length ? '   close names in Tasks: ' + near.join(' | ') : '   (Tasks 里没有相近的名字)');
+    }
   }
+  out.push('');
+  out.push('规则：填了 Actual min 按实际；没填但状态是 Done 按 Est min；Partial / Later / Drop 不算');
+  return log_(out);
+}
+
+function log_(lines) {
+  var text = lines.join('\n');
+  Logger.log(text);
+  return text;
 }
 
 // 某天可用的分钟数；同一天填了多行取最下面那行，没填返回 null（页面用 Settings 里的默认值）
@@ -319,6 +398,7 @@ function doPost(e) {
     if (r.reason && c.reason >= 0) text_(sh.getLastRow(), c.reason, r.reason);
   });
 
-  try { recount_(); } catch (err) {}   // Projects 出问题也不能影响同步
-  return json_({ ok: true, count: (body.rows || []).length });
+  var rc;                              // Projects 出问题也不能影响同步，但要能看见
+  try { rc = recount_(); } catch (err) { rc = { error: String(err) }; }
+  return json_({ ok: true, count: (body.rows || []).length, recount: rc });
 }

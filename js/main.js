@@ -1,5 +1,5 @@
 // 苦昼短：入口。管页面切换（#today / #calendar / #projects / #settings）、主题、同步时机、整页重画。
-// 手机（≤760px）只有「今天」和设置；电脑有侧栏、日历和任务池。
+// 手机（≤760px）只有「今天」和设置；电脑有侧栏、日历和任务池、项目、统计。
 
 import * as store from "./store.js";
 import * as sync from "./sync.js";
@@ -16,10 +16,11 @@ import { projectsHTML, initProjects, refreshProjectEditor, openProjectEditor } f
 import { settingsHTML, initSettings } from "./ui/settings.js";
 import { initEditor, refreshEditor } from "./ui/editor.js";
 import { initDnd } from "./ui/dnd.js";
+import { statsHTML, initStats } from "./ui/stats.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
-const VIEWS = ["today", "calendar", "projects", "settings"];
+const VIEWS = ["today", "calendar", "projects", "stats", "settings"];
 const side = document.getElementById("side");
 const main = document.getElementById("main");
 const pool = document.getElementById("pool");
@@ -44,7 +45,7 @@ function applyTheme() {
 
 function sidebarHTML(c, view) {
   const todayOpen = c.tasks.filter((t) => t.date === c.today && !t.status).length;
-  const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["settings", "Settings", ""]];
+  const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""], ["settings", "Settings", ""]];
   const projects = c.projects.filter(E.isActive).map((p) => {
     const h = E.health(c, p);
     const need = Math.round(E.needOn(c, p, c.today));
@@ -97,7 +98,7 @@ function draw() {
   document.body.classList.toggle("phone", phone);
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
-  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "settings" ? settingsHTML(phone) : todayHTML(c, phone);
+  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "settings" ? settingsHTML(phone) : todayHTML(c, phone);
   const showPool = !phone && view === "calendar" && store.local().pool;
   pool.hidden = !showPool;
   pool.innerHTML = showPool ? poolHTML(c) : "";
@@ -115,7 +116,7 @@ function paintSync() {
   const text = st.text === "Syncing…" || st.bad || !pending ? st.text : sync.configured() ? "Unsynced changes" : st.text;
   document.querySelectorAll("[data-sync-status]").forEach((el) => {
     el.textContent = text;
-    el.closest(".sync-pill, .sync-status")?.classList.toggle("bad", st.bad);
+    el.closest(".sync-pill, .sync-status, .psync")?.classList.toggle("bad", st.bad);
   });
 }
 
@@ -158,6 +159,7 @@ initProjects(render);
 initSettings(applyTheme);
 initEditor();
 initDnd(handleDrop);
+initStats(render);
 
 store.subscribe((meta) => {
   if (meta.local) setFx(store.local().fx !== false);

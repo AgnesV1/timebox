@@ -1,11 +1,12 @@
 // 「今天」页：安全线、当天的任务块、昨天的账单、过期没做的、任务列表、加任务、给这天的备注。
-// 手机上只有这一页；电脑上左边是清单，右边是安全线和账单。日历里点开某一天也用它。
+// 电脑上左边是清单，右边是安全线和账单；日历里点开某一天也用它。
+// 手机上只留两件事：看今天前后各 5 天的任务、给任务标结果；右上角齿轮进去只有白天黑夜和连表格。计划都在电脑上做。
 
 import * as store from "../store.js";
 import * as E from "../engine.js";
 import { esc, on, icon, debounce } from "../dom.js";
-import { fmtDay, fmtShort, addDays } from "../dates.js";
-import { heroHTML, stripHTML, billHTML, colorOf, projectOf, STATUS, CATS } from "./common.js";
+import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, WEEKDAYS } from "../dates.js";
+import { heroHTML, stripHTML, billHTML, colorOf, projectOf, segStyle, lineInfo, STATUS, CATS } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 
 const openDesc = new Set();
@@ -16,7 +17,7 @@ let viewDate = "";
 export const shownDate = () => viewDate || store.today();
 export function showDate(d) { viewDate = d === store.today() ? "" : d; }
 
-function rowHTML(c, t, tasks) {
+function rowHTML(c, t, tasks, phone = false) {
   const p = projectOf(t);
   const fin = t.status === "done" || t.status === "partial";
   const why = t.status === "partial" || t.status === "later" || t.status === "drop";
@@ -32,11 +33,11 @@ function rowHTML(c, t, tasks) {
     (p && p.name.trim().toLowerCase() !== t.title.trim().toLowerCase() ? ' <span class="pj" style="--pc:' + esc(p.color) + '">' + esc(p.name) + "</span>" : "") +
     (t.desc && !open ? '<span class="more"> ⋯</span>' : "") + "</div>" +
     (fin ? '<label class="act"><input class="num" data-act="actual" inputmode="numeric" placeholder="—" value="' + esc(t.actual ?? "") + '" aria-label="Actual minutes">min</label>' : "") +
-    '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>" +
+    (phone ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") +
     "</div>" +
     (open ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Details">' + esc(t.desc || "") + "</textarea>" : "") +
     '<div class="chips">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
-    (t.status === "later" && !movedOn ? '<button type="button" class="chip ghost" data-act="tomorrow">→ Tomorrow</button>' : "") + "</div>" +
+    (t.status === "later" && !movedOn && !phone ? '<button type="button" class="chip ghost" data-act="tomorrow">→ Tomorrow</button>' : "") + "</div>" +
     (why ? '<input class="reason" data-act="reason" data-keep="reason-' + t.id + '" placeholder="Why?" value="' + esc(t.reason || "") + '">' : "") +
     "</div></div>";
 }
@@ -87,19 +88,51 @@ export function dayModalHTML(c, d) {
   return '<div class="dayview" data-date="' + d + '"><h2 class="sheet-title">' + fmtDay(d) + (d === c.today ? " <small>Today</small>" : "") + "</h2>" + x.hero + x.strip + x.list + x.add + x.note + "</div>";
 }
 
+// ---------- 手机 ----------
+
+const PHONE_SPAN = 5;
+
+// 一天的小圆点：全标完 = 实心；还有没标的 = 空心；没有任务 = 不画
+function dayDot(tasks) {
+  if (!tasks.length) return "";
+  const open = tasks.filter((t) => !t.status && !t.optional).length;
+  return '<i class="' + (open ? (open < tasks.length ? "some" : "todo") : "all") + '"></i>';
+}
+
+// 还没连表格（比如换了新手机）：只在这时候让人填网址和口令
+function connectHTML() {
+  const l = store.local();
+  return '<section class="settings connect"><h2>Connect your Sheet</h2><p class="hint">Paste the Apps Script URL and the secret once. After that this screen goes away.</p>' +
+    '<label class="field"><span>Apps Script URL</span><input data-local="url" value="' + esc(l.url) + '" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false"></label>' +
+    '<label class="field"><span>Secret</span><input data-local="secret" type="password" value="' + esc(l.secret) + '" autocomplete="off"></label></section>';
+}
+
+function phoneHTML(c) {
+  let d = shownDate();
+  if (Math.abs(diffDays(c.today, d)) > PHONE_SPAN) { showDate(c.today); d = c.today; }
+  const tasks = store.tasksOn(d);
+  const days = Array.from({ length: PHONE_SPAN * 2 + 1 }, (_, i) => addDays(c.today, i - PHONE_SPAN));
+  const strip = '<nav class="daystrip" aria-label="Days">' + days.map((x) =>
+    '<button type="button" class="dpill' + (x === c.today ? " today" : "") + (x === d ? " on" : "") + (x < c.today ? " past" : "") + '" data-act="day-pick" data-date="' + x + '" aria-label="' + fmtDay(x) + '">' +
+    "<span>" + WEEKDAYS[weekday(x)].slice(0, 2) + "</span><b>" + Number(x.slice(8)) + "</b>" + dayDot(store.tasksOn(x)) + "</button>").join("") + "</nav>";
+  const day = E.daySummary(c, d);
+  const { line, done } = lineInfo(c, d);
+  const lineText = line > 0 ? (done >= line - 1 ? "Line " + fmtMin(line) + " ✓" : "Line " + fmtMin(line) + " · " + fmtMin(line - done) + " to go") : "";
+  const meta = '<div class="stripmeta' + (day.cap > 0 && day.planned > day.cap ? " over" : "") + '"><span>' + Math.round(day.done) + " / " + day.planned + " min done</span><span>" + lineText + "</span></div>";
+  const bar = '<div class="strip">' + tasks.map((t) => '<i style="flex-grow:' + Math.max(5, Number(t.est) || 0) + ";" + segStyle(t) + '"></i>').join("") + "</div>";
+  return '<div class="dayview phone-day" data-date="' + d + '">' +
+    '<header class="phead"><div class="l"><h1 data-act="day-today">' + fmtDay(d) + '</h1><span class="ball" data-act="ball" role="button" aria-label="Sparkles"></span></div>' +
+    '<div class="r"><span class="psync" data-sync-status></span><a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
+    (store.local().url ? bar + meta + '<div class="list" data-list="' + d + '">' +
+      (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true)).join("") : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet — plan it on the computer.") + "</div>") + "</div>"
+      : connectHTML()) + "</div>";
+}
+
 export function todayHTML(c, phone) {
   const d = shownDate();
   const x = dayParts(c, d);
   const isToday = d === c.today;
-  if (phone) {
-    return '<div class="dayview phone-day" data-date="' + d + '">' +
-      '<header class="phead"><div class="l"><button type="button" class="nav" data-act="day-prev" aria-label="Previous day">‹</button>' +
-      '<h1 data-act="day-today">' + fmtDay(d) + '</h1><span class="ball" data-act="ball" role="button" aria-label="Sparkles"></span>' +
-      '<button type="button" class="nav" data-act="day-next" aria-label="Next day">›</button></div><a class="nav" href="#settings">Settings</a></header>' +
-      (isToday ? "" : '<button type="button" class="back-today" data-act="day-today">← Back to today</button>') +
-      x.hero + x.strip + x.bill + x.overdue + x.list + x.add + x.note +
-      '<footer class="pfoot"><button type="button" class="btn" data-act="sync">Sync now</button><span class="sync-status" data-sync-status></span></footer></div>';
-  }
+  if (phone) return phoneHTML(c);
   return '<div class="dayview" data-date="' + d + '">' +
     '<header class="page-head"><div><p class="eyebrow">' + (isToday ? "Today" : d < store.today() ? "Looking back" : "Looking ahead") + "</p><h2>" + fmtDay(d) + "</h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="day-prev" aria-label="Previous day">' + icon("left") + '</button><button type="button" class="nav" data-act="day-today">Today</button><button type="button" class="nav" data-act="day-next" aria-label="Next day">' + icon("right") + "</button></div></header>" +
@@ -127,6 +160,7 @@ export function initToday(rerender) {
     } else if (act === "day-prev") { showDate(addDays(shownDate(), -1)); rerender(); }
     else if (act === "day-next") { showDate(addDays(shownDate(), 1)); rerender(); }
     else if (act === "day-today") { showDate(store.today()); rerender(); }
+    else if (act === "day-pick") { showDate(el.dataset.date); rerender(); }
   });
 
   on(document, "input", ".dayview [data-act]", (e, el) => {

@@ -1,10 +1,13 @@
 {
-  "name": "Timebox",
-  "short_name": "Timebox",
-  "start_url": "./index.html",
+  "name": "苦昼短",
+  "short_name": "苦昼短",
+  "description": "Plan backwards from the deadline, one day at a time.",
+  "lang": "en",
+  "start_url": "./index.html#today",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#FFFDF8",
-  "theme_color": "#FFFDF8",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
   "icons": [
     { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }

@@ -5,7 +5,7 @@ import * as store from "../store.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { addDays, addMonths, startOfWeek, startOfMonth, range, fmtShort, fmtMin, WEEKDAYS, MONTHS, MONTHS_LONG, weekday } from "../dates.js";
-import { colorOf, lineInfo, projectOf, toast } from "./common.js";
+import { colorOf, lineInfo, projectOf, projectOptions, groupsOf, toast } from "./common.js";
 import { openModal } from "./modal.js";
 import { dayModalHTML } from "./today.js";
 import { openTaskEditor } from "./editor.js";
@@ -21,7 +21,7 @@ const weekStart = () => store.prefs().weekStartsOn;
 function chipHTML(t) {
   const p = projectOf(t);
   return '<div class="ev st-' + (t.status || "open") + (t.optional ? " opt" : "") + '" data-drag="task:' + t.id + '" data-act="edit-task" data-id="' + t.id + '" style="--c:' + colorOf(t) + '" title="' + esc(t.title + (p ? " · " + p.name : "")) + '">' +
-    '<span class="t">' + esc(t.title) + '</span><span class="m num">' + t.est + "</span></div>";
+    '<span class="t">' + (E.isRoutine(t) ? '<i class="rt">↻</i>' : "") + esc(t.title) + '</span><span class="m num">' + t.est + "</span></div>";
 }
 
 function cellHTML(c, d, { month = false, outside = false } = {}) {
@@ -83,17 +83,21 @@ export function calendarHTML(c) {
 export function poolHTML(c) {
   const projects = c.projects.filter(E.isActive);
   const list = E.poolItems(c);
-  const groups = projects.map((p) => ({ p, items: list.filter((x) => x.item.projectId === p.id) })).filter((g) => g.items.length);
+  const subs = projects.map((p) => ({ p, items: list.filter((x) => x.item.projectId === p.id) })).filter((g) => g.items.length);
   const total = list.reduce((a, x) => a + x.state.unscheduled, 0);
   let h = '<div class="pool-inner" data-drop="pool"><header class="pool-head"><div><h3>Pool</h3><p>' + (list.length ? list.length + " items · " + fmtMin(total) + " to place" : "Drag onto a day to plan it") + '</p></div>' +
     '<button type="button" class="icon-btn" data-act="pool-toggle" aria-label="Hide pool">' + icon("close") + "</button></header>";
   if (projects.length) {
-    h += '<form class="pool-add" autocomplete="off"><select name="project" aria-label="Project">' + projects.map((p) => '<option value="' + p.id + '">' + esc(p.name) + "</option>").join("") + "</select>" +
+    h += '<form class="pool-add" autocomplete="off"><select name="project" aria-label="Sub-project">' + projectOptions(projects, "", null) + "</select>" +
       '<div class="row2"><input name="title" data-keep="pool-add" placeholder="New item"><input name="est" class="num" type="number" value="45" min="5" step="5" aria-label="Minutes"><button class="btn cta" type="submit">' + icon("plus") + "</button></div></form>";
   }
   if (!projects.length) h += '<p class="empty">Make a project first — its items land here.</p><a class="btn" href="#projects">Projects</a>';
-  else if (!groups.length) h += '<p class="empty">Everything is on the calendar ✓</p>';
-  groups.forEach(({ p, items }) => {
+  else if (!subs.length) h += '<p class="empty">Everything is on the calendar ✓</p>';
+  // 项目 → 子项目 → 模块
+  let lastGroup = null;
+  groupsOf(subs.map((x) => x.p)).forEach((g) => g.subs.forEach((p) => {
+    const { items } = subs.find((x) => x.p === p);
+    if (g.name !== lastGroup) { lastGroup = g.name; if (g.name) h += '<div class="pg-group">' + esc(g.name) + "</div>"; }
     h += '<section class="pg"><div class="pg-head" style="--pc:' + esc(p.color) + '"><i></i><span>' + esc(p.name) + "</span><em>" + fmtMin(items.reduce((a, x) => a + x.state.unscheduled, 0)) + "</em></div>";
     let mod = null;
     items.forEach(({ item, state }) => {
@@ -102,7 +106,7 @@ export function poolHTML(c) {
       h += '<div class="pi" data-drag="item:' + item.id + '" style="--c:' + esc(p.color) + '"><i class="g"></i><span>' + esc(item.title) + '</span><b class="num">' + fmtMin(state.unscheduled) + (part ? " left" : "") + "</b></div>";
     });
     h += "</section>";
-  });
+  }));
   h += forecastHTML(c) + '<p class="pool-hint">Drag items onto a day. Drag a task back here to unschedule it.</p></div>';
   return h;
 }

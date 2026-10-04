@@ -326,7 +326,10 @@ body.phone #main { max-width: 560px; margin: 0 auto; padding: 0 16px calc(40px +
 [data-theme="dark"] .load i { background: linear-gradient(90deg, #00E5FF, #CCFF00); }
 .ln { font-size: 10.5px; font-weight: 600; color: var(--muted); }
 .ev { position: relative; display: flex; align-items: flex-start; gap: 4px; padding: 5px 6px 5px 8px; border-radius: 8px; background: var(--surface); box-shadow: inset 3px 0 0 var(--c); font-size: 11.5px; line-height: 1.3; cursor: grab; }
-.ev .t { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.ev .t { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: break-word; }
+/* 格子太窄（开着任务池的小屏）：分钟数藏起来，留地方给名字 */
+.cell { container-type: inline-size; }
+@container (max-width: 96px) { .ev .m { display: none; } .ev { padding-right: 4px; } .ev .rt { display: none; } }
 .ev .m { flex-shrink: 0; font-size: 10px; color: var(--muted); }
 .ev:hover { background: var(--surface2); }
 .ev.st-done { opacity: .5; }
@@ -479,8 +482,51 @@ body.modal-open { overflow: hidden; }
 .settings .btns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .weekly { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .weekly label { display: grid; gap: 4px; text-align: center; font-size: 11px; color: var(--muted); }
-.weekly input { padding: 8px 4px; text-align: center; }
+.weekly input { padding: 8px 4px; text-align: center; color: var(--ink); font-weight: 600; }
 body.phone .settings .page-head { margin-top: 4px; }
+
+/* ---------- 项目 → 子项目 ---------- */
+.pgroup { margin-bottom: 26px; }
+.pg-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.pg-top h3 { margin: 0; font: 700 18px var(--display); letter-spacing: -.01em; }
+.pg-top .rename { width: 260px; padding: 6px 10px; font: 700 16px var(--display); border: var(--b); }
+.pg-meta { font-size: 12.5px; color: var(--muted); }
+.dot-only { padding: 0; background: none; font-size: 12px; }
+.pg-actions { display: flex; gap: 6px; margin-left: auto; }
+.pg-actions .btn { padding: 6px 12px; font-size: 12.5px; }
+.btn.ghosty { border-color: transparent; background: transparent; color: var(--muted); }
+.gbar { height: 6px; margin: 0 0 14px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.gbar i { display: block; height: 100%; border-radius: inherit; background: var(--meter); }
+.sp-group { margin: 10px 10px 2px; font-size: 11.5px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp.nested { padding-left: 20px; }
+.pg-group { margin: 18px 0 -4px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
+.rt { font-style: normal; font-size: .9em; color: var(--muted); }
+.ev .rt { margin-right: 3px; }
+
+/* ---------- 重复任务 ---------- */
+.rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.rcard { padding: 16px 16px 14px; border: var(--b); border-radius: 20px; background: var(--bg); box-shadow: var(--hard); }
+.rcard header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rname { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 0; border: 0; background: none; font: 700 17px/1.25 var(--display); text-align: left; letter-spacing: -.01em; }
+.rname i { width: 12px; height: 12px; flex-shrink: 0; border-radius: 50%; background: var(--rc); box-shadow: 0 0 0 1.5px var(--edge); }
+[data-theme="dark"] .rname i { box-shadow: 0 0 10px var(--rc); }
+.rtotal { flex-shrink: 0; font-size: 12px; color: var(--muted); }
+.rsub { margin: 6px 0 12px; font-size: 12.5px; color: var(--muted); }
+.rweek { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.rday { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.rbar { display: flex; align-items: flex-end; width: 100%; max-width: 24px; height: 40px; }
+.rbar i { display: block; width: 100%; min-height: 0; border-radius: 4px 4px 0 0; background: var(--rc); }
+.rday.off .rbar { border-bottom: 1px solid var(--line); }
+.rday b { font-size: 12px; }
+.rday.off b { color: var(--muted); }
+.rday em { font-style: normal; font-size: 10.5px; color: var(--muted); }
+.fill-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.fill-row input { width: 70px; padding: 7px 8px; text-align: center; }
+.fill-row .btn { padding: 6px 12px; font-size: 12.5px; }
+.page-hint { max-width: 640px; margin-top: 18px; }
+.ptable .grow td { font-weight: 700; border-bottom: 0; padding-top: 12px; }
+.ptable .nested td:first-child { padding-left: 22px; }
+.gname { color: var(--muted); }
 
 /* ---------- 统计 ---------- */
 /* 图上的颜色用 --k-*（校验过的同色系），文字一律用正文颜色；柱子 ≤24px、顶端 4px 圆角、相邻留 2px 缝 */

@@ -6,7 +6,7 @@ import * as store from "../store.js";
 import * as S from "../stats.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtMin, fmtShort, fmtDay, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays } from "../dates.js";
-import { healthPill } from "./common.js";
+import { healthPill, groupsOf } from "./common.js";
 
 let kind = "d30";
 let anchor = "";
@@ -158,10 +158,17 @@ function projectsHTML(c, s) {
   const rows = S.projectRows(c, s.from, s.last);
   if (!rows.length) return "";
   return '<section class="card wide"><h3>Projects</h3><p class="lede">Planned = all items; done = how much of the plan is finished; spent = the real time it took.</p>' +
-    '<div class="table-wrap"><table class="ptable"><thead><tr><th>Project</th><th>Planned</th><th>Done</th><th>Spent</th><th>This period</th><th>Health</th></tr></thead><tbody>' +
-    rows.map((r) => '<tr><td><span class="pdot" style="background:' + esc(r.p.color) + '"></span>' + esc(r.p.name) + '</td><td class="num">' + fmtMin(r.planned) + '</td><td class="num">' + fmtMin(r.done) +
-      (r.planned ? " <small>" + pct(r.done / r.planned) + "</small>" : "") + '</td><td class="num">' + fmtMin(r.spent) +
-      (r.done > 0 && r.spent > 0 ? " <small>" + (r.spent / r.done).toFixed(2) + "×</small>" : "") + '</td><td class="num">' + fmtMin(r.spentHere) + "</td><td>" + healthPill(r.health) + "</td></tr>").join("") +
+    '<div class="table-wrap"><table class="ptable"><thead><tr><th>Sub-project</th><th>Planned</th><th>Done</th><th>Spent</th><th>This period</th><th>Health</th></tr></thead><tbody>' +
+    groupsOf(rows.map((r) => r.p)).map((g) => {
+      const rs = g.subs.map((p) => rows.find((r) => r.p === p));
+      const sum = (k) => rs.reduce((a, r) => a + r[k], 0);
+      const head = g.name && rs.length > 1
+        ? '<tr class="grow"><td>' + esc(g.name) + '</td><td class="num">' + fmtMin(sum("planned")) + '</td><td class="num">' + fmtMin(sum("done")) + '</td><td class="num">' + fmtMin(sum("spent")) + '</td><td class="num">' + fmtMin(sum("spentHere")) + "</td><td></td></tr>"
+        : "";
+      return head + rs.map((r) => '<tr' + (head ? ' class="nested"' : "") + '><td><span class="pdot" style="background:' + esc(r.p.color) + '"></span>' + (g.name && !head ? '<small class="gname">' + esc(g.name) + " · </small>" : "") + esc(r.p.name) + '</td><td class="num">' + fmtMin(r.planned) + '</td><td class="num">' + fmtMin(r.done) +
+        (r.planned ? " <small>" + pct(r.done / r.planned) + "</small>" : "") + '</td><td class="num">' + fmtMin(r.spent) +
+        (r.done > 0 && r.spent > 0 ? " <small>" + (r.spent / r.done).toFixed(2) + "×</small>" : "") + '</td><td class="num">' + fmtMin(r.spentHere) + "</td><td>" + healthPill(r.health) + "</td></tr>").join("");
+    }).join("") +
     "</tbody></table></div></section>";
 }
 

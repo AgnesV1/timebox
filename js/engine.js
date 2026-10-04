@@ -41,6 +41,8 @@ export function planMin(t) {
 }
 
 export const isOpen = (t) => !t.status;
+// 重复任务错过了就算错过，不往后顺延
+export const isRoutine = (t) => String(t.id || "").startsWith("rt:");
 export const isActive = (p) => !p.status || p.status === "active";
 export const earlyDays = (p) => Math.max(0, Math.floor(num(p.early)));
 
@@ -388,12 +390,12 @@ export function health(ctx, p) {
   return out("danger", "Too much · " + need);
 }
 
-// ---------- 过期没做的任务：一键顺延 ----------
+// ---------- 过期没做的任务：一键顺延（重复任务不算） ----------
 // 每件挪到「最空、又不超过它项目目标日」的那天，越早越好；目标日早的先排。只返回计划，不改数据。
 
 export function planOverdue(ctx) {
   const cap = ctx.capacity;
-  const overdue = ctx.tasks.filter((t) => isOpen(t) && t.date && t.date < ctx.today);
+  const overdue = ctx.tasks.filter((t) => isOpen(t) && t.date && t.date < ctx.today && !isRoutine(t));
   const load = {};
   for (const t of ctx.tasks) if (isOpen(t) && t.date >= ctx.today) load[t.date] = (load[t.date] || 0) + num(t.est);
   const limitOf = (t) => {

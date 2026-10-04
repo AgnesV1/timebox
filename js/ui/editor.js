@@ -4,8 +4,9 @@ import * as store from "../store.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtMin } from "../dates.js";
-import { CATS } from "./common.js";
+import { CATS, projectOptions } from "./common.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
+import { parseRoutineTaskId } from "../routines.js";
 
 let editing = "";
 
@@ -14,6 +15,8 @@ function editorHTML(t) {
   const projects = c.projects.filter((p) => E.isActive(p) || p.id === t.projectId);
   const item = t.itemId ? store.get("items", t.itemId) : null;
   const st = item ? E.itemState(c, item) : null;
+  const rt = parseRoutineTaskId(t.id);
+  const routine = rt ? store.routines().find((r) => r.id === rt.rid) : null;
   return '<div class="task-editor" data-task="' + t.id + '"><h2 class="sheet-title">Edit task</h2>' +
     '<label class="field"><span>Task</span><input data-f="title" value="' + esc(t.title) + '"></label>' +
     '<div class="field-row"><label class="field"><span>Date</span><input type="date" data-f="date" value="' + esc(t.date) + '"></label>' +
@@ -21,9 +24,9 @@ function editorHTML(t) {
     '<div class="field"><span>Category</span><div class="cats">' +
     ["", ...CATS].map((k) => '<label class="cat"><input type="radio" name="ecat" data-f="category" value="' + k + '"' + ((t.category || "") === k ? " checked" : "") + '><i style="--c:' + (k ? "var(--c-" + k + ")" : "var(--c-None)") + '"></i>' + (k || "None") + "</label>").join("") +
     "</div></div>" +
-    '<label class="field"><span>Project</span><select data-f="projectId"><option value="">No project</option>' +
-    projects.map((p) => '<option value="' + p.id + '"' + (p.id === t.projectId ? " selected" : "") + ">" + esc(p.name) + "</option>").join("") + "</select></label>" +
+    '<label class="field"><span>Sub-project</span><select data-f="projectId">' + projectOptions(projects, t.projectId) + "</select></label>" +
     (item ? '<p class="hint">Part of <b>' + esc(item.title) + "</b> · " + fmtMin(st.progress) + " of " + fmtMin(st.est) + " done</p>" : "") +
+    (routine ? '<p class="hint">↻ From the routine <b>' + esc(routine.title) + '</b>. Changes here only affect this day. <a href="#routines">Edit the routine</a></p>' : "") +
     '<label class="check"><input type="checkbox" data-f="optional"' + (t.optional ? " checked" : "") + "> Optional — nice to do, not a must</label>" +
     '<label class="field"><span>Details</span><textarea data-f="desc" rows="4" placeholder="Steps, links, anything">' + esc(t.desc || "") + "</textarea></label>" +
     '<div class="sheet-foot"><button type="button" class="btn danger" data-act="del">' + icon("trash") + " Delete</button>" +

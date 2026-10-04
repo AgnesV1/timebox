@@ -6,7 +6,7 @@ import * as store from "../store.js";
 import * as E from "../engine.js";
 import { esc, on, icon, debounce } from "../dom.js";
 import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, WEEKDAYS } from "../dates.js";
-import { heroHTML, stripHTML, billHTML, colorOf, projectOf, segStyle, lineInfo, STATUS, CATS } from "./common.js";
+import { heroHTML, stripHTML, billHTML, colorOf, projectOf, projectOptions, segStyle, lineInfo, STATUS, CATS } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 
 const openDesc = new Set();
@@ -30,6 +30,7 @@ function rowHTML(c, t, tasks, phone = false) {
     '<div class="bar" style="--bar:' + colorOf(t) + ";min-height:" + Math.max(20, Math.min(t.est * 0.6, 90)) + 'px"></div>' +
     '<div class="body"><div class="line">' +
     '<div class="task" data-act="desc">' + (t.optional ? '<span class="tag">Optional</span>' : "") + esc(t.title) +
+    (E.isRoutine(t) ? ' <span class="rt" title="Routine">↻</span>' : "") +
     (p && p.name.trim().toLowerCase() !== t.title.trim().toLowerCase() ? ' <span class="pj" style="--pc:' + esc(p.color) + '">' + esc(p.name) + "</span>" : "") +
     (t.desc && !open ? '<span class="more"> ⋯</span>' : "") + "</div>" +
     (fin ? '<label class="act"><input class="num" data-act="actual" inputmode="numeric" placeholder="—" value="' + esc(t.actual ?? "") + '" aria-label="Actual minutes">min</label>' : "") +
@@ -43,7 +44,7 @@ function rowHTML(c, t, tasks, phone = false) {
 }
 
 function overdueHTML(c) {
-  const od = c.tasks.filter((t) => !t.status && t.date && t.date < c.today).sort((a, b) => a.date.localeCompare(b.date));
+  const od = c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isRoutine(t)).sort((a, b) => a.date.localeCompare(b.date));
   if (!od.length) return "";
   return '<section class="overdue"><div class="od-head"><b>' + od.length + " left behind</b><span>from earlier days</span>" +
     '<button type="button" class="link" data-act="od-toggle">' + (overdueOpen ? "Hide" : "Show") + "</button></div>" +
@@ -59,7 +60,7 @@ function addHTML(c, d) {
     '<button class="btn cta" type="submit">Add</button></div>' +
     '<div class="add-more"><div class="cats">' +
     ["", ...CATS].map((k) => '<label class="cat"><input type="radio" name="cat" value="' + k + '"' + (k ? "" : " checked") + '><i style="--c:' + (k ? "var(--c-" + k + ")" : "var(--c-None)") + '"></i>' + (k || "None") + "</label>").join("") +
-    "</div>" + (projects.length ? '<select name="project" aria-label="Project"><option value="">No project</option>' + projects.map((p) => '<option value="' + p.id + '">' + esc(p.name) + "</option>").join("") + "</select>" : "") +
+    "</div>" + (projects.length ? '<select name="project" aria-label="Sub-project">' + projectOptions(projects) + "</select>" : "") +
     "</div></form>";
 }
 
@@ -156,7 +157,7 @@ export function initToday(rerender) {
     else if (act === "spread") store.spreadOverdue();
     else if (act === "all-today") {
       const c = store.ctx();
-      store.moveMany(c.tasks.filter((t) => !t.status && t.date && t.date < c.today).map((t) => t.id), c.today);
+      store.moveMany(c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isRoutine(t)).map((t) => t.id), c.today);
     } else if (act === "day-prev") { showDate(addDays(shownDate(), -1)); rerender(); }
     else if (act === "day-next") { showDate(addDays(shownDate(), 1)); rerender(); }
     else if (act === "day-today") { showDate(store.today()); rerender(); }

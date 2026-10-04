@@ -3,6 +3,7 @@
 
 import { todayIso, addDays } from "./dates.js";
 import * as E from "./engine.js";
+import * as R from "./routines.js";
 import { readLocal, writeLocal } from "./dom.js";
 
 const KEY = "kuzhouduan-v1";
@@ -132,10 +133,11 @@ function remember(t, id) {
   if (tx && !tx.before.has(k)) tx.before.set(k, S.data[t][id] ? structuredClone(S.data[t][id]) : null);
 }
 
-function put(t, row) {
+// generated = 重复任务自动生成的那一次：改动时间记成 1，哪台设备上真改过它都比这个新，不会被盖掉
+function put(t, row, { generated = false } = {}) {
   remember(t, row.id);
   const prev = S.data[t][row.id];
-  row.updated = Math.max(Date.now(), (Number(prev?.updated) || 0) + 1);
+  row.updated = generated && !prev ? 1 : Math.max(Date.now(), (Number(prev?.updated) || 0) + 1);
   S.data[t][row.id] = row;
   S.pending[t + ":" + row.id] = row.updated;
   S.deletes = S.deletes.filter((d) => !(d.table === t && d.id === row.id));
@@ -332,8 +334,17 @@ export function reorder(ids) {
   }));
 }
 
+// 删掉重复任务的某一次：记进规则的 skip，以后不再给那天生成
 export function deleteTask(id) {
-  change(() => drop("tasks", id), "Deleted");
+  const rt = R.parseRoutineTaskId(id);
+  change(() => {
+    drop("tasks", id);
+    if (rt) {
+      const list = routines();
+      const r = list.find((x) => x.id === rt.rid);
+      if (r && !(r.skip || []).includes(rt.date)) writeRoutines(list.map((x) => (x.id === rt.rid ? { ...x, skip: [...(x.skip || []), rt.date] } : x)));
+    }
+  }, "Deleted");
 }
 
 // Later → 原来那条留着（原因还在），在明天放一条新的
@@ -472,4 +483,80 @@ export function ensureTodayLog() {
     const need = Object.values(tl.shares).reduce((a, v) => a + (Number(v) || 0), 0);
     change(() => put("log", { ...get("log", c.today), need, projects: tl.shares }));
   }
+}
+
+// ---------- 项目 / 子项目 ----------
+// 子项目就是 projects 表里的一行；它的 group 就是上一层的「项目」名字
+
+export function renameGroup(from, to) {
+  const name = String(to || "").trim();
+  if (!name || name === from) return;
+  change(() => all("projects").filter((p) => (p.group || "") === from).forEach((p) => put("projects", { ...p, group: name })), "Renamed project");
+}
+
+// ---------- 重复任务 ----------
+// 规则存在 Settings 表的 routines 里（一份 JSON），生成出来的任务进 Tasks 表
+
+export const routines = () => (setting("routines", []) || []).slice().sort(byOrder);
+
+function writeRoutines(list) {
+  put("settings", { id: "routines", key: "routines", value: list });
+}
+
+// 补上接下来两周还没生成的那几次
+function generate(list, t) {
+  let n = 0;
+  for (const r of list) {
+    for (const o of R.occurrences(r, t)) {
+      const id = R.routineTaskId(r.id, o.date);
+      if (S.data.tasks[id]) continue;
+      put("tasks", {
+        id, date: o.date, title: r.title, est: o.est, actual: null, category: r.category || "", status: "", doneOrder: null,
+        reason: "", optional: Boolean(r.optional), projectId: r.projectId || "", itemId: "", desc: "", order: nextOrder(o.date)
+      }, { generated: true });
+      n += 1;
+    }
+  }
+  return n;
+}
+
+export function materializeRoutines() {
+  const list = routines(), t = today();
+  if (!list.some((r) => R.occurrences(r, t).some((o) => !S.data.tasks[R.routineTaskId(r.id, o.date)]))) return 0;
+  let n = 0;
+  change(() => { n = generate(list, t); });
+  return n;
+}
+
+// 改规则：未来还没开始的那几次跟着改，规则里没有了的删掉，再把缺的补上；做过的不动
+export function saveRoutine(input) {
+  const list = routines();
+  const id = input.id || newId();
+  const prev = list.find((x) => x.id === id);
+  const r = {
+    title: "", category: "", projectId: "", optional: false, days: [0, 0, 0, 0, 0, 0, 0], start: today(), end: "", skip: [],
+    order: prev?.order ?? list.reduce((m, x) => Math.max(m, Number(x.order) || 0), 0) + 1, ...prev, ...input, id
+  };
+  const t = today();
+  change(() => {
+    const next = [...list.filter((x) => x.id !== id), r];
+    writeRoutines(next);
+    for (const task of all("tasks")) {
+      const p = R.parseRoutineTaskId(task.id);
+      if (!p || p.rid !== id || task.status || task.date < t) continue;
+      const m = R.minutesOn(r, p.date);
+      if (!m || !R.inRange(r, p.date) || r.paused) drop("tasks", task.id);
+      else put("tasks", { ...task, title: r.title, est: m, category: r.category || "", projectId: r.projectId || "", optional: Boolean(r.optional) });
+    }
+    generate(next, t);
+  }, prev ? "Routine updated" : null);
+  return id;
+}
+
+export function deleteRoutine(id) {
+  const t = today();
+  change(() => {
+    all("tasks").filter((x) => { const p = R.parseRoutineTaskId(x.id); return p && p.rid === id && !x.status && x.date >= t; }).forEach((x) => drop("tasks", x.id));
+    writeRoutines(routines().filter((x) => x.id !== id));
+  }, "Deleted routine");
 }

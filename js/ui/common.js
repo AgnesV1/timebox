@@ -11,6 +11,30 @@ export const STATUS = [["done", "Done"], ["partial", "Partial"], ["later", "Late
 
 export const projectOf = (t) => (t.projectId ? store.get("projects", t.projectId) : null);
 
+// 两层：上一层「项目」= 子项目的 group，下面是子项目（projects 表里的行）。
+// 按出现顺序分好组：[{ name, subs }]，没有项目的那些放最后（name 为空）
+export function groupsOf(projects) {
+  const map = new Map();
+  for (const p of projects) {
+    const g = String(p.group || "").trim();
+    if (!map.has(g)) map.set(g, []);
+    map.get(g).push(p);
+  }
+  const out = [...map.entries()].filter(([g]) => g).map(([name, subs]) => ({ name, subs }));
+  if (map.has("")) out.push({ name: "", subs: map.get("") });
+  return out;
+}
+
+// 下拉框：按项目分组列子项目
+export function projectOptions(projects, selected = "", none = "No sub-project") {
+  const opt = (p) => '<option value="' + p.id + '"' + (p.id === selected ? " selected" : "") + ">" + esc(p.name) + "</option>";
+  return (none === null ? "" : '<option value="">' + none + "</option>") + groupsOf(projects).map((g) =>
+    g.name ? '<optgroup label="' + esc(g.name) + '">' + g.subs.map(opt).join("") + "</optgroup>" : g.subs.map(opt).join("")).join("");
+}
+
+// 「Main - French · Module #4」
+export const fullName = (p) => (p.group ? p.group + " · " : "") + p.name;
+
 // 任务的颜色：有分类用分类色，没有就用项目色，都没有是灰
 export function colorOf(t) {
   if (CATS.includes(t.category)) return "var(--c-" + t.category + ")";

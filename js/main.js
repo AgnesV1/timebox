@@ -1,5 +1,5 @@
 // 苦昼短：入口。管页面切换（#today / #calendar / #projects / #settings）、主题、同步时机、整页重画。
-// 手机（≤760px）只有「今天」和设置；电脑有侧栏、日历和任务池、项目、重复任务、统计。
+// 手机（≤760px）只有「今天」和设置；电脑有侧栏、日历和任务池、项目、重复任务、统计。两边底部都有计时浮条。
 
 import * as store from "./store.js";
 import * as sync from "./sync.js";
@@ -18,6 +18,7 @@ import { initEditor, refreshEditor } from "./ui/editor.js";
 import { initDnd } from "./ui/dnd.js";
 import { statsHTML, initStats } from "./ui/stats.js";
 import { routinesHTML, initRoutines } from "./ui/routines.js";
+import { dockHTML, initTimer, tick } from "./ui/timer.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
@@ -25,6 +26,7 @@ const VIEWS = ["today", "calendar", "projects", "routines", "stats", "settings"]
 const side = document.getElementById("side");
 const main = document.getElementById("main");
 const pool = document.getElementById("pool");
+const dock = document.getElementById("dock");
 
 function route() {
   let v = location.hash.replace("#", "").split("/")[0] || "today";
@@ -105,6 +107,11 @@ function draw() {
   const showPool = !phone && view === "calendar" && store.local().pool;
   pool.hidden = !showPool;
   pool.innerHTML = showPool ? poolHTML(c) : "";
+  const hadDock = document.body.classList.contains("has-dock");
+  dock.innerHTML = dockHTML(c, view === "today" && shownDate() === c.today && (!phone || Boolean(store.local().url)));
+  document.body.classList.toggle("has-dock", Boolean(dock.innerHTML));
+  if (!hadDock) dock.firstElementChild?.classList.add("enter");   // 只在浮条刚出现时滑上来，重画时不闪
+  tick();
   restoreKeep(kept);
   paintSync();
   refreshEditor();
@@ -167,6 +174,7 @@ initEditor();
 initDnd(handleDrop);
 initStats(render);
 initRoutines();
+initTimer(render);
 
 store.subscribe((meta) => {
   if (meta.local) setFx(store.local().fx !== false);

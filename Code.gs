@@ -4,7 +4,7 @@
 var SECRET = 'CHANGE_ME';
 
 // 每张表：页名、主键、[字段, 表头, 类型, 标记]。列按表头文字找，可以挪位置、中间插自己的列。
-// 类型 text / num / date / bool / json / status / pstatus。
+// 类型 text / num / date / bool / json / status / pstatus / clock（钟点 09:10，存成文字）。
 // 标记 calc = 脚本自己算，App 不写；hide = setup 时把这列藏起来（右键可取消隐藏）。
 var T = {
   tasks: { sheet: 'Tasks', key: 'id', main: 'title', cols: [
@@ -32,7 +32,11 @@ var T = {
     ['date', 'Date', 'date'], ['need', 'Line min', 'num'], ['projects', 'Shares', 'json'],
     ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
   settings: { sheet: 'Settings', key: 'key', cols: [
-    ['key', 'Key', 'text'], ['value', 'Value', 'json'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] }
+    ['key', 'Key', 'text'], ['value', 'Value', 'json'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
+  // 计时记录：一段一行。From / To 是钟点（09:10），Min 是分钟
+  time: { sheet: 'Time', key: 'id', cols: [
+    ['date', 'Date', 'date'], ['task', 'Task', 'text', 'calc'], ['from', 'From', 'clock'], ['to', 'To', 'clock'], ['min', 'Min', 'num'],
+    ['id', 'ID', 'text', 'hide'], ['taskId', 'Task ID', 'text', 'hide'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] }
 };
 var DELETED = 'Deleted';
 var DELETED_HEADER = ['Table', 'ID', 'Deleted at', 'Synced'];
@@ -156,7 +160,7 @@ function ensure_(name) {
     if (!i) return;
     var range = sh.getRange(2, i, rows, 1);
     if (c[2] === 'date') range.setNumberFormat('yyyy-mm-dd');
-    else if (c[2] === 'text' || c[2] === 'json') range.setNumberFormat('@');   // 纯文本，「- 第一步」不会被当成公式
+    else if (c[2] === 'text' || c[2] === 'json' || c[2] === 'clock') range.setNumberFormat('@');   // 纯文本，「- 第一步」不会被当成公式
     if (c[0] === 'progress') range.setNumberFormat('0%');
     if (String(c[3] || '').indexOf('hide') >= 0) sh.hideColumns(i);
   });
@@ -225,6 +229,7 @@ function fromCell_(type, v, tz) {
   if (type === 'json') { if (v === '' || v === null) return null; try { return JSON.parse(v); } catch (e) { return null; } }
   if (type === 'status') return statusIn_(v);
   if (type === 'pstatus') return pstatusIn_(v);
+  if (type === 'clock' && Object.prototype.toString.call(v) === '[object Date]') return Utilities.formatDate(v, tz, 'HH:mm');
   return v === null || v === undefined ? '' : String(v);
 }
 
@@ -379,7 +384,7 @@ function pull_(since) {
 function spent_(t) {
   var a = Number(t.actual) || 0;
   if (t.status === 'done') return a > 0 ? a : Number(t.est) || 0;
-  return t.status === 'partial' ? a : 0;
+  return t.status === 'partial' || !t.status ? a : 0;   // 还没标状态但计过时的也算
 }
 
 function plan_(t) {
@@ -389,9 +394,10 @@ function plan_(t) {
 
 function recount_() {
   var projects = readAll_('projects'), items = readAll_('items'), tasks = readAll_('tasks');
-  var name = {}, planned = {}, done = {}, spent = {}, progress = {};
+  var name = {}, planned = {}, done = {}, spent = {}, progress = {}, title = {};
   projects.forEach(function (p) { name[p.id] = p.name; });
   tasks.forEach(function (t) {
+    title[t.id] = t.title;
     if (t.itemId) progress[t.itemId] = (progress[t.itemId] || 0) + plan_(t);
     if (t.projectId) spent[t.projectId] = (spent[t.projectId] || 0) + spent_(t);
   });
@@ -405,6 +411,7 @@ function recount_() {
   writeCol_('projects', 'progress', function (r) { return planned[r.id] ? (done[r.id] || 0) / planned[r.id] : ''; });
   writeCol_('tasks', 'project', function (r) { return name[r.projectId] || ''; });
   writeCol_('items', 'project', function (r) { return name[r.projectId] || ''; });
+  writeCol_('time', 'task', function (r) { return title[r.taskId] || ''; });
   return { ok: true, projects: projects.length };
 }
 
@@ -524,6 +531,7 @@ function doPost(e) {
       try { recount_(); } catch (err) { out.recount = String(err); }   // Projects 出问题不能影响同步，但要能看见
     }
     out.now = Date.now();
+    out.tables = Object.keys(T);   // 页面靠这个知道表格认不认识新加的表
     if (body.pull) out.pull = pull_(Number(body.since) || 0);
     return json_(out);
   } finally {

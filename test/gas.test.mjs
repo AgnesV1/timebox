@@ -134,3 +134,31 @@ test("a fresh, empty spreadsheet works too", () => {
   assert.equal(proj.Status, "Active");
   assert.equal(g.ss.getSheetByName("Tasks").objects()[0].Project, "French B2");
 });
+
+test("time log: its own sheet, task name filled in, old pages told which tables exist", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  assert.ok(g.ss.getSheetByName("Time"));
+  const r = g.post({ secret: "CHANGE_ME", pull: true, since: 0, push: { rows: {
+    tasks: [{ id: "t1", date: "2026-10-04", title: "French", est: 45, status: "", actual: 30, updated: 1 }],
+    time: [{ id: "x1", date: "2026-10-04", taskId: "t1", from: "09:10", to: "09:40", min: 30, updated: 1 }]
+  } } });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.ok(r.tables.includes("time"));
+  const row = g.ss.getSheetByName("Time").objects()[0];
+  assert.equal(row.Task, "French");
+  assert.equal(row.From, "09:10");
+  assert.equal(row.Min, 30);
+  assert.deepEqual({ ...r.pull.tables.time[0], synced: 0 }, { date: "2026-10-04", task: "French", from: "09:10", to: "09:40", min: 30, id: "x1", taskId: "t1", updated: 1, synced: 0 });
+});
+
+test("spent counts timed tasks that aren't marked yet", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  g.post({ secret: "CHANGE_ME", push: { rows: {
+    projects: [{ id: "p1", name: "French", status: "active", updated: 1 }],
+    tasks: [{ id: "t1", date: "2026-10-04", title: "Unit 1", est: 60, status: "", actual: 25, projectId: "p1", updated: 1 },
+      { id: "t2", date: "2026-10-04", title: "Unit 2", est: 60, status: "drop", actual: 10, projectId: "p1", updated: 1 }]
+  } } });
+  assert.equal(g.ss.getSheetByName("Projects").objects()[0]["Spent min"], 25);
+});

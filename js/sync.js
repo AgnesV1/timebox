@@ -48,9 +48,12 @@ export async function sync({ full = false } = {}) {
     clearTimeout(timer);
     const data = await res.json();
     if (data.error) throw new Error(ERRORS[data.error] || data.error);
-    store.pushed(out);
+    // 旧版 Code.gs 不回 tables，也不认识 Time 表：计时记录先留在本机
+    const known = data.tables || store.TABLES.filter((t) => t !== "time");
+    store.pushed(out, known);
     store.applyPull(data.pull, data.now, { full });
-    set("Synced " + hhmm());
+    if (out.rows.time && !known.includes("time")) set("Update Code.gs to sync time — saved here", true);
+    else set("Synced " + hhmm());
     ok = true;
   } catch (e) {
     const msg = e.name === "AbortError" ? "Sheet didn't answer" : navigator.onLine === false ? "Offline" : e instanceof TypeError ? "Can't reach the Sheet" : e.message;

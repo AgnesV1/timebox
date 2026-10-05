@@ -35,6 +35,8 @@ test("task minutes: spent vs plan progress", () => {
   assert.equal(E.spentMin({ status: "partial", est: 45 }), 0);
   assert.equal(E.spentMin({ status: "partial", est: 45, actual: 20 }), 20);
   assert.equal(E.spentMin({ status: "later", est: 45, actual: 20 }), 0);
+  assert.equal(E.spentMin({ status: "", est: 45, actual: 20 }), 20, "timed but not marked yet");
+  assert.equal(E.spentMin({ status: "", est: 45 }), 0);
   assert.equal(E.planMin({ status: "done", est: 45, actual: 90 }), 45);
   assert.equal(E.planMin({ status: "partial", est: 45, actual: 90 }), 45);
 });

@@ -8,7 +8,7 @@ import { readLocal, writeLocal } from "./dom.js";
 
 const KEY = "kuzhouduan-v1";
 const OLD_KEY = "timebox-v1";
-export const TABLES = ["tasks", "projects", "items", "capacity", "notes", "log", "settings"];
+export const TABLES = ["tasks", "projects", "items", "capacity", "notes", "log", "settings", "time"];
 const KEYED = { capacity: "date", notes: "date", log: "date", settings: "key" };
 
 // 只把这些字段发给表格；Planned / Spent / 项目名这些是表格自己算的
@@ -19,7 +19,8 @@ const FIELDS = {
   capacity: ["date", "min"],
   notes: ["date", "note"],
   log: ["date", "need", "projects"],
-  settings: ["key", "value"]
+  settings: ["key", "value"],
+  time: ["date", "taskId", "from", "to", "min"]
 };
 
 export const PROJECT_COLORS = ["#B8F000", "#2F5BFF", "#FF3EA5", "#FF7A1A", "#9B5CFF", "#00C2A8", "#FFC400", "#FF4D4D"];
@@ -190,9 +191,10 @@ export function outgoing() {
   return { rows, deletes: S.deletes.slice(), stamp };
 }
 
-// 推送成功：发出去之后没再改过的行才算推上去了
-export function pushed(out) {
-  for (const [k, u] of Object.entries(out.stamp)) if (S.pending[k] === u) delete S.pending[k];
+// 推送成功：发出去之后没再改过的行才算推上去了。
+// known = 表格认识的表；旧版 Code.gs 不认识 time，那些行先留在本机，等 Code.gs 更新了再推
+export function pushed(out, known = TABLES) {
+  for (const [k, u] of Object.entries(out.stamp)) if (S.pending[k] === u && known.includes(k.slice(0, k.indexOf(":")))) delete S.pending[k];
   S.deletes = S.deletes.filter((d) => !out.deletes.some((x) => x.table === d.table && x.id === d.id && x.at === d.at));
   persist();
 }
@@ -209,6 +211,7 @@ function normalize(t, raw) {
   }
   if (t === "items") { r.est = Number(r.est) || 0; r.projectId = r.projectId || ""; }
   if (t === "projects") r.status = r.status || "active";
+  if (t === "time") { r.min = Number(r.min) || 0; r.from = r.from || ""; r.to = r.to || ""; }
   return r;
 }
 
@@ -292,7 +295,8 @@ export function updateTask(id, patch, label, opts) {
   change(() => put("tasks", { ...t, ...patch }), label, opts);
 }
 
-// 和旧版一样：再点一次同一个就取消；Done / Partial 记下这是今天第几件做完的
+// 和旧版一样：再点一次同一个就取消；Done / Partial 记下这是今天第几件做完的。
+// 实际分钟：有计时记录就是记录加起来，取消 / Later / Drop 也不清掉（时间是真花了的）
 export function setStatus(id, s) {
   const t = get("tasks", id);
   if (!t) return;
@@ -303,7 +307,7 @@ export function setStatus(id, s) {
     status: off ? "" : s,
     doneOrder: off ? null : fin ? (t.doneOrder ?? finished + 1) : null,
     reason: s === "done" && !off ? "" : t.reason,
-    actual: !off && fin ? t.actual : null
+    actual: !off && fin ? t.actual : timeTotal(id) || null
   });
 }
 
@@ -334,11 +338,21 @@ export function reorder(ids) {
   }));
 }
 
+// 删任务连同它的计时记录一起删
+function dropTask(id) {
+  timeOf(id).forEach((x) => drop("time", x.id));
+  if (timer()?.taskId === id) put("settings", { id: "timer", key: "timer", value: null });
+  drop("tasks", id);
+}
+
+// 动过的任务：标了状态，或者计过时
+const started = (t) => Boolean(t.status) || hasTime(t.id);
+
 // 删掉重复任务的某一次：记进规则的 skip，以后不再给那天生成
 export function deleteTask(id) {
   const rt = R.parseRoutineTaskId(id);
   change(() => {
-    drop("tasks", id);
+    dropTask(id);
     if (rt) {
       const list = routines();
       const r = list.find((x) => x.id === rt.rid);
@@ -382,8 +396,8 @@ export function scheduleItem(itemId, date) {
 // 拖回任务池：只有从条目来的、还没开始的任务能拖回去
 export function unschedule(id) {
   const t = get("tasks", id);
-  if (!t || !t.itemId || t.status) return false;
-  change(() => drop("tasks", id), "Back to pool");
+  if (!t || !t.itemId || started(t)) return false;
+  change(() => dropTask(id), "Back to pool");
   return true;
 }
 
@@ -435,7 +449,7 @@ export function updateItem(id, patch) {
 
 export function deleteItem(id) {
   change(() => {
-    all("tasks").filter((t) => t.itemId === id).forEach((t) => (t.status ? put("tasks", { ...t, itemId: "" }) : drop("tasks", t.id)));
+    all("tasks").filter((t) => t.itemId === id).forEach((t) => (started(t) ? put("tasks", { ...t, itemId: "" }) : dropTask(t.id)));
     drop("items", id);
   }, "Deleted item");
 }
@@ -543,9 +557,9 @@ export function saveRoutine(input) {
     writeRoutines(next);
     for (const task of all("tasks")) {
       const p = R.parseRoutineTaskId(task.id);
-      if (!p || p.rid !== id || task.status || task.date < t) continue;
+      if (!p || p.rid !== id || started(task) || task.date < t) continue;
       const m = R.minutesOn(r, p.date);
-      if (!m || !R.inRange(r, p.date) || r.paused) drop("tasks", task.id);
+      if (!m || !R.inRange(r, p.date) || r.paused) dropTask(task.id);
       else put("tasks", { ...task, title: r.title, est: m, category: r.category || "", projectId: r.projectId || "", optional: Boolean(r.optional) });
     }
     generate(next, t);
@@ -556,7 +570,85 @@ export function saveRoutine(input) {
 export function deleteRoutine(id) {
   const t = today();
   change(() => {
-    all("tasks").filter((x) => { const p = R.parseRoutineTaskId(x.id); return p && p.rid === id && !x.status && x.date >= t; }).forEach((x) => drop("tasks", x.id));
+    all("tasks").filter((x) => { const p = R.parseRoutineTaskId(x.id); return p && p.rid === id && !started(x) && x.date >= t; }).forEach((x) => dropTask(x.id));
     writeRoutines(routines().filter((x) => x.id !== id));
   }, "Deleted routine");
+}
+
+// ---------- 计时 ----------
+// 正在跑的计时器存在 Settings 的 timer 里（{taskId, start}），所以手机上开始、电脑上也能停。
+// 每段时间是 Time 表的一行：{date, taskId, from, to, min}，from / to 是「09:10」这样的钟点。
+// 任务的实际分钟 = 它所有记录加起来。
+
+export const timer = () => setting("timer", null);
+export const timeOf = (taskId) => all("time").filter((x) => x.taskId === taskId).sort((a, b) => clockKey(a.from || a.to) - clockKey(b.from || b.to));
+export const hasTime = (taskId) => all("time").some((x) => x.taskId === taskId);
+export const timeTotal = (taskId) => timeOf(taskId).reduce((a, x) => a + (Number(x.min) || 0), 0);
+
+const pad2 = (n) => String(n).padStart(2, "0");
+export const clockOf = (ms) => { const d = new Date(ms); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); };
+export const clockNow = () => clockOf(Date.now());
+const toMin = (hm) => { const [h, m] = String(hm).split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+const fromMin = (v) => { const x = ((v % 1440) + 1440) % 1440; return pad2(Math.floor(x / 60)) + ":" + pad2(x % 60); };
+// 一天从 dayStartsAt 算起：凌晨 1 点排在晚上 11 点后面
+function clockKey(hm) { return hm ? (toMin(hm) - toMin(prefs().dayStartsAt) + 1440) % 1440 : 9999; }
+
+function setTimer(value) { put("settings", { id: "timer", key: "timer", value }); }
+
+function addTime(taskId, min, to, from) {
+  const t = get("tasks", taskId);
+  if (!t) return;
+  put("time", { id: newId(), date: t.date, taskId, from: to ? from ?? fromMin(toMin(to) - min) : "", to: to || "", min });
+  put("tasks", { ...get("tasks", taskId), actual: timeTotal(taskId) });
+}
+
+// 开始：已经有一个在跑就先停下记好（和 Toggl 一样一次只跑一个）
+export function startTimer(taskId) {
+  if (!get("tasks", taskId) || timer()?.taskId === taskId) return;
+  let logged = null;
+  change(() => {
+    logged = stopRunning();
+    setTimer({ taskId, start: Date.now() });
+  });
+  return logged;
+}
+
+function stopRunning() {
+  const r = timer();
+  if (!r) return null;
+  setTimer(null);
+  const now = Date.now();
+  const min = Math.round((now - Number(r.start)) / 60000);
+  if (min < 1 || !get("tasks", r.taskId)) return { taskId: r.taskId, min: 0 };
+  addTime(r.taskId, min, clockOf(now), clockOf(Number(r.start)));
+  return { taskId: r.taskId, min };
+}
+
+// 停下：返回记了多少分钟（不到 1 分钟不记）
+export function stopTimer() {
+  let logged = null;
+  change(() => { logged = stopRunning(); });
+  return logged;
+}
+
+export function discardTimer() {
+  if (!timer()) return;
+  change(() => setTimer(null), "Timer discarded");
+}
+
+// 手动补一段：用了多少分钟、几点结束（不填结束时间也行，只记分钟）
+export function logTime(taskId, min, to) {
+  min = Math.round(Number(min) || 0);
+  if (min < 1 || !get("tasks", taskId)) return;
+  change(() => addTime(taskId, min, to || ""), "Logged " + min + " min");
+}
+
+export function deleteTime(id) {
+  const x = get("time", id);
+  if (!x) return;
+  change(() => {
+    drop("time", id);
+    const t = get("tasks", x.taskId);
+    if (t) put("tasks", { ...t, actual: timeTotal(x.taskId) || null });
+  }, "Deleted time");
 }

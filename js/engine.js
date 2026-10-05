@@ -25,11 +25,12 @@ const round5 = (v) => Math.round(v / 5) * 5;
 
 // ---------- 单个任务 ----------
 
-// 实际花掉的时间：填了 Actual 按实际；没填的 Done 按预计；Partial 没填算 0；其他不算
+// 实际花掉的时间：填了 Actual 按实际；没填的 Done 按预计；Partial 没填算 0；
+// 还没标状态但计过时的，按计的时间算；Later / Drop 不算
 export function spentMin(t) {
   const a = num(t.actual);
   if (t.status === "done") return a > 0 ? a : num(t.est);
-  if (t.status === "partial") return a;
+  if (t.status === "partial" || !t.status) return a;
   return 0;
 }
 

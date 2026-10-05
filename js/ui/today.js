@@ -1,21 +1,47 @@
 // 「今天」页：安全线、当天的任务块、昨天的账单、过期没做的、任务列表、加任务、给这天的备注。
 // 电脑上左边是清单，右边是安全线和账单；日历里点开某一天也用它。
-// 手机上只留两件事：看今天前后各 5 天的任务、给任务标结果；右上角齿轮进去只有白天黑夜和连表格。计划都在电脑上做。
+// 手机上：看今天前后各 5 天的任务、给任务标结果、计时、加任务；右上角齿轮进去只有白天黑夜和连表格。计划都在电脑上做。
 
 import * as store from "../store.js";
 import * as E from "../engine.js";
 import { esc, on, icon, debounce } from "../dom.js";
 import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, WEEKDAYS } from "../dates.js";
-import { heroHTML, stripHTML, billHTML, colorOf, projectOf, projectOptions, segStyle, lineInfo, STATUS, CATS } from "./common.js";
+import { heroHTML, stripHTML, billHTML, colorOf, projectOf, projectOptions, segStyle, lineInfo, toast, STATUS, CATS } from "./common.js";
 import { openTaskEditor } from "./editor.js";
+import { pickedId, pick, timeable, elapsed } from "./timer.js";
 
 const openDesc = new Set();
+const logOpen = new Set();   // 已经有计时记录、又点了「+ time」要再补一段的任务
 const seen = new Set();
 let overdueOpen = false;
 let viewDate = "";
 
 export const shownDate = () => viewDate || store.today();
 export function showDate(d) { viewDate = d === store.today() ? "" : d; }
+
+// 计时记录：「09:10–09:40 · 30m ×」；正在计时的那个显示走着的时间
+function timesHTML(c, t, list, form) {
+  const run = store.timer();
+  const live = run?.taskId === t.id;
+  const fin = t.status === "done" || t.status === "partial";
+  if (!list.length && !live) return "";
+  return '<div class="times">' + (live ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : "") +
+    list.map((x) => '<span class="tm">' + (x.from ? '<span class="num">' + esc(x.from) + "–" + esc(x.to) + "</span> · " : "") + fmtMin(x.min) +
+      '<button type="button" class="tm-x" data-act="time-del" data-tid="' + x.id + '" aria-label="Delete this time">×</button></span>').join("") +
+    (list.length > 1 ? '<span class="tm sum">= ' + fmtMin(store.timeTotal(t.id)) + "</span>" : "") +
+    (fin && !form ? '<button type="button" class="tm more-time" data-act="time-more">+ time</button>' : "") + "</div>";
+}
+
+// 标了 Done / Partial：填「用了几小时几分、几点结束」记一段。没计过时的直接出来；计过的点「+ time」再补
+function logFormHTML(c, t, list) {
+  const base = list.length ? 0 : Number(t.actual) > 0 ? Number(t.actual) : t.status === "done" ? Number(t.est) || 0 : 0;
+  const k = (f) => 'data-lt="' + f + '" data-keep="lt-' + f + "-" + t.id + '"';
+  return '<div class="logtime"><span>Took</span>' +
+    '<input class="num" ' + k("h") + ' inputmode="numeric" value="' + (base ? Math.floor(base / 60) : "") + '" placeholder="0" aria-label="Hours"><span>h</span>' +
+    '<input class="num" ' + k("m") + ' inputmode="numeric" value="' + (base ? base % 60 : "") + '" placeholder="0" aria-label="Minutes"><span>m</span>' +
+    '<span>ended</span><input type="time" ' + k("to") + ' value="' + (t.date === c.today ? store.clockNow() : "") + '" aria-label="Ended at">' +
+    '<button type="button" class="btn" data-act="time-log">Log</button></div>';
+}
 
 function rowHTML(c, t, tasks, phone = false) {
   const p = projectOf(t);
@@ -25,7 +51,11 @@ function rowHTML(c, t, tasks, phone = false) {
   const fresh = !seen.has(t.id);
   seen.add(t.id);
   const movedOn = t.status === "later" && c.tasks.some((x) => !x.status && x.date > t.date && x.title === t.title);
-  return '<div class="row st-' + (t.status || "open") + (t.optional ? " opt" : "") + (fresh ? " enter" : "") + '" data-id="' + t.id + '" style="--i:' + tasks.indexOf(t) + '">' +
+  const list = store.timeOf(t.id);
+  const form = fin && t.date <= c.today && (!list.length || logOpen.has(t.id));
+  const picked = timeable(t, c.today) && pickedId(c) === t.id;
+  const running = store.timer()?.taskId === t.id;
+  return '<div class="row st-' + (t.status || "open") + (t.optional ? " opt" : "") + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + '" data-id="' + t.id + '" style="--i:' + tasks.indexOf(t) + '">' +
     '<div class="est num" data-drag-row title="Drag to reorder"><b>' + t.est + '</b><i class="grip"></i></div>' +
     '<div class="bar" style="--bar:' + colorOf(t) + ";min-height:" + Math.max(20, Math.min(t.est * 0.6, 90)) + 'px"></div>' +
     '<div class="body"><div class="line">' +
@@ -33,12 +63,12 @@ function rowHTML(c, t, tasks, phone = false) {
     (E.isRoutine(t) ? ' <span class="rt" title="Routine">↻</span>' : "") +
     (p && p.name.trim().toLowerCase() !== t.title.trim().toLowerCase() ? ' <span class="pj" style="--pc:' + esc(p.color) + '">' + esc(p.name) + "</span>" : "") +
     (t.desc && !open ? '<span class="more"> ⋯</span>' : "") + "</div>" +
-    (fin ? '<label class="act"><input class="num" data-act="actual" inputmode="numeric" placeholder="—" value="' + esc(t.actual ?? "") + '" aria-label="Actual minutes">min</label>' : "") +
     (phone ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") +
-    "</div>" +
+    "</div>" + timesHTML(c, t, list, form) +
     (open ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Details">' + esc(t.desc || "") + "</textarea>" : "") +
     '<div class="chips">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
     (t.status === "later" && !movedOn && !phone ? '<button type="button" class="chip ghost" data-act="tomorrow">→ Tomorrow</button>' : "") + "</div>" +
+    (form ? logFormHTML(c, t, list) : "") +
     (why ? '<input class="reason" data-act="reason" data-keep="reason-' + t.id + '" placeholder="Why?" value="' + esc(t.reason || "") + '">' : "") +
     "</div></div>";
 }
@@ -125,7 +155,7 @@ function phoneHTML(c) {
     '<header class="phead"><div class="l"><h1 data-act="day-today">' + fmtDay(d) + '</h1><span class="ball" data-act="ball" role="button" aria-label="Sparkles"></span></div>' +
     '<div class="r"><span class="psync" data-sync-status></span><a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
     (store.local().url ? bar + meta + '<div class="list" data-list="' + d + '">' +
-      (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true)).join("") : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet — plan it on the computer.") + "</div>") + "</div>"
+      (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true)).join("") : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + "</div>" + addHTML(c, d)
       : connectHTML()) + "</div>";
 }
 
@@ -144,14 +174,25 @@ export function todayHTML(c, phone) {
 // ---------- 交互（挂在 document 上，今天页和弹出的某一天都能用） ----------
 
 const saveNote = debounce((d, v) => store.setNote(d, v), 500);
+
+function logFromRow(row) {
+  if (!row) return;
+  const val = (f) => row.querySelector('[data-lt="' + f + '"]')?.value || "";
+  const min = (Number(val("h")) || 0) * 60 + (Number(val("m")) || 0);
+  if (min < 1) { toast("How long did it take?"); row.querySelector("[data-lt=h]")?.focus(); return; }
+  logOpen.delete(row.dataset.id);
+  store.logTime(row.dataset.id, min, val("to"));
+}
 const rowId = (el) => el.closest(".row")?.dataset.id;
 
 export function initToday(rerender) {
   on(document, "click", ".dayview [data-act]", (e, el) => {
     const act = el.dataset.act, id = rowId(el);
-    if (act === "status") store.setStatus(id, el.dataset.s);
-    else if (act === "desc") { if (openDesc.has(id)) openDesc.delete(id); else openDesc.add(id); rerender(); }
+    if (act === "status") { logOpen.delete(id); store.setStatus(id, el.dataset.s); }
     else if (act === "edit") openTaskEditor(id);
+    else if (act === "time-del") store.deleteTime(el.dataset.tid);
+    else if (act === "time-more") { logOpen.add(id); rerender(); }
+    else if (act === "time-log") logFromRow(el.closest(".row"));
     else if (act === "tomorrow") store.toTomorrow(id);
     else if (act === "od-toggle") { overdueOpen = !overdueOpen; rerender(); }
     else if (act === "spread") store.spreadOverdue();
@@ -164,21 +205,29 @@ export function initToday(rerender) {
     else if (act === "day-pick") { showDate(el.dataset.date); rerender(); }
   });
 
+  // 点任务：今天能计时的、还没选中的 → 选中它（底部浮条换成它）；已经选中的再点名字 → 展开说明
+  on(document, "click", ".dayview .row", (e, row) => {
+    if (e.target.closest("button, input, textarea, select, label, a, [data-drag-row]")) return;
+    const id = row.dataset.id, c = store.ctx();
+    if (timeable(store.get("tasks", id), c.today) && pickedId(c) !== id) { pick(id); rerender(); return; }
+    if (!e.target.closest("[data-act=desc]")) return;
+    if (openDesc.has(id)) openDesc.delete(id); else openDesc.add(id);
+    rerender();
+  });
+
+  // 「几小时几分」只留数字
+  on(document, "input", ".logtime [data-lt=h], .logtime [data-lt=m]", (e, el) => { el.value = el.value.replace(/\D/g, "").slice(0, 3); });
+  on(document, "keydown", ".logtime input", (e, el) => { if (e.key === "Enter") { e.preventDefault(); logFromRow(el.closest(".row")); } });
+
   on(document, "input", ".dayview [data-act]", (e, el) => {
     const act = el.dataset.act, id = rowId(el);
-    if (act === "actual") {
-      el.value = el.value.replace(/\D/g, "").slice(0, 3);
-      store.updateTask(id, { actual: el.value === "" ? null : Number(el.value) }, null, { quiet: true });
-    } else if (act === "reason") store.updateTask(id, { reason: el.value }, null, { quiet: true });
+    if (act === "reason") store.updateTask(id, { reason: el.value }, null, { quiet: true });
     else if (act === "desc-input") {
       el.style.height = "auto";
       el.style.height = el.scrollHeight + "px";
       store.updateTask(id, { desc: el.value }, null, { quiet: true });
     } else if (act === "note") saveNote(el.dataset.date, el.value);
   });
-
-  // 填完实际分钟离开输入框时，再整页更新一次数字
-  on(document, "change", ".dayview [data-act=actual]", () => rerender());
 
   on(document, "submit", ".dayview form[data-add]", (e, form) => {
     e.preventDefault();
@@ -189,7 +238,8 @@ export function initToday(rerender) {
     // 「Gym 40」「Gym 40m」：末尾的数字当分钟
     const m = title.match(/^(.*\S)\s+(\d{1,3})\s*(m|min|mins)?$/i);
     if (m && Number(m[2]) >= 5) { title = m[1]; est = Number(m[2]); }
-    store.addTask({ date: form.dataset.add, title, est, category: String(f.get("cat") || ""), projectId: String(f.get("project") || "") });
+    const id = store.addTask({ date: form.dataset.add, title, est, category: String(f.get("cat") || ""), projectId: String(f.get("project") || "") });
+    if (form.dataset.add === store.today()) { pick(id); rerender(); }   // 加完就选中，底部点 Start 就能开始
     const input = document.querySelector('[data-keep="add-title-' + form.dataset.add + '"]');
     if (input) { input.value = ""; input.focus(); }
   });

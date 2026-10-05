@@ -99,6 +99,6 @@ node --test test/*.test.mjs
 ```
 
 想连着一个假的表格试同步：`node tools/fake-sheet.mjs` 会在 http://127.0.0.1:8002/exec 起一个
-（口令 `CHANGE_ME`，里面是按旧表格式造的假数据）；`python3 tools/serve.py .` 起一个不缓存的本地网页（端口 8000）。
+（口令 `CHANGE_ME`，里面是按旧表格式造的假数据）；`python3 tools/serve.py .`（或 `node tools/serve.mjs .`）起一个不缓存的本地网页（端口 8000）。
 
 字体（Unbounded、Space Grotesk、JetBrains Mono）放在 `fonts/`，SIL Open Font License，许可证在同一个文件夹里。

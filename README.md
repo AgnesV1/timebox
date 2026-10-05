@@ -49,9 +49,12 @@
 **电脑**
 - `Projects`：按项目分区，区里是子项目。点「+ Sub-project」加子项目，填 Deadline 和条目
   （可以一行一个批量加，也能用 Numbered 生成「Unit 1…10」）；「Rename」改项目名，下面的子项目一起改
-- `Routines`：重复任务。周一到周日分别填分钟数（比如 Gym 周一 60、周三 40、周五 60，空着 = 那天不做），
-  会自动排进接下来两周的日历。改了规则，还没开始的那几天跟着变，做过的不动；
-  在电脑上删掉某一次，以后不会再生成那天；错过的重复任务不算「left behind」
+- **重复任务**：就是普通任务，设的时候选怎么重复、重复多久，整段时间一次排进日历。
+  一键：在加任务框里选「↻ Every day / Weekdays / Every 周几」和「for 1 week … 6 months」再点 Add；
+  细调：点任务的 ⋯ → Repeat，可以每个星期几填不同分钟（Gym 周一 60、周三 40、周五 60），选多久或到哪天为止。
+  重复的任务在编辑框顶上选「This one / This & following / All」，改名字、分钟、分类、子项目就作用到那些天；
+  「Change…」从这一天起改重复方式。删的时候选 Only this / This & following / This & earlier / All，
+  做过或计过时的留着当记录。错过的重复任务不算「left behind」
 - `Calendar`：右边是任务池，把条目拖到某天就排进去；日历里的任务能拖到别的天，拖回任务池就撤回。
   格子右上角的数字是那天能用的时间，点一下就能改
 - `Today`：左边是今天的清单，右边是安全线、昨天的账单、过期没做的、给今天的备注
@@ -73,7 +76,7 @@
 Optional（可选）的任务底下垫一层淡豹纹。
 
 **表格里怎么对应**：Projects 页一行是一个子项目，`Group` 列 = 项目，`Project` 列 = 子项目；
-重复任务的规则存在 Settings 页的 `routines` 那一行，生成出来的每一次在 Tasks 页里（ID 以 `rt:` 开头）；
+重复任务的规则存在 Settings 页的 `routines` 那一行，每一次都在 Tasks 页里（ID 以 `rt:` 开头）；
 计时记录在 Time 页（Date / Task / From / To / Min），正在跑的计时器在 Settings 页的 `timer` 那一行。
 
 ## 同步是怎么工作的

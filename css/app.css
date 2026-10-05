@@ -500,27 +500,21 @@ body.phone .settings .page-head { margin-top: 4px; }
 .rt { font-style: normal; font-size: .9em; color: var(--muted); }
 .ev .rt { margin-right: 3px; }
 
-/* ---------- 重复任务 ---------- */
-.rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-.rcard { padding: 16px 16px 14px; border: var(--b); border-radius: 20px; background: var(--bg); box-shadow: var(--hard); }
-.rcard header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.rname { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 0; border: 0; background: none; font: 700 17px/1.25 var(--display); text-align: left; letter-spacing: -.01em; }
-.rname i { width: 12px; height: 12px; flex-shrink: 0; border-radius: 50%; background: var(--rc); box-shadow: 0 0 0 1.5px var(--edge); }
-[data-theme="dark"] .rname i { box-shadow: 0 0 10px var(--rc); }
-.rtotal { flex-shrink: 0; font-size: 12px; color: var(--muted); }
-.rsub { margin: 6px 0 12px; font-size: 12.5px; color: var(--muted); }
-.rweek { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-.rday { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.rbar { display: flex; align-items: flex-end; width: 100%; max-width: 24px; height: 40px; }
-.rbar i { display: block; width: 100%; min-height: 0; border-radius: 4px 4px 0 0; background: var(--rc); }
-.rday.off .rbar { border-bottom: 1px solid var(--line); }
-.rday b { font-size: 12px; }
-.rday.off b { color: var(--muted); }
-.rday em { font-style: normal; font-size: 10.5px; color: var(--muted); }
-.fill-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.fill-row input { width: 70px; padding: 7px 8px; text-align: center; }
-.fill-row .btn { padding: 6px 12px; font-size: 12.5px; }
-.page-hint { max-width: 640px; margin-top: 18px; }
+/* ---------- 重复：编辑框里的设置、删哪些 ---------- */
+.rep-sum { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; padding: 10px 12px; border: var(--b-soft); border-radius: var(--r-sm); font-size: 13.5px; color: var(--muted); }
+.rep-sum b { color: var(--ink); }
+.rep-sum .link { margin-left: auto; }
+.rep-panel { margin-bottom: 14px; padding: 14px 14px 12px; border: var(--b); border-radius: 16px; background: var(--surface); }
+.rep-panel .field:last-child { margin-bottom: 0; }
+.rep-go { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rep-go .hint { margin: 0; }
+.field.scope .seg { justify-self: start; }
+.del-ask { margin-top: 20px; padding: 14px; border: 1.5px dashed var(--warn); border-radius: 16px; }
+.del-ask p { margin: 0 0 10px; font-weight: 700; }
+.del-ask .hint { display: block; margin: 2px 0 0; font-weight: 400; }
+.del-ask .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.del-ask .btn { padding: 7px 12px; font-size: 12.5px; }
+.add:has(select[name="repeat"] option[value=""]:checked) select[name="for"] { display: none; }
 .ptable .grow td { font-weight: 700; border-bottom: 0; padding-top: 12px; }
 .ptable .nested td:first-child { padding-left: 22px; }
 .gname { color: var(--muted); }
@@ -653,6 +647,9 @@ body.phone .settings .page-head { margin-top: 4px; }
 body.has-dock #main { padding-bottom: 140px; }
 body.phone.has-dock #main { padding-bottom: calc(140px + env(safe-area-inset-bottom)); }
 body.has-dock #toast { bottom: calc(108px + env(safe-area-inset-bottom)); }
+/* 正在页面里打字：浮条先让开，别挡住输入框（手机上也别压在键盘上） */
+body:has(#main :is(input, textarea, select):focus) #dock { visibility: hidden; }
+body:has(#main :is(input, textarea, select):focus) #toast { bottom: calc(22px + env(safe-area-inset-bottom)); }
 [data-theme="dark"] .dock { border-color: var(--edge); background: rgba(21, 21, 31, .92); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
 [data-theme="dark"] .dock.run { border-color: rgba(204, 255, 0, .5); box-shadow: 0 0 24px rgba(204, 255, 0, .18); }
 [data-theme="dark"] .dock .dot, [data-theme="dark"] .dock .pulse { border: 0; box-shadow: 0 0 10px var(--bar); }

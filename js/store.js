@@ -1,7 +1,7 @@
 // 数据层：本机存一份（localStorage），所有改动都从这里走，记下哪些行还没推到表格。
 // 每行都有 updated（改动时间），两台设备改了同一行，以后改的为准。
 
-import { todayIso, addDays } from "./dates.js";
+import { todayIso, addDays, fmtShort } from "./dates.js";
 import * as E from "./engine.js";
 import * as R from "./routines.js";
 import { readLocal, writeLocal } from "./dom.js";
@@ -509,70 +509,130 @@ export function renameGroup(from, to) {
 }
 
 // ---------- 重复任务 ----------
-// 规则存在 Settings 表的 routines 里（一份 JSON），生成出来的任务进 Tasks 表
+// 规则存在 Settings 表的 routines 里（一份 JSON），每一次都是 Tasks 表里的普通任务（ID 以 rt: 开头）。
+// 设好之后一次把整段时间都排进日历；只有设重复、改重复的时候才会生成，同步时不会自己再长出来。
 
 export const routines = () => (setting("routines", []) || []).slice().sort(byOrder);
+export const routineOf = (taskId) => { const p = R.parseRoutineTaskId(taskId); return p ? routines().find((r) => r.id === p.rid) || null : null; };
+export const seriesTasks = (rid) => all("tasks").filter((x) => x.id.startsWith("rt:" + rid + ":")).sort((a, b) => a.date.localeCompare(b.date));
 
 function writeRoutines(list) {
   put("settings", { id: "routines", key: "routines", value: list });
 }
 
-// 补上接下来两周还没生成的那几次
-function generate(list, t) {
-  let n = 0;
-  for (const r of list) {
-    for (const o of R.occurrences(r, t)) {
-      const id = R.routineTaskId(r.id, o.date);
-      if (S.data.tasks[id]) continue;
-      put("tasks", {
-        id, date: o.date, title: r.title, est: o.est, actual: null, category: r.category || "", status: "", doneOrder: null,
-        reason: "", optional: Boolean(r.optional), projectId: r.projectId || "", itemId: "", desc: "", order: nextOrder(o.date)
-      }, { generated: true });
-      n += 1;
-    }
-  }
-  return n;
-}
-
-export function materializeRoutines() {
-  const list = routines(), t = today();
-  if (!list.some((r) => R.occurrences(r, t).some((o) => !S.data.tasks[R.routineTaskId(r.id, o.date)]))) return 0;
-  let n = 0;
-  change(() => { n = generate(list, t); });
-  return n;
-}
-
-// 改规则：未来还没开始的那几次跟着改，规则里没有了的删掉，再把缺的补上；做过的不动
-export function saveRoutine(input) {
+function newRule(input) {
   const list = routines();
-  const id = input.id || newId();
-  const prev = list.find((x) => x.id === id);
-  const r = {
-    title: "", category: "", projectId: "", optional: false, days: [0, 0, 0, 0, 0, 0, 0], start: today(), end: "", skip: [],
-    order: prev?.order ?? list.reduce((m, x) => Math.max(m, Number(x.order) || 0), 0) + 1, ...prev, ...input, id
-  };
-  const t = today();
-  change(() => {
-    const next = [...list.filter((x) => x.id !== id), r];
-    writeRoutines(next);
-    for (const task of all("tasks")) {
-      const p = R.parseRoutineTaskId(task.id);
-      if (!p || p.rid !== id || started(task) || task.date < t) continue;
-      const m = R.minutesOn(r, p.date);
-      if (!m || !R.inRange(r, p.date) || r.paused) dropTask(task.id);
-      else put("tasks", { ...task, title: r.title, est: m, category: r.category || "", projectId: r.projectId || "", optional: Boolean(r.optional) });
-    }
-    generate(next, t);
-  }, prev ? "Routine updated" : null);
-  return id;
+  return { title: "", category: "", projectId: "", optional: false, days: [0, 0, 0, 0, 0, 0, 0], start: today(), end: "", skip: [],
+    order: list.reduce((m, x) => Math.max(m, Number(x.order) || 0), 0) + 1, ...input, id: newId() };
 }
 
-export function deleteRoutine(id) {
-  const t = today();
+// 把规则里 from 之后还没有的那几次补上
+function generate(r, from) {
+  let first = "";
+  for (const o of R.occurrences(r, from)) {
+    const id = R.routineTaskId(r.id, o.date);
+    if (S.data.tasks[id]) continue;
+    put("tasks", {
+      id, date: o.date, title: r.title, est: o.est, actual: null, category: r.category || "", status: "", doneOrder: null,
+      reason: "", optional: Boolean(r.optional), projectId: r.projectId || "", itemId: "", desc: "", order: nextOrder(o.date)
+    }, { generated: true });
+    first = first || id;
+  }
+  return first;
+}
+
+// 加任务时直接设重复：days 是一周七天的分钟数，end 是最后一天。返回第一次的 ID
+export function addRepeating(fields, days, end) {
+  const start = fields.date || today();
+  const r = newRule({ title: fields.title, category: fields.category || "", projectId: fields.projectId || "", optional: Boolean(fields.optional),
+    days, start, end: R.clampEnd(start, end) });
+  let first = "";
   change(() => {
-    all("tasks").filter((x) => { const p = R.parseRoutineTaskId(x.id); return p && p.rid === id && !started(x) && x.date >= t; }).forEach((x) => dropTask(x.id));
-    writeRoutines(routines().filter((x) => x.id !== id));
-  }, "Deleted routine");
+    writeRoutines([...routines(), r]);
+    first = generate(r, start);
+  }, "Repeats until " + fmtShort(r.end));
+  return first;
+}
+
+// 已有的普通任务改成重复的：它自己变成第一次（换成 rt: 的 ID，计时记录跟过去），后面的排上。返回它的新 ID
+export function repeatTask(id, days, end) {
+  const t = get("tasks", id);
+  if (!t) return id;
+  const r = newRule({ title: t.title, category: t.category || "", projectId: t.projectId || "", optional: Boolean(t.optional),
+    days, start: t.date, end: R.clampEnd(t.date, end) });
+  const nid = R.routineTaskId(r.id, t.date);
+  change(() => {
+    writeRoutines([...routines(), r]);
+    put("tasks", { ...t, id: nid });
+    timeOf(id).forEach((x) => put("time", { ...x, taskId: nid }));
+    if (timer()?.taskId === id) put("settings", { id: "timer", key: "timer", value: { ...timer(), taskId: nid } });
+    drop("tasks", id);
+    generate(r, addDays(t.date, 1));
+  }, "Repeats until " + fmtShort(r.end));
+  return nid;
+}
+
+// 改重复（从这一次起）：这天以后还没开始的跟着新规则变，规则里没有了的删掉，缺的补上；之前的和做过的不动
+export function replanSeries(id, days, end) {
+  const t = get("tasks", id), r = routineOf(id);
+  if (!t || !r) return;
+  const from = t.date;
+  const next = { ...r, days, end: R.clampEnd(from, end) };
+  change(() => {
+    writeRoutines(routines().map((x) => (x.id === r.id ? next : x)));
+    for (const x of seriesTasks(r.id)) {
+      if (x.date < from || started(x)) continue;
+      const m = R.minutesOn(next, x.date);
+      if (x.id !== id && (!m || !R.inRange(next, x.date))) dropTask(x.id);
+      else if (m) put("tasks", { ...x, est: m });
+    }
+    generate(next, from);
+  }, "Repeat updated");
+}
+
+const SERIES_FIELDS = ["title", "est", "category", "projectId", "optional"];
+
+// 改名字、分钟、分类、子项目、可选：只改这一次 / 这次和以后 / 全部（做过的不动，除了这一次自己）
+export function editSeries(id, patch, scope) {
+  const t = get("tasks", id), r = routineOf(id);
+  if (!t || !r || scope === "this") return updateTask(id, patch, null, { quiet: patch.title !== undefined });
+  const fields = Object.fromEntries(Object.entries(patch).filter(([k]) => SERIES_FIELDS.includes(k)));
+  change(() => {
+    for (const x of seriesTasks(r.id)) {
+      if (x.id !== id && (started(x) || (scope === "following" && x.date < t.date))) continue;
+      put("tasks", { ...x, ...fields, ...("projectId" in fields ? { itemId: "" } : {}) });
+    }
+    const rule = { ...r };
+    for (const k of ["title", "category", "projectId", "optional"]) if (k in fields) rule[k] = fields[k];
+    if ("est" in fields) rule.days = (r.days || []).map((v) => (Number(v) > 0 ? Number(fields.est) || 0 : 0));
+    writeRoutines(routines().map((x) => (x.id === r.id ? rule : x)));
+  }, null, { quiet: patch.title !== undefined });
+}
+
+// 删的时候会删掉哪几个：only = 只这一次；following / earlier / all 只删还没开始的（这一次也一样）
+export function seriesScope(id, scope) {
+  const t = get("tasks", id), p = R.parseRoutineTaskId(id);
+  if (!t) return [];
+  if (scope === "this" || !p) return [t];
+  return seriesTasks(p.rid).filter((x) => !started(x) &&
+    (scope === "all" || (scope === "following" ? x.date >= t.date : x.date <= t.date)));
+}
+
+export function deleteSeries(id, scope) {
+  const t = get("tasks", id), p = R.parseRoutineTaskId(id);
+  if (!t || !p || scope === "this") return deleteTask(id);
+  const gone = seriesScope(id, scope);
+  change(() => {
+    gone.forEach((x) => dropTask(x.id));
+    const r = routines().find((x) => x.id === p.rid);
+    if (!r) return;
+    const left = seriesTasks(r.id);
+    if (scope === "all" || !left.length) writeRoutines(routines().filter((x) => x.id !== r.id));
+    else if (scope === "following") {
+      const kept = left.filter((x) => x.date >= t.date).map((x) => x.date).sort().pop();
+      writeRoutines(routines().map((x) => (x.id === r.id ? { ...r, end: kept || addDays(t.date, -1) } : x)));
+    }
+  }, gone.length ? "Deleted " + gone.length + " task" + (gone.length === 1 ? "" : "s") : "Stopped repeating");
 }
 
 // ---------- 计时 ----------

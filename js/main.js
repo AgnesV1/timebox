@@ -1,5 +1,5 @@
 // 苦昼短：入口。管页面切换（#today / #calendar / #projects / #settings）、主题、同步时机、整页重画。
-// 手机（≤760px）只有「今天」和设置；电脑有侧栏、日历和任务池、项目、重复任务、统计。两边底部都有计时浮条。
+// 手机（≤760px）只有「今天」和设置；电脑有侧栏、日历和任务池、项目、统计。两边底部都有计时浮条。
 
 import * as store from "./store.js";
 import * as sync from "./sync.js";
@@ -17,12 +17,11 @@ import { settingsHTML, initSettings } from "./ui/settings.js";
 import { initEditor, refreshEditor } from "./ui/editor.js";
 import { initDnd } from "./ui/dnd.js";
 import { statsHTML, initStats } from "./ui/stats.js";
-import { routinesHTML, initRoutines } from "./ui/routines.js";
 import { dockHTML, initTimer, tick } from "./ui/timer.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
-const VIEWS = ["today", "calendar", "projects", "routines", "stats", "settings"];
+const VIEWS = ["today", "calendar", "projects", "stats", "settings"];
 const side = document.getElementById("side");
 const main = document.getElementById("main");
 const pool = document.getElementById("pool");
@@ -48,7 +47,7 @@ function applyTheme() {
 
 function sidebarHTML(c, view) {
   const todayOpen = c.tasks.filter((t) => t.date === c.today && !t.status).length;
-  const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["routines", "Routines", ""], ["stats", "Stats", ""], ["settings", "Settings", ""]];
+  const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""], ["settings", "Settings", ""]];
   // 项目（group）下面缩进列子项目
   const sub = (p) => {
     const h = E.health(c, p);
@@ -103,7 +102,7 @@ function draw() {
   document.body.classList.toggle("phone", phone);
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
-  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "routines" ? routinesHTML() : view === "stats" ? statsHTML(c) : view === "settings" ? settingsHTML(phone) : todayHTML(c, phone);
+  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "settings" ? settingsHTML(phone) : todayHTML(c, phone);
   const showPool = !phone && view === "calendar" && store.local().pool;
   pool.hidden = !showPool;
   pool.innerHTML = showPool ? poolHTML(c) : "";
@@ -143,11 +142,10 @@ function celebrate(c, view) {
 
 // ---------- 同步时机 ----------
 
-// 同步完：拍今天的安全线快照，补上重复任务接下来两周的那几次
+// 同步完：拍今天的安全线快照
 async function syncThenLog() {
   await sync.sync();
   store.ensureTodayLog();
-  store.materializeRoutines();
 }
 
 let lastToday = store.today();
@@ -156,7 +154,6 @@ function tickDay() {
   if (t === lastToday) return;
   lastToday = t;
   store.ensureTodayLog();
-  store.materializeRoutines();
   render();
 }
 
@@ -173,7 +170,6 @@ initSettings(applyTheme);
 initEditor();
 initDnd(handleDrop);
 initStats(render);
-initRoutines();
 initTimer(render);
 
 store.subscribe((meta) => {
@@ -213,4 +209,3 @@ render();
 // 早上的线要等表格里的数据拉下来再拍；连不上就 6 秒后用本机的
 if (sync.configured()) await Promise.race([syncThenLog(), new Promise((r) => setTimeout(r, 6000))]);
 store.ensureTodayLog();
-store.materializeRoutines();

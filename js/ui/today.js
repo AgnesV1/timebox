@@ -6,6 +6,7 @@ import * as store from "../store.js";
 import * as E from "../engine.js";
 import { esc, on, icon, debounce } from "../dom.js";
 import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, WEEKDAYS } from "../dates.js";
+import * as R from "../routines.js";
 import { heroHTML, stripHTML, billHTML, colorOf, projectOf, projectOptions, segStyle, lineInfo, toast, STATUS, CATS } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
@@ -82,7 +83,8 @@ function overdueHTML(c) {
     '<div class="od-actions"><button type="button" class="btn primary" data-act="spread">Spread them out</button><button type="button" class="btn" data-act="all-today">All to today</button></div></section>';
 }
 
-function addHTML(c, d) {
+// 加任务；电脑上多两个下拉：怎么重复、重复多久（一键排好整段时间）
+function addHTML(c, d, phone = false) {
   const projects = c.projects.filter(E.isActive);
   return '<form class="add" data-add="' + d + '" autocomplete="off">' +
     '<div class="add-main"><input name="title" data-keep="add-title-' + d + '" placeholder="Add a task" enterkeyhint="done">' +
@@ -91,6 +93,9 @@ function addHTML(c, d) {
     '<div class="add-more"><div class="cats">' +
     ["", ...CATS].map((k) => '<label class="cat"><input type="radio" name="cat" value="' + k + '"' + (k ? "" : " checked") + '><i style="--c:' + (k ? "var(--c-" + k + ")" : "var(--c-None)") + '"></i>' + (k || "None") + "</label>").join("") +
     "</div>" + (projects.length ? '<select name="project" aria-label="Sub-project">' + projectOptions(projects) + "</select>" : "") +
+    (phone ? "" : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
+      '<option value="weekdays">↻ Weekdays</option><option value="weekly">↻ Every ' + WEEKDAYS[weekday(d)] + "</option></select>" +
+      '<select name="for" aria-label="For how long">' + R.LENGTHS.map(([v, l]) => '<option value="' + v + '"' + (v === R.DEFAULT_LENGTH ? " selected" : "") + ">for " + l + "</option>").join("") + "</select>") +
     "</div></form>";
 }
 
@@ -155,7 +160,7 @@ function phoneHTML(c) {
     '<header class="phead"><div class="l"><h1 data-act="day-today">' + fmtDay(d) + '</h1><span class="ball" data-act="ball" role="button" aria-label="Sparkles"></span></div>' +
     '<div class="r"><span class="psync" data-sync-status></span><a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
     (store.local().url ? bar + meta + '<div class="list" data-list="' + d + '">' +
-      (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true)).join("") : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + "</div>" + addHTML(c, d)
+      (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true)).join("") : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + "</div>" + addHTML(c, d, true)
       : connectHTML()) + "</div>";
 }
 
@@ -238,7 +243,10 @@ export function initToday(rerender) {
     // 「Gym 40」「Gym 40m」：末尾的数字当分钟
     const m = title.match(/^(.*\S)\s+(\d{1,3})\s*(m|min|mins)?$/i);
     if (m && Number(m[2]) >= 5) { title = m[1]; est = Number(m[2]); }
-    const id = store.addTask({ date: form.dataset.add, title, est, category: String(f.get("cat") || ""), projectId: String(f.get("project") || "") });
+    const fields = { date: form.dataset.add, title, est, category: String(f.get("cat") || ""), projectId: String(f.get("project") || "") };
+    const how = String(f.get("repeat") || "");
+    const id = how ? store.addRepeating(fields, R.daysFor(how, fields.date, est), R.endFor(fields.date, Number(f.get("for")))) : store.addTask(fields);
+    if (how) form.querySelector("[name=repeat]").value = "";
     if (form.dataset.add === store.today()) { pick(id); rerender(); }   // 加完就选中，底部点 Start 就能开始
     const input = document.querySelector('[data-keep="add-title-' + form.dataset.add + '"]');
     if (input) { input.value = ""; input.focus(); }

@@ -4,6 +4,7 @@
 import * as store from "./store.js";
 import * as sync from "./sync.js";
 import * as E from "./engine.js";
+import * as R from "./routines.js";
 import { esc, on, icon } from "./dom.js";
 import { fmtMin } from "./dates.js";
 import { paintPatterns } from "./patterns.js";
@@ -50,8 +51,9 @@ function sidebarHTML(c, view) {
   const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""], ["settings", "Settings", ""]];
   // 项目（group）下面缩进列子项目
   const sub = (p) => {
-    const h = E.health(c, p);
-    const need = Math.round(E.needOn(c, p, c.today));
+    const reg = E.isRegular(p);
+    const h = reg ? { level: "regular", text: R.describe(R.ruleOf(p), store.prefs().weekStartsOn, p.place) } : E.health(c, p);
+    const need = Math.round(reg ? (E.isAuto(p) ? R.dueOn(R.ruleOf(p), c.today) : 0) : E.needOn(c, p, c.today));
     return '<button type="button" class="sp h-' + h.level + (p.group ? " nested" : "") + '" data-open-project="' + p.id + '" style="--pc:' + esc(p.color) + '" title="' + esc(h.text) + '"><i></i><span>' + esc(p.name) + "</span>" + (need ? '<b class="num">' + fmtMin(need) + "</b>" : "") + "</button>";
   };
   const projects = groupsOf(c.projects.filter(E.isActive)).map((g) => (g.name ? '<p class="sp-group">' + esc(g.name) + "</p>" : "") + g.subs.map(sub).join("")).join("");

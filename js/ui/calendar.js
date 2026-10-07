@@ -1,5 +1,6 @@
 // 日历（电脑）：周视图 / 月视图，右边是任务池。
 // 把任务池里的条目拖到某天就排进去；日历里的任务拖到别的天就挪过去，拖回任务池就撤回。
+// 自动排的计划在以后的日子里画成淡色预览：规律的那一次可以拖走 / 点开（这时才变成真任务），整块的预计份额只看。
 
 import * as store from "../store.js";
 import * as E from "../engine.js";
@@ -24,13 +25,22 @@ function chipHTML(t) {
     '<span class="t">' + (E.isRoutine(t) ? '<i class="rt">↻</i>' : "") + esc(t.title) + '</span><span class="m num">' + t.est + "</span></div>";
 }
 
+function ghostHTML(g) {
+  const reg = g.kind === "regular";
+  return '<div class="ev ghost' + (reg ? "" : " proj") + '"' + (reg ? ' data-drag="ghost:' + esc(g.key) + '" data-act="open-ghost" data-key="' + esc(g.key) + '"' : "") +
+    ' style="--c:' + esc(g.plan.color) + '" title="' + esc(g.title + (reg ? " · repeats" : " · projected share")) + '">' +
+    '<span class="t">' + (reg ? '<i class="rt">↻</i>' : "") + esc(g.title) + '</span><span class="m num">' + g.est + "</span></div>";
+}
+
 function cellHTML(c, d, { month = false, outside = false } = {}) {
   const tasks = store.tasksOn(d);
+  const ghosts = E.ghostsOn(c, d);
   const sum = E.daySummary(c, d);
   const line = d >= c.today || c.log[d] ? lineInfo(c, d).line : 0;
   const capOver = c.capacity.overrides[d] !== undefined;
   const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : ""].filter(Boolean).join(" ");
-  const shown = month ? tasks.slice(0, 3) : tasks;
+  const all = [...tasks.map(chipHTML), ...ghosts.map(ghostHTML)];
+  const shown = month ? all.slice(0, 3) : all;
   const loadPct = sum.cap ? Math.min(100, (sum.planned / sum.cap) * 100) : 0;
   let h = '<div class="' + cls + '" data-drop="day:' + d + '">' +
     '<div class="cell-head"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"><span>' + (month ? "" : WEEKDAYS[weekday(d)]) + "</span><b>" + Number(d.slice(8)) + "</b></button>" +
@@ -39,8 +49,8 @@ function cellHTML(c, d, { month = false, outside = false } = {}) {
       : '<button type="button" class="cap num' + (capOver ? " set" : "") + '" data-act="cap" data-date="' + d + '" title="Available minutes this day — click to change">' + (sum.rest ? "rest" : fmtMin(sum.cap)) + "</button>") + "</div>" +
     '<div class="load"><i style="width:' + loadPct + '%"></i></div>' +
     (line && !month ? '<div class="ln num">line ' + fmtMin(line) + "</div>" : "") +
-    shown.map(chipHTML).join("") +
-    (month && tasks.length > 3 ? '<button type="button" class="more-ev" data-act="open-day" data-date="' + d + '">+' + (tasks.length - 3) + " more</button>" : "");
+    shown.join("") +
+    (month && all.length > 3 ? '<button type="button" class="more-ev" data-act="open-day" data-date="' + d + '">+' + (all.length - 3) + " more</button>" : "");
   if (!month) {
     h += adding === d
       ? '<form class="cell-form" data-cell-add="' + d + '"><input name="title" data-keep="cell-add-' + d + '" placeholder="Task 30" autocomplete="off"></form>'
@@ -81,18 +91,24 @@ export function calendarHTML(c) {
 // ---------- 任务池 ----------
 
 export function poolHTML(c) {
-  const projects = c.projects.filter(E.isActive);
+  const projects = c.projects.filter((p) => E.isActive(p) && !E.isRegular(p));   // 条目只挂在整块计划上
   const list = E.poolItems(c);
+  const regs = E.poolRegulars(c);
   const subs = projects.map((p) => ({ p, items: list.filter((x) => x.item.projectId === p.id) })).filter((g) => g.items.length);
   const total = list.reduce((a, x) => a + x.state.unscheduled, 0);
   let h = '<div class="pool-inner" data-drop="pool"><header class="pool-head"><div><h3>Pool</h3><p>' + (list.length ? list.length + " items · " + fmtMin(total) + " to place" : "Drag onto a day to plan it") + '</p></div>' +
     '<button type="button" class="icon-btn" data-act="pool-toggle" aria-label="Hide pool">' + icon("close") + "</button></header>";
   if (projects.length) {
-    h += '<form class="pool-add" autocomplete="off"><select name="project" aria-label="Sub-project">' + projectOptions(projects, "", null) + "</select>" +
+    h += '<form class="pool-add" autocomplete="off"><select name="project" aria-label="Plan">' + projectOptions(projects, "", null) + "</select>" +
       '<div class="row2"><input name="title" data-keep="pool-add" placeholder="New item"><input name="est" class="num" type="number" value="45" min="5" step="5" aria-label="Minutes"><button class="btn cta" type="submit">' + icon("plus") + "</button></div></form>";
   }
-  if (!projects.length) h += '<p class="empty">Make a project first — its items land here.</p><a class="btn" href="#projects">Projects</a>';
-  else if (!subs.length) h += '<p class="empty">Everything is on the calendar ✓</p>';
+  if (!projects.length) h += '<p class="empty">Make a plan first — its items land here.</p><a class="btn" href="#projects">Projects</a>';
+  else if (!subs.length && !regs.length) h += '<p class="empty">Everything is on the calendar ✓</p>';
+  // 规律计划（Pool）：这周还剩几次，拖一次排一次
+  if (regs.length) {
+    h += '<section class="pg"><div class="pg-head"><i></i><span>This week</span></div>' + regs.map((x) =>
+      '<div class="pi" data-drag="regular:' + x.plan.id + '" style="--c:' + esc(x.plan.color) + '"><i class="g"></i><span>↻ ' + esc(x.plan.name) + '</span><b class="num">' + x.min + "m · " + x.left + " left</b></div>").join("") + "</section>";
+  }
   // 项目 → 子项目 → 模块
   let lastGroup = null;
   groupsOf(subs.map((x) => x.p)).forEach((g) => g.subs.forEach((p) => {
@@ -141,6 +157,7 @@ export function initCalendar(rerender) {
     else if (act === "cal-mode") store.setLocal({ calMode: el.dataset.mode });
     else if (act === "pool-toggle") store.setLocal({ pool: !store.local().pool });
     else if (act === "edit-task") openTaskEditor(el.dataset.id);
+    else if (act === "open-ghost") { const id = store.materialize(el.dataset.key); if (id) openTaskEditor(id); }
     else if (act === "open-day") {
       openDay = el.dataset.date;
       openModal(dayModalHTML(store.ctx(), openDay), { wide: true, close: () => { openDay = ""; } });
@@ -199,7 +216,8 @@ export function initCalendar(rerender) {
 }
 
 export function handleDrop(payload, target) {
-  const [kind, id] = payload.split(":");
+  const i = payload.indexOf(":");
+  const kind = payload.slice(0, i), id = payload.slice(i + 1);   // 重复任务的 id 里也有冒号
   if (target === "pool") {
     if (kind === "task" && !store.unschedule(id)) toast("Only unstarted tasks that came from the pool can go back");
     return;
@@ -207,4 +225,6 @@ export function handleDrop(payload, target) {
   const date = target.slice(4);
   if (kind === "task") store.moveTask(id, date);
   else if (kind === "item") store.scheduleItem(id, date);
+  else if (kind === "regular") store.placeRegular(id, date);
+  else if (kind === "ghost") { const tid = store.materialize(id); if (tid) store.moveTask(tid, date); }
 }

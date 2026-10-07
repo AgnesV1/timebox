@@ -74,8 +74,15 @@ function rowHTML(c, t, tasks, phone = false) {
     "</div></div>";
 }
 
+// 以后某天：自动排的计划画成淡色预览（只看，不存；到那天才变成任务）
+function ghostsHTML(c, d) {
+  return E.ghostsOn(c, d).map((g) => '<div class="row ghost" title="' + (g.kind === "regular" ? "Repeats — shows up on the day" : "Projected share — shows up on the day") + '">' +
+    '<div class="est num"><b>' + g.est + '</b></div><div class="bar" style="--bar:' + esc(g.plan.color) + '"></div>' +
+    '<div class="body"><div class="line"><div class="task">' + esc(g.title) + (g.kind === "regular" ? ' <span class="rt">↻</span>' : "") + "</div></div></div></div>").join("");
+}
+
 function overdueHTML(c) {
-  const od = c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isRoutine(t)).sort((a, b) => a.date.localeCompare(b.date));
+  const od = c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isAutoTask(t)).sort((a, b) => a.date.localeCompare(b.date));
   if (!od.length) return "";
   return '<section class="overdue"><div class="od-head"><b>' + od.length + " left behind</b><span>from earlier days</span>" +
     '<button type="button" class="link" data-act="od-toggle">' + (overdueOpen ? "Hide" : "Show") + "</button></div>" +
@@ -90,7 +97,7 @@ function addHTML(c, d, phone = false) {
     '<div class="add-main"><input name="title" data-keep="add-title-' + d + '" placeholder="Add a task" enterkeyhint="done">' +
     '<input name="est" class="min num" data-keep="add-est-' + d + '" type="number" inputmode="numeric" value="30" min="5" step="5" aria-label="Minutes">' +
     '<button class="btn cta" type="submit">Add</button></div>' +
-    '<div class="add-more">' + (projects.length ? '<select name="project" aria-label="Sub-project">' + projectOptions(projects) + "</select>" : "") +
+    '<div class="add-more">' + (projects.length ? '<select name="project" aria-label="Plan">' + projectOptions(projects) + "</select>" : "") +
     (phone ? "" : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
       '<option value="weekdays">↻ Weekdays</option><option value="weekly">↻ Every ' + WEEKDAYS[weekday(d)] + "</option></select>" +
       '<select name="for" aria-label="For how long">' + R.LENGTHS.map(([v, l]) => '<option value="' + v + '"' + (v === R.DEFAULT_LENGTH ? " selected" : "") + ">for " + l + "</option>").join("") + "</select>") +
@@ -105,7 +112,7 @@ export function dayParts(c, d) {
     strip: stripHTML(c, d, tasks),
     bill: isToday ? billHTML(E.yesterdayBill(c)) : "",
     overdue: isToday ? overdueHTML(c) : "",
-    list: '<div class="list" data-list="' + d + '">' + (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks)).join("") : '<div class="empty">No tasks for this day.</div>') + "</div>",
+    list: '<div class="list" data-list="' + d + '">' + (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">No tasks for this day.</div>') + ghostsHTML(c, d) + "</div>",
     add: addHTML(c, d)
   };
 }
@@ -152,7 +159,7 @@ function phoneHTML(c) {
     '<header class="phead"><div class="l"><h1 data-act="day-today">' + fmtDay(d) + '</h1><span class="ball" data-act="ball" role="button" aria-label="Sparkles"></span></div>' +
     '<div class="r"><span class="psync" data-sync-status></span><a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
     (store.local().url ? bar + meta + '<div class="list" data-list="' + d + '">' +
-      (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true)).join("") : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + "</div>" + addHTML(c, d, true)
+      (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + ghostsHTML(c, d) + "</div>" + addHTML(c, d, true)
       : connectHTML()) + "</div>";
 }
 
@@ -193,7 +200,7 @@ export function initToday(rerender) {
     else if (act === "spread") store.spreadOverdue();
     else if (act === "all-today") {
       const c = store.ctx();
-      store.moveMany(c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isRoutine(t)).map((t) => t.id), c.today);
+      store.moveMany(c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isAutoTask(t)).map((t) => t.id), c.today);
     } else if (act === "day-prev") { showDate(addDays(shownDate(), -1)); rerender(); }
     else if (act === "day-next") { showDate(addDays(shownDate(), 1)); rerender(); }
     else if (act === "day-today") { showDate(store.today()); rerender(); }
@@ -247,7 +254,7 @@ export function initToday(rerender) {
     if (e.button > 0) return;
     e.preventDefault();
     const list = handle.closest(".list");
-    const rows = [...list.querySelectorAll(".row")];
+    const rows = [...list.querySelectorAll(".row[data-id]")];
     const row = handle.closest(".row"), i = rows.indexOf(row);
     const cs = getComputedStyle(row);
     const h = row.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);

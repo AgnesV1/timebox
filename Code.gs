@@ -71,6 +71,7 @@ function setup() {
   if (old) migrate_();
   timeIntoTasks_(ss);
   capacityIntoSettings_(ss);
+  routinesIntoProjects_();
   fillDefaults_();
   dropColumns_();
   dropGroups_(ss);
@@ -251,6 +252,37 @@ function capacityIntoSettings_(ss) {
   retire_(ss, sh);
 }
 
+// 以前的重复规则（Settings 的 routines）→ Projects 里的规律计划（Regular + Auto），计划 ID = 规则 ID。
+// 以后的、没动过的那几次删掉（页面只画预览，到那天才生成）；留下的挂到计划上。和页面 store.js 的 upgrade 做的一样
+function routinesIntoProjects_() {
+  var row = readAll_('settings').filter(function (r) { return r.id === 'routines'; })[0];
+  if (!row) return;
+  var rules = Array.isArray(row.value) ? row.value : [], now = Date.now();
+  var today = Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd');
+  var projects = readAll_('projects'), byId = {}, order = 0;
+  projects.forEach(function (p) { byId[p.id] = p; order = Math.max(order, Number(p.order) || 0); });
+  var rows = [];
+  rules.forEach(function (r, k) {
+    if (!r || !r.id || byId[r.id]) return;
+    var host = byId[r.projectId];
+    rows.push({ id: r.id, name: r.title || 'Routine', group: host ? host.group || host.name || '' : '', kind: 'regular', place: 'auto',
+      status: r.end && r.end < today ? 'done' : 'active', early: 0,
+      rule: { days: r.days || [0, 0, 0, 0, 0, 0, 0], start: r.start || '', end: r.end || '', skip: r.skip || [], optional: Boolean(r.optional) },
+      color: (host && host.color) || COLORS[k % COLORS.length], order: ++order, updated: 1 });
+    byId[r.id] = rows[rows.length - 1];
+  });
+  upsert_('projects', rows, now);
+  var gone = [], link = [];
+  readAll_('tasks').forEach(function (t) {
+    var m = /^rt:(.+):(\d{4}-\d{2}-\d{2})$/.exec(t.id);
+    if (!m || !byId[m[1]]) return;
+    if (t.date > today && !t.status && !t.times && !(Number(t.actual) > 0)) gone.push({ table: 'tasks', id: t.id, at: Number(t.updated) || 1 });
+    else if (t.projectId !== m[1]) link.push({ id: t.id, projectId: m[1], updated: Number(t.updated) || 1 });
+  });
+  upsert_('tasks', link, now);
+  remove_(gone.concat([{ table: 'settings', id: 'routines', at: Number(row.updated) || 1 }]), now);
+}
+
 // 空着的 Kind / Place 填上默认（Total / Pool），表格里看得明白
 function fillDefaults_() {
   writeCol_('projects', 'kind', function (r) { return r.kind; });
@@ -270,11 +302,11 @@ function dropGroups_(ss) {
   if (sh) ss.deleteSheet(sh);
 }
 
-// 删除记录只留最近 90 天（太久没打开的设备，在设置里点 Reload everything 就好）
+// 删除记录只留最近 90 天（按记下来的时间 Synced 算；太久没打开的设备，在设置里点 Reload everything 就好）
 function pruneDeleted_() {
   var sh = deletedSheet_(), data = body_(sh, DELETED_HEADER);
   var cut = Date.now() - KEEP_DELETED_DAYS * 864e5;
-  var keep = data.filter(function (r) { return Number(r[2]) >= cut; });
+  var keep = data.filter(function (r) { return Number(r[3]) >= cut; });
   if (keep.length === data.length) return;
   var blank = DELETED_HEADER.map(function () { return ''; });
   sh.getRange(2, 1, data.length, DELETED_HEADER.length).setValues(keep.concat(data.slice(keep.length).map(function () { return blank; })));

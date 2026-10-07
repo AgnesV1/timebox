@@ -1,5 +1,6 @@
 // 拖放：日历里的任务、任务池里的条目。
-// 可拖的元素带 data-drag="task:<id>" 或 "item:<id>"；能放的地方带 data-drop="day:<日期>" 或 "pool"。
+// 可拖的元素带 data-drag="task:<id>"、"item:<id>"、"regular:<计划 id>"（池里的规律计划）或 "ghost:<rt id>"（以后某天的预览）；
+// 能放的地方带 data-drop="day:<日期>" 或 "pool"。
 // 鼠标按下移动 5px 才算开始拖，所以单击还是单击。拖到窗口上下边缘会自动滚动。
 
 let drag = null;

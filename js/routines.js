@@ -1,13 +1,15 @@
-// 重复任务：在任务上设「怎么重复、重复多久」，一次把这段时间里的每一次都排进日历，每一次都是普通任务。
-// 规则存在 Settings 的 routines 里：{id, title, category, projectId, optional, days, start, end, skip}
-//   days = [周日, 周一, …, 周六] 那天做多少分钟（0 = 不做）；skip = 单独删掉的那几天，改规则时也不再生成。
-// 每一次的 ID = "rt:<规则 id>:<原定那天>"：挪到别的天 ID 不变，所以还认得出是哪个系列的。
+// 规律计划（Regular）：存在 Projects 表一行里，规则在它的 rule：
+//   { days, perWeek, min, start, end, skip, optional }
+//   Auto（固定星期几）：days = [周日, 周一, …, 周六] 那天做多少分钟（0 = 不做）
+//   Pool（每周几次，哪天自己拖）：perWeek 次 × min 分钟
+//   end 空 = 一直重复；skip = 单独删掉的那几天，不再出现。
+// 只有今天的那一次会写进 Tasks（ID = "rt:<计划 id>:<原定那天>"，挪到别的天 ID 不变）；以后的只画预览。
 
 import { addDays, range, weekday, diffDays, WEEKDAYS } from "./dates.js";
 
-export const MAX_DAYS = 366;
-export const LENGTHS = [[7, "1 week"], [14, "2 weeks"], [28, "4 weeks"], [56, "8 weeks"], [91, "3 months"], [182, "6 months"]];
-export const DEFAULT_LENGTH = 28;
+// 加任务框「for 多久」：0 = 一直重复
+export const LENGTHS = [[0, "good"], [7, "1 week"], [14, "2 weeks"], [28, "4 weeks"], [56, "8 weeks"], [91, "3 months"], [182, "6 months"]];
+export const DEFAULT_LENGTH = 0;
 
 export const routineTaskId = (rid, date) => "rt:" + rid + ":" + date;
 
@@ -17,6 +19,9 @@ export function parseRoutineTaskId(id) {
 }
 
 export const isRoutineTask = (t) => String(t?.id || "").startsWith("rt:");
+
+// 计划行 → 规则（带上 id 和名字，下面的函数都吃这个）
+export const ruleOf = (p) => ({ days: [0, 0, 0, 0, 0, 0, 0], perWeek: 0, min: 0, start: "", end: "", skip: [], ...(p?.rule || {}), id: p?.id, title: p?.name || "" });
 
 // 几种重复方式 → 一周七天各多少分钟。weekly = 和开始那天同一个星期几
 export function daysFor(pattern, start, min) {
@@ -37,11 +42,11 @@ export function patternOf(days, start) {
   return "custom";
 }
 
-// 开始那天 + 多少天 → 最后一天
-export const endFor = (start, days) => addDays(start, Math.min(MAX_DAYS, Math.max(1, Number(days) || DEFAULT_LENGTH)) - 1);
+// 开始那天 + 多少天 → 最后一天；0 = 没有最后一天
+export const endFor = (start, days) => (Number(days) > 0 ? addDays(start, Number(days) - 1) : "");
 
-// 结束日期别超过一年
-export const clampEnd = (start, end) => (!end || end < start ? start : diffDays(start, end) >= MAX_DAYS ? addDays(start, MAX_DAYS - 1) : end);
+// 结束日期不能早于开始；空着 = 一直重复
+export const clampEnd = (start, end) => (!end ? "" : end < start ? start : end);
 
 export function minutesOn(r, date) {
   const v = Number(r.days?.[weekday(date)]) || 0;
@@ -52,17 +57,23 @@ export function inRange(r, date) {
   return (!r.start || date >= r.start) && (!r.end || date <= r.end);
 }
 
-// from 起到规则结束，每一次 {date, est}（没写结束日期的老规则不生成）
-export function occurrences(r, from = r.start) {
-  if (!r.end) return [];
-  const skip = new Set(r.skip || []);
-  return range(from > r.start ? from : r.start, r.end)
-    .filter((d) => minutesOn(r, d) > 0 && !skip.has(d))
-    .map((d) => ({ date: d, est: minutesOn(r, d) }));
+// 那天该不该出现、做几分钟（Auto 规则）
+export function dueOn(r, date) {
+  if (!inRange(r, date) || (r.skip || []).includes(date)) return 0;
+  return minutesOn(r, date);
 }
 
-// 「Every day 30m」「Weekdays 45m」「Mon 60 · Wed 40 · Fri 60」
-export function describe(r, weekStartsOn = "monday") {
+// from 到 to（含）之间该出现的每一次 {date, est}；没有结束日期时 to 必须给
+export function occurrences(r, from = r.start, to = r.end) {
+  const a = from > (r.start || from) ? from : r.start || from;
+  const b = r.end && (!to || r.end < to) ? r.end : to;
+  if (!a || !b || b < a || diffDays(a, b) > 3660) return [];
+  return range(a, b).map((d) => ({ date: d, est: dueOn(r, d) })).filter((o) => o.est > 0);
+}
+
+// 「Every day 30m」「Weekdays 45m」「Mon 60 · Wed 40 · Fri 60」「3×/week 60m」
+export function describe(r, weekStartsOn = "monday", place = "auto") {
+  if (place === "pool") return (Number(r.perWeek) || 0) + "×/week " + (Number(r.min) || 0) + "m";
   const days = r.days || [];
   const p = patternOf(days, r.start || "2026-01-05");
   const first = Number(days.find((v) => Number(v) > 0)) || 0;

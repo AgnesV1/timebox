@@ -179,7 +179,7 @@ test("last version's sheet: the Time tab folds into Times, old deletes are prune
   ]);
   put("Groups", [["Group"], ["Work 1"]]);
   put("Notes", [["Date", "Note"], [D("2026-10-04"), "hi"]]);
-  put("Deleted", [["Table", "ID", "Deleted at", "Synced"], ["tasks", "gone-old", Date.now() - 100 * 864e5, 1], ["tasks", "gone-new", Date.now() - 864e5, 1]]);
+  put("Deleted", [["Table", "ID", "Deleted at", "Synced"], ["tasks", "gone-old", 1, Date.now() - 100 * 864e5], ["tasks", "gone-new", 1, Date.now() - 864e5]]);
   g.sandbox.setup();
   const rows = g.ss.getSheetByName("Tasks").objects();
   const fr = rows.find((r) => r.ID === "t1");
@@ -207,4 +207,41 @@ test("day capacity edits from two devices are merged per day", () => {
   assert.equal(cap.value.default, 300, "the newer default wins");
   assert.deepEqual(cap.value.overrides, { "2026-10-08": 90, "2026-10-09": null, "2026-10-10": 0, "2026-10-11": 30 });
   assert.equal(cap.updated, 20);
+});
+
+test("old repeat rules become Regular plans; future untouched ones go, the rest link up", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  const pad = (n) => String(n).padStart(2, "0");
+  const day = (k) => { const d = new Date(); d.setDate(d.getDate() + k); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const rule = { id: "r1", title: "Gym", category: "Fun", projectId: "p1", optional: false, days: [40, 40, 40, 40, 40, 40, 40], start: day(-2), end: day(5), skip: [day(1)], order: 1 };
+  g.post({ secret: "CHANGE_ME", push: { rows: {
+    projects: [{ id: "p1", name: "Fitness 2026", group: "Main - Fitness", color: "#00C2A8", updated: 5 }],
+    settings: [{ key: "routines", value: [rule], updated: 7 }],
+    tasks: [
+      { id: "rt:r1:" + day(-1), date: day(-1), title: "Gym", est: 40, status: "done", projectId: "p1", updated: 9 },
+      { id: "rt:r1:" + day(0), date: day(0), title: "Gym", est: 40, status: "", updated: 1 },
+      { id: "rt:r1:" + day(2), date: day(2), title: "Gym", est: 40, status: "", updated: 1 },
+      { id: "rt:r1:" + day(3), date: day(3), title: "Gym", est: 40, status: "", times: "20m", actual: 20, updated: 4 },
+      { id: "rt:r1:" + day(4), date: day(4), title: "Gym", est: 40, status: "", updated: 1 }
+    ]
+  } } });
+  g.sandbox.setup();
+  const all = g.post({ secret: "CHANGE_ME", pull: true, since: 0 }).pull;
+  const plan = all.tables.projects.find((p) => p.id === "r1");
+  assert.equal(plan.name, "Gym");
+  assert.equal(plan.group, "Main - Fitness");
+  assert.equal(plan.kind, "regular");
+  assert.equal(plan.place, "auto");
+  assert.equal(plan.color, "#00C2A8");
+  assert.deepEqual(plan.rule, { days: rule.days, start: rule.start, end: rule.end, skip: rule.skip, optional: false });
+  const ids = all.tables.tasks.map((t) => t.id).sort();
+  assert.deepEqual(ids, ["rt:r1:" + day(-1), "rt:r1:" + day(0), "rt:r1:" + day(3)].sort(), "future untouched ones are gone");
+  assert.ok(all.tables.tasks.every((t) => t.projectId === "r1"));
+  assert.equal(all.tables.tasks.find((t) => t.id === "rt:r1:" + day(-1)).updated, 9, "change times stay");
+  assert.ok(!all.tables.settings.some((r) => r.key === "routines"));
+  assert.ok(all.deleted.some((d) => d.id === "rt:r1:" + day(2)) && all.deleted.some((d) => d.table === "settings" && d.id === "routines"));
+  // 再跑一次 setup 不出事
+  g.sandbox.setup();
+  assert.equal(g.ss.getSheetByName("Projects").objects().filter((p) => p.ID === "r1").length, 1);
 });

@@ -92,6 +92,30 @@ function upgrade(s) {
       pend["settings:capacity"] = d.settings.capacity.updated;
     }
   }
+  // 重复规则（settings.routines）→ Projects 里的规律计划，计划 id = 规则 id（rt: 任务 ID 不用改）。
+  // 以后的、没动过的那几次删掉（以后只画预览）；留下的挂到计划上
+  const rules = d.settings?.routines?.value;
+  if (Array.isArray(rules)) {
+    const projects = (d.projects = d.projects || {});
+    const T = todayIso(d.settings?.prefs?.value?.dayStartsAt || "04:00");
+    let order = Object.values(projects).reduce((m, x) => Math.max(m, Number(x.order) || 0), 0);
+    rules.forEach((r, k) => {
+      if (!r?.id || projects[r.id]) return;
+      const host = projects[r.projectId];
+      projects[r.id] = { id: r.id, name: r.title || "Routine", group: host ? host.group || host.name || "" : "", kind: "regular", place: "auto",
+        status: r.end && r.end < T ? "done" : "active", deadline: "", start: "", early: 0, calib: null,
+        rule: { days: r.days || [0, 0, 0, 0, 0, 0, 0], start: r.start || "", end: r.end || "", skip: r.skip || [], optional: Boolean(r.optional) },
+        color: host?.color || PROJECT_COLORS[k % PROJECT_COLORS.length], order: ++order, updated: 1 };
+    });
+    for (const t of Object.values(d.tasks || {})) {
+      const x = R.parseRoutineTaskId(t.id);
+      if (!x || !projects[x.rid]) continue;
+      if (t.date > T && !t.status && !t.times && !(Number(t.actual) > 0) && !pend["tasks:" + t.id]) delete d.tasks[t.id];
+      else t.projectId = x.rid;
+    }
+    delete d.settings.routines;
+    delete pend["settings:routines"];
+  }
   for (const t of Object.values(d.tasks || {})) { delete t.category; delete t.doneOrder; }
   for (const gone of ["time", "capacity", "notes"]) {
     delete d[gone];
@@ -141,7 +165,8 @@ export function ctx() {
     tasks: all("tasks"),
     capacity: { default: Number(cap.default) || 0, weekly: Array.isArray(cap.weekly) ? cap.weekly : null, overrides },
     log,
-    level: prefs().level !== false
+    level: prefs().level !== false,
+    weekStartsOn: prefs().weekStartsOn
   };
   return ctxCache;
 }
@@ -394,16 +419,13 @@ function dropTask(id) {
 // 动过的任务：标了状态，或者计过时
 const started = (t) => Boolean(t.status) || hasTime(t.id);
 
-// 删掉重复任务的某一次：记进规则的 skip，以后不再给那天生成
+// 删掉规律计划的某一次：记进规则的 skip，那天不再出现
 export function deleteTask(id) {
   const rt = R.parseRoutineTaskId(id);
   change(() => {
     dropTask(id);
-    if (rt) {
-      const list = routines();
-      const r = list.find((x) => x.id === rt.rid);
-      if (r && !(r.skip || []).includes(rt.date)) writeRoutines(list.map((x) => (x.id === rt.rid ? { ...x, skip: [...(x.skip || []), rt.date] } : x)));
-    }
+    const p = rt && routineOf(id);
+    if (p && !(p.rule?.skip || []).includes(rt.date)) setRule(p, { skip: [...(p.rule?.skip || []), rt.date] });
   }, "Deleted");
 }
 
@@ -457,24 +479,40 @@ export function spreadOverdue() {
   return moves.length;
 }
 
-// ---------- 项目和条目 ----------
+// ---------- 计划和条目 ----------
+// 计划 = projects 表一行。kind：total（总时长 + 截止日）/ regular（规律）；place：auto（自动排到每天）/ pool（进任务池）
 
+const nextPlanOrder = () => all("projects").reduce((m, x) => Math.max(m, Number(x.order) || 0), 0) + 1;
+// 同一个项目（group）里的计划默认用同一个颜色
+const colorFor = (group) => all("projects").find((x) => group && x.group === group)?.color || PROJECT_COLORS[all("projects").length % PROJECT_COLORS.length];
+// 任务挂着的计划属于哪个项目（没有 group 的计划自己就是项目）
+const groupFor = (projectId) => { const p = get("projects", projectId); return p ? p.group || p.name || "" : ""; };
+
+// p.total（分钟）：新建整块计划时只填了总时长，就建一个同名的大条目
 export function saveProject(p) {
   const id = p.id || newId();
   const prev = get("projects", id);
-  const order = prev?.order ?? all("projects").reduce((m, x) => Math.max(m, Number(x.order) || 0), 0) + 1;
-  const color = p.color || prev?.color || PROJECT_COLORS[all("projects").length % PROJECT_COLORS.length];
-  change(() => put("projects", { name: "", group: "", status: "active", deadline: "", start: "", early: 2, calib: null, ...prev, ...p, id, order, color }));
+  const { total, ...fields } = p;
+  const row = { name: "", group: "", kind: "total", place: "pool", status: "active", deadline: "", start: "", early: 2, calib: null, rule: null, ...prev, ...fields, id };
+  row.order = prev?.order ?? nextPlanOrder();
+  row.color = fields.color || prev?.color || colorFor(row.group);
+  if (row.kind === "regular") { const { id: _i, title: _t, ...rule } = R.ruleOf(row); row.rule = rule; }
+  change(() => {
+    put("projects", row);
+    if (!prev && row.kind === "total" && Number(total) > 0) put("items", { id: newId(), projectId: id, module: "", title: row.name, est: Math.round(Number(total)), origEst: null, order: 1 });
+  });
+  // 刚变成「自动排」的：今天的那份马上排进来
+  if (E.isAuto(row) && E.isActive(row) && (!prev || !E.isAuto(prev) || !E.isActive(prev))) autoToday(id);
   return id;
 }
 
-// 删项目：条目一起删；做过的任务留着当记录，只是不再挂在项目上
+// 删计划：条目一起删；做过的任务留着当记录，只是不再挂在计划上；自动排出来还没动的删掉
 export function deleteProject(id) {
   change(() => {
     all("items").filter((i) => i.projectId === id).forEach((i) => drop("items", i.id));
-    all("tasks").filter((t) => t.projectId === id).forEach((t) => put("tasks", { ...t, projectId: "", itemId: "" }));
+    all("tasks").filter((t) => t.projectId === id).forEach((t) => (E.isAutoTask(t) && !started(t) ? dropTask(t.id) : put("tasks", { ...t, projectId: "", itemId: "" })));
     drop("projects", id);
-  }, "Deleted project");
+  }, "Deleted plan");
 }
 
 export function addItems(projectId, module, titles, est) {
@@ -535,14 +573,62 @@ export function setSetting(key, value) {
   change(() => put("settings", { id: key, key, value }));
 }
 
+// 自动排出来的任务（generated：改动时间记成 1，哪台设备真改过它都比这个新）
+function putAuto(x) {
+  put("tasks", { actual: null, status: "", reason: "", optional: false, itemId: "", times: "", desc: "", ...x, order: nextOrder(x.date) }, { generated: true });
+}
+
+// 规律计划（Auto）今天该出现、还没有的那一次
+function regularsDueToday(c) {
+  return c.projects.filter((p) => E.isActive(p) && E.isRegular(p) && E.isAuto(p)).map((p) => {
+    const id = R.routineTaskId(p.id, c.today), est = R.dueOn(R.ruleOf(p), c.today);
+    return est && !get("tasks", id) ? { id, date: c.today, title: p.name, est, projectId: p.id, optional: Boolean(p.rule?.optional) } : null;
+  }).filter(Boolean);
+}
+
+// 拍今天的安全线快照（第一次打开时）；同时把今天的自动任务落成：规律的那一次、整块计划（Auto）今天的份额。
+// 整块的份额只在快照新拍、或新加进快照时排一次——删掉了就不会再长出来
 export function ensureTodayLog() {
   const c = ctx();
   const tl = E.todayLine(c);
-  if (tl.fresh) change(() => put("log", { id: c.today, date: c.today, need: tl.line, projects: tl.shares }));
-  else if (tl.added) {
-    const need = Object.values(tl.shares).reduce((a, v) => a + (Number(v) || 0), 0);
-    change(() => put("log", { ...get("log", c.today), need, projects: tl.shares }));
+  const before = c.log[c.today]?.projects || {};
+  const fresh = Object.keys(tl.shares).filter((pid) => tl.fresh || !(pid in before));
+  const chunks = fresh.length ? E.autoChunks(c, tl.shares, fresh) : [];
+  const regs = regularsDueToday(c);
+  if (!tl.fresh && !tl.added && !chunks.length && !regs.length) return;
+  change(() => {
+    if (tl.fresh) put("log", { id: c.today, date: c.today, need: tl.line, projects: tl.shares });
+    else if (tl.added) put("log", { ...get("log", c.today), need: Object.values(tl.shares).reduce((a, v) => a + (Number(v) || 0), 0), projects: tl.shares });
+    chunks.forEach(putAuto);
+    regs.forEach(putAuto);
+  });
+}
+
+function autoToday(pid) {
+  ensureTodayLog();
+  const c = ctx();
+  const chunks = E.autoChunks(c, E.todayLine(c).shares, [pid]);
+  if (chunks.length) change(() => chunks.forEach(putAuto));
+}
+
+// 以后某天的预览变成真任务（拖动 / 点开它的时候）：返回任务 id
+export function materialize(key) {
+  const x = R.parseRoutineTaskId(key);
+  const p = x && routineOf(key);
+  if (!p) return "";
+  if (!get("tasks", key)) {
+    const est = R.dueOn(R.ruleOf(p), x.date) || R.minutesOn(R.ruleOf(p), x.date);
+    change(() => put("tasks", { id: key, date: x.date, title: p.name, est, actual: null, status: "", reason: "", optional: Boolean(p.rule?.optional),
+      projectId: p.id, itemId: "", times: "", desc: "", order: nextOrder(x.date) }));
   }
+  return key;
+}
+
+// 任务池里的规律计划（Pool）拖到某天：排一次
+export function placeRegular(pid, date) {
+  const p = get("projects", pid);
+  if (!p) return "";
+  return addTask({ date, title: p.name, est: Number(p.rule?.min) || 30, projectId: pid, optional: Boolean(p.rule?.optional) });
 }
 
 // ---------- 项目 / 子项目 ----------
@@ -554,130 +640,121 @@ export function renameGroup(from, to) {
   change(() => all("projects").filter((p) => (p.group || "") === from).forEach((p) => put("projects", { ...p, group: name })), "Renamed project");
 }
 
-// ---------- 重复任务 ----------
-// 规则存在 Settings 表的 routines 里（一份 JSON），每一次都是 Tasks 表里的普通任务（ID 以 rt: 开头）。
-// 设好之后一次把整段时间都排进日历；只有设重复、改重复的时候才会生成，同步时不会自己再长出来。
+// ---------- 规律计划（重复） ----------
+// 规则在计划的 rule 里（见 routines.js）。只有今天的那一次是 Tasks 里的任务（ID 以 rt: 开头），以后的只是预览。
+// 加任务框的「重复」、任务编辑框里的「Repeat」都是新建一个 Regular + Auto 的计划。
 
-export const routines = () => (setting("routines", []) || []).slice().sort(byOrder);
-export const routineOf = (taskId) => { const p = R.parseRoutineTaskId(taskId); return p ? routines().find((r) => r.id === p.rid) || null : null; };
+export const routines = () => all("projects").filter(E.isRegular).sort(byOrder);
+export const routineOf = (taskId) => { const x = R.parseRoutineTaskId(taskId); const p = x ? get("projects", x.rid) : null; return p && E.isRegular(p) ? p : null; };
 export const seriesTasks = (rid) => all("tasks").filter((x) => x.id.startsWith("rt:" + rid + ":")).sort((a, b) => a.date.localeCompare(b.date));
+const origDate = (id) => R.parseRoutineTaskId(id)?.date || "";
 
-function writeRoutines(list) {
-  put("settings", { id: "routines", key: "routines", value: list });
+function setRule(p, patch) {
+  const { id: _i, title: _t, ...rule } = R.ruleOf(get("projects", p.id) || p);
+  put("projects", { ...(get("projects", p.id) || p), rule: { ...rule, ...patch } });
 }
 
-function newRule(input) {
-  const list = routines();
-  return { title: "", category: "", projectId: "", optional: false, days: [0, 0, 0, 0, 0, 0, 0], start: today(), end: "", skip: [],
-    order: list.reduce((m, x) => Math.max(m, Number(x.order) || 0), 0) + 1, ...input, id: newId() };
+function newRegular(name, projectId, rule) {
+  const group = groupFor(projectId);
+  return { id: newId(), name, group, kind: "regular", place: "auto", status: "active", deadline: "", start: "", early: 0, calib: null,
+    rule: { days: [0, 0, 0, 0, 0, 0, 0], skip: [], ...rule }, color: get("projects", projectId)?.color || colorFor(group), order: nextPlanOrder() };
 }
 
-// 把规则里 from 之后还没有的那几次补上
-function generate(r, from) {
-  let first = "";
-  for (const o of R.occurrences(r, from)) {
-    const id = R.routineTaskId(r.id, o.date);
-    if (S.data.tasks[id]) continue;
-    put("tasks", {
-      id, date: o.date, title: r.title, est: o.est, actual: null, status: "",
-      reason: "", optional: Boolean(r.optional), projectId: r.projectId || "", itemId: "", times: "", desc: "", order: nextOrder(o.date)
-    }, { generated: true });
-    first = first || id;
-  }
-  return first;
-}
+const repeatLabel = (end) => (end ? "Repeats until " + fmtShort(end) : "Repeats from now on");
 
-// 加任务时直接设重复：days 是一周七天的分钟数，end 是最后一天。返回第一次的 ID
+// 加任务时直接设重复：days 是一周七天的分钟数，end 是最后一天（空 = 一直）。返回第一次的 ID（那天要做的话）
 export function addRepeating(fields, days, end) {
   const start = fields.date || today();
-  const r = newRule({ title: fields.title, category: fields.category || "", projectId: fields.projectId || "", optional: Boolean(fields.optional),
-    days, start, end: R.clampEnd(start, end) });
+  const p = newRegular(fields.title, fields.projectId, { days, start, end: R.clampEnd(start, end), optional: Boolean(fields.optional) });
   let first = "";
   change(() => {
-    writeRoutines([...routines(), r]);
-    first = generate(r, start);
-  }, "Repeats until " + fmtShort(r.end));
+    put("projects", p);
+    const est = R.dueOn(R.ruleOf(p), start);
+    if (est) {
+      first = R.routineTaskId(p.id, start);
+      put("tasks", { id: first, date: start, title: p.name, est, actual: null, status: "", reason: "", optional: Boolean(fields.optional),
+        projectId: p.id, itemId: "", times: "", desc: "", order: nextOrder(start) });
+    }
+  }, repeatLabel(p.rule.end));
   return first;
 }
 
-// 已有的普通任务改成重复的：它自己变成第一次（换成 rt: 的 ID，计时记录跟过去），后面的排上。返回它的新 ID
+// 已有的普通任务改成重复的：它自己变成第一次（换成 rt: 的 ID，计时记录跟着走）。返回它的新 ID
 export function repeatTask(id, days, end) {
   const t = get("tasks", id);
   if (!t) return id;
-  const r = newRule({ title: t.title, category: t.category || "", projectId: t.projectId || "", optional: Boolean(t.optional),
-    days, start: t.date, end: R.clampEnd(t.date, end) });
-  const nid = R.routineTaskId(r.id, t.date);
+  const p = newRegular(t.title, t.projectId, { days, start: t.date, end: R.clampEnd(t.date, end), optional: Boolean(t.optional) });
+  const nid = R.routineTaskId(p.id, t.date);
   change(() => {
-    writeRoutines([...routines(), r]);
-    put("tasks", { ...t, id: nid });
-    if (timer()?.taskId === id) put("settings", { id: "timer", key: "timer", value: { ...timer(), taskId: nid } });
+    put("projects", p);
+    put("tasks", { ...t, id: nid, projectId: p.id, itemId: "" });
+    if (timer()?.taskId === id) setTimer({ ...timer(), taskId: nid });
     drop("tasks", id);
-    generate(r, addDays(t.date, 1));
-  }, "Repeats until " + fmtShort(r.end));
+  }, repeatLabel(p.rule.end));
   return nid;
 }
 
-// 改重复（从这一次起）：这天以后还没开始的跟着新规则变，规则里没有了的删掉，缺的补上；之前的和做过的不动
+// 改重复（从这一次起）：规则换成新的；已经落成、还没开始的那几次跟着变（新规则里没有的删掉）
 export function replanSeries(id, days, end) {
-  const t = get("tasks", id), r = routineOf(id);
-  if (!t || !r) return;
-  const from = t.date;
-  const next = { ...r, days, end: R.clampEnd(from, end) };
+  const t = get("tasks", id), p = routineOf(id);
+  if (!t || !p) return;
   change(() => {
-    writeRoutines(routines().map((x) => (x.id === r.id ? next : x)));
-    for (const x of seriesTasks(r.id)) {
-      if (x.date < from || started(x)) continue;
-      const m = R.minutesOn(next, x.date);
-      if (x.id !== id && (!m || !R.inRange(next, x.date))) dropTask(x.id);
+    setRule(p, { days, end: R.clampEnd(origDate(id), end) });
+    const next = R.ruleOf(get("projects", p.id));
+    for (const x of seriesTasks(p.id)) {
+      if (origDate(x.id) < origDate(id) || started(x)) continue;
+      const m = R.dueOn(next, origDate(x.id));
+      if (x.id !== id && !m) dropTask(x.id);
       else if (m) put("tasks", { ...x, est: m });
     }
-    generate(next, from);
   }, "Repeat updated");
 }
 
-const SERIES_FIELDS = ["title", "est", "category", "projectId", "optional"];
+const SERIES_FIELDS = ["title", "est", "optional"];
 
-// 改名字、分钟、分类、子项目、可选：只改这一次 / 这次和以后 / 全部（做过的不动，除了这一次自己）
+// 改名字、分钟、可选：只改这一次 / 这次和以后 / 全部（做过的不动，除了这一次自己）
 export function editSeries(id, patch, scope) {
-  const t = get("tasks", id), r = routineOf(id);
-  if (!t || !r || scope === "this") return updateTask(id, patch, null, { quiet: patch.title !== undefined });
+  const t = get("tasks", id), p = routineOf(id);
+  if (!t || !p || scope === "this") return updateTask(id, patch, null, { quiet: patch.title !== undefined });
   const fields = Object.fromEntries(Object.entries(patch).filter(([k]) => SERIES_FIELDS.includes(k)));
   change(() => {
-    for (const x of seriesTasks(r.id)) {
-      if (x.id !== id && (started(x) || (scope === "following" && x.date < t.date))) continue;
-      put("tasks", { ...x, ...fields, ...("projectId" in fields ? { itemId: "" } : {}) });
+    for (const x of seriesTasks(p.id)) {
+      if (x.id !== id && (started(x) || (scope === "following" && origDate(x.id) < origDate(id)))) continue;
+      put("tasks", { ...x, ...fields });
     }
-    const rule = { ...r };
-    for (const k of ["title", "category", "projectId", "optional"]) if (k in fields) rule[k] = fields[k];
-    if ("est" in fields) rule.days = (r.days || []).map((v) => (Number(v) > 0 ? Number(fields.est) || 0 : 0));
-    writeRoutines(routines().map((x) => (x.id === r.id ? rule : x)));
+    const plan = get("projects", p.id);
+    const rule = { ...(plan.rule || {}) };
+    if ("optional" in fields) rule.optional = Boolean(fields.optional);
+    if ("est" in fields) rule.days = (rule.days || []).map((v) => (Number(v) > 0 ? Number(fields.est) || 0 : 0));
+    put("projects", { ...plan, ...("title" in fields ? { name: fields.title } : {}), rule });
   }, null, { quiet: patch.title !== undefined });
 }
 
-// 删的时候会删掉哪几个：only = 只这一次；following / earlier / all 只删还没开始的（这一次也一样）
+// 删的时候会删掉哪几个已经落成的：only = 只这一次；following / earlier / all 只删还没开始的（这一次也一样）
 export function seriesScope(id, scope) {
-  const t = get("tasks", id), p = R.parseRoutineTaskId(id);
+  const t = get("tasks", id), x = R.parseRoutineTaskId(id);
   if (!t) return [];
-  if (scope === "this" || !p) return [t];
-  return seriesTasks(p.rid).filter((x) => !started(x) &&
-    (scope === "all" || (scope === "following" ? x.date >= t.date : x.date <= t.date)));
+  if (scope === "this" || !x) return [t];
+  return seriesTasks(x.rid).filter((s) => !started(s) &&
+    (scope === "all" || (scope === "following" ? origDate(s.id) >= x.date : origDate(s.id) <= x.date)));
 }
 
+// following = 从这次起不再重复；earlier = 这次和以前的不要了（从下一次开始）；all = 整个计划不要了
+// （做过的还在的话计划留着、标成 Dropped，统计里还认得出名字）
 export function deleteSeries(id, scope) {
-  const t = get("tasks", id), p = R.parseRoutineTaskId(id);
+  const t = get("tasks", id), p = routineOf(id);
   if (!t || !p || scope === "this") return deleteTask(id);
-  const gone = seriesScope(id, scope);
+  const od = origDate(id), gone = seriesScope(id, scope);
   change(() => {
     gone.forEach((x) => dropTask(x.id));
-    const r = routines().find((x) => x.id === p.rid);
-    if (!r) return;
-    const left = seriesTasks(r.id);
-    if (scope === "all" || !left.length) writeRoutines(routines().filter((x) => x.id !== r.id));
-    else if (scope === "following") {
-      const kept = left.filter((x) => x.date >= t.date).map((x) => x.date).sort().pop();
-      writeRoutines(routines().map((x) => (x.id === r.id ? { ...r, end: kept || addDays(t.date, -1) } : x)));
-    }
-  }, gone.length ? "Deleted " + gone.length + " task" + (gone.length === 1 ? "" : "s") : "Stopped repeating");
+    if (scope === "following") setRule(p, { end: addDays(od, -1) });
+    else if (scope === "earlier") setRule(p, { start: addDays(od, 1) });
+    const r = R.ruleOf(get("projects", p.id));
+    if (scope !== "all" && !(r.start && r.end && r.end < r.start)) return;
+    // 一次都不剩了：做过的还在就留着计划（标 Dropped），不然整个删掉
+    if (all("tasks").some((x) => x.projectId === p.id)) put("projects", { ...get("projects", p.id), status: "dropped" });
+    else drop("projects", p.id);
+  }, scope === "all" ? "Deleted repeat" : "Stopped repeating");
 }
 
 // ---------- 计时 ----------

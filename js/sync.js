@@ -3,6 +3,7 @@
 // 表格里的 Code.gs 和页面要是同一版（VERSION）：不知道表格是哪版时先问一句，旧版就先不推，改动都留在本机。
 
 import * as store from "./store.js";
+import * as reading from "./reading.js";
 import { debounce } from "./dom.js";
 
 export const VERSION = 3;
@@ -64,9 +65,12 @@ export async function sync({ full = false } = {}) {
     }
     full = full || store.needsFull();
     const out = store.outgoing();
-    const data = await post(url, { secret, pull: true, since: full ? 0 : store.cursor(), push: { rows: out.rows, deletes: out.deletes } });
+    // 阅读表格：设了链接才带（要追加的、要不要列表）
+    const rq = store.setting("reading")?.url ? reading.request() : null;
+    const data = await post(url, { secret, pull: true, since: full ? 0 : store.cursor(), push: { rows: out.rows, deletes: out.deletes }, ...(rq ? { reading: rq } : {}) });
     store.pushed(out, data.tables || store.TABLES);
     store.applyPull(data.pull, data.now, { full });
+    if (rq) reading.apply(data.reading, rq);
     set("Synced " + hhmm());
     ok = true;
   } catch (e) {

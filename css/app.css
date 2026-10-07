@@ -700,3 +700,24 @@ body.phone .logtime input, body.phone .add input, body.phone .add select { font-
 .pweek span { margin-left: 6px; font-size: 12px; color: var(--muted); }
 .seg button[disabled] { opacity: .35; cursor: not-allowed; }
 .sp.h-regular i { background: var(--pc); }
+
+/* ---------- 阅读页 ---------- */
+.reading { max-width: 640px; }
+.radd { display: grid; gap: 10px; }
+.radd .rtitle { width: 100%; padding: 10px 12px; border: var(--b); border-radius: 12px; background: var(--bg); font-size: 16px; font-weight: 600; }
+.radd textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font: inherit; resize: vertical; }
+.rmatches:empty { display: none; }
+.rmatches { padding: 8px 10px; border: 1px dashed var(--line); border-radius: 10px; font-size: 13px; }
+.rmatches ul { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.rmatches li small { display: block; color: var(--muted); }
+.rmatches .rhead, .rmatches .rnone { margin: 0; font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.rtype { padding: 1px 6px; border-radius: 999px; background: var(--surface); font-size: 11px; color: var(--muted); }
+.rrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rlab { width: 40px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.vibes { display: flex; gap: 6px; }
+.vibe { width: 40px; height: 36px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 19px; line-height: 1; filter: grayscale(.8); opacity: .7; }
+.vibe.on { border: var(--b); filter: none; opacity: 1; background: var(--surface); }
+.rtypes { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rtype-in { flex: 1; min-width: 110px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); font-size: 13px; }
+.rgo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+body.phone .reading { padding: 0 2px 90px; }

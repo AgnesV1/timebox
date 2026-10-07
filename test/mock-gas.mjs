@@ -30,6 +30,7 @@ class Range {
 class Sheet {
   constructor(ss, name, rows = 1000, cols = 26) { this.ss = ss; this.name = name; this.rows = Array.from({ length: rows }, () => Array(cols).fill("")); this.cols = cols; this.fmt = {}; this.hidden = new Set(); }
   getName() { return this.name; }
+  getSheetId() { return this.ss.sheets.indexOf(this) * 1000; }
   setName(n) { this.name = n; return this; }
   cell(r, c) { if (r > this.rows.length || c > this.cols) throw new Error(`read out of bounds ${r},${c} in ${this.name}`); return this.rows[r - 1][c - 1]; }
   put(r, c, v) {
@@ -78,11 +79,13 @@ class Spreadsheet {
 
 // ss：接着用另一份 Code.gs 留下的表（测从上一版升级）
 export function load(codePath, ss = new Spreadsheet()) {
+  const others = {};   // openByUrl 能打开的别的表格：url → Spreadsheet
+  const byUrl = (url) => { const k = Object.keys(others).find((u) => String(url).startsWith(u)); if (!k) throw new Error("Spreadsheet not found"); return others[k]; };
   const logs = [];
   const pad = (n) => String(n).padStart(2, "0");
   const validation = { requireValueInList() { return this; }, requireValueInRange() { return this; }, build() { return {}; } };
   const sandbox = {
-    SpreadsheetApp: { getActiveSpreadsheet: () => ss, newDataValidation: () => Object.create(validation) },
+    SpreadsheetApp: { getActiveSpreadsheet: () => ss, openByUrl: byUrl, newDataValidation: () => Object.create(validation) },
     Utilities: { getUuid: () => crypto.randomUUID(), formatDate: (d, tz, f) => (f === "HH:mm" ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: "json" }, createTextOutput: (s) => ({ setMimeType() { return this; }, getContent: () => s }) },
@@ -92,5 +95,7 @@ export function load(codePath, ss = new Spreadsheet()) {
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(codePath, "utf8"), sandbox);
   const post = (body) => JSON.parse(sandbox.doPost({ postData: { contents: JSON.stringify({ version: 3, ...body }) } }).getContent());
-  return { ss, sandbox, logs, post };
+  // 测试用：再开一个表格（比如阅读记录），网页里填它的链接
+  const spreadsheet = (url) => (others[url] = others[url] || new Spreadsheet());
+  return { ss, sandbox, logs, post, spreadsheet };
 }

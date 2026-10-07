@@ -66,6 +66,13 @@ Object.assign(g, load(current, g.ss));
 g.sandbox.setup();
 console.log("→ current:", g.logs.join(" | "));
 
+// 一个假的阅读记录表格：在页面设置里填 https://docs.google.com/spreadsheets/d/FAKE-READING/edit
+if (g.spreadsheet) {
+  const sh = g.spreadsheet("https://docs.google.com/spreadsheets/d/FAKE-READING").insertSheet("Reading");
+  [["Title", "Type", "Author", "Finished"], ["三体", "Novel", "刘慈欣", D("2025-03-01")], ["Severance", "TV", "", ""], ["Bad Blood", "Nonfiction", "", ""],
+    ["Dune", "Novel", "", ""], ["The Rest Is History", "Podcast", "", ""], ["Hollow Knight", "Game", "", ""]].forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v)));
+}
+
 http.createServer((req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   if (req.method === "OPTIONS") { res.setHeader("Access-Control-Allow-Headers", "*"); res.end(); return; }

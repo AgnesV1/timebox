@@ -642,6 +642,91 @@ function migrate_() {
   upsert_('tasks', tRows, now);
 }
 
+// ================= 阅读：你自己的另一个表格 =================
+// 链接在 Settings 的 reading（{url}），在网页电脑端的设置里填一次。按表头文字认列（下面这些写法都认，不分大小写）；
+// 没有 Vibe / Note 列就加在最右边。只往最后追加，不改、不删已有的行，也不往那个表格里加隐藏列。
+var READING_COLS = {
+  title: ['title', 'name', '书名', '名字', '名称', '标题', '作品'],
+  type: ['type', 'kind', 'category', 'format', '类型', '类别', '分类', '种类'],
+  vibe: ['vibe', 'style', 'mood', '风格'],
+  note: ['note', 'notes', 'comment', '备注', '笔记', '感想'],
+  added: ['added', 'date added', '添加日期', '加入日期']
+};
+
+function readingSheet_() {
+  var row = readAll_('settings').filter(function (r) { return r.id === 'reading'; })[0];
+  var url = row && row.value && String(row.value.url || '').trim();
+  if (!url) return null;
+  var ss = SpreadsheetApp.openByUrl(url);
+  var gid = (/[#&?]gid=(\d+)/.exec(url) || [])[1];
+  var hit = gid ? ss.getSheets().filter(function (sh) { return String(sh.getSheetId()) === gid; })[0] : null;
+  return hit || ss.getSheets()[0];
+}
+
+function readingCols_(sh, grow) {
+  var names = head_(sh), low = names.map(function (h) { return h.toLowerCase(); }), col = {};
+  Object.keys(READING_COLS).forEach(function (k) {
+    col[k] = -1;
+    READING_COLS[k].forEach(function (a) { if (col[k] < 0) col[k] = low.indexOf(a); });
+  });
+  if (grow) {
+    [['vibe', 'Vibe'], ['note', 'Note']].forEach(function (x) {
+      if (col[x[0]] >= 0) return;
+      if (sh.getMaxColumns() < names.length + 1) sh.insertColumnAfter(sh.getMaxColumns());
+      sh.getRange(1, names.length + 1).setValue(x[1]);
+      col[x[0]] = names.length;
+      names.push(x[1]);
+    });
+  }
+  col.width = names.length;
+  return col;
+}
+
+// 查重用：不分大小写，书名号、引号、空格都不算
+function titleKey_(s) {
+  return String(s || '').toLowerCase().replace(/[《》<>「」『』"'“”‘’\s]+/g, '');
+}
+
+// req = { list: true, add: [{id, title, type, vibe, note}] } → { rows, types, added: [id], dupes: [{id, title}] }
+function reading_(req) {
+  var sh = readingSheet_();
+  if (!sh) return { error: 'no sheet' };
+  var adds = (req.add || []).filter(function (a) { return a && String(a.title || '').trim(); });
+  var col = readingCols_(sh, adds.length > 0);
+  if (col.title < 0) return { error: 'no title column' };
+  var tz = tz_(), cell = function (r, k) { return col[k] >= 0 ? String(r[col[k]] === null ? '' : r[col[k]]).trim() : ''; };
+  var rows = body_(sh, head_(sh)).map(function (r) {
+    return { title: cell(r, 'title'), type: cell(r, 'type'), vibe: cell(r, 'vibe'), note: cell(r, 'note') };
+  }).filter(function (r) { return r.title; });
+  var seen = {};
+  rows.forEach(function (r) { seen[titleKey_(r.title)] = r; });
+  var out = { added: [], dupes: [] }, fresh = [];
+  adds.forEach(function (a) {
+    var r = { title: String(a.title).trim(), type: String(a.type || '').trim(), vibe: String(a.vibe || '').trim(), note: String(a.note || '').trim() };
+    if (seen[titleKey_(r.title)]) { out.dupes.push({ id: a.id, title: r.title }); return; }
+    var line = [];
+    for (var i = 0; i < col.width; i++) line.push('');
+    ['title', 'type', 'vibe', 'note'].forEach(function (k) { if (col[k] >= 0) line[col[k]] = toCell_('text', r[k]); });
+    if (col.added >= 0) line[col.added] = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    fresh.push(line);
+    seen[titleKey_(r.title)] = r;
+    rows.push(r);
+    out.added.push(a.id);
+  });
+  if (fresh.length) {
+    var start = sh.getLastRow() + 1, need = start + fresh.length - 1 - sh.getMaxRows();
+    if (need > 0) sh.insertRowsAfter(sh.getMaxRows(), need);
+    sh.getRange(start, 1, fresh.length, col.width).setValues(fresh);
+  }
+  if (req.list) {
+    var count = {};
+    rows.forEach(function (r) { if (r.type) count[r.type] = (count[r.type] || 0) + 1; });
+    out.rows = rows;
+    out.types = Object.keys(count).sort(function (a, b) { return count[b] - count[a]; });
+  }
+  return out;
+}
+
 // ================= 网页接口 =================
 // App 只发 POST：{ secret, version, push: { rows: { tasks: [...] }, deletes: [{table, id, at}] }, pull: true, since }
 // 返回 { ok, now, pull: { tables, deleted } }。所有请求排队执行，所以 since 不会漏掉数据。
@@ -670,6 +755,9 @@ function doPost(e) {
     touched += remove_(push.deletes, now);
     if (touched) {
       try { recount_(); } catch (err) { out.recount = String(err); }   // 名字列出问题不能影响同步，但要能看见
+    }
+    if (body.reading) {
+      try { out.reading = reading_(body.reading); } catch (err) { out.reading = { error: String(err.message || err) }; }   // 阅读表格出问题不影响同步
     }
     out.now = Date.now();
     out.version = VERSION;

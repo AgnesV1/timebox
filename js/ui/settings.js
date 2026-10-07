@@ -34,6 +34,10 @@ export function settingsHTML(phone) {
     '<p class="hint look-hint">Auto follows your phone or computer.</p>' +
     '<label class="check"><input type="checkbox" data-local-check="fx"' + (l.fx !== false ? " checked" : "") + "> Sparkles and confetti</label></section>";
 
+  const read = '<section class="card"><h3>Reading</h3>' +
+    '<label class="field"><span>Link to your reading Sheet (the tab you keep the list in)</span><input data-reading-url value="' + esc(store.setting("reading")?.url || "") + '" placeholder="https://docs.google.com/spreadsheets/d/…/edit#gid=…" autocomplete="off" spellcheck="false"></label>' +
+    '<p class="hint">New entries from the Reading page are added at the bottom of that tab. Columns are found by their header (Title, Type, Vibe, Note); Vibe and Note are added if missing.</p></section>';
+
   const backup = '<section class="card"><h3>Backup</h3><p class="hint">Everything is in your Sheet already. This saves a copy of this device\'s data as a file.</p>' +
     '<button type="button" class="btn" data-act="export">Export JSON</button></section>';
 
@@ -41,7 +45,7 @@ export function settingsHTML(phone) {
     return '<div class="settings phone-settings"><header class="phead"><div class="l"><a class="nav" href="#today">‹ Today</a></div></header>' +
       '<header class="page-head"><div><p class="eyebrow">Settings</p><h2>苦昼短</h2></div></header>' + look + sheet + "</div>";
   }
-  return '<div class="settings"><header class="page-head"><div><p class="eyebrow">Settings</p><h2>苦昼短</h2></div></header>' + sheet + time + look + backup + "</div>";
+  return '<div class="settings"><header class="page-head"><div><p class="eyebrow">Settings</p><h2>苦昼短</h2></div></header>' + sheet + time + read + look + backup + "</div>";
 }
 
 // 每周那一排：全空 = 每天都用默认值；填了几个就只改那几天
@@ -57,6 +61,10 @@ export function initSettings(applyTheme) {
     if (el.dataset.local === "url" || el.dataset.local === "secret") sync.sync({ full: true });
   });
   on(document, "change", ".settings [data-local-check]", (e, el) => store.setLocal({ [el.dataset.localCheck]: el.checked }));
+  on(document, "change", ".settings [data-reading-url]", (e, el) => {
+    store.setSetting("reading", { url: el.value.trim() });
+    sync.sync();
+  });
   on(document, "change", ".settings [data-cap], .settings [data-week]", (e, el) => {
     const root = el.closest(".settings");
     const def = Math.max(0, Number(root.querySelector('[data-cap="default"]').value) || 0);

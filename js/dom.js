@@ -44,7 +44,8 @@ const ICONS = {
   sync: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/>',
   trash: '<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
-  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>'
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  reading: '<path d="M4.5 5.5A2.5 2.5 0 0 1 7 3h12.5v15H7a2.5 2.5 0 0 0-2.5 2.5v-15Z"/><path d="M4.5 20.5A2.5 2.5 0 0 1 7 18h12.5v3H7"/>'
 };
 
 // 只在后台跑一次的小定时器

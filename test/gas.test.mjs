@@ -245,3 +245,35 @@ test("old repeat rules become Regular plans; future untouched ones go, the rest 
   g.sandbox.setup();
   assert.equal(g.ss.getSheetByName("Projects").objects().filter((p) => p.ID === "r1").length, 1);
 });
+
+test("reading: list, search data, append with duplicate check, extra columns only when needed", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  const url = "https://docs.google.com/spreadsheets/d/READ/edit";
+  const book = g.spreadsheet(url);
+  book.insertSheet("2024");
+  const sh = book.insertSheet("All");
+  [["书名", "类型", "作者", "读完"], ["《三体》", "小说", "刘慈欣", D("2025-03-01")], ["Severance", "剧", "", ""], ["Bad Blood", "非虚构", "", ""], ["Dune", "小说", "", ""]]
+    .forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v)));
+  const read = (reading) => g.post({ secret: "CHANGE_ME", reading }).reading;
+  assert.equal(read({ list: true }).error, "no sheet", "no link yet");
+  g.post({ secret: "CHANGE_ME", push: { rows: { settings: [{ key: "reading", value: { url: url + "#gid=" + sh.getSheetId() }, updated: 1 }] } } });
+  const list = read({ list: true });
+  assert.equal(list.rows.length, 4);
+  assert.deepEqual(list.types, ["小说", "剧", "非虚构"], "most used first");
+  assert.equal(sh.header().length, 4, "just looking doesn't add columns");
+  const res = read({ list: true, add: [
+    { id: "a1", title: "三体", type: "小说", vibe: "🎉", note: "again?" },
+    { id: "a2", title: "The Bear", type: "剧", vibe: "😊", note: "=chef" },
+    { id: "a3", title: " the  bear ", type: "剧" }
+  ] });
+  assert.deepEqual(res.added, ["a2"]);
+  assert.deepEqual(res.dupes.map((d) => d.id), ["a1", "a3"], "《》, case and spaces don't matter");
+  assert.equal(res.rows.length, 5);
+  assert.deepEqual(sh.header(), ["书名", "类型", "作者", "读完", "Vibe", "Note"]);
+  const last = sh.objects().pop();
+  assert.equal(last["书名"], "The Bear");
+  assert.equal(last.Vibe, "😊");
+  assert.equal(last.Note, "=chef", "text, not a formula");
+  assert.equal(last["读完"], "", "a finish date column is left alone");
+});

@@ -34,16 +34,14 @@ export function readingHTML(phone) {
   const head = phone
     ? '<header class="phead"><div class="l"><a class="nav" href="#today">‹ Today</a></div></header><header class="page-head"><div><h2>Reading</h2></div></header>'
     : '<header class="page-head"><div><h2>Reading</h2></div></header>';
-  const chips = reading.types().slice(0, 8);
   return '<div class="reading' + (phone ? " phone-reading" : "") + '">' + head +
     '<form class="radd" autocomplete="off">' +
     '<input name="title" class="rtitle" data-keep="read-title" placeholder="What do you want to read or watch?" enterkeyhint="next" value="' + esc(query) + '">' +
     '<div class="rmatches" data-rmatches>' + matchesHTML() + "</div>" +
     '<div class="rrow"><span class="rlab">Vibe</span><div class="vibes">' + reading.VIBES.map((v) =>
       '<button type="button" class="vibe' + (vibe === v ? " on" : "") + '" data-act="vibe" data-v="' + v + '">' + v + "</button>").join("") + "</div></div>" +
-    '<div class="rrow"><span class="rlab">Type</span><div class="rtypes">' + chips.map((t) =>
-      '<button type="button" class="chip' + (type === t ? " on" : "") + '" data-act="rtype" data-v="' + esc(t) + '">' + esc(t) + "</button>").join("") +
-    '<input name="type" class="rtype-in" data-keep="read-type" placeholder="' + (chips.length ? "Other…" : "Book, film, podcast…") + '" value="' + esc(chips.includes(type) ? "" : type) + '"></div></div>' +
+    '<div class="rrow"><span class="rlab">Type</span><div class="rtypes">' + reading.TYPES.map((t) =>
+      '<button type="button" class="chip' + (type === t ? " on" : "") + '" data-act="rtype" data-v="' + esc(t) + '">' + esc(t) + "</button>").join("") + "</div></div>" +
     '<textarea name="note" data-keep="read-note" rows="2" placeholder="Note"></textarea>' +
     '<div class="rgo"><span class="hint" data-rstatus>' + esc(statusText()) + '</span><button class="btn cta" type="submit">Add</button></div>' +
     "</form></div>";
@@ -55,17 +53,9 @@ export function initReading(rerender) {
     const box = document.querySelector("[data-rmatches]");
     if (box) box.innerHTML = matchesHTML();
   });
-  on(document, "input", ".radd [name=type]", (e, el) => {
-    type = el.value.trim();
-    document.querySelectorAll(".radd [data-act=rtype]").forEach((b) => b.classList.toggle("on", b.dataset.v === type));
-  });
   on(document, "click", ".radd [data-act]", (e, el) => {
     if (el.dataset.act === "vibe") vibe = vibe === el.dataset.v ? "" : el.dataset.v;
-    if (el.dataset.act === "rtype") {
-      type = type === el.dataset.v ? "" : el.dataset.v;
-      const input = document.querySelector(".radd [name=type]");
-      if (input) input.value = "";
-    }
+    if (el.dataset.act === "rtype") type = type === el.dataset.v ? "" : el.dataset.v;
     rerender();
   });
   on(document, "submit", ".radd", (e, form) => {
@@ -74,10 +64,10 @@ export function initReading(rerender) {
     if (!title) { form.title.focus(); return; }
     const hit = reading.exists(title);
     if (hit) { toast("Already in your list" + (hit.tab ? " (" + hit.tab + ")" : "")); return; }
-    reading.add({ title, type: form.type.value.trim() || type, vibe, note: form.note.value });
+    reading.add({ title, type, vibe, note: form.note.value });
     toast("Added " + title);
     query = ""; vibe = ""; type = "";
-    form.title.value = ""; form.type.value = ""; form.note.value = "";
+    form.title.value = ""; form.note.value = "";
     rerender();
     sync.sync();
   });

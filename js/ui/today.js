@@ -157,7 +157,7 @@ function phoneHTML(c) {
   const bar = '<div class="strip">' + tasks.map((t) => '<i style="flex-grow:' + Math.max(5, Number(t.est) || 0) + ";" + segStyle(t) + '"></i>').join("") + "</div>";
   return '<div class="dayview phone-day" data-date="' + d + '">' +
     '<header class="phead"><div class="l"><h1 data-act="day-today">' + fmtDay(d) + '</h1><span class="ball" data-act="ball" role="button" aria-label="Sparkles"></span></div>' +
-    '<div class="r"><span class="psync" data-sync-status></span><a class="icon-btn pset" href="#reading" aria-label="Reading">' + icon("reading") + '</a><a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
+    '<div class="r"><span class="psync" data-sync-status></span><a class="pread" href="#reading">' + icon("reading") + '<span>Reading</span></a><a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
     (store.local().url ? bar + meta + '<div class="list" data-list="' + d + '">' +
       (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + ghostsHTML(c, d) + "</div>" + addHTML(c, d, true)
       : connectHTML()) + "</div>";

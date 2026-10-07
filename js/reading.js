@@ -8,6 +8,7 @@ import { readLocal, writeLocal } from "./dom.js";
 const KEY = "kuzhouduan-reading";
 const FRESH = 10 * 60000;   // 列表 10 分钟内拉过就不再拉（打开阅读页时总会拉一次）
 export const VIBES = ["🎉", "😊", "👀"];   // 爽 / 成长 / 好奇
+export const TYPES = ["Book", "PodCast", "Fiction", "TV", "Blogger", "Game", "Article", "etc"];   // 用户定的，和阅读表格的页名对应
 
 let R = { rows: [], types: [], at: 0, pending: [], error: "" };
 Object.assign(R, readLocal(KEY, {}) || {});

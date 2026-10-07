@@ -24,6 +24,7 @@ class Range {
   setValue(v) { this.sh.put(this.r, this.c, v); return this; }
   setNumberFormat(f) { for (let j = 0; j < this.nc; j++) this.sh.fmt[this.c + j] = f; return this; }
   setDataValidation() { return this; }
+  clearDataValidations() { return this; }
 }
 
 class Sheet {
@@ -54,6 +55,8 @@ class Sheet {
     this.rows.forEach((row) => { const v = row.splice(c - 1, 1)[0]; row.splice(dest > c ? dest - 2 : dest - 1, 0, v); });
   }
   setFrozenRows() { return this; }
+  hideSheet() { this.sheetHidden = true; return this; }
+  isSheetHidden() { return Boolean(this.sheetHidden); }
   hideColumns(c) { this.hidden.add(c); }
   copyTo(ss) { const s = new Sheet(ss, "Copy of " + this.name); s.rows = this.rows.map((r) => r.slice()); s.cols = this.cols; ss.sheets.push(s); return s; }
   // test helpers
@@ -69,17 +72,18 @@ class Spreadsheet {
   getSheetByName(n) { return this.sheets.find((s) => s.name === n) || null; }
   insertSheet(n) { const s = new Sheet(this, n); this.sheets.push(s); return s; }
   getSheets() { return this.sheets; }
+  deleteSheet(sh) { this.sheets = this.sheets.filter((s) => s !== sh); }
   getSpreadsheetTimeZone() { return "America/Toronto"; }
 }
 
-export function load(codePath) {
-  const ss = new Spreadsheet();
+// ss：接着用另一份 Code.gs 留下的表（测从上一版升级）
+export function load(codePath, ss = new Spreadsheet()) {
   const logs = [];
   const pad = (n) => String(n).padStart(2, "0");
   const validation = { requireValueInList() { return this; }, requireValueInRange() { return this; }, build() { return {}; } };
   const sandbox = {
     SpreadsheetApp: { getActiveSpreadsheet: () => ss, newDataValidation: () => Object.create(validation) },
-    Utilities: { getUuid: () => crypto.randomUUID(), formatDate: (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` },
+    Utilities: { getUuid: () => crypto.randomUUID(), formatDate: (d, tz, f) => (f === "HH:mm" ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: "json" }, createTextOutput: (s) => ({ setMimeType() { return this; }, getContent: () => s }) },
     Logger: { log: (m) => logs.push(m) },
@@ -87,6 +91,6 @@ export function load(codePath) {
   };
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(codePath, "utf8"), sandbox);
-  const post = (body) => JSON.parse(sandbox.doPost({ postData: { contents: JSON.stringify(body) } }).getContent());
+  const post = (body) => JSON.parse(sandbox.doPost({ postData: { contents: JSON.stringify({ version: 3, ...body }) } }).getContent());
   return { ss, sandbox, logs, post };
 }

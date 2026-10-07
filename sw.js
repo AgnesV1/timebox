@@ -1,8 +1,8 @@
 // 离线：页面、脚本、样式、字体都先上网拿最新的（顺便存一份），4 秒拿不到就用存着的那份。
 // 发给 Apps Script 的请求不经过这里。
-const CACHE = "kuzhouduan-v6";
+const CACHE = "kuzhouduan-v7";
 const SHELL = ["./", "index.html", "css/app.css", "manifest.json", "icon-180.png", "favicon.png",
-  "js/main.js", "js/store.js", "js/sync.js", "js/engine.js", "js/stats.js", "js/routines.js", "js/dates.js", "js/dom.js", "js/patterns.js", "js/fx.js",
+  "js/main.js", "js/store.js", "js/sync.js", "js/engine.js", "js/stats.js", "js/routines.js", "js/times.js", "js/dates.js", "js/dom.js", "js/patterns.js", "js/fx.js",
   "js/ui/common.js", "js/ui/today.js", "js/ui/calendar.js", "js/ui/projects.js", "js/ui/settings.js", "js/ui/editor.js", "js/ui/modal.js", "js/ui/dnd.js", "js/ui/stats.js", "js/ui/timer.js",
   "fonts/unbounded.woff2", "fonts/space-grotesk.woff2", "fonts/jetbrains-mono.woff2"];
 const TIMEOUT = 4000;

@@ -15,10 +15,10 @@ test("period ranges and the one before", () => {
   assert.equal(S.shiftAnchor("month", "2026-01-31", 1), "2026-02-01");
 });
 
-test("summary: time, completion, line held, accuracy, categories, reasons", () => {
+test("summary: time, completion, line held, accuracy, projects, reasons", () => {
   const t = (id, date, est, status, extra = {}) => ({ id, date, est, status, ...extra });
   const c = ctx({
-    projects: [{ id: "p" }],
+    projects: [{ id: "p", name: "Module #4", group: "Main - French", color: "#f0f" }],
     log: { "2026-10-01": { need: 60, projects: { p: 60 } }, "2026-10-02": { need: 60, projects: { p: 60 } } },
     tasks: [
       t("a", "2026-10-01", 60, "done", { actual: 75, projectId: "p", category: "Main" }),
@@ -41,8 +41,10 @@ test("summary: time, completion, line held, accuracy, categories, reasons", () =
   assert.deepEqual(s.status, { partial: 1, later: 1, drop: 1 });
   assert.equal(s.reasons[0].count, 2, "same reason, different case and spaces");
   assert.equal(s.reasons[0].text, "Meetings");
-  assert.equal(s.byCategory.find((x) => x.cat === "Work").spent, 10);
-  assert.equal(s.byCategory.find((x) => x.cat === "").counted, 1, "the dropped one counts, the optional one does not");
+  assert.equal(s.byProject[0].name, "Main - French");
+  assert.equal(s.byProject[0].spent, 75);
+  assert.equal(s.byProject[0].color, "#f0f");
+  assert.equal(s.byProject.find((x) => x.name === "").counted, 3, "the dropped one counts, the optional one does not");
   assert.equal(s.daily.length, 7);
   assert.equal(s.daily.find((x) => x.date === "2026-10-06").future, true);
   assert.equal(s.byWeekday[4].avg, 85, "Thursday Oct 1");

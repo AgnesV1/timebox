@@ -4,10 +4,10 @@
 
 import * as store from "../store.js";
 import * as E from "../engine.js";
-import { esc, on, icon, debounce } from "../dom.js";
+import { esc, on, icon } from "../dom.js";
 import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, WEEKDAYS } from "../dates.js";
 import * as R from "../routines.js";
-import { heroHTML, stripHTML, billHTML, colorOf, projectOf, projectOptions, segStyle, lineInfo, toast, STATUS, CATS } from "./common.js";
+import { heroHTML, stripHTML, billHTML, colorOf, projectOf, projectOptions, segStyle, lineInfo, toast, STATUS } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
 
@@ -90,18 +90,11 @@ function addHTML(c, d, phone = false) {
     '<div class="add-main"><input name="title" data-keep="add-title-' + d + '" placeholder="Add a task" enterkeyhint="done">' +
     '<input name="est" class="min num" data-keep="add-est-' + d + '" type="number" inputmode="numeric" value="30" min="5" step="5" aria-label="Minutes">' +
     '<button class="btn cta" type="submit">Add</button></div>' +
-    '<div class="add-more"><div class="cats">' +
-    ["", ...CATS].map((k) => '<label class="cat"><input type="radio" name="cat" value="' + k + '"' + (k ? "" : " checked") + '><i style="--c:' + (k ? "var(--c-" + k + ")" : "var(--c-None)") + '"></i>' + (k || "None") + "</label>").join("") +
-    "</div>" + (projects.length ? '<select name="project" aria-label="Sub-project">' + projectOptions(projects) + "</select>" : "") +
+    '<div class="add-more">' + (projects.length ? '<select name="project" aria-label="Sub-project">' + projectOptions(projects) + "</select>" : "") +
     (phone ? "" : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
       '<option value="weekdays">↻ Weekdays</option><option value="weekly">↻ Every ' + WEEKDAYS[weekday(d)] + "</option></select>" +
       '<select name="for" aria-label="For how long">' + R.LENGTHS.map(([v, l]) => '<option value="' + v + '"' + (v === R.DEFAULT_LENGTH ? " selected" : "") + ">for " + l + "</option>").join("") + "</select>") +
     "</div></form>";
-}
-
-function noteHTML(d) {
-  const note = store.get("notes", d)?.note || "";
-  return '<section class="note"><label for="note-' + d + '">Note to self</label><textarea id="note-' + d + '" data-act="note" data-date="' + d + '" data-keep="note-' + d + '" rows="2" placeholder="Stuck points, ideas, how the day went…">' + esc(note) + "</textarea></section>";
 }
 
 export function dayParts(c, d) {
@@ -113,15 +106,14 @@ export function dayParts(c, d) {
     bill: isToday ? billHTML(E.yesterdayBill(c)) : "",
     overdue: isToday ? overdueHTML(c) : "",
     list: '<div class="list" data-list="' + d + '">' + (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks)).join("") : '<div class="empty">No tasks for this day.</div>') + "</div>",
-    add: addHTML(c, d),
-    note: noteHTML(d)
+    add: addHTML(c, d)
   };
 }
 
 // 日历里点开某一天：同一套，竖着排
 export function dayModalHTML(c, d) {
   const x = dayParts(c, d);
-  return '<div class="dayview" data-date="' + d + '"><h2 class="sheet-title">' + fmtDay(d) + (d === c.today ? " <small>Today</small>" : "") + "</h2>" + x.hero + x.strip + x.list + x.add + x.note + "</div>";
+  return '<div class="dayview" data-date="' + d + '"><h2 class="sheet-title">' + fmtDay(d) + (d === c.today ? " <small>Today</small>" : "") + "</h2>" + x.hero + x.strip + x.list + x.add + "</div>";
 }
 
 // ---------- 手机 ----------
@@ -173,12 +165,10 @@ export function todayHTML(c, phone) {
     '<header class="page-head"><div><p class="eyebrow">' + (isToday ? "Today" : d < store.today() ? "Looking back" : "Looking ahead") + "</p><h2>" + fmtDay(d) + "</h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="day-prev" aria-label="Previous day">' + icon("left") + '</button><button type="button" class="nav" data-act="day-today">Today</button><button type="button" class="nav" data-act="day-next" aria-label="Next day">' + icon("right") + "</button></div></header>" +
     '<div class="today-grid"><div class="today-main">' + x.strip + x.list + x.add + "</div>" +
-    '<div class="today-side">' + x.hero + x.bill + x.overdue + x.note + "</div></div></div>";
+    '<div class="today-side">' + x.hero + x.bill + x.overdue + "</div></div></div>";
 }
 
 // ---------- 交互（挂在 document 上，今天页和弹出的某一天都能用） ----------
-
-const saveNote = debounce((d, v) => store.setNote(d, v), 500);
 
 function logFromRow(row) {
   if (!row) return;
@@ -231,7 +221,7 @@ export function initToday(rerender) {
       el.style.height = "auto";
       el.style.height = el.scrollHeight + "px";
       store.updateTask(id, { desc: el.value }, null, { quiet: true });
-    } else if (act === "note") saveNote(el.dataset.date, el.value);
+    }
   });
 
   on(document, "submit", ".dayview form[data-add]", (e, form) => {
@@ -243,7 +233,7 @@ export function initToday(rerender) {
     // 「Gym 40」「Gym 40m」：末尾的数字当分钟
     const m = title.match(/^(.*\S)\s+(\d{1,3})\s*(m|min|mins)?$/i);
     if (m && Number(m[2]) >= 5) { title = m[1]; est = Number(m[2]); }
-    const fields = { date: form.dataset.add, title, est, category: String(f.get("cat") || ""), projectId: String(f.get("project") || "") };
+    const fields = { date: form.dataset.add, title, est, projectId: String(f.get("project") || "") };
     const how = String(f.get("repeat") || "");
     const id = how ? store.addRepeating(fields, R.daysFor(how, fields.date, est), R.endFor(fields.date, Number(f.get("for")))) : store.addTask(fields);
     if (how) form.querySelector("[name=repeat]").value = "";

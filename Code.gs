@@ -6,43 +6,41 @@ var SECRET = 'CHANGE_ME';
 // 每张表：页名、主键、[字段, 表头, 类型, 标记]。列按表头文字找，可以挪位置、中间插自己的列。
 // 类型 text / num / date / bool / json / status / pstatus / clock（钟点 09:10，存成文字）。
 // 标记 calc = 脚本自己算，App 不写；hide = setup 时把这列藏起来（右键可取消隐藏）。
+var VERSION = 3;   // 页面和脚本对版本：页面不是这个版本就不收它的数据，免得新旧格式混在一起
 var T = {
+  // 计时记录在 Times 一格里：「09:10-09:40 30m; 20m」
   tasks: { sheet: 'Tasks', key: 'id', main: 'title', cols: [
     ['date', 'Date', 'date'], ['title', 'Task', 'text'], ['est', 'Est min', 'num'], ['actual', 'Actual min', 'num'],
-    ['order', 'Order', 'num'], ['category', 'Category', 'text'], ['status', 'Status', 'status'],
-    ['doneOrder', 'Done order', 'num'], ['reason', 'Reason', 'text'], ['project', 'Project', 'text', 'calc'],
-    ['optional', 'Optional', 'bool'], ['id', 'ID', 'text', 'hide'], ['projectId', 'Project ID', 'text', 'hide'],
-    ['itemId', 'Item ID', 'text', 'hide'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide'],
+    ['status', 'Status', 'status'], ['reason', 'Reason', 'text'], ['project', 'Project', 'text', 'calc'],
+    ['optional', 'Optional', 'bool'], ['times', 'Times', 'text'], ['order', 'Order', 'num', 'hide'],
+    ['id', 'ID', 'text', 'hide'], ['projectId', 'Project ID', 'text', 'hide'], ['itemId', 'Item ID', 'text', 'hide'],
+    ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide'],
     ['desc', 'Description', 'text']] },                               // Description 永远最后一列
+  // 一行 = 一个计划。Kind：Total（总时长 + 截止日）/ Regular（规律）；Place：Auto（自动排到每天）/ Pool（进任务池）
   projects: { sheet: 'Projects', key: 'id', main: 'name', cols: [
-    ['name', 'Project', 'text'], ['group', 'Group', 'text'], ['status', 'Status', 'pstatus'],
-    ['deadline', 'Deadline', 'date'], ['start', 'Start', 'date'], ['early', 'Finish early', 'num'], ['color', 'Color', 'text'],
-    ['planned', 'Planned min', 'num', 'calc'], ['spent', 'Spent min', 'num', 'calc'], ['progress', 'Progress', 'num', 'calc'],
-    ['order', 'Order', 'num'], ['calib', 'Calibration', 'json', 'hide'], ['id', 'ID', 'text', 'hide'],
+    ['name', 'Project', 'text'], ['group', 'Group', 'text'], ['kind', 'Kind', 'kind'], ['place', 'Place', 'place'],
+    ['status', 'Status', 'pstatus'], ['deadline', 'Deadline', 'date'], ['start', 'Start', 'date'], ['early', 'Finish early', 'num'],
+    ['rule', 'Rule', 'json', 'hide'], ['color', 'Color', 'text', 'hide'], ['order', 'Order', 'num', 'hide'],
+    ['calib', 'Calibration', 'json', 'hide'], ['id', 'ID', 'text', 'hide'],
     ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
   items: { sheet: 'Items', key: 'id', main: 'title', cols: [
     ['title', 'Item', 'text'], ['project', 'Project', 'text', 'calc'], ['module', 'Module', 'text'], ['est', 'Est min', 'num'],
-    ['origEst', 'Original est', 'num'], ['order', 'Order', 'num'], ['id', 'ID', 'text', 'hide'],
+    ['origEst', 'Original est', 'num', 'hide'], ['order', 'Order', 'num', 'hide'], ['id', 'ID', 'text', 'hide'],
     ['projectId', 'Project ID', 'text', 'hide'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
-  capacity: { sheet: 'Day capacity', key: 'date', cols: [
-    ['date', 'Date', 'date'], ['min', 'Available min', 'num'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
-  notes: { sheet: 'Notes', key: 'date', cols: [
-    ['date', 'Date', 'date'], ['note', 'Note', 'text'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
   log: { sheet: 'Log', key: 'date', cols: [
     ['date', 'Date', 'date'], ['need', 'Line min', 'num'], ['projects', 'Shares', 'json'],
     ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
+  // capacity（含每天单独改的 overrides）/ prefs / timer / reading 都是 JSON
   settings: { sheet: 'Settings', key: 'key', cols: [
-    ['key', 'Key', 'text'], ['value', 'Value', 'json'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
-  // 计时记录：一段一行。From / To 是钟点（09:10），Min 是分钟
-  time: { sheet: 'Time', key: 'id', cols: [
-    ['date', 'Date', 'date'], ['task', 'Task', 'text', 'calc'], ['from', 'From', 'clock'], ['to', 'To', 'clock'], ['min', 'Min', 'num'],
-    ['id', 'ID', 'text', 'hide'], ['taskId', 'Task ID', 'text', 'hide'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] }
+    ['key', 'Key', 'text'], ['value', 'Value', 'json'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] }
 };
+// 不再用的列：setup 最后删掉
+var DROP = { tasks: ['审核', 'Review', 'Category', 'Done order'], projects: ['Planned min', 'Spent min', 'Progress'] };
+// 平时不用看的页：藏起来（右键页签 → 显示）
+var HIDE = ['Log', 'Settings', 'Deleted', 'Notes'];
+var KEEP_DELETED_DAYS = 90;
 var DELETED = 'Deleted';
 var DELETED_HEADER = ['Table', 'ID', 'Deleted at', 'Synced'];
-var GROUP_SHEET = 'Groups';
-var GROUPS = ['Work 1', 'Work 2', 'Main - English', 'Main - French', 'Main - Fitness', 'Fun'];
-var CATEGORIES = ['Main', 'Work', 'Fun', 'Chore'];
 var STATUS_OUT = { done: 'Done', partial: 'Partial', later: 'Later', drop: 'Drop' };
 var PSTATUS_OUT = { active: 'Active', done: 'Done', dropped: 'Dropped' };
 // 老表里出现过的写法都认
@@ -58,6 +56,8 @@ var COLORS = ['#C6FF00', '#2F5BFF', '#FF3EA5', '#FF7A1A', '#9B5CFF', '#00C2A8', 
 // ================= 第一次用，以及每次更新代码后：选 setup 点「运行」 =================
 // 老表（Tasks 里还没有 ID 列）会先整页备份成「Backup …」，再原地升级：补列、补 ID、
 // 状态统一成一个词、按任务名把每日任务挂到同名 Project 上、每个 Project 建一个同名条目。
+// 之后的精简（都可以重复跑）：Time 页并进 Tasks 的 Times 列、Day capacity 并进 Settings、
+// 用不着的列删掉、Groups 页删掉；搬完的旧页改名「Old …」藏起来，确认没问题后可以自己右键删。
 function setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   rename_(ss, '任务', 'Tasks');
@@ -66,11 +66,17 @@ function setup() {
   if (old) backup_(ss);
   Object.keys(T).forEach(ensure_);
   deletedSheet_();
-  groupSheet_();
   validate_();
   Object.keys(T).forEach(function (name) { readAll_(name, true); });   // 没有 ID 的行补上
   if (old) migrate_();
+  timeIntoTasks_(ss);
+  capacityIntoSettings_(ss);
+  fillDefaults_();
+  dropColumns_();
+  dropGroups_(ss);
+  pruneDeleted_();
   recount_();
+  hideSheets_(ss);
   Logger.log(old ? 'Migrated the old sheet. Backups: ' + backupNames_(ss).join(', ') : 'Setup done.');
 }
 
@@ -161,7 +167,6 @@ function ensure_(name) {
     var range = sh.getRange(2, i, rows, 1);
     if (c[2] === 'date') range.setNumberFormat('yyyy-mm-dd');
     else if (c[2] === 'text' || c[2] === 'json' || c[2] === 'clock') range.setNumberFormat('@');   // 纯文本，「- 第一步」不会被当成公式
-    if (c[0] === 'progress') range.setNumberFormat('0%');
     if (String(c[3] || '').indexOf('hide') >= 0) sh.hideColumns(i);
   });
 }
@@ -177,16 +182,111 @@ function deletedSheet_() {
   return sh;
 }
 
-// 大类清单，Projects 的 Group 下拉就读这一列，随便改名增删
-function groupSheet_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(GROUP_SHEET);
-  if (!sh) {
-    sh = ss.insertSheet(GROUP_SHEET);
-    sh.getRange(1, 1, GROUPS.length + 1, 1).setValues([['Group']].concat(GROUPS.map(function (g) { return [g]; })));
-    sh.setFrozenRows(1);
-  }
-  return sh;
+// 一列一次写回（只写这一列，别的格子不碰，免得「=…」这种文字被重新当成公式）
+function setCol_(sh, c, values) {
+  if (values.length) sh.getRange(2, c + 1, values.length, 1).setValues(values.map(function (v) { return [v]; }));
+}
+
+function body_(sh, names) {
+  var last = sh.getLastRow();
+  return last > 1 && names.length ? sh.getRange(2, 1, last - 1, names.length).getValues() : [];
+}
+
+function retire_(ss, sh) {
+  var to = 'Old ' + sh.getName(), n = 2;
+  while (ss.getSheetByName(to)) to = 'Old ' + sh.getName() + ' ' + n++;
+  sh.setName(to);
+}
+
+// 计时记录：「09:10-09:40 30m; 20m」（和页面 js/times.js 同一个写法）
+function timesText_(list) {
+  return list.map(function (x) { return (x.from && x.to ? x.from + '-' + x.to + ' ' : '') + Math.round(x.min) + 'm'; }).join('; ');
+}
+
+// Time 页（一段一行）并进 Tasks 的 Times 列，Actual = 加起来。任务的 Updated 不动，设备上更晚的改动照样算数
+function timeIntoTasks_(ss) {
+  var sh = ss.getSheetByName('Time');
+  if (!sh) return;
+  var names = head_(sh), tz = tz_(), segs = {};
+  var at = function (h) { return names.indexOf(h); };
+  body_(sh, names).forEach(function (r) {
+    var tid = String(r[at('Task ID')] || '').trim(), min = Number(r[at('Min')]) || 0;
+    if (!tid || min <= 0) return;
+    (segs[tid] = segs[tid] || []).push({ from: fromCell_('clock', r[at('From')], tz), to: fromCell_('clock', r[at('To')], tz), min: min });
+  });
+  var tsh = sheetOf_('tasks'), tn = head_(tsh), col = cols_(T.tasks, tn), data = body_(tsh, tn), now = Date.now();
+  var times = [], actual = [], synced = [];
+  data.forEach(function (row) {
+    var list = segs[String(row[col.id] || '').trim()];
+    var fill = list && String(row[col.times] || '').trim() === '';
+    if (fill) list.sort(function (a, b) { return (a.from || '~') < (b.from || '~') ? -1 : (a.from || '~') > (b.from || '~') ? 1 : 0; });
+    times.push(fill ? timesText_(list) : row[col.times]);
+    actual.push(fill ? list.reduce(function (a, x) { return a + x.min; }, 0) : row[col.actual]);
+    synced.push(fill ? now : row[col.synced]);
+  });
+  setCol_(tsh, col.times, times);
+  setCol_(tsh, col.actual, actual);
+  setCol_(tsh, col.synced, synced);
+  retire_(ss, sh);
+}
+
+// Day capacity 页（某天单独改的可用时间）并进 Settings 的 capacity.overrides
+function capacityIntoSettings_(ss) {
+  var sh = ss.getSheetByName('Day capacity');
+  if (!sh) return;
+  var names = head_(sh), tz = tz_(), overrides = {}, latest = 1;
+  body_(sh, names).forEach(function (r) {
+    var d = day_(r[names.indexOf('Date')], tz), v = r[names.indexOf('Available min')];
+    if (!d || v === '' || v === null || isNaN(Number(v))) return;
+    overrides[d] = Number(v);
+    latest = Math.max(latest, Number(r[names.indexOf('Updated')]) || 0);
+  });
+  var cur = readAll_('settings').filter(function (r) { return r.id === 'capacity'; })[0];
+  var value = (cur && cur.value) || { default: 420, weekly: null };
+  var merged = {};
+  Object.keys(overrides).forEach(function (d) { merged[d] = overrides[d]; });
+  Object.keys(value.overrides || {}).forEach(function (d) { merged[d] = value.overrides[d]; });
+  value.overrides = merged;
+  upsert_('settings', [{ key: 'capacity', value: value, updated: Math.max(latest, (cur && Number(cur.updated)) || 0) }], Date.now());
+  retire_(ss, sh);
+}
+
+// 空着的 Kind / Place 填上默认（Total / Pool），表格里看得明白
+function fillDefaults_() {
+  writeCol_('projects', 'kind', function (r) { return r.kind; });
+  writeCol_('projects', 'place', function (r) { return r.place; });
+}
+
+function dropColumns_() {
+  Object.keys(DROP).forEach(function (name) {
+    var sh = sheetOf_(name), names = head_(sh);
+    for (var i = names.length - 1; i >= 0; i--) if (DROP[name].indexOf(names[i]) >= 0) sh.deleteColumn(i + 1);
+  });
+}
+
+// Groups 页只是以前 Group 下拉的清单，现在项目名在网页里选
+function dropGroups_(ss) {
+  var sh = ss.getSheetByName('Groups');
+  if (sh) ss.deleteSheet(sh);
+}
+
+// 删除记录只留最近 90 天（太久没打开的设备，在设置里点 Reload everything 就好）
+function pruneDeleted_() {
+  var sh = deletedSheet_(), data = body_(sh, DELETED_HEADER);
+  var cut = Date.now() - KEEP_DELETED_DAYS * 864e5;
+  var keep = data.filter(function (r) { return Number(r[2]) >= cut; });
+  if (keep.length === data.length) return;
+  var blank = DELETED_HEADER.map(function () { return ''; });
+  sh.getRange(2, 1, data.length, DELETED_HEADER.length).setValues(keep.concat(data.slice(keep.length).map(function () { return blank; })));
+}
+
+function hideSheets_(ss) {
+  ss.getSheets().forEach(function (sh) {
+    var n = sh.getName();
+    if (HIDE.indexOf(n) >= 0 || n.indexOf('Backup ') === 0 || n.indexOf('Old ') === 0) {
+      try { sh.hideSheet(); } catch (e) { /* 正开着的那页藏不了，没关系 */ }
+    }
+  });
 }
 
 function validate_() {
@@ -196,12 +296,11 @@ function validate_() {
     return i ? sh.getRange(2, i, Math.max(sh.getMaxRows() - 1, 1), 1) : null;
   };
   var r;
-  if ((r = col('tasks', 'Category'))) r.setDataValidation(list(CATEGORIES));
   if ((r = col('tasks', 'Status'))) r.setDataValidation(list(['Done', 'Partial', 'Later', 'Drop']));
   if ((r = col('projects', 'Status'))) r.setDataValidation(list(['Active', 'Done', 'Dropped']));
-  if ((r = col('projects', 'Group'))) {
-    r.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(groupSheet_().getRange('A2:A200'), true).build());
-  }
+  if ((r = col('projects', 'Kind'))) r.setDataValidation(list(['Total', 'Regular']));
+  if ((r = col('projects', 'Place'))) r.setDataValidation(list(['Auto', 'Pool']));
+  if ((r = col('projects', 'Group'))) r.clearDataValidations();   // 以前读 Groups 页的下拉，Groups 页不要了
 }
 
 // ================= 读、写 =================
@@ -229,16 +328,20 @@ function fromCell_(type, v, tz) {
   if (type === 'json') { if (v === '' || v === null) return null; try { return JSON.parse(v); } catch (e) { return null; } }
   if (type === 'status') return statusIn_(v);
   if (type === 'pstatus') return pstatusIn_(v);
+  if (type === 'kind') return /^reg/i.test(String(v || '').trim()) ? 'regular' : 'total';
+  if (type === 'place') return /^auto/i.test(String(v || '').trim()) ? 'auto' : 'pool';
   if (type === 'clock' && Object.prototype.toString.call(v) === '[object Date]') return Utilities.formatDate(v, tz, 'HH:mm');
   return v === null || v === undefined ? '' : String(v);
 }
 
 function toCell_(type, v) {
-  if (v === null || v === undefined) return '';
+  if ((v === null || v === undefined) && type !== 'kind' && type !== 'place') return '';
   if (type === 'bool') return v ? true : '';
   if (type === 'json') return v === '' ? '' : JSON.stringify(v);
   if (type === 'status') return STATUS_OUT[v] || '';
   if (type === 'pstatus') return PSTATUS_OUT[v] || 'Active';
+  if (type === 'kind') return v === 'regular' ? 'Regular' : 'Total';
+  if (type === 'place') return v === 'auto' ? 'Auto' : 'Pool';
   if (type === 'num') { var n = Number(v); return v === '' || isNaN(n) ? '' : n; }
   var s = String(v);
   return s.charAt(0) === '=' ? "'" + s : s;   // 以 = 开头的文字别变成公式
@@ -286,8 +389,9 @@ function readAll_(name, fix) {
   return out;
 }
 
-// 按主键写入：表里那行更新得更晚就不覆盖（Log 例外：两边的份额合并）
-function upsert_(name, rows, now) {
+// 按主键写入：表里那行更新得更晚就不覆盖（Log 例外：两边的份额合并）；
+// 删过的行，除非这次的改动比删除还晚（比如撤销），不再写回来——自动生成的任务删了不会「复活」
+function upsert_(name, rows, now, dead) {
   if (!rows || !rows.length) return 0;
   var t = T[name], sh = sheetOf_(name), tz = tz_();
   var names = head_(sh), col = cols_(t, names), width = names.length;
@@ -299,17 +403,21 @@ function upsert_(name, rows, now) {
   rows.forEach(function (r) {
     var key = String(r[t.key] || r.id || '').trim();
     if (!key) return;
+    if (dead && (dead[name + ':' + key] || 0) >= (Number(r.updated) || 0)) return;
     var i = at[key], row;
     var pending = i !== undefined && i >= data.length;   // 这一批里刚新增的
     if (i !== undefined) {
       row = (pending ? appended[i - data.length] : data[i]).slice();
       if (name === 'log') r = mergeLog_(fromCell_('json', row[col.projects], tz), r);
+      else if (name === 'settings' && key === 'capacity') r = mergeCapacity_(fromCell_('json', row[col.value], tz), Number(row[col.updated]) || 0, r);
       else if ((Number(row[col.updated]) || 0) > (Number(r.updated) || 0)) return;
     } else {
       row = names.map(function () { return ''; });
     }
+    var fresh = i === undefined;
     t.cols.forEach(function (c) {
-      if (col[c[0]] < 0 || String(c[3] || '').indexOf('calc') >= 0 || r[c[0]] === undefined) return;
+      if (col[c[0]] < 0 || String(c[3] || '').indexOf('calc') >= 0) return;
+      if (r[c[0]] === undefined && !(fresh && (c[2] === 'kind' || c[2] === 'place'))) return;   // 新行的 Kind / Place 填上默认
       row[col[c[0]]] = toCell_(c[2], r[c[0]]);
     });
     if (col[t.key] >= 0) row[col[t.key]] = key;
@@ -336,6 +444,27 @@ function mergeLog_(existing, r) {
   Object.keys(a).forEach(function (k) { shares[k] = a[k]; });
   var need = Object.keys(shares).reduce(function (s, k) { return s + (Number(shares[k]) || 0); }, 0);
   return { date: r.date, need: need, projects: shares, updated: r.updated };
+}
+
+// 每张表每个 ID 最后一次删除的时间
+function deadMap_() {
+  var out = {};
+  body_(deletedSheet_(), DELETED_HEADER).forEach(function (r) {
+    var k = String(r[0]) + ':' + String(r[1]);
+    out[k] = Math.max(out[k] || 0, Number(r[2]) || 0);
+  });
+  return out;
+}
+
+// 每天的可用时间：两边各改了不同的日子，都留下（同一天以后改的为准；清空的那天记成 null）
+function mergeCapacity_(cur, curAt, r) {
+  var inc = r.value || {}, newer = (Number(r.updated) || 0) >= curAt;
+  var a = newer ? cur || {} : inc, b = newer ? inc : cur || {};
+  var v = {}, ov = {};
+  Object.keys(b).forEach(function (k) { v[k] = b[k]; });
+  [a.overrides || {}, b.overrides || {}].forEach(function (o) { Object.keys(o).forEach(function (d) { ov[d] = o[d]; }); });
+  v.overrides = ov;
+  return { key: r.key, value: v, updated: Math.max(Number(r.updated) || 0, curAt) };
 }
 
 function remove_(dels, now) {
@@ -377,15 +506,7 @@ function pull_(since) {
   return out;
 }
 
-// ================= Projects 的 Planned / Spent / Progress，和名字列 =================
-// 和 App 里算法一致：Planned = 条目预计之和；Spent = 挂在项目上的任务实际花的时间
-// （填了 Actual 按实际，没填的 Done 按预计，Partial 按实际）；Progress = 计划完成了多少
-
-function spent_(t) {
-  var a = Number(t.actual) || 0;
-  if (t.status === 'done') return a > 0 ? a : Number(t.est) || 0;
-  return t.status === 'partial' || !t.status ? a : 0;   // 还没标状态但计过时的也算
-}
+// ================= 名字列：Tasks / Items 里显示属于哪个计划 =================
 
 function plan_(t) {
   if (t.status === 'done') return Number(t.est) || 0;
@@ -393,26 +514,11 @@ function plan_(t) {
 }
 
 function recount_() {
-  var projects = readAll_('projects'), items = readAll_('items'), tasks = readAll_('tasks');
-  var name = {}, planned = {}, done = {}, spent = {}, progress = {}, title = {};
-  projects.forEach(function (p) { name[p.id] = p.name; });
-  tasks.forEach(function (t) {
-    title[t.id] = t.title;
-    if (t.itemId) progress[t.itemId] = (progress[t.itemId] || 0) + plan_(t);
-    if (t.projectId) spent[t.projectId] = (spent[t.projectId] || 0) + spent_(t);
-  });
-  items.forEach(function (i) {
-    var est = Number(i.est) || 0;
-    planned[i.projectId] = (planned[i.projectId] || 0) + est;
-    done[i.projectId] = (done[i.projectId] || 0) + Math.min(progress[i.id] || 0, est);
-  });
-  writeCol_('projects', 'planned', function (r) { return planned[r.id] || 0; });
-  writeCol_('projects', 'spent', function (r) { return spent[r.id] || 0; });
-  writeCol_('projects', 'progress', function (r) { return planned[r.id] ? (done[r.id] || 0) / planned[r.id] : ''; });
+  var name = {};
+  readAll_('projects').forEach(function (p) { name[p.id] = p.name; });
   writeCol_('tasks', 'project', function (r) { return name[r.projectId] || ''; });
   writeCol_('items', 'project', function (r) { return name[r.projectId] || ''; });
-  writeCol_('time', 'task', function (r) { return title[r.taskId] || ''; });
-  return { ok: true, projects: projects.length };
+  return { ok: true, projects: Object.keys(name).length };
 }
 
 // 整列一次写回（只写有 ID 的行，别的行原样留着）
@@ -432,7 +538,7 @@ function writeCol_(name, field, f) {
   sh.getRange(2, c + 1, values.length, 1).setValues(values);
 }
 
-// 在编辑器里选 recount 点运行：立刻重算一次 Projects
+// 在编辑器里选 recount 点运行：立刻把名字列重填一次
 function recount() {
   var r = recount_();
   Logger.log(JSON.stringify(r));
@@ -449,6 +555,9 @@ function migrate_() {
   var tz = tz_(), now = Date.now();
   var projects = readAll_('projects');
   var tasks = readAll_('tasks');
+  var planned = {};   // 升级前手填的 Planned min（这一列最后会删掉，先读出来）
+  var psh = sheetOf_('projects'), pn = head_(psh), pc = pn.indexOf('Planned min'), pid = pn.indexOf('ID');
+  if (pc >= 0 && pid >= 0) body_(psh, pn).forEach(function (r) { planned[String(r[pid])] = Number(r[pc]) || 0; });
   var byName = {};
   projects.forEach(function (p, k) { if (p.name) byName[key_(p.name)] = p; });
 
@@ -460,7 +569,7 @@ function migrate_() {
   });
   var pRows = [], iRows = [], itemOf = {};
   projects.forEach(function (p, k) {
-    var est = Number(p.planned) > 0 ? Number(p.planned) : planOf[p.id] || 0;   // 升级前手填的 Planned min
+    var est = planned[p.id] > 0 ? planned[p.id] : planOf[p.id] || 0;
     if (est > 0) {
       var id = Utilities.getUuid();
       itemOf[p.id] = id;
@@ -502,7 +611,7 @@ function migrate_() {
 }
 
 // ================= 网页接口 =================
-// App 只发 POST：{ secret, push: { rows: { tasks: [...] }, deletes: [{table, id, at}] }, pull: true, since }
+// App 只发 POST：{ secret, version, push: { rows: { tasks: [...] }, deletes: [{table, id, at}] }, pull: true, since }
 // 返回 { ok, now, pull: { tables, deleted } }。所有请求排队执行，所以 since 不会漏掉数据。
 
 function json_(obj) {
@@ -511,27 +620,28 @@ function json_(obj) {
 
 // 浏览器直接打开 …/exec 能看到这一行，说明部署好了
 function doGet() {
-  return json_({ ok: true, app: '苦昼短' });
+  return json_({ ok: true, app: '苦昼短', version: VERSION });
 }
 
 function doPost(e) {
   var body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return json_({ error: 'bad request' }); }
   if (body.secret !== SECRET) return json_({ error: 'denied' });
-  // 还没刷新的旧版页面发来的是旧格式，直接不写，免得把表弄乱
-  if (body.removed !== undefined && !body.push) return json_({ error: 'old page' });
+  // 还没刷新的旧版页面发来的是旧格式，直接不写，免得把表弄乱（它的改动还留在设备上，刷新成新版再推）
+  if (!(Number(body.version) >= VERSION)) return json_({ error: 'old page' });
   var lock = LockService.getScriptLock();
   try { lock.waitLock(25000); } catch (err) { return json_({ error: 'busy' }); }
   try {
     var now = Date.now(), touched = 0, out = { ok: true };
-    var push = body.push || {}, rows = push.rows || {};
-    Object.keys(rows).forEach(function (name) { if (T[name]) touched += upsert_(name, rows[name], now); });
+    var push = body.push || {}, rows = push.rows || {}, dead = deadMap_();
+    Object.keys(rows).forEach(function (name) { if (T[name]) touched += upsert_(name, rows[name], now, dead); });
     touched += remove_(push.deletes, now);
     if (touched) {
-      try { recount_(); } catch (err) { out.recount = String(err); }   // Projects 出问题不能影响同步，但要能看见
+      try { recount_(); } catch (err) { out.recount = String(err); }   // 名字列出问题不能影响同步，但要能看见
     }
     out.now = Date.now();
-    out.tables = Object.keys(T);   // 页面靠这个知道表格认不认识新加的表
+    out.version = VERSION;
+    out.tables = Object.keys(T);
     if (body.pull) out.pull = pull_(Number(body.since) || 0);
     return json_(out);
   } finally {

@@ -48,11 +48,11 @@ test("missed repeating tasks are not spread as overdue", () => {
 test("store: add with repeat, edit this / following / all, re-plan, delete with scopes", async () => {
   const store = await import("../js/store.js?routines");
   const t = store.today();
-  const first = store.addRepeating({ date: t, title: "Gym", est: 45, category: "Fun" }, R.daysFor("daily", t, 45), R.endFor(t, 14));
+  const first = store.addRepeating({ date: t, title: "Gym", est: 45 }, R.daysFor("daily", t, 45), R.endFor(t, 14));
   const rid = R.parseRoutineTaskId(first).rid;
   const all = () => store.seriesTasks(rid);
   assert.equal(all().length, 14, "every day for two weeks, all on the calendar now");
-  assert.ok(all().every((x) => x.est === 45 && x.title === "Gym" && x.category === "Fun" && x.updated === 1));
+  assert.ok(all().every((x) => x.est === 45 && x.title === "Gym" && x.updated === 1));
   assert.equal(store.routineOf(first).end, addDays(t, 13));
 
   // 改：只改这次 / 这次和以后 / 全部（做过的不动）

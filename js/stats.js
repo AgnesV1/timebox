@@ -1,12 +1,11 @@
 // 统计的计算：只算数，不碰页面。时间单位都是分钟。
 // 看的是一段时间（最近 30 天 / 一周 / 一个月 / 一年）里：花了多少时间、做完了多少、
-// 守住了几天安全线、估时准不准、各分类、星期几、没做完的原因、每天到底装得下多少。
+// 守住了几天安全线、估时准不准、各项目、星期几、没做完的原因、每天到底装得下多少。
 
 import { addDays, diffDays, range, weekday, startOfWeek, startOfMonth, addMonths, daysInMonth, isoOf } from "./dates.js";
 import * as E from "./engine.js";
 
 export const PERIODS = { week: "Week", d30: "30 days", month: "Month", year: "Year" };
-export const CATS = ["Main", "Work", "Fun", "Chore", ""];
 
 export function periodRange(kind, anchor, weekStartsOn = "monday") {
   if (kind === "week") { const from = startOfWeek(anchor, weekStartsOn); return { from, to: addDays(from, 6) }; }
@@ -56,17 +55,21 @@ export function summarize(ctx, from, to) {
   const accuracy = timed.length ? timed.reduce((a, t) => a + num(t.actual), 0) / timed.reduce((a, t) => a + num(t.est), 0) : null;
   const caps = days.map((d) => E.capacityFor(ctx.capacity, d)).filter((v) => v > 0);
 
-  const byCategory = CATS.map((cat) => {
-    const ts = tasks.filter((t) => (CATS.includes(t.category) ? t.category : "") === cat);
+  // 按项目（计划的 group；没有 group 的计划自己算一个；没挂计划的放最后）
+  const projectOf = (t) => (t.projectId ? E.projectById(ctx, t.projectId) : null);
+  const nameOf = (t) => { const p = projectOf(t); return p ? String(p.group || "").trim() || p.name || "" : ""; };
+  const byProject = [...new Set(tasks.map(nameOf))].map((name) => {
+    const ts = tasks.filter((t) => nameOf(t) === name);
     const tm = ts.filter((t) => t.status === "done" && num(t.actual) > 0 && num(t.est) > 0);
     return {
-      cat,
+      name,
+      color: ts.map((t) => projectOf(t)?.color).find(Boolean) || "",
       spent: ts.reduce((a, t) => a + E.spentMin(t), 0),
       done: ts.filter((t) => t.status === "done").length,
       counted: ts.filter((t) => !t.optional || t.status === "done").length,
       accuracy: tm.length ? tm.reduce((a, t) => a + num(t.actual), 0) / tm.reduce((a, t) => a + num(t.est), 0) : null
     };
-  }).filter((x) => x.counted || x.spent);
+  }).filter((x) => x.counted || x.spent).sort((a, b) => (!a.name) - (!b.name) || b.spent - a.spent);
 
   const byWeekday = Array.from({ length: 7 }, (_, wd) => {
     const ds = days.filter((d) => weekday(d) === wd);
@@ -95,7 +98,7 @@ export function summarize(ctx, from, to) {
     avgPlanned: days.length ? planned / days.length : 0,
     avgSpent: days.length ? spent / days.length : 0,
     avgCap: caps.length ? caps.reduce((a, v) => a + v, 0) / caps.length : 0,
-    byCategory, byWeekday, status, reasons, withoutReason: status.partial + status.later + status.drop - withReason,
+    byProject, byWeekday, status, reasons, withoutReason: status.partial + status.later + status.drop - withReason,
     daily: range(from, to).map((d) => ({ date: d, spent: spentBy[d] || 0, planned: plannedBy[d] || 0, line: num(ctx.log?.[d]?.need), future: d > ctx.today }))
   };
 }

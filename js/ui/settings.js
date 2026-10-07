@@ -53,14 +53,14 @@ function weeklyFromInputs(root, def) {
 
 export function initSettings(applyTheme) {
   on(document, "change", ".settings [data-local]", (e, el) => {
-    store.setLocal({ [el.dataset.local]: el.value.trim() });
+    store.setLocal({ [el.dataset.local]: el.value.trim(), ...(el.dataset.local === "url" ? { serverVersion: 0 } : {}) });   // 换了表格：重新问它是哪一版
     if (el.dataset.local === "url" || el.dataset.local === "secret") sync.sync({ full: true });
   });
   on(document, "change", ".settings [data-local-check]", (e, el) => store.setLocal({ [el.dataset.localCheck]: el.checked }));
   on(document, "change", ".settings [data-cap], .settings [data-week]", (e, el) => {
     const root = el.closest(".settings");
     const def = Math.max(0, Number(root.querySelector('[data-cap="default"]').value) || 0);
-    store.setSetting("capacity", { default: def, weekly: weeklyFromInputs(root, def) });
+    store.setSetting("capacity", { ...store.capacitySettings(), default: def, weekly: weeklyFromInputs(root, def) });
   });
   on(document, "change", ".settings [data-pref]", (e, el) => {
     const v = el.type === "checkbox" ? el.checked : el.value;

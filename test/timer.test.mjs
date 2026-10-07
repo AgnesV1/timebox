@@ -82,15 +82,23 @@ test("un-marking keeps tracked time; deleting the task deletes its time", () => 
   assert.equal(store.timer(), null);
 });
 
-test("pushed() keeps rows of tables the Sheet doesn't know", () => {
+test("time lives on the task: one Times text, pushed with the task", () => {
   const id = store.addTask({ title: "Sync me" });
   store.logTime(id, 15, "08:15");
+  store.logTime(id, 10, "");
+  store.logTime(id, 30, "07:30");
+  assert.equal(store.get("tasks", id).times, "07:00-07:30 30m; 08:00-08:15 15m; 10m", "sorted by clock, untimed last");
   const out = store.outgoing();
-  assert.ok(out.rows.time?.length);
-  store.pushed(out, store.TABLES.filter((t) => t !== "time"));
-  const again = store.outgoing();
-  assert.ok(again.rows.time?.length, "time rows still waiting");
-  assert.ok(!again.rows.tasks, "tasks went through");
-  store.pushed(again);
+  assert.ok(!out.rows.time, "no separate time table any more");
+  assert.equal(out.rows.tasks.find((r) => r.id === id).times, "07:00-07:30 30m; 08:00-08:15 15m; 10m");
+  store.pushed(out);
   assert.equal(store.hasPending(), false);
+});
+
+test("times text: parse and format round-trip, hand edits in the Sheet still read", async () => {
+  const T = await import("../js/times.js");
+  assert.deepEqual(T.parseTimes("09:10-09:40 30m; 14:00-14:45 45m; 20m"), [{ from: "09:10", to: "09:40", min: 30 }, { from: "14:00", to: "14:45", min: 45 }, { from: "", to: "", min: 20 }]);
+  assert.deepEqual(T.parseTimes("9:10–9:40；23:50-00:20"), [{ from: "09:10", to: "09:40", min: 30 }, { from: "23:50", to: "00:20", min: 30 }]);
+  assert.deepEqual(T.parseTimes("  ; nonsense; 0m"), []);
+  assert.equal(T.formatTimes(T.parseTimes("09:10-09:40 30m; 20m")), "09:10-09:40 30m; 20m");
 });

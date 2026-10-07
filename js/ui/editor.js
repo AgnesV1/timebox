@@ -1,4 +1,4 @@
-// 改一个任务：名字、日期、分钟、分类、项目、可选、说明、重复、删除。改了就存，没有「保存」按钮（重复要点按钮才生效）。
+// 改一个任务：名字、日期、分钟、计划、可选、说明、重复、删除。改了就存，没有「保存」按钮（重复要点按钮才生效）。
 // 重复的任务：顶上选「只改这次 / 这次和以后 / 全部」；删的时候问删哪些。
 
 import * as store from "../store.js";
@@ -6,7 +6,7 @@ import * as E from "../engine.js";
 import * as R from "../routines.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtMin, fmtShort, weekday, WEEKDAYS } from "../dates.js";
-import { CATS, projectOptions } from "./common.js";
+import { projectOptions } from "./common.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
 
 let editing = "";
@@ -14,7 +14,7 @@ let scope = "this";    // 重复任务改动作用到哪些：this / following /
 let delAsk = false;    // 删重复任务时正在问删哪些
 let rep = null;        // 正在设重复：{pattern, days, len, until}
 
-const SERIES_FIELDS = ["title", "est", "category", "projectId", "optional"];
+const SERIES_FIELDS = ["title", "est", "projectId", "optional"];
 const PATTERNS = [["", "Doesn't repeat"], ["daily", "Every day"], ["weekdays", "Weekdays (Mon–Fri)"], ["weekly", "Every week, same day"], ["custom", "Pick days…"]];
 const weekOrder = () => (store.prefs().weekStartsOn === "sunday" ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0]);
 
@@ -86,9 +86,6 @@ function editorHTML(t) {
     '<label class="field"><span>Task</span><input data-f="title" value="' + esc(t.title) + '"></label>' +
     '<div class="field-row"><label class="field"><span>Date</span><input type="date" data-f="date" value="' + esc(t.date) + '"></label>' +
     '<label class="field"><span>Minutes</span><input type="number" class="num" min="0" step="5" data-f="est" value="' + esc(t.est) + '"></label></div>' +
-    '<div class="field"><span>Category</span><div class="cats">' +
-    ["", ...CATS].map((k) => '<label class="cat"><input type="radio" name="ecat" data-f="category" value="' + k + '"' + ((t.category || "") === k ? " checked" : "") + '><i style="--c:' + (k ? "var(--c-" + k + ")" : "var(--c-None)") + '"></i>' + (k || "None") + "</label>").join("") +
-    "</div></div>" +
     '<label class="field"><span>Sub-project</span><select data-f="projectId">' + projectOptions(projects, t.projectId) + "</select></label>" +
     (item ? '<p class="hint">Part of <b>' + esc(item.title) + "</b> · " + fmtMin(st.progress) + " of " + fmtMin(st.est) + " done</p>" : "") +
     '<label class="check"><input type="checkbox" data-f="optional"' + (t.optional ? " checked" : "") + "> Optional — nice to do, not a must</label>" +

@@ -13,7 +13,6 @@ let anchor = "";
 const tips = {};   // 图表 id → 每根柱子的读数
 
 const PREV = { week: "last week", d30: "the 30 days before", month: "last month", year: "last year" };
-const CAT_NAME = (c) => c || "No category";
 const pct = (v) => Math.round(v * 100) + "%";
 
 function niceMax(v) {
@@ -101,16 +100,16 @@ function trendHTML(s) {
     "</tbody></table></details></figure>";
 }
 
-// ---------- 分类 ----------
+// ---------- 各项目 ----------
 
-function categoryHTML(s) {
-  if (!s.byCategory.length) return '<section class="card"><h3>By category</h3><p class="empty">No tasks in this period.</p></section>';
-  const max = Math.max(1, ...s.byCategory.map((x) => x.spent));
-  return '<section class="card"><h3>By category</h3><p class="lede">Time spent, how much got done, and how close the estimates were.</p><div class="crows">' +
-    s.byCategory.map((x) => {
-      const k = x.cat || "None";
-      return '<div class="crow"><span class="cname"><i style="background:var(--k-' + k + ')"></i>' + CAT_NAME(x.cat) + "</span>" +
-        '<span class="ctrack"><i class="cbar" style="width:' + ((x.spent / max) * 100).toFixed(1) + "%;background:var(--k-" + k + ')"></i></span>' +
+function projectHTML(s) {
+  if (!s.byProject.length) return '<section class="card"><h3>By project</h3><p class="empty">No tasks in this period.</p></section>';
+  const max = Math.max(1, ...s.byProject.map((x) => x.spent));
+  return '<section class="card"><h3>By project</h3><p class="lede">Time spent, how much got done, and how close the estimates were.</p><div class="crows">' +
+    s.byProject.map((x) => {
+      const c = esc(x.color || "var(--c-None)");
+      return '<div class="crow"><span class="cname"><i style="background:' + c + '"></i>' + esc(x.name || "No project") + "</span>" +
+        '<span class="ctrack"><i class="cbar" style="width:' + ((x.spent / max) * 100).toFixed(1) + "%;background:" + c + '"></i></span>' +
         '<span class="cval num">' + fmtMin(x.spent) + "</span>" +
         '<span class="cdone num">' + x.done + "/" + x.counted + (x.counted ? " · " + pct(x.done / x.counted) : "") + "</span>" +
         '<span class="cacc num">' + (x.accuracy === null ? "—" : x.accuracy.toFixed(2) + "×") + "</span></div>";
@@ -184,7 +183,7 @@ export function statsHTML(c) {
     '<button type="button" class="nav" data-act="st-prev" aria-label="Earlier">' + icon("left") + '</button><button type="button" class="nav" data-act="st-today">Now</button>' +
     '<button type="button" class="nav" data-act="st-next" aria-label="Later"' + (r.to >= c.today ? " disabled" : "") + ">" + icon("right") + "</button></div></header>" +
     kpis(s, prev) + trendHTML(s) +
-    '<div class="stat-grid">' + categoryHTML(s) + weekdayHTML(s) + reasonsHTML(s) + "</div>" +
+    '<div class="stat-grid">' + projectHTML(s) + weekdayHTML(s) + reasonsHTML(s) + "</div>" +
     projectsHTML(c, s) + "</div>";
 }
 

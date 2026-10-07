@@ -27,16 +27,22 @@ function oldSheet() {
   return g;
 }
 
-test("setup migrates the old sheet in place, with backups", () => {
+test("setup migrates the old sheet in place, with backups, and slims it", () => {
   const g = oldSheet();
   g.sandbox.setup();
   const names = g.ss.getSheets().map((s) => s.name);
   assert.ok(names.some((n) => n.startsWith("Backup Tasks")), names.join(","));
-  assert.ok(names.includes("Items") && names.includes("Notes") && names.includes("Log") && names.includes("Settings") && names.includes("Deleted"));
+  assert.ok(names.includes("Items") && names.includes("Log") && names.includes("Settings") && names.includes("Deleted"));
+  assert.ok(!names.includes("Notes") && !names.includes("Groups") && !names.includes("Time"), names.join(","));
+  const hidden = g.ss.getSheets().filter((s) => s.isSheetHidden()).map((s) => s.name);
+  assert.ok(["Log", "Settings", "Deleted", "Old Day capacity"].every((n) => hidden.includes(n)), hidden.join(","));
+  assert.ok(hidden.some((n) => n.startsWith("Backup Tasks")));
+  assert.ok(!hidden.includes("Tasks") && !hidden.includes("Projects") && !hidden.includes("Items"));
   const tasks = g.ss.getSheetByName("Tasks");
   const head = tasks.header();
   assert.equal(head[head.length - 1], "Description");
-  assert.ok(head.includes("ID") && head.includes("Project ID") && head.includes("Optional"));
+  assert.ok(head.includes("ID") && head.includes("Project ID") && head.includes("Optional") && head.includes("Times"));
+  assert.ok(!head.includes("Category") && !head.includes("Done order"), head.join(","));
   const rows = tasks.objects();
   assert.equal(rows.length, 6);
   assert.ok(rows.every((r) => r.ID && r.Updated && r.Synced));
@@ -46,23 +52,26 @@ test("setup migrates the old sheet in place, with backups", () => {
   assert.equal(read.Optional, true, "max order of a day with several orders is optional");
   assert.equal(rows.find((r) => r.Task === "Gym").Status, "Done");
   assert.equal(rows.find((r) => r.Task === "Laundry").Description, "- step 1");
-  const proj = g.ss.getSheetByName("Projects").objects();
+  const psheet = g.ss.getSheetByName("Projects");
+  assert.ok(!psheet.header().includes("Planned min") && !psheet.header().includes("Progress"));
+  const proj = psheet.objects();
   const m4 = proj.find((p) => p.Project === "Module #4");
   assert.ok(m4.ID);
+  assert.equal(m4.Kind, "Total");
+  assert.equal(m4.Place, "Pool");
   const linked = rows.filter((r) => r["Project ID"] === m4.ID);
   assert.equal(linked.length, 2, "case/space-insensitive name match");
   assert.equal(linked[0].Project, "Module #4");
   const items = g.ss.getSheetByName("Items").objects();
   assert.equal(items.length, 1, "only projects with planned or done time get an item");
-  assert.equal(items[0]["Est min"], 600);
-  assert.equal(m4["Planned min"], 600);
-  assert.equal(m4["Spent min"], 95);
-  assert.equal(Math.round(m4.Progress * 100), 15);
-  assert.equal(g.ss.getSheetByName("Day capacity").objects()[0].Synced > 0, true);
+  assert.equal(items[0]["Est min"], 600, "planned minutes read before the column goes");
+  const cap = g.post({ secret: "CHANGE_ME", pull: true, since: 0 }).pull.tables.settings.find((r) => r.key === "capacity");
+  assert.deepEqual(cap.value.overrides, { "2026-10-03": 180 });
 
   // running setup again changes nothing important
   g.sandbox.setup();
   assert.equal(g.ss.getSheets().filter((s) => s.name.startsWith("Backup Tasks")).length, 1);
+  assert.equal(g.ss.getSheets().filter((s) => s.name.startsWith("Old ")).length, 1);
   assert.equal(g.ss.getSheetByName("Items").objects().length, 1);
   assert.equal(g.ss.getSheetByName("Tasks").objects().length, 6);
 });
@@ -71,14 +80,17 @@ test("pull, push, LWW, delete and log merge", () => {
   const g = oldSheet();
   g.sandbox.setup();
   assert.equal(g.post({ secret: "nope" }).error, "denied");
-  assert.equal(g.post({ secret: "CHANGE_ME", rows: [], removed: [] }).error, "old page");
+  const raw = (body) => JSON.parse(g.sandbox.doPost({ postData: { contents: JSON.stringify(body) } }).getContent());
+  assert.equal(raw({ secret: "CHANGE_ME", pull: true, push: { rows: { tasks: [{ id: "x", title: "old", updated: 9e15 }] } } }).error, "old page", "pages without a version are turned away");
+  const hello = g.post({ secret: "CHANGE_ME" });
+  assert.equal(hello.version, 3);
   const all = g.post({ secret: "CHANGE_ME", pull: true, since: 0 });
   assert.equal(all.ok, true);
   assert.equal(all.pull.tables.tasks.length, 6);
+  assert.deepEqual(Object.keys(all.pull.tables).sort(), ["items", "log", "projects", "settings", "tasks"]);
   const t0 = all.pull.tables.tasks.find((t) => t.title === "Laundry");
   assert.equal(t0.date, "2026-10-02");
   assert.equal(t0.status, "");
-  assert.equal(all.pull.tables.capacity[0].date, "2026-10-03");
   const since = all.now;
 
   const later = Date.now() + 1000;
@@ -88,11 +100,11 @@ test("pull, push, LWW, delete and log merge", () => {
       rows: {
         tasks: [
           { id: "new-1", date: "2026-10-04", title: "=not a formula", est: 30, status: "", order: 1, updated: later },
-          { id: t0.id, status: "done", actual: 25, updated: later },
+          { id: t0.id, status: "done", actual: 25, times: "09:00-09:25 25m", updated: later },
           { id: "new-1", est: 35, updated: later + 1 }
         ],
         log: [{ date: "2026-10-04", need: 60, projects: { a: 60 }, updated: later }],
-        settings: [{ key: "capacity", value: { default: 300, weekly: null }, updated: later }]
+        settings: [{ key: "capacity", value: { default: 300, weekly: null, overrides: {} }, updated: later }]
       },
       deletes: [{ table: "tasks", id: all.pull.tables.tasks.find((t) => t.title === "Gym").id, at: later }]
     }
@@ -104,6 +116,7 @@ test("pull, push, LWW, delete and log merge", () => {
   assert.equal(n1.title, "=not a formula");
   assert.equal(n1.est, 35);
   assert.equal(changed.find((t) => t.id === t0.id).status, "done");
+  assert.equal(changed.find((t) => t.id === t0.id).times, "09:00-09:25 25m");
   assert.equal(res.pull.deleted.length, 1);
   assert.equal(g.ss.getSheetByName("Tasks").objects().length, 6);
   assert.equal(res.pull.tables.settings[0].value.default, 300);
@@ -119,6 +132,18 @@ test("pull, push, LWW, delete and log merge", () => {
   assert.equal(log.need, 90);
 });
 
+test("deleted rows don't come back from a stale device, but an undo does", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  g.post({ secret: "CHANGE_ME", push: { rows: { tasks: [{ id: "rt:r1:2026-10-06", date: "2026-10-06", title: "Gym", est: 40, updated: 1 }] } } });
+  g.post({ secret: "CHANGE_ME", push: { deletes: [{ table: "tasks", id: "rt:r1:2026-10-06", at: 5000 }] } });
+  assert.equal(g.ss.getSheetByName("Tasks").objects().length, 0);
+  g.post({ secret: "CHANGE_ME", push: { rows: { tasks: [{ id: "rt:r1:2026-10-06", date: "2026-10-06", title: "Gym", est: 40, updated: 1 }] } } });
+  assert.equal(g.ss.getSheetByName("Tasks").objects().length, 0, "generated again elsewhere: stays deleted");
+  g.post({ secret: "CHANGE_ME", push: { rows: { tasks: [{ id: "rt:r1:2026-10-06", date: "2026-10-06", title: "Gym", est: 40, updated: 6000 }] } } });
+  assert.equal(g.ss.getSheetByName("Tasks").objects().length, 1, "undo is newer than the delete");
+});
+
 test("a fresh, empty spreadsheet works too", () => {
   const g = load(CODE);
   g.sandbox.setup();
@@ -128,37 +153,58 @@ test("a fresh, empty spreadsheet works too", () => {
   const p = g.post({ secret: "CHANGE_ME", push: { rows: { projects: [{ id: "p1", name: "French B2", status: "active", deadline: "2026-11-20", early: 2, updated: 1 }], items: [{ id: "i1", projectId: "p1", title: "Unit 1", est: 120, updated: 1 }], tasks: [{ id: "t1", date: "2026-10-04", title: "Unit 1", est: 60, status: "done", projectId: "p1", itemId: "i1", updated: 1 }] } } });
   assert.equal(p.ok, true, JSON.stringify(p));
   const proj = g.ss.getSheetByName("Projects").objects()[0];
-  assert.equal(proj["Planned min"], 120);
-  assert.equal(proj["Spent min"], 60);
-  assert.equal(proj.Progress, 0.5);
   assert.equal(proj.Status, "Active");
+  assert.equal(proj.Kind, "Total");
+  assert.equal(proj.Place, "Pool");
   assert.equal(g.ss.getSheetByName("Tasks").objects()[0].Project, "French B2");
+  assert.equal(g.ss.getSheetByName("Items").objects()[0].Project, "French B2");
+  const back = g.post({ secret: "CHANGE_ME", pull: true, since: 0 }).pull.tables.projects[0];
+  assert.equal(back.kind, "total");
+  assert.equal(back.place, "pool");
 });
 
-test("time log: its own sheet, task name filled in, old pages told which tables exist", () => {
+test("last version's sheet: the Time tab folds into Times, old deletes are pruned", () => {
   const g = load(CODE);
+  const put = (name, rows) => { const sh = g.ss.insertSheet(name); rows.forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v))); return sh; };
+  put("Tasks", [
+    ["Date", "Task", "Est min", "Actual min", "Order", "Category", "Status", "Done order", "Reason", "Project", "Optional", "ID", "Project ID", "Item ID", "Updated", "Synced", "Description"],
+    [D("2026-10-04"), "French", 45, 50, 1, "Main", "Done", 1, "", "", "", "t1", "", "", 111, 222, ""],
+    [D("2026-10-04"), "=SUM(1)", 20, "", 2, "", "", "", "", "", "", "t2", "", "", 111, 222, ""]
+  ]);
+  put("Time", [
+    ["Date", "Task", "From", "To", "Min", "ID", "Task ID", "Updated", "Synced"],
+    [D("2026-10-04"), "French", "14:00", "14:20", 20, "x2", "t1", 1, 1],
+    [D("2026-10-04"), "French", "09:10", "09:40", 30, "x1", "t1", 1, 1],
+    [D("2026-10-04"), "French", "", "", 5, "x3", "t1", 1, 1]
+  ]);
+  put("Groups", [["Group"], ["Work 1"]]);
+  put("Notes", [["Date", "Note"], [D("2026-10-04"), "hi"]]);
+  put("Deleted", [["Table", "ID", "Deleted at", "Synced"], ["tasks", "gone-old", Date.now() - 100 * 864e5, 1], ["tasks", "gone-new", Date.now() - 864e5, 1]]);
   g.sandbox.setup();
-  assert.ok(g.ss.getSheetByName("Time"));
-  const r = g.post({ secret: "CHANGE_ME", pull: true, since: 0, push: { rows: {
-    tasks: [{ id: "t1", date: "2026-10-04", title: "French", est: 45, status: "", actual: 30, updated: 1 }],
-    time: [{ id: "x1", date: "2026-10-04", taskId: "t1", from: "09:10", to: "09:40", min: 30, updated: 1 }]
-  } } });
-  assert.equal(r.ok, true, JSON.stringify(r));
-  assert.ok(r.tables.includes("time"));
-  const row = g.ss.getSheetByName("Time").objects()[0];
-  assert.equal(row.Task, "French");
-  assert.equal(row.From, "09:10");
-  assert.equal(row.Min, 30);
-  assert.deepEqual({ ...r.pull.tables.time[0], synced: 0 }, { date: "2026-10-04", task: "French", from: "09:10", to: "09:40", min: 30, id: "x1", taskId: "t1", updated: 1, synced: 0 });
+  const rows = g.ss.getSheetByName("Tasks").objects();
+  const fr = rows.find((r) => r.ID === "t1");
+  assert.equal(fr.Times, "09:10-09:40 30m; 14:00-14:20 20m; 5m");
+  assert.equal(fr["Actual min"], 55);
+  assert.equal(fr.Updated, 111, "the change time stays, so newer edits on a device still win");
+  assert.ok(fr.Synced > 222);
+  assert.equal(rows.find((r) => r.ID === "t2").Task, "=SUM(1)");
+  assert.ok(g.ss.getSheetByName("Old Time").isSheetHidden());
+  assert.ok(g.ss.getSheetByName("Notes").isSheetHidden());
+  assert.equal(g.ss.getSheetByName("Groups"), null);
+  assert.deepEqual(g.ss.getSheetByName("Deleted").objects().map((r) => r.ID), ["gone-new"]);
+  const pulled = g.post({ secret: "CHANGE_ME", pull: true, since: 0 }).pull.tables.tasks.find((t) => t.id === "t1");
+  assert.equal(pulled.times, "09:10-09:40 30m; 14:00-14:20 20m; 5m");
 });
 
-test("spent counts timed tasks that aren't marked yet", () => {
+test("day capacity edits from two devices are merged per day", () => {
   const g = load(CODE);
   g.sandbox.setup();
-  g.post({ secret: "CHANGE_ME", push: { rows: {
-    projects: [{ id: "p1", name: "French", status: "active", updated: 1 }],
-    tasks: [{ id: "t1", date: "2026-10-04", title: "Unit 1", est: 60, status: "", actual: 25, projectId: "p1", updated: 1 },
-      { id: "t2", date: "2026-10-04", title: "Unit 2", est: 60, status: "drop", actual: 10, projectId: "p1", updated: 1 }]
-  } } });
-  assert.equal(g.ss.getSheetByName("Projects").objects()[0]["Spent min"], 25);
+  const push = (value, updated) => g.post({ secret: "CHANGE_ME", push: { rows: { settings: [{ key: "capacity", value, updated }] } } });
+  push({ default: 420, weekly: null, overrides: { "2026-10-08": 90, "2026-10-09": 60 } }, 10);
+  push({ default: 300, weekly: null, overrides: { "2026-10-10": 0, "2026-10-09": null } }, 20);
+  push({ default: 999, weekly: null, overrides: { "2026-10-11": 30, "2026-10-10": 120 } }, 15);   // older device
+  const cap = g.post({ secret: "CHANGE_ME", pull: true, since: 0 }).pull.tables.settings.find((r) => r.key === "capacity");
+  assert.equal(cap.value.default, 300, "the newer default wins");
+  assert.deepEqual(cap.value.overrides, { "2026-10-08": 90, "2026-10-09": null, "2026-10-10": 0, "2026-10-11": 30 });
+  assert.equal(cap.updated, 20);
 });

@@ -5,22 +5,21 @@ import { todayIso, addDays, fmtShort } from "./dates.js";
 import * as E from "./engine.js";
 import * as R from "./routines.js";
 import { readLocal, writeLocal } from "./dom.js";
+import { parseTimes, formatTimes, sumTimes } from "./times.js";
 
 const KEY = "kuzhouduan-v1";
 const OLD_KEY = "timebox-v1";
-export const TABLES = ["tasks", "projects", "items", "capacity", "notes", "log", "settings", "time"];
-const KEYED = { capacity: "date", notes: "date", log: "date", settings: "key" };
+const SCHEMA = 3;   // 和表格的 Code.gs 版本对应（见 sync.js）
+export const TABLES = ["tasks", "projects", "items", "log", "settings"];
+const KEYED = { log: "date", settings: "key" };
 
-// 只把这些字段发给表格；Planned / Spent / 项目名这些是表格自己算的
+// 只把这些字段发给表格；项目名这种是表格自己填的
 const FIELDS = {
-  tasks: ["date", "title", "est", "actual", "order", "category", "status", "doneOrder", "reason", "optional", "projectId", "itemId", "desc"],
-  projects: ["name", "group", "status", "deadline", "start", "early", "color", "order", "calib"],
+  tasks: ["date", "title", "est", "actual", "order", "status", "reason", "optional", "projectId", "itemId", "times", "desc"],
+  projects: ["name", "group", "kind", "place", "status", "deadline", "start", "early", "rule", "color", "order", "calib"],
   items: ["title", "module", "est", "origEst", "order", "projectId"],
-  capacity: ["date", "min"],
-  notes: ["date", "note"],
   log: ["date", "need", "projects"],
-  settings: ["key", "value"],
-  time: ["date", "taskId", "from", "to", "min"]
+  settings: ["key", "value"]
 };
 
 export const PROJECT_COLORS = ["#B8F000", "#2F5BFF", "#FF3EA5", "#FF7A1A", "#9B5CFF", "#00C2A8", "#FFC400", "#FF4D4D"];
@@ -31,7 +30,9 @@ function blank() {
     pending: {},   // "表:id" → 发送时比对用的 updated
     deletes: [],   // 待推送的删除
     cursor: 0,     // 上次从表格拉到的时间点
-    local: { url: "", secret: "", theme: "auto", fx: true, calMode: "week", pool: true }   // 只存在这台设备上
+    schema: SCHEMA,
+    needFull: false,   // 下次同步整表重拉（本机刚升级过数据格式）
+    local: { url: "", secret: "", theme: "auto", fx: true, calMode: "week", pool: true, serverVersion: 0 }   // 只存在这台设备上
   };
 }
 
@@ -44,9 +45,10 @@ const undoListeners = new Set();
 function load() {
   const saved = readLocal(KEY, null);
   const s = saved || blank();
-  TABLES.forEach((t) => { s.data[t] = s.data[t] || {}; });
   s.pending = s.pending || {};
   s.deletes = s.deletes || [];
+  if (saved && (saved.schema || 0) < SCHEMA) upgrade(s);
+  TABLES.forEach((t) => { s.data[t] = s.data[t] || {}; });
   s.local = { ...blank().local, ...(s.local || {}) };
   if (!saved) {
     // 第一次打开新版：从旧版 Timebox 搬 Apps Script 网址、口令和每天默认时长，不用重填
@@ -58,6 +60,48 @@ function load() {
     }
   }
   return s;
+}
+
+// 本机数据升级到新格式（表格那边 setup 也做同样的事）：
+// 计时记录并进任务的 times；每天单独改的可用时间并进 settings.capacity.overrides；
+// 不要了的：每日备注、分类、完成次序。升级完下次同步整表重拉一次，以表格为准；
+// 还没推上去的改动照样留着待推送（它们改动时间更晚，表格那边会收下）。
+function upgrade(s) {
+  const d = s.data, pend = s.pending;
+  const segs = {};
+  for (const x of Object.values(d.time || {})) (segs[x.taskId] = segs[x.taskId] || []).push(x);
+  for (const [tid, list] of Object.entries(segs)) {
+    const t = d.tasks?.[tid];
+    if (!t) continue;
+    list.sort((a, b) => String(a.from || "~").localeCompare(String(b.from || "~")));
+    t.times = formatTimes(list);
+    t.actual = sumTimes(list) || t.actual || null;
+    if (list.some((x) => pend["time:" + x.id])) {
+      t.updated = Math.max(Number(t.updated) || 0, ...list.map((x) => Number(x.updated) || 0));
+      pend["tasks:" + tid] = t.updated;
+    }
+  }
+  const caps = Object.values(d.capacity || {}).filter((r) => r.min !== null && r.min !== "" && r.min !== undefined);
+  if (caps.length) {
+    d.settings = d.settings || {};
+    const row = d.settings.capacity || { id: "capacity", key: "capacity", value: {}, updated: 1 };
+    const overrides = { ...Object.fromEntries(caps.map((r) => [r.date || r.id, Number(r.min)])), ...(row.value?.overrides || {}) };
+    d.settings.capacity = { ...row, value: { ...(row.value || {}), overrides } };
+    if (caps.some((r) => pend["capacity:" + r.id])) {
+      d.settings.capacity.updated = Math.max(Number(row.updated) || 0, ...caps.map((r) => Number(r.updated) || 0));
+      pend["settings:capacity"] = d.settings.capacity.updated;
+    }
+  }
+  for (const t of Object.values(d.tasks || {})) { delete t.category; delete t.doneOrder; }
+  for (const gone of ["time", "capacity", "notes"]) {
+    delete d[gone];
+    for (const k of Object.keys(pend)) if (k.startsWith(gone + ":")) delete pend[k];
+  }
+  s.deletes = s.deletes.filter((x) => TABLES.includes(x.table));
+  s.schema = SCHEMA;
+  s.cursor = 0;
+  s.needFull = true;
+  if (s.local) s.local.serverVersion = 0;
 }
 
 function persist() {
@@ -72,6 +116,7 @@ export const local = () => S.local;
 export const cursor = () => S.cursor;
 export const hasPending = () => Object.keys(S.pending).length > 0 || S.deletes.length > 0;
 export const pendingCount = () => Object.keys(S.pending).length + S.deletes.length;
+export const needsFull = () => Boolean(S.needFull);
 
 export const setting = (key, fallback) => S.data.settings[key]?.value ?? fallback;
 export const prefs = () => ({ dayStartsAt: "04:00", weekStartsOn: "monday", level: true, ...(setting("prefs", {}) || {}) });
@@ -86,7 +131,7 @@ export function ctx() {
   if (ctxCache && ctxCache.today === t) return ctxCache;
   const cap = capacitySettings();
   const overrides = {};
-  for (const r of all("capacity")) if (r.min !== null && r.min !== "" && r.min !== undefined) overrides[r.date] = Number(r.min);
+  for (const [d, v] of Object.entries(cap.overrides || {})) if (v !== null && v !== "" && v !== undefined) overrides[d] = Number(v);
   const log = {};
   for (const r of all("log")) log[r.date] = { need: Number(r.need) || 0, projects: r.projects || {} };
   ctxCache = {
@@ -191,8 +236,7 @@ export function outgoing() {
   return { rows, deletes: S.deletes.slice(), stamp };
 }
 
-// 推送成功：发出去之后没再改过的行才算推上去了。
-// known = 表格认识的表；旧版 Code.gs 不认识 time，那些行先留在本机，等 Code.gs 更新了再推
+// 推送成功：发出去之后没再改过的行才算推上去了。known = 表格认识的表，不认识的先留在本机
 export function pushed(out, known = TABLES) {
   for (const [k, u] of Object.entries(out.stamp)) if (S.pending[k] === u && known.includes(k.slice(0, k.indexOf(":")))) delete S.pending[k];
   S.deletes = S.deletes.filter((d) => !out.deletes.some((x) => x.table === d.table && x.id === d.id && x.at === d.at));
@@ -208,10 +252,14 @@ function normalize(t, raw) {
     r.optional = Boolean(r.optional);
     r.projectId = r.projectId || "";
     r.itemId = r.itemId || "";
+    r.times = r.times || "";
   }
   if (t === "items") { r.est = Number(r.est) || 0; r.projectId = r.projectId || ""; }
-  if (t === "projects") r.status = r.status || "active";
-  if (t === "time") { r.min = Number(r.min) || 0; r.from = r.from || ""; r.to = r.to || ""; }
+  if (t === "projects") {
+    r.status = r.status || "active";
+    r.kind = r.kind === "regular" ? "regular" : "total";
+    r.place = r.place === "auto" ? "auto" : "pool";
+  }
   return r;
 }
 
@@ -247,6 +295,7 @@ export function applyPull(pull, now, { full = false } = {}) {
     if (full) for (const id of Object.keys(S.data[t])) if (!seen.has(id) && !S.pending[t + ":" + id]) delete S.data[t][id];
   }
   if (now) S.cursor = now;
+  if (full) S.needFull = false;
   persist();
   ctxCache = null;
   emit({ pulled: true });
@@ -282,8 +331,8 @@ export function addTask(fields) {
   change(() => {
     const itemId = fields.projectId && !fields.itemId ? itemFor(fields.projectId, fields.title, fields.est) : fields.itemId || "";
     put("tasks", {
-      id, title: "", est: 30, actual: null, category: "", status: "", doneOrder: null, reason: "",
-      optional: false, projectId: "", desc: "", ...fields, date, itemId, order: nextOrder(date)
+      id, title: "", est: 30, actual: null, status: "", reason: "", optional: false, projectId: "", times: "", desc: "",
+      ...fields, date, itemId, order: nextOrder(date)
     });
   });
   return id;
@@ -295,17 +344,15 @@ export function updateTask(id, patch, label, opts) {
   change(() => put("tasks", { ...t, ...patch }), label, opts);
 }
 
-// 和旧版一样：再点一次同一个就取消；Done / Partial 记下这是今天第几件做完的。
+// 和旧版一样：再点一次同一个就取消。
 // 实际分钟：有计时记录就是记录加起来，取消 / Later / Drop 也不清掉（时间是真花了的）
 export function setStatus(id, s) {
   const t = get("tasks", id);
   if (!t) return;
   const off = t.status === s;
   const fin = s === "done" || s === "partial";
-  const finished = tasksOn(t.date).filter((x) => x.doneOrder !== null && x.doneOrder !== undefined && x.doneOrder !== "").length;
   updateTask(id, {
     status: off ? "" : s,
-    doneOrder: off ? null : fin ? (t.doneOrder ?? finished + 1) : null,
     reason: s === "done" && !off ? "" : t.reason,
     actual: !off && fin ? t.actual : timeTotal(id) || null
   });
@@ -338,9 +385,8 @@ export function reorder(ids) {
   }));
 }
 
-// 删任务连同它的计时记录一起删
+// 删任务（计时记录在任务自己身上，一起没了）；正在计时的话计时器也停掉
 function dropTask(id) {
-  timeOf(id).forEach((x) => drop("time", x.id));
   if (timer()?.taskId === id) put("settings", { id: "timer", key: "timer", value: null });
   drop("tasks", id);
 }
@@ -367,8 +413,8 @@ export function toTomorrow(id) {
   if (!t) return;
   const date = addDays(t.date < today() ? today() : t.date, 1);
   change(() => {
-    if (t.status !== "later") put("tasks", { ...t, status: "later", doneOrder: null, actual: null });
-    put("tasks", { ...t, id: newId(), date, status: "", doneOrder: null, actual: null, reason: "", order: nextOrder(date) });
+    if (t.status !== "later") put("tasks", { ...t, status: "later" });
+    put("tasks", { ...t, id: newId(), date, status: "", actual: null, times: "", reason: "", order: nextOrder(date) });
   }, "Moved to tomorrow");
 }
 
@@ -387,8 +433,8 @@ export function scheduleItem(itemId, date) {
   }
   const id = newId();
   change(() => put("tasks", {
-    id, date, title: item.title, est: Math.round(est), actual: null, category: "", status: "", doneOrder: null, reason: "",
-    optional: false, projectId: item.projectId, itemId, desc: "", order: nextOrder(date)
+    id, date, title: item.title, est: Math.round(est), actual: null, status: "", reason: "",
+    optional: false, projectId: item.projectId, itemId, times: "", desc: "", order: nextOrder(date)
   }), "Scheduled");
   return id;
 }
@@ -475,18 +521,18 @@ export function keepPlan(projectId, module) {
   change(() => put("projects", { ...p, calib: { ...(p.calib || {}), [module]: s.samples.length } }));
 }
 
-// ---------- 容量、备注、设置、早上的线 ----------
+// ---------- 容量、设置、早上的线 ----------
 
+// 某天单独改可用时间：存在 settings.capacity.overrides 里；清空 = 回到每周默认（记成 null，表格合并时才知道是清空了）
 export function setDayCapacity(date, min) {
-  change(() => (min === null || min === "" ? drop("capacity", date) : put("capacity", { id: date, date, min: Number(min) })));
+  const cap = capacitySettings();
+  const overrides = { ...(cap.overrides || {}) };
+  overrides[date] = min === null || min === "" ? null : Number(min);
+  setSetting("capacity", { ...cap, overrides });
 }
 
 export function setSetting(key, value) {
   change(() => put("settings", { id: key, key, value }));
-}
-
-export function setNote(date, note) {
-  change(() => put("notes", { id: date, date, note }), null, { quiet: true });
 }
 
 export function ensureTodayLog() {
@@ -533,8 +579,8 @@ function generate(r, from) {
     const id = R.routineTaskId(r.id, o.date);
     if (S.data.tasks[id]) continue;
     put("tasks", {
-      id, date: o.date, title: r.title, est: o.est, actual: null, category: r.category || "", status: "", doneOrder: null,
-      reason: "", optional: Boolean(r.optional), projectId: r.projectId || "", itemId: "", desc: "", order: nextOrder(o.date)
+      id, date: o.date, title: r.title, est: o.est, actual: null, status: "",
+      reason: "", optional: Boolean(r.optional), projectId: r.projectId || "", itemId: "", times: "", desc: "", order: nextOrder(o.date)
     }, { generated: true });
     first = first || id;
   }
@@ -564,7 +610,6 @@ export function repeatTask(id, days, end) {
   change(() => {
     writeRoutines([...routines(), r]);
     put("tasks", { ...t, id: nid });
-    timeOf(id).forEach((x) => put("time", { ...x, taskId: nid }));
     if (timer()?.taskId === id) put("settings", { id: "timer", key: "timer", value: { ...timer(), taskId: nid } });
     drop("tasks", id);
     generate(r, addDays(t.date, 1));
@@ -637,29 +682,38 @@ export function deleteSeries(id, scope) {
 
 // ---------- 计时 ----------
 // 正在跑的计时器存在 Settings 的 timer 里（{taskId, start}），所以手机上开始、电脑上也能停。
-// 每段时间是 Time 表的一行：{date, taskId, from, to, min}，from / to 是「09:10」这样的钟点。
-// 任务的实际分钟 = 它所有记录加起来。
+// 每段时间记在任务自己的 times 里（js/times.js 的写法）：「09:10-09:40 30m; 20m」。
+// 任务的实际分钟 = 这些加起来。每段的 id = 「任务 id#第几段」。
 
 export const timer = () => setting("timer", null);
-export const timeOf = (taskId) => all("time").filter((x) => x.taskId === taskId).sort((a, b) => clockKey(a.from || a.to) - clockKey(b.from || b.to));
-export const hasTime = (taskId) => all("time").some((x) => x.taskId === taskId);
-export const timeTotal = (taskId) => timeOf(taskId).reduce((a, x) => a + (Number(x.min) || 0), 0);
+export function timeOf(taskId) {
+  const t = get("tasks", taskId);
+  return t ? parseTimes(t.times).map((x, i) => ({ ...x, id: taskId + "#" + i, taskId, date: t.date })) : [];
+}
+export const hasTime = (taskId) => timeOf(taskId).length > 0;
+export const timeTotal = (taskId) => sumTimes(timeOf(taskId));
 
 const pad2 = (n) => String(n).padStart(2, "0");
 export const clockOf = (ms) => { const d = new Date(ms); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); };
 export const clockNow = () => clockOf(Date.now());
 const toMin = (hm) => { const [h, m] = String(hm).split(":").map(Number); return (h || 0) * 60 + (m || 0); };
 const fromMin = (v) => { const x = ((v % 1440) + 1440) % 1440; return pad2(Math.floor(x / 60)) + ":" + pad2(x % 60); };
-// 一天从 dayStartsAt 算起：凌晨 1 点排在晚上 11 点后面
+// 一天从 dayStartsAt 算起：凌晨 1 点排在晚上 11 点后面；没有钟点的排最后
 function clockKey(hm) { return hm ? (toMin(hm) - toMin(prefs().dayStartsAt) + 1440) % 1440 : 9999; }
 
 function setTimer(value) { put("settings", { id: "timer", key: "timer", value }); }
 
+function writeTimes(taskId, list) {
+  const t = get("tasks", taskId);
+  if (!t) return;
+  const sorted = list.slice().sort((a, b) => clockKey(a.from || a.to) - clockKey(b.from || b.to));
+  put("tasks", { ...t, times: formatTimes(sorted), actual: sumTimes(sorted) || null });
+}
+
 function addTime(taskId, min, to, from) {
   const t = get("tasks", taskId);
   if (!t) return;
-  put("time", { id: newId(), date: t.date, taskId, from: to ? from ?? fromMin(toMin(to) - min) : "", to: to || "", min });
-  put("tasks", { ...get("tasks", taskId), actual: timeTotal(taskId) });
+  writeTimes(taskId, [...parseTimes(t.times), { from: to ? from ?? fromMin(toMin(to) - min) : "", to: to || "", min }]);
 }
 
 // 开始：已经有一个在跑就先停下记好（和 Toggl 一样一次只跑一个）
@@ -704,11 +758,10 @@ export function logTime(taskId, min, to) {
 }
 
 export function deleteTime(id) {
-  const x = get("time", id);
-  if (!x) return;
-  change(() => {
-    drop("time", id);
-    const t = get("tasks", x.taskId);
-    if (t) put("tasks", { ...t, actual: timeTotal(x.taskId) || null });
-  }, "Deleted time");
+  const i = String(id).lastIndexOf("#");
+  const taskId = String(id).slice(0, i), n = Number(String(id).slice(i + 1));
+  const list = parseTimes(get("tasks", taskId)?.times);
+  if (!list[n]) return;
+  list.splice(n, 1);
+  change(() => writeTimes(taskId, list), "Deleted time");
 }

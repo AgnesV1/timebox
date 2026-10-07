@@ -6,7 +6,6 @@ import { esc } from "../dom.js";
 import { fmtMin } from "../dates.js";
 import { zebraFor } from "../patterns.js";
 
-export const CATS = ["Main", "Work", "Fun", "Chore"];
 export const STATUS = [["done", "Done"], ["partial", "Partial"], ["later", "Later"], ["drop", "Drop"]];
 
 export const projectOf = (t) => (t.projectId ? store.get("projects", t.projectId) : null);
@@ -35,14 +34,12 @@ export function projectOptions(projects, selected = "", none = "No sub-project")
 // 「Main - French · Module #4」
 export const fullName = (p) => (p.group ? p.group + " · " : "") + p.name;
 
-// 任务的颜色：有分类用分类色，没有就用项目色，都没有是灰
+// 任务的颜色：计划的颜色，没挂计划是灰
 export function colorOf(t) {
-  if (CATS.includes(t.category)) return "var(--c-" + t.category + ")";
   return projectOf(t)?.color || "var(--c-None)";
 }
 
 export function zebraOf(t) {
-  if (CATS.includes(t.category)) return "var(--zebra-" + t.category + ")";
   const p = projectOf(t);
   return p?.color ? zebraFor(p.color) : "var(--zebra-None)";
 }

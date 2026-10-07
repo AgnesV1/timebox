@@ -121,6 +121,6 @@ node --test test/*.test.mjs
 
 想连着一个假的表格试同步：`node tools/fake-sheet.mjs` 会在 http://127.0.0.1:8002/exec 起一个
 （口令 `CHANGE_ME`，先用 main 分支的 `Code.gs` 把旧表升级、造一点上一版的数据，再用现在的 `Code.gs` 跑 setup——
-相当于真的从上一版升级；里面还有一个假的阅读表格（几页、表头高低不一），链接填 `https://docs.google.com/spreadsheets/d/FAKE-READING/edit`）；`python3 tools/serve.py .`（或 `node tools/serve.mjs .`）起一个不缓存的本地网页（端口 8000）。
+相当于真的从上一版升级；里面还有一个假的阅读表格（几页、表头高低不一），链接填 `https://docs.google.com/spreadsheets/d/FAKE-READING-0000000000000000/edit`）；`python3 tools/serve.py .`（或 `node tools/serve.mjs .`）起一个不缓存的本地网页（端口 8000）。
 
 字体（Unbounded、Space Grotesk、JetBrains Mono）放在 `fonts/`，SIL Open Font License，许可证在同一个文件夹里。

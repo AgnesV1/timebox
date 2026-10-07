@@ -653,7 +653,9 @@ var NAME_HEADS = ['name', 'title', '名字', '书名', '名称', '标题'];
 function readingBook_() {
   var row = readAll_('settings').filter(function (r) { return r.id === 'reading'; })[0];
   var url = row && row.value && String(row.value.url || '').trim();
-  return url ? SpreadsheetApp.openByUrl(url) : null;
+  if (!url) return null;
+  var id = (/\/d\/([a-zA-Z0-9_-]{20,})/.exec(url) || [])[1];   // 链接后面带 ?usp=sharing、#gid= 都没关系
+  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.openByUrl(url);
 }
 
 // 前 8 行里找表头：有一格写着 Name（或 Title / 书名……）的那一行

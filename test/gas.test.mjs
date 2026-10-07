@@ -249,8 +249,8 @@ test("old repeat rules become Regular plans; future untouched ones go, the rest 
 test("reading: every tab is searched, new things go to a Want tab, duplicates are caught", () => {
   const g = load(CODE);
   g.sandbox.setup();
-  const url = "https://docs.google.com/spreadsheets/d/READ/edit?usp=sharing";
-  const book = g.spreadsheet("https://docs.google.com/spreadsheets/d/READ");
+  const url = "https://docs.google.com/spreadsheets/d/1ReadingSheetIdAbcdefghijklmnop/edit?usp=sharing";
+  const book = g.spreadsheet("https://docs.google.com/spreadsheets/d/1ReadingSheetIdAbcdefghijklmnop");
   const tab = (name, rows) => { const sh = book.insertSheet(name); rows.forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v))); return sh; };
   const books = tab("Book", [["", "not a header", "secret-ish", "年度笔记"], [], ["Year", "Month", "Name", "这一切真的值得吗"],
     [2023, "July", "《法国高中生哲学课本1》", "🥰", "book"], [2026, "February", "The Last Days Of Socrates", "🥰", "English", "nice"]]);

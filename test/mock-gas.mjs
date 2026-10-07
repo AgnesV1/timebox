@@ -85,7 +85,7 @@ export function load(codePath, ss = new Spreadsheet()) {
   const pad = (n) => String(n).padStart(2, "0");
   const validation = { requireValueInList() { return this; }, requireValueInRange() { return this; }, build() { return {}; } };
   const sandbox = {
-    SpreadsheetApp: { getActiveSpreadsheet: () => ss, openByUrl: byUrl, newDataValidation: () => Object.create(validation) },
+    SpreadsheetApp: { getActiveSpreadsheet: () => ss, openByUrl: byUrl, openById: (id) => byUrl(Object.keys(others).find((u) => u.includes("/d/" + id)) || "?"), newDataValidation: () => Object.create(validation) },
     Utilities: { getUuid: () => crypto.randomUUID(), formatDate: (d, tz, f) => (f === "HH:mm" ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: "json" }, createTextOutput: (s) => ({ setMimeType() { return this; }, getContent: () => s }) },

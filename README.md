@@ -1,20 +1,23 @@
 # 苦昼短
 
 从 Deadline 倒推、每天只做好今天这一份的时间盒。电脑上排计划（日历 + 任务池拖拽），
-手机上看今天、计时、标完成。数据存在你自己的 Google Sheet，Mac 和手机共用一份。
+手机上看今天、计时、标完成，也能往阅读记录里加想看的东西。数据存在你自己的 Google Sheet，Mac 和手机共用一份。
 页面文字是英文；你自己写的任务名、原因、备注用什么语言都行。
 
 ## 它怎么算「今天该做多少」
 
-1. 两层：**项目**（French、Work 1 这种大目标）下面是**子项目**（Module #4、B2 exam 这种有截止日的一块）。
-   每个子项目有 Deadline，和「想提前几天完成」（Finish early）
-2. 子项目里的条目（Items）各有预计分钟；做完的部分按 Done / Partial 算
-3. 剩下的分钟，摊到「目标完成日」之前每天能用的时间里（`Day capacity`，0 = 休息日）
-4. 几个子项目同时进行时，按 15 分钟一块自动平摊，免得某几天特别挤
-5. 每天第一次打开时，把今天的量记下来当「安全线」——白天做完任务，线不会跟着降
-6. 第二天对账：昨天少做了，差额摊到之后几天（Yesterday ran … short）；多做了，之后每天轻一点
-7. 完成时填实际分钟，同一模块攒够 2 个样本、和预计差得多，会建议你改剩下条目的估时
-8. 最近两周的真实速度推算预计完成日，给项目一个健康度：On pace / Cutting it close / … late
+1. 两层：**项目**（French、Work 1 这种大目标）下面是**计划**。计划建的时候选两样：
+   - 种类（Kind）：**Total** = 总共多少小时、什么时候前做完（B2 exam 20h，10 月 30 日）；**Regular** = 规律的（Gym 周一三五 40 分钟、Yoga 每周 2 次）
+   - 放法（Place）：**Auto** = 自己出现在每天的清单里；**Pool** = 进任务池，你自己拖到哪天
+2. Total 计划可以拆成条目（Items），各有预计分钟；做完的部分按 Done / Partial 算。只填总时长的话就是一个大条目
+3. 剩下的分钟，摊到「目标完成日」之前每天能用的时间里（每天的可用时间，0 = 休息日）；那天固定要做的 Regular（Auto）先占掉一块
+4. 几个 Total 计划同时进行时，按 15 分钟一块自动平摊，免得某几天特别挤。Auto 的那份每天早上自己出现在今天的清单里，
+   没做完不顺延——剩下的量会摊到后面几天
+5. 只有今天的那份 / 那一次会写进表格；以后的日子在日历和手机日期条里画成淡色预览
+6. 每天第一次打开时，把今天的量记下来当「安全线」——白天做完任务，线不会跟着降
+7. 第二天对账：昨天少做了，差额摊到之后几天（Yesterday ran … short）；多做了，之后每天轻一点
+8. 完成时填实际分钟，同一模块攒够 2 个样本、和预计差得多，会建议你改剩下条目的估时
+9. 最近两周的真实速度推算预计完成日，给项目一个健康度：On pace / Cutting it close / … late
 
 ## 一、Google Sheet 这一端
 
@@ -27,8 +30,14 @@
    - 把 Tasks / Projects / Day capacity 整页复制成「Backup … 日期」
    - 原地升级：补上 ID 等辅助列（会自动隐藏）、状态统一成一个词、
      按任务名把每日任务挂到同名 Project 上、每个 Project 建一个同名条目（预计 = 原来的 Planned min）
-   - 新建 Items / Notes / Log / Settings / Deleted 几页
-5. 部署 → 管理部署 → 编辑 → 版本选「新版本」→ 部署。网址不变，所以手机和电脑都不用重填
+   - 新建 Items / Log / Settings / Deleted 几页
+   - 精简（每次跑都会检查，跑几次都一样）：Time 页的计时记录并进 Tasks 的 `Times` 列，Day capacity 并进 Settings，
+     以前的重复规则变成 Projects 里的 Regular 计划（以后的、没动过的那几次删掉），
+     删掉 Category / Done order / Planned / Spent / Progress 几列和 Groups 页；
+     搬完的旧页改名「Old …」藏起来，Notes、Backup、Log、Settings、Deleted 也藏起来（右键页签能显示）。
+     确认数据都在后，Old / Backup / Notes 可以自己右键删掉
+5. 部署 → 管理部署 → 编辑 → 版本选「新版本」→ 部署。网址不变，所以手机和电脑都不用重填。
+   表格和网页版本对不上时（比如网页更新了、`Code.gs` 还没换），网页会提示「Update Code.gs in your Sheet first」，改动先留在设备上，不会丢
 
 **第一次用**：新建一个空表格，做上面 2–4 步，然后「部署 → 新建部署 → 网页应用」，
 执行身份选「我」，谁有权访问选「任何人」，复制生成的 `…/exec` 网址。
@@ -47,37 +56,44 @@
 ## 三、每天怎么用
 
 **电脑**
-- `Projects`：按项目分区，区里是子项目。点「+ Sub-project」加子项目，填 Deadline 和条目
-  （可以一行一个批量加，也能用 Numbered 生成「Unit 1…10」）；「Rename」改项目名，下面的子项目一起改
-- **重复任务**：就是普通任务，设的时候选怎么重复、重复多久，整段时间一次排进日历。
-  一键：在加任务框里选「↻ Every day / Weekdays / Every 周几」和「for 1 week … 6 months」再点 Add；
-  细调：点任务的 ⋯ → Repeat，可以每个星期几填不同分钟（Gym 周一 60、周三 40、周五 60），选多久或到哪天为止。
-  重复的任务在编辑框顶上选「This one / This & following / All」，改名字、分钟、分类、子项目就作用到那些天；
+- `Projects`：按项目分区，区里是计划。点「New plan」或某个项目的「+ Plan」，选 Total / Regular 和 Auto / Pool；
+  Total 填 Deadline 和总时长或条目（可以一行一个批量加，也能用 Numbered 生成「Unit 1…10」），
+  Regular 填每个星期几做几分钟（Auto）或每周几次、每次几分钟（Pool）；「Rename」改项目名，下面的计划一起改
+- **重复的快捷方式**：在加任务框里选「↻ Every day / Weekdays / Every 周几」和「for good / for 1 week …」再点 Add，
+  就是建了一个 Regular + Auto 的计划；点任务的 ⋯ → Repeat 也一样，可以每个星期几填不同分钟。
+  重复的任务在编辑框顶上选「This one / This & following / All」，改名字、分钟就作用到那些天；
   「Change…」从这一天起改重复方式。删的时候选 Only this / This & following / This & earlier / All，
-  做过或计过时的留着当记录。错过的重复任务不算「left behind」
-- `Calendar`：右边是任务池，把条目拖到某天就排进去；日历里的任务能拖到别的天，拖回任务池就撤回。
+  做过或计过时的留着当记录。错过的自动任务不算「left behind」
+- `Calendar`：右边是任务池，把条目拖到某天就排进去；Pool 的 Regular 计划在「This week」里，显示这周还剩几次，拖一次排一次。
+  日历里的任务能拖到别的天，拖回任务池就撤回；以后几天的淡色预览里，Regular 的那一次可以拖走或点开，Total 的预计份额只能看。
   格子右上角的数字是那天能用的时间，点一下就能改
-- `Today`：左边是今天的清单，右边是安全线、昨天的账单、过期没做的、给今天的备注
+- `Today`：左边是今天的清单，右边是安全线、昨天的账单、过期没做的
 
 **计时（电脑和手机一样）**：点今天的一个任务选中它，底部浮条点 **Start** 开始，做完点 **Stop**；
 停下后浮条上可以直接点 Done / Partial。一次只跑一个，在跑的时候选了别的任务，浮条上会出现「Switch to …」。
 计时器跟着表格同步，手机上开始、电脑上也能停；不到 1 分钟的不记。
 没计时也行：点 Done / Partial 后，任务下面填「用了几小时几分 + 几点结束」点 Log；已经有记录的点「+ time」再补一段。
-每段时间是 Time 页的一行，任务的 Actual min = 它所有记录加起来；计过时但还没标状态的，也先算进今天做了多少。
+每段时间记在任务的 `Times` 一格里（「09:10-09:40 30m; 20m」），任务的 Actual min = 它们加起来；计过时但还没标状态的，也先算进今天做了多少。
 
 - `Stats`：选一段时间（周 / 30 天 / 月 / 年），看花了多少时间、做完多少、守住几天线、估时准不准、
-  每天计划和实际、各分类、星期几的节奏、没做完的原因、各项目计划和实际
+  每天计划和实际、各项目、星期几的节奏、没做完的原因、各计划的计划和实际
 
-**手机**：看任务、计时、标结果、加任务。顶上一排是今天前后各 5 天，点哪天看哪天。
+**阅读（电脑和手机都有）**：电脑 Settings → Reading 里贴一次你的阅读记录表格的链接（就是放清单的那一页）。
+之后在 `Reading` 页（手机右上角的书本图标）填标题、类型、风格（🎉 爽 / 😊 成长 / 👀 好奇）和 Note，点 Add 就加在那一页最后。
+打标题时会搜你已经有的，重复的不会加。按表头认列（Title / Type / Vibe / Note 这些，中文表头「书名 / 类型 / 风格 / 备注」也认），
+没有 Vibe 和 Note 列会自动加在最右边；已有的行不改不删。没网时先存在设备上，有网了再发。
+
+**手机**：看任务、计时、标结果、加任务，往阅读记录里加东西。顶上一排是今天前后各 5 天，点哪天看哪天。
 点 Done / Partial / Later / Drop 标结果，Done 和 Partial 下面填用了多久、几点结束，没做完的写原因；
 按住左边的分钟数上下拖，调整顺序；列表最下面可以加任务（「Gym 40」末尾的数字当分钟）。排计划、设置都在电脑上做。
 
 **进度条的花纹**：做完 = 纯色，部分完成 = 豹纹，还没做 = 斑马纹，Later 只剩描边。
 Optional（可选）的任务底下垫一层淡豹纹。
 
-**表格里怎么对应**：Projects 页一行是一个子项目，`Group` 列 = 项目，`Project` 列 = 子项目；
-重复任务的规则存在 Settings 页的 `routines` 那一行，每一次都在 Tasks 页里（ID 以 `rt:` 开头）；
-计时记录在 Time 页（Date / Task / From / To / Min），正在跑的计时器在 Settings 页的 `timer` 那一行。
+**表格里怎么对应**：平时只露出 Tasks / Projects / Items 三页。Projects 页一行是一个计划，`Group` 列 = 项目，
+`Project` 列 = 计划名，`Kind` / `Place` 是种类和放法，Regular 的规则在隐藏的 `Rule` 列；
+自动出现的任务 ID 以 `rt:`（Regular）或 `au:`（Total 的今日份额）开头；
+计时记录在 Tasks 的 `Times` 列，正在跑的计时器、每天单独改的可用时间、阅读表格链接在（隐藏的）Settings 页。
 
 ## 同步是怎么工作的
 
@@ -102,6 +118,7 @@ node --test test/*.test.mjs
 ```
 
 想连着一个假的表格试同步：`node tools/fake-sheet.mjs` 会在 http://127.0.0.1:8002/exec 起一个
-（口令 `CHANGE_ME`，里面是按旧表格式造的假数据）；`python3 tools/serve.py .`（或 `node tools/serve.mjs .`）起一个不缓存的本地网页（端口 8000）。
+（口令 `CHANGE_ME`，先用 main 分支的 `Code.gs` 把旧表升级、造一点上一版的数据，再用现在的 `Code.gs` 跑 setup——
+相当于真的从上一版升级；里面还有一个假的阅读表格，链接填 `https://docs.google.com/spreadsheets/d/FAKE-READING/edit`）；`python3 tools/serve.py .`（或 `node tools/serve.mjs .`）起一个不缓存的本地网页（端口 8000）。
 
 字体（Unbounded、Space Grotesk、JetBrains Mono）放在 `fonts/`，SIL Open Font License，许可证在同一个文件夹里。

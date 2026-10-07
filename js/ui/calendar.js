@@ -79,7 +79,7 @@ export function calendarHTML(c) {
   const { line, done } = lineInfo(c, c.today);
   const scale = Math.max(line * 1.2, done, 60);
   return '<div class="calendar">' +
-    '<header class="page-head"><div><p class="eyebrow">Calendar</p><h2>' + title + "</h2></div>" +
+    '<header class="page-head"><div><h2>' + title + "</h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="cal-today">Today</button>' +
     '<button type="button" class="nav" data-act="cal-prev" aria-label="Previous">' + icon("left") + '</button><button type="button" class="nav" data-act="cal-next" aria-label="Next">' + icon("right") + "</button>" +
     '<span class="seg"><button type="button" data-act="cal-mode" data-mode="week"' + (week ? ' class="on"' : "") + '>Week</button><button type="button" data-act="cal-mode" data-mode="month"' + (!week ? ' class="on"' : "") + ">Month</button></span>" +

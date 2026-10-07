@@ -178,7 +178,7 @@ export function statsHTML(c) {
   const p = S.previousRange(kind, r, ws);
   const s = S.summarize(c, r.from, r.to);
   const prev = S.summarize(c, p.from, p.to);
-  return '<div class="stats"><header class="page-head"><div><p class="eyebrow">Stats</p><h2>' + rangeLabel(r) + "</h2></div>" +
+  return '<div class="stats"><header class="page-head"><div><h2>' + rangeLabel(r) + "</h2></div>" +
     '<div class="tools"><span class="seg">' + Object.entries(S.PERIODS).map(([k, t]) => '<button type="button" data-act="period" data-k="' + k + '"' + (k === kind ? ' class="on"' : "") + ">" + t + "</button>").join("") + "</span>" +
     '<button type="button" class="nav" data-act="st-prev" aria-label="Earlier">' + icon("left") + '</button><button type="button" class="nav" data-act="st-today">Now</button>' +
     '<button type="button" class="nav" data-act="st-next" aria-label="Later"' + (r.to >= c.today ? " disabled" : "") + ">" + icon("right") + "</button></div></header>" +

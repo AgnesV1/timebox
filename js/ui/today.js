@@ -58,7 +58,7 @@ function rowHTML(c, t, tasks, phone = false) {
   const running = store.timer()?.taskId === t.id;
   return '<div class="row st-' + (t.status || "open") + (t.optional ? " opt" : "") + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + '" data-id="' + t.id + '" style="--i:' + tasks.indexOf(t) + '">' +
     '<div class="est num" data-drag-row title="Drag to reorder"><b>' + t.est + '</b><i class="grip"></i></div>' +
-    '<div class="bar" style="--bar:' + colorOf(t) + ";min-height:" + Math.max(20, Math.min(t.est * 0.6, 90)) + 'px"></div>' +
+    '<div class="bar" style="--bar:' + colorOf(t) + '"></div>' +
     '<div class="body"><div class="line">' +
     '<div class="task" data-act="desc">' + (t.optional ? '<span class="tag">Optional</span>' : "") + esc(t.title) +
     (E.isRoutine(t) ? ' <span class="rt" title="Routine">↻</span>' : "") +
@@ -169,7 +169,7 @@ export function todayHTML(c, phone) {
   const isToday = d === c.today;
   if (phone) return phoneHTML(c);
   return '<div class="dayview" data-date="' + d + '">' +
-    '<header class="page-head"><div><p class="eyebrow">' + (isToday ? "Today" : d < store.today() ? "Looking back" : "Looking ahead") + "</p><h2>" + fmtDay(d) + "</h2></div>" +
+    '<header class="page-head"><div><h2>' + fmtDay(d) + " <small>" + (isToday ? "Today" : d < store.today() ? "Looking back" : "Looking ahead") + "</small></h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="day-prev" aria-label="Previous day">' + icon("left") + '</button><button type="button" class="nav" data-act="day-today">Today</button><button type="button" class="nav" data-act="day-next" aria-label="Next day">' + icon("right") + "</button></div></header>" +
     '<div class="today-grid"><div class="today-main">' + x.strip + x.list + x.add + "</div>" +
     '<div class="today-side">' + x.hero + x.bill + x.overdue + "</div></div></div>";

@@ -43,9 +43,9 @@ export function settingsHTML(phone) {
 
   if (phone) {
     return '<div class="settings phone-settings"><header class="phead"><div class="l"><a class="nav" href="#today">‹ Today</a></div></header>' +
-      '<header class="page-head"><div><p class="eyebrow">Settings</p><h2>苦昼短</h2></div></header>' + look + sheet + "</div>";
+      '<header class="page-head"><div><h2>Settings</h2></div></header>' + look + sheet + "</div>";
   }
-  return '<div class="settings"><header class="page-head"><div><p class="eyebrow">Settings</p><h2>苦昼短</h2></div></header>' + sheet + time + read + look + backup + "</div>";
+  return '<div class="settings"><header class="page-head"><div><h2>Settings</h2></div></header>' + sheet + time + read + look + backup + "</div>";
 }
 
 // 每周那一排：全空 = 每天都用默认值；填了几个就只改那几天

@@ -61,7 +61,7 @@ function sidebarHTML(c, view) {
   const projects = groupsOf(c.projects.filter(E.isActive)).map((g) => (g.name ? '<p class="sp-group">' + esc(g.name) + "</p>" : "") + g.subs.map(sub).join("")).join("");
   const theme = store.local().theme;
   const st = sync.getStatus();
-  return '<div class="brand"><span class="ball" data-act="ball"></span><h1>苦昼短</h1></div><i class="tape" aria-hidden="true"></i>' +
+  return '<div class="brand"><span class="ball" data-act="ball"></span><h1>苦昼短</h1></div>' +
     '<nav class="snav">' + nav.map(([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '">' + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>").join("") + "</nav>" +
     '<section class="sprojects"><div class="sp-head"><a href="#projects">Projects</a><button type="button" class="icon-btn" data-act="new-project-side" aria-label="New project">' + icon("plus") + "</button></div>" +
     (projects || '<p class="sp-empty">None yet</p>') + "</section>" +

@@ -66,11 +66,14 @@ Object.assign(g, load(current, g.ss));
 g.sandbox.setup();
 console.log("→ current:", g.logs.join(" | "));
 
-// 一个假的阅读记录表格：在页面设置里填 https://docs.google.com/spreadsheets/d/FAKE-READING/edit
+// 一个假的阅读记录表格（一页一种，表头那行写着 Name）：在页面设置里填 https://docs.google.com/spreadsheets/d/FAKE-READING/edit
 if (g.spreadsheet) {
-  const sh = g.spreadsheet("https://docs.google.com/spreadsheets/d/FAKE-READING").insertSheet("Reading");
-  [["Title", "Type", "Author", "Finished"], ["三体", "Novel", "刘慈欣", D("2025-03-01")], ["Severance", "TV", "", ""], ["Bad Blood", "Nonfiction", "", ""],
-    ["Dune", "Novel", "", ""], ["The Rest Is History", "Podcast", "", ""], ["Hollow Knight", "Game", "", ""]].forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v)));
+  const book = g.spreadsheet("https://docs.google.com/spreadsheets/d/FAKE-READING");
+  const tab = (name, rows) => { const sh = book.insertSheet(name); rows.forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v))); };
+  tab("Book", [["", "", "", "年度笔记"], [], ["Year", "Month", "Name", "这一切真的值得吗"], [2024, "March", "《日常生活中的自我呈现》", "🥰", "book"], [2026, "February", "The Last Days Of Socrates", "🥰", "English"]]);
+  tab("Fiction", [["Year", "Month", "Name", "这一切真的值得吗"], [2026, "May", "迷宫馆事件 by绫辻行人", "🎉"], [2026, "September", "《同学少年都不贱》by张爱玲", "🥰"]]);
+  tab("TV", [[], ["Year", "Month", "Name", "这一切真的值得吗"], [2025, "May", "Severance", "🎉", "", "great"], ["", "", "奥本海默"]]);
+  tab("Game", [[], ["Year", "Month", "Name", "这一切真的值得吗"], [2026, "May", "古剑奇谭3", "🥰", "", "天行健"]]);
 }
 
 http.createServer((req, res) => {

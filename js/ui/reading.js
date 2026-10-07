@@ -1,5 +1,5 @@
-// 阅读页（电脑和手机都有）：往阅读表格里加一条想看的东西——标题、类型、风格（🎉 爽 / 😊 成长 / 👀 好奇）、Note。
-// 标题边打边搜已经有的，免得重复。不显示整个清单，只显示和你打的字对得上的。
+// 阅读页（电脑和手机都有）：往阅读表格的 Want 页加一条想看的东西——标题、类型（就是那个表格的各页）、
+// 风格（🎉 爽 / 😊 成长 / 👀 好奇）、Note。标题边打边搜所有页里已经有的，免得重复。不显示整个清单，只显示对得上的。
 
 import * as store from "../store.js";
 import * as sync from "../sync.js";
@@ -17,7 +17,8 @@ function matchesHTML() {
   if (!hits.length) return '<p class="rnone">Not in your list yet.</p>';
   const same = hits.some((h) => reading.titleKey(h.title) === reading.titleKey(query));
   return '<p class="rhead">' + (same ? "Already in your list" : "Similar") + "</p><ul>" + hits.map((r) =>
-    "<li><b>" + esc(r.title) + "</b>" + (r.type ? ' <span class="rtype">' + esc(r.type) + "</span>" : "") + (r.vibe ? " " + esc(r.vibe) : "") +
+    "<li><b>" + esc(r.title) + "</b>" + (r.tab ? ' <span class="rtype">' + esc(r.tab) + "</span>" : "") + (r.want ? ' <span class="rtype want">Want</span>' : "") +
+    (r.mark ? " " + esc(r.mark) : "") + (r.when ? ' <span class="rwhen">' + esc(r.when) + "</span>" : "") +
     (r.queued ? " <em>sending…</em>" : "") + (r.note ? "<small>" + esc(r.note) + "</small>" : "") + "</li>").join("") + "</ul>";
 }
 
@@ -71,7 +72,8 @@ export function initReading(rerender) {
     e.preventDefault();
     const title = form.title.value.trim();
     if (!title) { form.title.focus(); return; }
-    if (reading.exists(title)) { toast("Already in your list"); return; }
+    const hit = reading.exists(title);
+    if (hit) { toast("Already in your list" + (hit.tab ? " (" + hit.tab + ")" : "")); return; }
     reading.add({ title, type: form.type.value.trim() || type, vibe, note: form.note.value });
     toast("Added " + title);
     query = ""; vibe = ""; type = "";
@@ -82,7 +84,7 @@ export function initReading(rerender) {
   // 表格回来说「已经有了」的
   reading.subscribe(() => {
     const d = reading.takeDupes();
-    if (d.length) toast("Already in your list: " + d.map((x) => x.title).join(", "));
+    if (d.length) toast("Already in your list: " + d.map((x) => x.title + (x.tab ? " (" + x.tab + ")" : "")).join(", "));
     const s = document.querySelector("[data-rstatus]");
     if (s) s.textContent = statusText();
   });

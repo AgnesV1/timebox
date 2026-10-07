@@ -643,43 +643,29 @@ function migrate_() {
 }
 
 // ================= 阅读：你自己的另一个表格 =================
-// 链接在 Settings 的 reading（{url}），在网页电脑端的设置里填一次。按表头文字认列（下面这些写法都认，不分大小写）；
-// 没有 Vibe / Note 列就加在最右边。只往最后追加，不改、不删已有的行，也不往那个表格里加隐藏列。
-var READING_COLS = {
-  title: ['title', 'name', '书名', '名字', '名称', '标题', '作品'],
-  type: ['type', 'kind', 'category', 'format', '类型', '类别', '分类', '种类'],
-  vibe: ['vibe', 'style', 'mood', '风格'],
-  note: ['note', 'notes', 'comment', '备注', '笔记', '感想'],
-  added: ['added', 'date added', '添加日期', '加入日期']
-};
+// 链接在 Settings 的 reading（{url}），在网页电脑端的设置里填一次（整个表格的链接就行）。
+// 那个表格每一页是一种（Book、PodCast、TV……），各页找到写着 Name 的那一行当表头，下面每一行是一条。
+// 网页加的东西只放进单独一页 Want（没有就建一个），别的页不改不删；查重和搜索看所有页。
+var READING_TAB = 'Want';
+var READING_HEAD = ['Added', 'Name', 'Type', 'Vibe', 'Note'];
+var NAME_HEADS = ['name', 'title', '名字', '书名', '名称', '标题'];
 
-function readingSheet_() {
+function readingBook_() {
   var row = readAll_('settings').filter(function (r) { return r.id === 'reading'; })[0];
   var url = row && row.value && String(row.value.url || '').trim();
-  if (!url) return null;
-  var ss = SpreadsheetApp.openByUrl(url);
-  var gid = (/[#&?]gid=(\d+)/.exec(url) || [])[1];
-  var hit = gid ? ss.getSheets().filter(function (sh) { return String(sh.getSheetId()) === gid; })[0] : null;
-  return hit || ss.getSheets()[0];
+  return url ? SpreadsheetApp.openByUrl(url) : null;
 }
 
-function readingCols_(sh, grow) {
-  var names = head_(sh), low = names.map(function (h) { return h.toLowerCase(); }), col = {};
-  Object.keys(READING_COLS).forEach(function (k) {
-    col[k] = -1;
-    READING_COLS[k].forEach(function (a) { if (col[k] < 0) col[k] = low.indexOf(a); });
-  });
-  if (grow) {
-    [['vibe', 'Vibe'], ['note', 'Note']].forEach(function (x) {
-      if (col[x[0]] >= 0) return;
-      if (sh.getMaxColumns() < names.length + 1) sh.insertColumnAfter(sh.getMaxColumns());
-      sh.getRange(1, names.length + 1).setValue(x[1]);
-      col[x[0]] = names.length;
-      names.push(x[1]);
-    });
+// 前 8 行里找表头：有一格写着 Name（或 Title / 书名……）的那一行
+function readingHead_(sh) {
+  var last = sh.getLastRow(), width = sh.getLastColumn();
+  if (last < 1 || width < 1) return null;
+  var top = sh.getRange(1, 1, Math.min(8, last), width).getValues();
+  for (var r = 0; r < top.length; r++) {
+    var low = top[r].map(function (v) { return String(v === null ? '' : v).trim().toLowerCase(); });
+    for (var i = 0; i < low.length; i++) if (NAME_HEADS.indexOf(low[i]) >= 0) return { row: r + 1, name: i, cols: low, width: width, last: last };
   }
-  col.width = names.length;
-  return col;
+  return null;
 }
 
 // 查重用：不分大小写，书名号、引号、空格都不算
@@ -687,43 +673,91 @@ function titleKey_(s) {
   return String(s || '').toLowerCase().replace(/[《》<>「」『』"'“”‘’\s]+/g, '');
 }
 
-// req = { list: true, add: [{id, title, type, vibe, note}] } → { rows, types, added: [id], dupes: [{id, title}] }
-function reading_(req) {
-  var sh = readingSheet_();
-  if (!sh) return { error: 'no sheet' };
-  var adds = (req.add || []).filter(function (a) { return a && String(a.title || '').trim(); });
-  var col = readingCols_(sh, adds.length > 0);
-  if (col.title < 0) return { error: 'no title column' };
-  var tz = tz_(), cell = function (r, k) { return col[k] >= 0 ? String(r[col[k]] === null ? '' : r[col[k]]).trim() : ''; };
-  var rows = body_(sh, head_(sh)).map(function (r) {
-    return { title: cell(r, 'title'), type: cell(r, 'type'), vibe: cell(r, 'vibe'), note: cell(r, 'note') };
-  }).filter(function (r) { return r.title; });
-  var seen = {};
-  rows.forEach(function (r) { seen[titleKey_(r.title)] = r; });
-  var out = { added: [], dupes: [] }, fresh = [];
-  adds.forEach(function (a) {
-    var r = { title: String(a.title).trim(), type: String(a.type || '').trim(), vibe: String(a.vibe || '').trim(), note: String(a.note || '').trim() };
-    if (seen[titleKey_(r.title)]) { out.dupes.push({ id: a.id, title: r.title }); return; }
-    var line = [];
-    for (var i = 0; i < col.width; i++) line.push('');
-    ['title', 'type', 'vibe', 'note'].forEach(function (k) { if (col[k] >= 0) line[col[k]] = toCell_('text', r[k]); });
-    if (col.added >= 0) line[col.added] = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-    fresh.push(line);
-    seen[titleKey_(r.title)] = r;
-    rows.push(r);
-    out.added.push(a.id);
+// 一页里的每一条：名字、哪一页、什么时候（Year + Month 或 Added）、名字后面那格的 emoji、再后面的几格当备注
+function readingRows_(sh, tz) {
+  var h = readingHead_(sh);
+  if (!h || h.last <= h.row) return [];
+  var at = function (k) { return h.cols.indexOf(k); };
+  var year = at('year'), month = at('month'), added = at('added'), vibe = at('vibe'), type = at('type'), note = at('note');
+  var str = function (v) {
+    if (Object.prototype.toString.call(v) === '[object Date]') return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+    return typeof v === 'number' && v % 1 === 0 ? String(v) : String(v === null ? '' : v).trim();
+  };
+  var mine = sh.getName() === READING_TAB;
+  return sh.getRange(h.row + 1, 1, h.last - h.row, h.width).getValues().map(function (r) {
+    var title = str(r[h.name]);
+    if (!title) return null;
+    var when = added >= 0 ? str(r[added]) : [year >= 0 ? str(r[year]) : '', month >= 0 ? str(r[month]).slice(0, 3) : ''].join(' ').trim();
+    var mark = mine && vibe >= 0 ? str(r[vibe]) : str(r[h.name + 1]);
+    if (mark.length > 4) mark = '';   // 名字后面那格只有 emoji 才当成评价
+    var rest = [];
+    if (mine) { if (note >= 0 && str(r[note])) rest.push(str(r[note])); }
+    else for (var i = h.name + 2; i < r.length; i++) if (str(r[i])) rest.push(str(r[i]));
+    return { title: title, tab: mine && type >= 0 && str(r[type]) ? str(r[type]) : sh.getName(), want: mine, when: when, mark: mark, note: rest.join(' · ').slice(0, 120) };
+  }).filter(Boolean);
+}
+
+// Want 页：没有就建，表头缺的补在后面；返回 { sh, col: {added, name, type, vibe, note} }
+function wantTab_(book) {
+  var sh = book.getSheetByName(READING_TAB);
+  if (!sh) {
+    sh = book.insertSheet(READING_TAB);
+    sh.getRange(1, 1, 1, READING_HEAD.length).setValues([READING_HEAD]);
+    sh.setFrozenRows(1);
+    sh.getRange(2, 2, Math.max(sh.getMaxRows() - 1, 1), 4).setNumberFormat('@');
+  }
+  var names = head_(sh), col = {};
+  READING_HEAD.forEach(function (hd) {
+    var i = names.map(function (n) { return n.toLowerCase(); }).indexOf(hd.toLowerCase());
+    if (i < 0) {
+      if (sh.getMaxColumns() < names.length + 1) sh.insertColumnAfter(sh.getMaxColumns());
+      sh.getRange(1, names.length + 1).setValue(hd);
+      i = names.length;
+      names.push(hd);
+    }
+    col[hd.toLowerCase()] = i;
   });
-  if (fresh.length) {
-    var start = sh.getLastRow() + 1, need = start + fresh.length - 1 - sh.getMaxRows();
-    if (need > 0) sh.insertRowsAfter(sh.getMaxRows(), need);
-    sh.getRange(start, 1, fresh.length, col.width).setValues(fresh);
+  return { sh: sh, col: col, width: names.length };
+}
+
+// req = { list: true, add: [{id, title, type, vibe, note}] } → { rows, types, added: [id], dupes: [{id, title, tab}] }
+function reading_(req) {
+  var book = readingBook_();
+  if (!book) return { error: 'no sheet' };
+  var tz = tz_(), rows = [], types = [];
+  book.getSheets().forEach(function (sh) {
+    if (sh.getName() !== READING_TAB) types.push(sh.getName());
+    rows = rows.concat(readingRows_(sh, tz));
+  });
+  var seen = {};
+  rows.forEach(function (r) { if (!seen[titleKey_(r.title)]) seen[titleKey_(r.title)] = r; });
+  var out = { added: [], dupes: [] };
+  var adds = (req.add || []).filter(function (a) { return a && String(a.title || '').trim(); });
+  if (adds.length) {
+    var w = wantTab_(book), fresh = [], today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    adds.forEach(function (a) {
+      var r = { title: String(a.title).trim(), tab: String(a.type || '').trim(), want: true, when: today, mark: String(a.vibe || '').trim(), note: String(a.note || '').trim() };
+      var hit = seen[titleKey_(r.title)];
+      if (hit) { out.dupes.push({ id: a.id, title: r.title, tab: hit.tab }); return; }
+      var line = [];
+      for (var i = 0; i < w.width; i++) line.push('');
+      line[w.col.added] = today;
+      line[w.col.name] = toCell_('text', r.title);
+      line[w.col.type] = toCell_('text', r.tab);
+      line[w.col.vibe] = toCell_('text', r.mark);
+      line[w.col.note] = toCell_('text', r.note);
+      fresh.push(line);
+      seen[titleKey_(r.title)] = r;
+      rows.push(r);
+      out.added.push(a.id);
+    });
+    if (fresh.length) {
+      var start = w.sh.getLastRow() + 1, need = start + fresh.length - 1 - w.sh.getMaxRows();
+      if (need > 0) w.sh.insertRowsAfter(w.sh.getMaxRows(), need);
+      w.sh.getRange(start, 1, fresh.length, w.width).setValues(fresh);
+    }
   }
-  if (req.list) {
-    var count = {};
-    rows.forEach(function (r) { if (r.type) count[r.type] = (count[r.type] || 0) + 1; });
-    out.rows = rows;
-    out.types = Object.keys(count).sort(function (a, b) { return count[b] - count[a]; });
-  }
+  if (req.list) { out.rows = rows; out.types = types; }
   return out;
 }
 

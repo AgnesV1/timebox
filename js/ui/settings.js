@@ -35,8 +35,8 @@ export function settingsHTML(phone) {
     '<label class="check"><input type="checkbox" data-local-check="fx"' + (l.fx !== false ? " checked" : "") + "> Sparkles and confetti</label></section>";
 
   const read = '<section class="card"><h3>Reading</h3>' +
-    '<label class="field"><span>Link to your reading Sheet (the tab you keep the list in)</span><input data-reading-url value="' + esc(store.setting("reading")?.url || "") + '" placeholder="https://docs.google.com/spreadsheets/d/…/edit#gid=…" autocomplete="off" spellcheck="false"></label>' +
-    '<p class="hint">New entries from the Reading page are added at the bottom of that tab. Columns are found by their header (Title, Type, Vibe, Note); Vibe and Note are added if missing.</p></section>';
+    '<label class="field"><span>Link to your reading Sheet</span><input data-reading-url value="' + esc(store.setting("reading")?.url || "") + '" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false"></label>' +
+    '<p class="hint">New entries from the Reading page go to a <b>Want</b> tab in that Sheet (made if it isn\'t there). Search looks through every tab — wherever a row says Name.</p></section>';
 
   const backup = '<section class="card"><h3>Backup</h3><p class="hint">Everything is in your Sheet already. This saves a copy of this device\'s data as a file.</p>' +
     '<button type="button" class="btn" data-act="export">Export JSON</button></section>';

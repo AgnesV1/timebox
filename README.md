@@ -78,10 +78,12 @@
 - `Stats`：选一段时间（周 / 30 天 / 月 / 年），看花了多少时间、做完多少、守住几天线、估时准不准、
   每天计划和实际、各项目、星期几的节奏、没做完的原因、各计划的计划和实际
 
-**阅读（电脑和手机都有）**：电脑 Settings → Reading 里贴一次你的阅读记录表格的链接（就是放清单的那一页）。
-之后在 `Reading` 页（手机右上角的书本图标）填标题、类型、风格（🎉 爽 / 😊 成长 / 👀 好奇）和 Note，点 Add 就加在那一页最后。
-打标题时会搜你已经有的，重复的不会加。按表头认列（Title / Type / Vibe / Note 这些，中文表头「书名 / 类型 / 风格 / 备注」也认），
-没有 Vibe 和 Note 列会自动加在最右边；已有的行不改不删。没网时先存在设备上，有网了再发。
+**阅读（电脑和手机都有）**：电脑 Settings → Reading 里贴一次你的阅读记录表格的链接（整个表格的链接就行）。
+之后在 `Reading` 页（手机右上角的书本图标）填标题、类型（就是那个表格的各页：Book、TV……）、风格（🎉 爽 / 😊 成长 / 👀 好奇）和 Note，
+点 Add 就加进那个表格的 **Want** 页（没有会自动建，表头 Added / Name / Type / Vibe / Note）；别的页不改不删。
+打标题时会搜**所有页**里已经有的（每页找写着 Name 的那一行当表头，下面每行一条），显示在哪一页、哪年哪月、那格 emoji；
+同名的（不分大小写、空格、书名号）不会再加。每次打开 Reading 页都会重新读一遍，所以你在表格里直接改的也搜得到。
+没网时先存在设备上，有网了再发。
 
 **手机**：看任务、计时、标结果、加任务，往阅读记录里加东西。顶上一排是今天前后各 5 天，点哪天看哪天。
 点 Done / Partial / Later / Drop 标结果，Done 和 Partial 下面填用了多久、几点结束，没做完的写原因；
@@ -119,6 +121,6 @@ node --test test/*.test.mjs
 
 想连着一个假的表格试同步：`node tools/fake-sheet.mjs` 会在 http://127.0.0.1:8002/exec 起一个
 （口令 `CHANGE_ME`，先用 main 分支的 `Code.gs` 把旧表升级、造一点上一版的数据，再用现在的 `Code.gs` 跑 setup——
-相当于真的从上一版升级；里面还有一个假的阅读表格，链接填 `https://docs.google.com/spreadsheets/d/FAKE-READING/edit`）；`python3 tools/serve.py .`（或 `node tools/serve.mjs .`）起一个不缓存的本地网页（端口 8000）。
+相当于真的从上一版升级；里面还有一个假的阅读表格（几页、表头高低不一），链接填 `https://docs.google.com/spreadsheets/d/FAKE-READING/edit`）；`python3 tools/serve.py .`（或 `node tools/serve.mjs .`）起一个不缓存的本地网页（端口 8000）。
 
 字体（Unbounded、Space Grotesk、JetBrains Mono）放在 `fonts/`，SIL Open Font License，许可证在同一个文件夹里。

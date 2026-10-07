@@ -1,5 +1,6 @@
-// 阅读入口：你的阅读记录在另一个 Google 表格里（链接存在 Settings 的 reading）。
-// 这里只做两件事：往那个表格追加想看的东西（没网先排队，下次同步一起发），和在本机缓存一份标题列表，打字时查重。
+// 阅读入口：你的阅读记录在另一个 Google 表格里（链接存在 Settings 的 reading），一页一种（Book、TV……）。
+// 这里只做两件事：往那个表格的 Want 页追加想看的东西（没网先排队，下次同步一起发），
+// 和在本机缓存一份所有页的条目，打字时查重。条目：{title, tab, want, when, mark, note}
 // 缓存和排队都只在这台设备上（localStorage 单独一个 key），不进 Tasks 那些表。
 
 import { readLocal, writeLocal } from "./dom.js";
@@ -31,13 +32,14 @@ export function want(on = true) { wanted = on; }
 export function search(q, limit = 8) {
   const k = titleKey(q);
   if (!k) return [];
-  const all = [...R.pending.map((x) => ({ ...x, queued: true })), ...R.rows];
+  const all = [...R.pending.map((x) => ({ title: x.title, tab: x.type, want: true, mark: x.vibe, note: x.note, queued: true })), ...R.rows];
   const exact = all.filter((r) => titleKey(r.title) === k);
   const part = all.filter((r) => titleKey(r.title) !== k && titleKey(r.title).includes(k));
   return [...exact, ...part].slice(0, limit);
 }
 
-export const exists = (title) => [...R.pending, ...R.rows].some((r) => titleKey(r.title) === titleKey(title));
+// 已经有了的那一条（同名，不分大小写 / 空格 / 书名号）；没有就是 undefined
+export const exists = (title) => search(title, 1).find((r) => titleKey(r.title) === titleKey(title));
 
 export function add(entry) {
   const id = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

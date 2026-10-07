@@ -707,3 +707,5 @@ body.phone .logtime input, body.phone .add input, body.phone .add select { font-
 .rtype-in { flex: 1; min-width: 110px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); font-size: 13px; }
 .rgo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 body.phone .reading { padding: 0 2px 90px; }
+.rtype.want { background: var(--accent); color: var(--accent-ink); }
+.rwhen { font-size: 11px; color: var(--muted); }

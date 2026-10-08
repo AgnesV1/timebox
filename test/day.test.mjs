@@ -5,30 +5,30 @@ import * as S from "../js/stats.js";
 
 console.warn = () => {};   // 「Can't save on this device」
 
-test("spiral: 6:00 on the left, noon on top, 18:00 on the right, midnight at the bottom; each day one more turn", () => {
-  const deg = (t) => ((D.angleAt(t) % 360) + 360) % 360;
-  const o = "2026-10-06";
-  assert.equal(D.absMin(o, o, "06:00"), 0);
-  assert.equal(deg(D.absMin(o, o, "06:00")), 180, "left");
-  assert.equal(deg(D.absMin(o, o, "12:00")), 270, "top (SVG angles grow clockwise)");
-  assert.equal(deg(D.absMin(o, o, "18:00")), 0, "right");
-  assert.equal(deg(D.absMin(o, o, "23:00")), 75, "toward the bottom");
-  assert.equal(D.absMin(o, "2026-10-07", "06:00"), D.TURN, "the next day starts the next turn");
-  assert.equal(D.angleAt(D.TURN) - D.angleAt(0), 360, "angles keep growing so the turns join up");
-  assert.equal(D.absMin(o, "2026-10-07", "01:00"), 2 * D.TURN - 300, "1 am is still that day (before dayStartsAt) — late that night");
-  assert.equal(D.absMin(o, "2026-10-07", "01:00", "00:00"), D.TURN - 300, "with the day starting at midnight it is early that morning");
+test("dial: 6:00 on the left, 9 on top, 12 on the right; 18 starts the inner ring", () => {
+  assert.equal(D.dialMin("06:00"), 0);
+  assert.equal(D.dialMin("05:59"), 1439);
+  assert.equal(D.angleOf(D.dialMin("06:00")), 180, "left");
+  assert.equal(D.angleOf(D.dialMin("09:00")), 270, "top (SVG angles grow clockwise)");
+  assert.equal(D.angleOf(D.dialMin("12:00")), 360, "right");
+  assert.equal(D.angleOf(D.dialMin("15:00")), 450, "bottom");
+  assert.equal(D.angleOf(D.dialMin("18:00")), 180, "inner ring starts on the left too");
+  assert.equal(D.angleOf(D.dialMin("21:00")), 270);
+  assert.equal(D.angleOf(D.dialMin("03:00")), 450);
 });
 
-test("spiral: timed stretches and commute blocks land in real time", () => {
-  const o = "2026-10-06";
-  assert.deepEqual(D.stretch(o, "2026-10-07", "09:10", "09:40"), { a: D.TURN + 190, b: D.TURN + 220 });
-  assert.deepEqual(D.stretch(o, "2026-10-07", "23:30", "00:30"), { a: D.TURN + 1050, b: D.TURN + 1110 }, "past midnight");
-  assert.deepEqual(D.stretch(o, "2026-10-07", "03:30", "04:30"), { a: D.TURN + 1290, b: D.TURN + 1350 }, "across dayStartsAt");
-  assert.equal(D.stretch(o, "2026-10-07", "10:00", "10:00"), null);
-  assert.equal(D.stretch(o, "2026-10-07", "", "10:00"), null);
-  // 通勤日 10-07：前一晚 23:00 睡到 08:00，08–09 通勤，17–18:30 通勤
-  assert.deepEqual(D.COMMUTE_BLOCKS.map((b) => D.blockSpan(o, "2026-10-07", b.from, b.to)), [
-    { a: 1020, b: D.TURN + 120 }, { a: D.TURN + 120, b: D.TURN + 180 }, { a: D.TURN + 660, b: D.TURN + 750 }
+test("dial: a stretch splits at 18:00 between rings and at 6:00 between end and start", () => {
+  assert.deepEqual(D.arcs([{ from: "09:10", to: "09:40" }]).map((a) => a.ring + " " + a.a + "-" + a.b), ["outer 190-220"]);
+  assert.deepEqual(D.arcs([{ from: "17:00", to: "18:30" }]).map((a) => a.ring + " " + a.a + "-" + a.b), ["outer 660-720", "inner 720-750"]);
+  assert.deepEqual(D.arcs([{ from: "23:00", to: "08:00", label: "Sleep" }]).map((a) => a.ring + " " + a.a + "-" + a.b + " " + a.label), ["inner 1020-1440 Sleep", "outer 0-120 Sleep"]);
+  assert.deepEqual(D.arcs([{ from: "", to: "" }, { from: "10:00", to: "10:00" }]), [], "no clock or zero length: nothing to draw");
+});
+
+test("commute blocks land where they should", () => {
+  const arcs = D.arcs(D.COMMUTE_BLOCKS);
+  // 画的时候终点角度 = 起点 + 长度（一圈的末尾不绕回 180°）
+  assert.deepEqual(arcs.map((a) => a.ring + " " + D.angleOf(a.a) + "→" + (D.angleOf(a.a) + ((a.b - a.a) / 720) * 360)), [
+    "inner 330→540", "outer 180→240", "outer 240→270", "outer 510→540", "inner 180→195"
   ]);
   assert.equal(D.isCommute({ days: { "2026-10-08": true } }, "2026-10-08"), true);
   assert.equal(D.isCommute(null, "2026-10-08"), false);

@@ -24,7 +24,7 @@ function matchesHTML() {
 
 function statusText() {
   const R = reading.state();
-  if (!store.setting("reading")?.url) return "Add your reading Sheet's link in Settings on the computer.";
+  if (!store.setting("reading")?.url) return "Paste your reading Sheet's link above first.";
   if (R.error) return R.error;
   const n = R.pending.length;
   return (R.at ? R.rows.length + " in your list" : "Loading your list…") + (n ? " · " + n + " waiting to send" : "");
@@ -34,7 +34,11 @@ export function readingHTML(phone) {
   const head = phone
     ? '<header class="phead"><div class="l"><a class="nav" href="#today">‹ Today</a></div></header><header class="page-head"><div><h2>Reading</h2></div></header>'
     : '<header class="page-head"><div><h2>Reading</h2></div></header>';
-  return '<div class="reading' + (phone ? " phone-reading" : "") + '">' + head +
+  // 还没连阅读表格：就在这里贴一次链接（手机上也行），贴进去就存
+  const connect = store.setting("reading")?.url ? "" :
+    '<label class="field rconnect"><span>Link to your reading Sheet</span><input data-reading-link inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/…/edit"></label>' +
+    '<p class="hint">Paste it once. The Sheet stays private — your own Google account opens it.</p>';
+  return '<div class="reading' + (phone ? " phone-reading" : "") + '">' + head + connect +
     '<form class="radd" autocomplete="off">' +
     '<input name="title" class="rtitle" data-keep="read-title" placeholder="What do you want to read or watch?" enterkeyhint="next" value="' + esc(query) + '">' +
     '<div class="rmatches" data-rmatches>' + matchesHTML() + "</div>" +
@@ -47,7 +51,20 @@ export function readingHTML(phone) {
     "</form></div>";
 }
 
+// 阅读表格的链接：贴进来就存（不用等离开输入框）。电脑 Settings 里那个框也走这里
+export function saveReadingLink(value) {
+  const url = String(value || "").trim();
+  if (url === (store.setting("reading")?.url || "")) return false;
+  if (url && !reading.looksLikeSheet(url)) return false;
+  store.setSetting("reading", { url });
+  if (url) toast("Reading Sheet linked");
+  sync.sync();
+  return true;
+}
+
 export function initReading(rerender) {
+  on(document, "input", "[data-reading-link]", (e, el) => { if (reading.looksLikeSheet(el.value)) saveReadingLink(el.value); });
+  on(document, "change", "[data-reading-link]", (e, el) => { if (!saveReadingLink(el.value) && el.value.trim()) toast("That doesn't look like a Google Sheets link"); });
   on(document, "input", ".radd [name=title]", (e, el) => {
     query = el.value;
     const box = document.querySelector("[data-rmatches]");

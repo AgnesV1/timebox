@@ -57,6 +57,9 @@ export function request() {
   return { add: R.pending.slice(), list };
 }
 
+// 贴进来的像不像一个 Google 表格的链接
+export const looksLikeSheet = (url) => /docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]{20,}/.test(String(url || ""));
+
 // 表格那边的错误换成看得懂的话。打不开多半是阅读表格属于另一个 Google 账号：
 // 不用公开，把它共享给 苦昼短 表格所在的那个账号（编辑者）就行
 export function readingError(e) {

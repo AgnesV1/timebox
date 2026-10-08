@@ -771,3 +771,6 @@ body[data-view="today"] #main, body.phone.has-dock[data-view="today"] #main { pa
 .hweek { margin-top: 12px; }
 .hweek p { margin: 0 0 4px; font-size: 12px; font-weight: 700; }
 .hweek .hc { height: 12px; }
+.rconnect { margin-bottom: 4px; }
+.rconnect input { border: var(--b); }
+body.phone .rconnect input, body.phone .radd input, body.phone .radd textarea { font-size: 16px; }

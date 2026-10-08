@@ -4,6 +4,8 @@ import * as store from "../store.js";
 import * as sync from "../sync.js";
 import { esc, on, icon } from "../dom.js";
 import { WEEKDAYS } from "../dates.js";
+import { looksLikeSheet } from "../reading.js";
+import { saveReadingLink } from "./reading.js";
 
 // 手机上只留两块：连表格 / 同步，和白天黑夜；每天的时间这些在电脑上设
 export function settingsHTML(phone) {
@@ -61,10 +63,9 @@ export function initSettings(applyTheme) {
     if (el.dataset.local === "url" || el.dataset.local === "secret") sync.sync({ full: true });
   });
   on(document, "change", ".settings [data-local-check]", (e, el) => store.setLocal({ [el.dataset.localCheck]: el.checked }));
-  on(document, "change", ".settings [data-reading-url]", (e, el) => {
-    store.setSetting("reading", { url: el.value.trim() });
-    sync.sync();
-  });
+  // 阅读表格链接：贴进来就存；清空也算（不再连）
+  on(document, "input", ".settings [data-reading-url]", (e, el) => { if (looksLikeSheet(el.value)) saveReadingLink(el.value); });
+  on(document, "change", ".settings [data-reading-url]", (e, el) => saveReadingLink(el.value));
   on(document, "change", ".settings [data-cap], .settings [data-week]", (e, el) => {
     const root = el.closest(".settings");
     const def = Math.max(0, Number(root.querySelector('[data-cap="default"]').value) || 0);

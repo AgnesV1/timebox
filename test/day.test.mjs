@@ -78,3 +78,11 @@ test("store: commute days toggle, and old ones are tidied away", async () => {
   assert.equal(store.isCommuteDay(t), false);
   assert.deepEqual(store.setting("commute").days, {}, "a day from years ago is dropped");
 });
+
+test("reading errors read as advice, not Google's raw message", async () => {
+  const R = await import("../js/reading.js");
+  assert.match(R.readingError("Exception: You do not have permission to access the requested document."), /share it .*Google account/);
+  assert.match(R.readingError("Exception: Unexpected error while getting the method or property openById on object SpreadsheetApp."), /can stay private/);
+  assert.match(R.readingError("no sheet"), /Settings/);
+  assert.equal(R.readingError("something else"), "something else");
+});

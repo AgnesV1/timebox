@@ -57,11 +57,21 @@ export function request() {
   return { add: R.pending.slice(), list };
 }
 
+// 表格那边的错误换成看得懂的话。打不开多半是阅读表格属于另一个 Google 账号：
+// 不用公开，把它共享给 苦昼短 表格所在的那个账号（编辑者）就行
+export function readingError(e) {
+  if (e === "no sheet") return "Add your reading Sheet's link in Settings on the computer.";
+  if (/permission|access|not found|openById|openByUrl|权限|找不到/i.test(String(e))) {
+    return "Can't open the reading Sheet. It can stay private — share it (as Editor) with the Google account your 苦昼短 Sheet belongs to.";
+  }
+  return String(e);
+}
+
 // 表格回来的：发成功的（加上了 / 重复了）从队列里拿掉；有列表就换成新的
 export function apply(res, sent) {
   if (!res || !sent) return;
   if (res.error) {
-    R.error = res.error === "no sheet" ? "Add your reading Sheet's link in Settings on the computer." : res.error === "no title column" ? "Couldn't find a title column in the reading Sheet." : res.error;
+    R.error = readingError(res.error);
   } else {
     R.error = "";
     const done = new Set([...(res.added || []), ...(res.dupes || []).map((d) => d.id)]);

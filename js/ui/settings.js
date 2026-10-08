@@ -36,7 +36,7 @@ export function settingsHTML(phone) {
 
   const read = '<section class="card"><h3>Reading</h3>' +
     '<label class="field"><span>Link to your reading Sheet</span><input data-reading-url value="' + esc(store.setting("reading")?.url || "") + '" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false"></label>' +
-    '<p class="hint">New entries from the Reading page go to a <b>Want</b> tab in that Sheet (made if it isn\'t there). Search looks through every tab — wherever a row says Name.</p></section>';
+    '<p class="hint">New entries from the Reading page go to a <b>Want</b> tab in that Sheet (made if it isn\'t there). Search looks through every tab — wherever a row says Name. The Sheet can stay private: it only has to be editable by the Google account your 苦昼短 Sheet belongs to.</p></section>';
 
   const backup = '<section class="card"><h3>Backup</h3><p class="hint">Everything is in your Sheet already. This saves a copy of this device\'s data as a file.</p>' +
     '<button type="button" class="btn" data-act="export">Export JSON</button></section>';

@@ -17,6 +17,7 @@
   --r: 14px; --r-sm: 10px;
   --leo-spot: #0B0B0B; --leo-inner: #FF3EA5; --zebra-ink: #0B0B0B;
   --k-Main: #719507; --k-Work: #1B4BFE; --k-Fun: #E40187; --k-Chore: #E36B02; --k-None: #85858F; --k-accent: #7E04F5; --grid: #ECECE6;
+  --sun-day: #F6E7B8; --sun-night: #D9DBE8; --sun-dot: #FF9A1F;
   --display: "Unbounded", -apple-system, "PingFang SC", sans-serif;
   --body: "Space Grotesk", -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
   --num: "Space Grotesk", -apple-system, sans-serif;
@@ -35,6 +36,7 @@
   --hard: 0 0 0 1px rgba(204, 255, 0, .05), 0 0 24px rgba(204, 255, 0, .06) inset; --hard-lg: 0 0 40px rgba(0, 229, 255, .06); --glow: 0 0 14px rgba(204, 255, 0, .5);
   --leo-spot: #FF2BD6; --leo-inner: rgba(255, 43, 214, .35); --zebra-ink: rgba(255, 255, 255, .85);
   --k-Main: #7BA208; --k-Work: #0083FC; --k-Fun: #F504A2; --k-Chore: #DB7206; --k-None: #6A6A80; --k-accent: #9E71FE; --grid: #1F1F2D;
+  --sun-day: #34304A; --sun-night: #17172A; --sun-dot: #FFD84D;
   --num: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -598,8 +600,26 @@ body.phone .settings .page-head { margin-top: 4px; }
 .fx .shard { background: linear-gradient(135deg, var(--c), rgba(255, 255, 255, .2)); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .fx .dot { border-radius: 50%; background: var(--c); }
 .fx .paper { border-radius: 2px; background: var(--c); }
-.fx .ring { width: 40px; height: 40px; margin: -20px 0 0 -20px; border: 1.5px solid var(--hot); border-radius: 50%; }
+.fx .ring { width: 28px; height: 28px; margin: -14px 0 0 -14px; border: 1px solid var(--hot); border-radius: 50%; }
+[data-theme="dark"] .fx .ring { border-color: var(--accent); box-shadow: 0 0 8px rgba(204, 255, 0, .35); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- 过渡（js/motion.js）：点完按钮，行、进度条、浮条平滑挪到新样子；翻天时列表左右滑 ---------- */
+::view-transition { pointer-events: none; }
+::view-transition-group(*) { animation-duration: .3s; animation-timing-function: var(--ease); }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .2s; }
+#dock { view-transition-name: dock; }
+#main .hero .meter .fill { view-transition-name: meter; }
+html[data-vt] .row.enter { animation: none; }
+html[data-vt="next"] #main .dayview .list, html[data-vt="prev"] #main .dayview .list { view-transition-name: daylist; }
+html[data-vt="next"]::view-transition-old(daylist) { animation: .2s var(--ease) both vt-out-l; }
+html[data-vt="next"]::view-transition-new(daylist) { animation: .3s var(--ease) both vt-in-r; }
+html[data-vt="prev"]::view-transition-old(daylist) { animation: .2s var(--ease) both vt-out-r; }
+html[data-vt="prev"]::view-transition-new(daylist) { animation: .3s var(--ease) both vt-in-l; }
+@keyframes vt-out-l { to { opacity: 0; transform: translateX(-28px); } }
+@keyframes vt-out-r { to { opacity: 0; transform: translateX(28px); } }
+@keyframes vt-in-r { from { opacity: 0; transform: translateX(28px); } }
+@keyframes vt-in-l { from { opacity: 0; transform: translateX(-28px); } }
 
 /* ---------- 窄一点的电脑 / 平板 ---------- */
 @media (max-width: 1180px) and (min-width: 761px) {
@@ -710,42 +730,56 @@ body.phone .reading { padding: 0 2px 90px; }
 .rtype.want { background: var(--accent); color: var(--accent-ink); }
 .rwhen { font-size: 11px; color: var(--muted); }
 
-/* ---------- 今天页的日出圆盘 ---------- */
-/* 落着 = 计时浮条上面一个半透明的半圆（缩到 0.4 倍、圆心压在浮条顶上）；--p 从 0 到 1 = 升到屏幕中间 */
-#sun { position: fixed; inset: 0; z-index: 36; pointer-events: none; }
+/* ---------- 今天页的日出螺旋 ---------- */
+/* 落着 = 计时浮条上面一个半透明的半圆（缩到 0.4 倍、圆心压在浮条顶上）；--p 从 0 到 1 = 升到屏幕中间。
+   --q 和 --p 一样，只是弹簧收尾时会稍微冲过头，只管位置和大小。两个都由 js/ui/sun.js 每帧设在 #sun 上 */
+#sun { --p: 0; --q: 0; position: fixed; inset: 0; z-index: 36; pointer-events: none; }
 #sun:empty { display: none; }
 #sun.up { z-index: 45; pointer-events: auto; }
-#sun::before { content: ""; position: absolute; inset: 0; background: rgba(11, 11, 11, .35); opacity: 0; transition: opacity .3s; pointer-events: none; }
-#sun.up::before { opacity: 1; }
-[data-theme="dark"] #sun::before { background: rgba(0, 0, 0, .55); }
-.sun { --D: min(360px, 88vw, 70vh); --s0: .4; --p: 0; position: absolute; left: 50%; width: var(--D); height: var(--D);
-  bottom: calc((var(--dock-h, 0px) + env(safe-area-inset-bottom)) * (1 - var(--p)) + 50vh * var(--p));
-  transform: translate(-50%, 50%) scale(calc(var(--s0) + (1 - var(--s0)) * var(--p)));
+#sun::before { content: ""; position: absolute; inset: 0; background: rgba(11, 11, 11, .35); opacity: var(--p); pointer-events: none; }
+[data-theme="dark"] #sun::before { background: rgba(0, 0, 0, .6); }
+.sun { --D: min(380px, 92vw, 72vh); --s0: .4; position: absolute; left: 50%; width: var(--D); height: var(--D);
+  bottom: calc((var(--dock-h, 0px) + env(safe-area-inset-bottom)) * (1 - var(--q)) + 50vh * var(--q));
+  transform: translate(-50%, 50%) scale(calc(var(--s0) + (1 - var(--s0)) * var(--q)));
   border-radius: 50%; background: color-mix(in srgb, var(--bg) calc(var(--p) * 100%), transparent);
   box-shadow: 0 20px 60px rgba(0, 0, 0, calc(.25 * var(--p)));
-  opacity: calc(.55 + .45 * var(--p)); pointer-events: auto; touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; }
+  opacity: calc(.75 + .25 * var(--p)); pointer-events: auto; touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; }
 .sun.dragging { cursor: grabbing; }
 .sun:focus-visible { outline-offset: 6px; }
 .sun svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.sun .trk { fill: none; stroke: var(--track); stroke-width: 18; }
-.sun .sweep { fill: none; stroke: var(--hot); stroke-width: 2.5; stroke-linecap: round; }
-.sun .arc { fill: none; stroke: var(--c, var(--c-None)); stroke-width: 18; opacity: .3; transition: opacity .25s, stroke-width .2s; cursor: pointer; }
-.sun .arc.lit { opacity: 1; }
-.sun .arc.fixed { stroke: var(--muted); stroke-dasharray: 1.2 1.6; opacity: .25; }
-.sun .arc.fixed.lit { opacity: .7; }
-.sun .arc.live.lit { animation: pulse 1.4s ease-in-out infinite; }
-.sun .arc.on { stroke-width: 22; }
-.sun .now { stroke: var(--hot); stroke-width: 2; stroke-linecap: round; opacity: calc(.4 + .6 * var(--p)); }
-.sun .hours text { fill: var(--muted); font: 600 8px var(--num); text-anchor: middle; dominant-baseline: middle; opacity: var(--p); }
-.sun-c { position: absolute; top: 50%; left: 50%; display: grid; justify-items: center; gap: 2px; width: 34%; transform: translate(-50%, -50%); text-align: center; font-size: 12.5px; line-height: 1.3; opacity: var(--p); pointer-events: none; }
-.sun-c b { font: 700 14px var(--display); overflow-wrap: anywhere; }
+.sun .trk { fill: var(--sun-day); }
+.sun .trk.night { fill: var(--sun-night); }
+.sun .trk.later { opacity: .5; }
+.sun .seg { fill: var(--c, var(--c-None)); transition: opacity .2s; }
+.sun .seg.fixed { fill: url(#sun-hatch); }
+.sun .hatch rect { fill: var(--muted); }
+.sun .base .seg { opacity: .45; }
+.sun .lit .seg.live { animation: breathe 1.6s ease-in-out infinite; }
+.sun.picking .lit .seg:not(.on) { opacity: .25; }
+.sun .seg.on { stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
+.sun .guide { fill: none; stroke: #fff; stroke-width: 25; }
+.sun .hits path { fill: transparent; cursor: pointer; }
+.sun .tick { stroke: var(--muted); stroke-width: 1; stroke-linecap: round; opacity: calc(.3 + .5 * var(--p)); }
+.sun .tick.major { stroke: var(--ink); stroke-width: 1.5; }
+.sun .hours text { fill: var(--muted); font: 600 8.5px var(--num); text-anchor: middle; dominant-baseline: central; opacity: clamp(0, (var(--p) - var(--k)) * 3.5, 1); }
+.sun .hours text.major { fill: var(--ink); font-size: 10px; font-weight: 700; }
+.sun .names text { fill: var(--muted); font: 700 6.5px var(--body); letter-spacing: .12em; text-transform: uppercase; text-anchor: middle; opacity: clamp(0, (var(--p) - .55) * 3, 1); }
+.sun .names text.cur { fill: var(--ink); }
+/* 「现在」：一颗发光的小太阳；升起时笔头那颗小光点沿着螺旋走 */
+.sun .now { fill: var(--sun-dot); stroke: var(--bg); stroke-width: 1.5; }
+.sun .glow { fill: url(#sun-glow); }
+.sun .g0 { stop-color: var(--sun-dot); stop-opacity: .55; }
+.sun .g1 { stop-color: var(--sun-dot); stop-opacity: 0; }
+.sun .pen { fill: var(--sun-dot); opacity: 0; filter: drop-shadow(0 0 3px var(--sun-dot)); }
+.sun-c { position: absolute; top: 50%; left: 50%; display: grid; justify-items: center; gap: 2px; width: 31%; transform: translate(-50%, -50%); text-align: center; font-size: 12px; line-height: 1.3; opacity: clamp(0, (var(--p) - .5) * 2.5, 1); pointer-events: none; }
+.sun-c b { font: 700 13px var(--display); overflow-wrap: anywhere; }
 .sun-c span { color: var(--muted); }
 .sun-c em { padding: 1px 8px; border-radius: 999px; background: var(--surface); font-style: normal; font-size: 11px; font-weight: 700; color: var(--muted); }
 /* 落着时：一点淡淡的晨光 */
-.sun::after { content: ""; position: absolute; inset: 12%; z-index: -1; border-radius: 50%; background: radial-gradient(circle, rgba(255, 196, 0, .35), transparent 70%); opacity: calc(1 - var(--p)); pointer-events: none; }
-[data-theme="dark"] .sun .arc.lit { filter: drop-shadow(0 0 4px var(--c, transparent)); }
-[data-theme="dark"] .sun .sweep { filter: drop-shadow(0 0 5px var(--accent)); }
-[data-theme="dark"] .sun::after { background: radial-gradient(circle, rgba(255, 43, 214, .3), transparent 70%); }
+.sun::after { content: ""; position: absolute; inset: 12%; z-index: -1; border-radius: 50%; background: radial-gradient(circle, rgba(255, 196, 0, .32), transparent 70%); opacity: calc(1 - var(--p)); pointer-events: none; }
+[data-theme="dark"] .sun .now { filter: drop-shadow(0 0 4px var(--sun-dot)); stroke: none; }
+[data-theme="dark"] .sun::after { background: radial-gradient(circle, rgba(255, 43, 214, .28), transparent 70%); }
+@keyframes breathe { 50% { opacity: .55; } }
 /* 今天页底下多留一点，最后几行别被半圆挡住 */
 body[data-view="today"] #main, body.phone.has-dock[data-view="today"] #main { padding-bottom: calc(var(--dock-h, 0px) + 110px + env(safe-area-inset-bottom)); }
 

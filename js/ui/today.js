@@ -10,6 +10,8 @@ import * as R from "../routines.js";
 import { heroHTML, stripHTML, billHTML, colorOf, projectOf, projectOptions, segStyle, lineInfo, toast, STATUS } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
+import { animateNext } from "../motion.js";
+import { cheer } from "../fx.js";
 
 const openDesc = new Set();
 const logOpen = new Set();   // 已经有计时记录、又点了「+ time」要再补一段的任务
@@ -190,8 +192,14 @@ const rowId = (el) => el.closest(".row")?.dataset.id;
 export function initToday(rerender) {
   on(document, "click", ".dayview [data-act]", (e, el) => {
     const act = el.dataset.act, id = rowId(el);
-    if (act === "status") { logOpen.delete(id); store.setStatus(id, el.dataset.s); }
-    else if (act === "edit") openTaskEditor(id);
+    // 换日子：往后翻列表往左滑，往前翻往右滑
+    const go = (d) => { if (d !== shownDate()) animateNext(d > shownDate() ? "next" : "prev"); showDate(d); rerender(); };
+    if (act !== "edit" && !act.startsWith("day-")) animateNext();
+    if (act === "status") {
+      logOpen.delete(id);
+      if (store.get("tasks", id)?.status !== el.dataset.s) cheer(el, el.dataset.s);
+      store.setStatus(id, el.dataset.s);
+    } else if (act === "edit") openTaskEditor(id);
     else if (act === "time-del") store.deleteTime(el.dataset.tid);
     else if (act === "time-more") { logOpen.add(id); rerender(); }
     else if (act === "time-log") logFromRow(el.closest(".row"));
@@ -201,19 +209,20 @@ export function initToday(rerender) {
     else if (act === "all-today") {
       const c = store.ctx();
       store.moveMany(c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isAutoTask(t)).map((t) => t.id), c.today);
-    } else if (act === "day-prev") { showDate(addDays(shownDate(), -1)); rerender(); }
-    else if (act === "day-next") { showDate(addDays(shownDate(), 1)); rerender(); }
-    else if (act === "day-today") { showDate(store.today()); rerender(); }
-    else if (act === "day-pick") { showDate(el.dataset.date); rerender(); }
+    } else if (act === "day-prev") go(addDays(shownDate(), -1));
+    else if (act === "day-next") go(addDays(shownDate(), 1));
+    else if (act === "day-today") go(store.today());
+    else if (act === "day-pick") go(el.dataset.date);
   });
 
   // 点任务：今天能计时的、还没选中的 → 选中它（底部浮条换成它）；已经选中的再点名字 → 展开说明
   on(document, "click", ".dayview .row", (e, row) => {
     if (e.target.closest("button, input, textarea, select, label, a, [data-drag-row]")) return;
     const id = row.dataset.id, c = store.ctx();
-    if (timeable(store.get("tasks", id), c.today) && pickedId(c) !== id) { pick(id); rerender(); return; }
+    if (timeable(store.get("tasks", id), c.today) && pickedId(c) !== id) { animateNext(); pick(id); rerender(); return; }
     if (!e.target.closest("[data-act=desc]")) return;
     if (openDesc.has(id)) openDesc.delete(id); else openDesc.add(id);
+    animateNext();
     rerender();
   });
 
@@ -241,6 +250,7 @@ export function initToday(rerender) {
     const m = title.match(/^(.*\S)\s+(\d{1,3})\s*(m|min|mins)?$/i);
     if (m && Number(m[2]) >= 5) { title = m[1]; est = Number(m[2]); }
     const fields = { date: form.dataset.add, title, est, projectId: String(f.get("project") || "") };
+    animateNext();
     const how = String(f.get("repeat") || "");
     const id = how ? store.addRepeating(fields, R.daysFor(how, fields.date, est), R.endFor(fields.date, Number(f.get("for")))) : store.addTask(fields);
     if (how) form.querySelector("[name=repeat]").value = "";

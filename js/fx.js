@@ -1,4 +1,4 @@
-// 触摸星星（点哪里冒一圈，按住划动留星轨）和守住安全线时的一把礼花。纯装饰，不接收点击。
+// 点哪里冒一圈细细的涟漪；标 Done 时在按钮上炸一把星星（Partial 一小把），守住安全线时撒礼花。纯装饰，不接收点击。
 // 系统开了「减弱动态效果」或设置里关掉时，全都不放。
 
 let layer = null, live = 0, hue = 0, enabled = true;
@@ -66,26 +66,25 @@ export function confetti() {
   }
 }
 
+// 标了 Done / Partial：在按的那个按钮上放星星
+export function cheer(el, status) {
+  if (status !== "done" && status !== "partial") return;
+  const b = el.getBoundingClientRect();
+  if (status === "done") burst(b.left + b.width / 2, b.top + b.height / 2, 22, 110);
+  else burst(b.left + b.width / 2, b.top + b.height / 2, 8, 60);
+}
+
 export function initFx() {
   layer = document.createElement("div");
   layer.className = "fx";
   document.body.appendChild(layer);
-  let down = false, lx = 0, ly = 0, lt = 0;
+  let lx = 0, ly = 0, lt = 0;
   addEventListener("pointerdown", (e) => {
     if (!enabled || reduce() || e.target.closest("input,textarea,select,[data-drag],[data-drag-row]")) return;
     if (e.timeStamp - lt < 50 && Math.hypot(e.clientX - lx, e.clientY - ly) < 10) return;
-    down = true; lx = e.clientX; ly = e.clientY; lt = e.timeStamp;
-    const p = colors();
+    lx = e.clientX; ly = e.clientY; lt = e.timeStamp;
     const o = document.createElement("i");
     o.className = "ring";
-    spawn(o, lx, ly, [{ transform: "scale(.2)", opacity: 0.9 }, { transform: "scale(1.5)", opacity: 0 }], 600, "ease-out");
-    for (let k = 0; k < 10; k++) star(lx, ly, 70, 18, 950, 10, 0.2, p);
+    spawn(o, lx, ly, [{ transform: "scale(.3)", opacity: 0.6 }, { transform: "scale(1.4)", opacity: 0 }], 450, "cubic-bezier(.2,.7,.3,1)");
   }, { passive: true });
-  addEventListener("pointermove", (e) => {
-    if (!down || !enabled || (Math.hypot(e.clientX - lx, e.clientY - ly) < 16 && e.timeStamp - lt < 45)) return;
-    lx = e.clientX; ly = e.clientY; lt = e.timeStamp;
-    star(lx, ly, 16, 13, 800, 16, 0.45, colors());
-  }, { passive: true });
-  addEventListener("pointerup", () => { down = false; }, { passive: true });
-  addEventListener("pointercancel", () => { down = false; }, { passive: true });
 }

@@ -22,6 +22,7 @@ import { statsHTML, initStats } from "./ui/stats.js";
 import { dockHTML, initTimer, tick } from "./ui/timer.js";
 import { readingHTML, initReading } from "./ui/reading.js";
 import { renderSun, initSun } from "./ui/sun.js";
+import { animateNext, takeTransition, nameParts } from "./motion.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
@@ -97,7 +98,21 @@ let raf = 0;
 let lastView = "";
 function render() {
   cancelAnimationFrame(raf);
-  raf = requestAnimationFrame(draw);
+  raf = requestAnimationFrame(frame);
+}
+
+// 用户刚点过的那次重画包一层过渡（js/motion.js）：平常每一行各自挪；换页、翻天时整块淡入 / 左右滑，行不单独动
+function frame() {
+  const kind = takeTransition();
+  if (!kind) { draw(); return; }
+  const html = document.documentElement, rows = kind === "on";
+  html.dataset.vt = kind;
+  if (!rows) nameParts(main, false);
+  const vt = document.startViewTransition(() => { draw(); if (!rows) nameParts(main, false); });
+  vt.finished.finally(() => {
+    if (html.dataset.vt === kind) delete html.dataset.vt;
+    if (!rows) nameParts(main, true);
+  }).catch(() => {});
 }
 
 function draw() {
@@ -109,6 +124,7 @@ function draw() {
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
   main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : todayHTML(c, phone);
+  if (document.startViewTransition) nameParts(main, true);
   // 打开阅读页：同步时顺便拉一次阅读表格的列表（查重用）
   reading.want(view === "reading");
   if (view === "reading" && lastView !== "reading" && sync.configured()) sync.sync();
@@ -168,7 +184,7 @@ function tickDay() {
     lastToday = t;
     store.ensureTodayLog();
     render();
-  } else if (store.timer() && route() === "today") renderSun(store.ctx(), shownDate());   // 在计时：圆盘上那段每分钟长一点
+  } else if (route() === "today" && (!phoneMQ.matches || store.local().url)) renderSun(store.ctx(), shownDate());   // 小太阳每分钟走一点；在计时的那段也长一点
 }
 
 // ---------- 启动 ----------
@@ -198,7 +214,7 @@ store.onUndo((label, before) => toast(label, () => store.undo(before)));
 reading.subscribe(() => { if (route() === "reading") render(); });
 sync.onStatus(paintSync);
 
-addEventListener("hashchange", () => { closeModal(); render(); scrollTo(0, 0); });
+addEventListener("hashchange", () => { closeModal(); animateNext("page"); render(); scrollTo(0, 0); });
 phoneMQ.addEventListener("change", render);
 darkMQ.addEventListener("change", () => { if (store.local().theme === "auto") { applyTheme(); render(); } });
 document.addEventListener("visibilitychange", () => {

@@ -5,6 +5,8 @@ import * as store from "../store.js";
 import { esc, on } from "../dom.js";
 import { fmtMin } from "../dates.js";
 import { colorOf, toast } from "./common.js";
+import { animateNext } from "../motion.js";
+import { cheer } from "../fx.js";
 
 let picked = "";     // 这台设备上选中的任务
 let stopped = null;  // 刚停下的那段 {taskId, min}：浮条上给 Done / Partial
@@ -83,6 +85,8 @@ function stop() {
 }
 
 export function initTimer(rerender) {
+  // 浮条上的按钮点了之后，浮条和列表平滑变成新样子
+  on(document, "click", "#dock [data-act]", () => animateNext());
   on(document, "click", "[data-act=timer-start]", (e, el) => {
     const r = store.startTimer(el.dataset.id);
     picked = el.dataset.id;
@@ -95,7 +99,7 @@ export function initTimer(rerender) {
   on(document, "click", "[data-act=dock-status]", (e, el) => {
     const id = stopped?.taskId;
     stopped = null;
-    if (id && store.get("tasks", id)?.status !== el.dataset.s) store.setStatus(id, el.dataset.s);   // 再点同一个会取消，这里不要
+    if (id && store.get("tasks", id)?.status !== el.dataset.s) { cheer(el, el.dataset.s); store.setStatus(id, el.dataset.s); }   // 再点同一个会取消，这里不要
     else rerender();
   });
   on(document, "click", "[data-act=dock-close]", () => { stopped = null; rerender(); });

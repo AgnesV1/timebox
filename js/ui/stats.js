@@ -7,6 +7,7 @@ import * as S from "../stats.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtMin, fmtShort, fmtDay, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays } from "../dates.js";
 import { healthPill, groupsOf } from "./common.js";
+import { hourLabel } from "../day.js";
 
 let kind = "d30";
 let anchor = "";
@@ -151,6 +152,42 @@ function reasonsHTML(s) {
     (s.withoutReason ? '<p class="lede">' + s.withoutReason + " without a reason written down.</p>" : "") + "</section>";
 }
 
+// ---------- 热力图：几点在干活 ----------
+// 横着 24 个小时（从 6:00 起，和今天页的圆盘一样），竖着星期几。只算写了起止钟点的计时段。
+// 底下「Week by week」展开后，每一周一张（最近的在上），通勤日的固定时段画灰；展开时才画，一年也不卡。
+
+let heatGrid = [];   // 这一页的每天 × 小时，展开每周时要用
+let weeksOpen = false;   // 「Week by week」开着：同步重画时别收起来
+const shade = (min) => (min > 0.5 ? "--h:" + Math.min(100, Math.round(18 + (min / 60) * 82)) + "%" : "");
+
+function heatRows(chart, rows) {
+  tips[chart] = [];
+  const head = '<div class="hrow hhead"><span></span>' + Array.from({ length: 24 }, (_, h) => "<i>" + (h % 3 === 0 ? hourLabel(h).slice(0, 2) : "") + "</i>").join("") + "</div>";
+  return '<div class="heat" data-chart="' + chart + '">' + head + rows.map((r) =>
+    '<div class="hrow"><span>' + esc(r.label) + "</span>" + r.hours.map((min, h) => {
+      const i = tips[chart].push({ title: r.label + " · " + hourLabel(h) + "–" + hourLabel(h + 1), rows: [[r.what, fmtMin(Math.round(min)), "dn"], ...(r.fixed?.[h] ? [["commute", fmtMin(r.fixed[h]), "pl"]] : [])] }) - 1;
+      return '<i class="hc' + (r.fixed?.[h] && min < 0.5 ? " fx" : "") + '" data-i="' + i + '" tabindex="-1" style="' + shade(min) + '"></i>';
+    }).join("") + "</div>").join("") + "</div>";
+}
+
+function heatHTML(c, s) {
+  const ws = store.prefs().weekStartsOn;
+  heatGrid = S.hourGrid(c, s.from, s.to);
+  const order = ws === "sunday" ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0];
+  const byWd = S.heatByWeekday(heatGrid);
+  const timed = heatGrid.reduce((a, x) => a + x.hours.reduce((b, v) => b + v, 0), 0);
+  return '<section class="card heatcard"><h3>When you worked</h3><p class="lede">Average minutes timed in each hour, from 6:00. Only time with a start and end counts.</p>' +
+    (timed ? heatRows("heat", order.map((wd) => ({ label: WEEKDAYS[wd], hours: byWd[wd].hours, what: "average" }))) : '<p class="empty">No timed sessions in this period.</p>') +
+    (timed ? '<details class="heat-weeks"' + (weeksOpen ? " open" : "") + '><summary>Week by week</summary><div data-heat-weeks>' + (weeksOpen ? weeksHTML() : "") + "</div></details>" : "") + "</section>";
+}
+
+// 展开时才把每一周画出来
+function weeksHTML() {
+  return S.heatWeeks(heatGrid, store.prefs().weekStartsOn).map((w, k) =>
+    '<div class="hweek"><p>' + fmtShort(w.from) + " – " + fmtShort(addDays(w.from, 6)) + "</p>" +
+    heatRows("heatw" + k, w.days.map((x, j) => ({ label: WEEKDAYS[(weekday(w.from) + j) % 7], hours: x ? x.hours : Array(24).fill(0), fixed: x?.fixed, what: x ? fmtShort(x.date) : "" }))) + "</div>").join("");
+}
+
 // ---------- 项目 ----------
 
 function projectsHTML(c, s) {
@@ -182,7 +219,7 @@ export function statsHTML(c) {
     '<div class="tools"><span class="seg">' + Object.entries(S.PERIODS).map(([k, t]) => '<button type="button" data-act="period" data-k="' + k + '"' + (k === kind ? ' class="on"' : "") + ">" + t + "</button>").join("") + "</span>" +
     '<button type="button" class="nav" data-act="st-prev" aria-label="Earlier">' + icon("left") + '</button><button type="button" class="nav" data-act="st-today">Now</button>' +
     '<button type="button" class="nav" data-act="st-next" aria-label="Later"' + (r.to >= c.today ? " disabled" : "") + ">" + icon("right") + "</button></div></header>" +
-    kpis(s, prev) + trendHTML(s) +
+    kpis(s, prev) + trendHTML(s) + heatHTML(c, s) +
     '<div class="stat-grid">' + projectHTML(s) + weekdayHTML(s) + reasonsHTML(s) + "</div>" +
     projectsHTML(c, s) + "</div>";
 }
@@ -237,8 +274,14 @@ export function initStats(rerender) {
     if (anchor > store.today()) anchor = store.today();
     rerender();
   });
-  on(document, "pointerover", ".stats .col", (e, col) => showTip(col));
-  on(document, "pointerout", ".stats .col", (e, col) => hideTip(col));
+  on(document, "pointerover", ".stats .col, .stats .hc", (e, col) => showTip(col));
+  on(document, "pointerout", ".stats .col, .stats .hc", (e, col) => hideTip(col));
   on(document, "focusin", ".stats .col", (e, col) => showTip(col));
   on(document, "focusout", ".stats .col", (e, col) => hideTip(col));
+  document.addEventListener("toggle", (e) => {
+    if (!e.target.matches?.(".heat-weeks")) return;
+    weeksOpen = e.target.open;
+    const box = e.target.querySelector("[data-heat-weeks]");
+    if (weeksOpen && !box.innerHTML) box.innerHTML = weeksHTML();
+  }, true);
 }

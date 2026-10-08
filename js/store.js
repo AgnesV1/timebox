@@ -166,7 +166,8 @@ export function ctx() {
     capacity: { default: Number(cap.default) || 0, weekly: Array.isArray(cap.weekly) ? cap.weekly : null, overrides },
     log,
     level: prefs().level !== false,
-    weekStartsOn: prefs().weekStartsOn
+    weekStartsOn: prefs().weekStartsOn,
+    commute: setting("commute", null)
   };
   return ctxCache;
 }
@@ -571,6 +572,17 @@ export function setDayCapacity(date, min) {
 
 export function setSetting(key, value) {
   change(() => put("settings", { id: key, key, value }));
+}
+
+// 通勤日：电脑日历里一天天点。存在 Settings 的 commute（{days: {"2026-10-08": true}}），一年前的顺手清掉
+export const isCommuteDay = (date) => Boolean(setting("commute", null)?.days?.[date]);
+
+export function toggleCommute(date) {
+  const cut = addDays(today(), -366);
+  const days = Object.fromEntries(Object.entries(setting("commute", null)?.days || {}).filter(([d, v]) => v && d >= cut));
+  if (days[date]) delete days[date];
+  else days[date] = true;
+  change(() => put("settings", { id: "commute", key: "commute", value: { days } }), days[date] ? "Commute day " + fmtShort(date) : "Not a commute day");
 }
 
 // 自动排出来的任务（generated：改动时间记成 1，哪台设备真改过它都比这个新）

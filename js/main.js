@@ -21,6 +21,7 @@ import { initDnd } from "./ui/dnd.js";
 import { statsHTML, initStats } from "./ui/stats.js";
 import { dockHTML, initTimer, tick } from "./ui/timer.js";
 import { readingHTML, initReading } from "./ui/reading.js";
+import { renderSun, initSun } from "./ui/sun.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
@@ -119,6 +120,9 @@ function draw() {
   dock.innerHTML = dockHTML(c, view === "today" && shownDate() === c.today && (!phone || Boolean(store.local().url)));
   document.body.classList.toggle("has-dock", Boolean(dock.innerHTML));
   if (!hadDock) dock.firstElementChild?.classList.add("enter");   // 只在浮条刚出现时滑上来，重画时不闪
+  // 圆盘落着的时候坐在浮条上面
+  document.body.style.setProperty("--dock-h", dock.firstElementChild ? dock.firstElementChild.offsetHeight + 22 + "px" : "0px");
+  renderSun(c, view === "today" && (!phone || store.local().url) ? shownDate() : "");
   tick();
   restoreKeep(kept);
   paintSync();
@@ -160,10 +164,11 @@ async function syncThenLog() {
 let lastToday = store.today();
 function tickDay() {
   const t = store.today();
-  if (t === lastToday) return;
-  lastToday = t;
-  store.ensureTodayLog();
-  render();
+  if (t !== lastToday) {
+    lastToday = t;
+    store.ensureTodayLog();
+    render();
+  } else if (store.timer() && route() === "today") renderSun(store.ctx(), shownDate());   // 在计时：圆盘上那段每分钟长一点
 }
 
 // ---------- 启动 ----------
@@ -181,6 +186,7 @@ initDnd(handleDrop);
 initStats(render);
 initTimer(render);
 initReading(render);
+initSun();
 
 store.subscribe((meta) => {
   if (meta.local) setFx(store.local().fx !== false);

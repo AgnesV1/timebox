@@ -1,6 +1,7 @@
 // 日历（电脑）：周视图 / 月视图，右边是任务池。
 // 把任务池里的条目拖到某天就排进去；日历里的任务拖到别的天就挪过去，拖回任务池就撤回。
 // 自动排的计划在以后的日子里画成淡色预览：规律的那一次可以拖走 / 点开（这时才变成真任务），整块的预计份额只看。
+// 格子里的日程永远全部显示（名字完整换行）；格子有最小宽度，放不下就左右滑。格子顶上的小开关标「通勤日」。
 
 import * as store from "../store.js";
 import * as E from "../engine.js";
@@ -38,19 +39,20 @@ function cellHTML(c, d, { month = false, outside = false } = {}) {
   const sum = E.daySummary(c, d);
   const line = d >= c.today || c.log[d] ? lineInfo(c, d).line : 0;
   const capOver = c.capacity.overrides[d] !== undefined;
-  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : ""].filter(Boolean).join(" ");
+  const commute = store.isCommuteDay(d);
+  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : "", commute ? "commute" : ""].filter(Boolean).join(" ");
   const all = [...tasks.map(chipHTML), ...ghosts.map(ghostHTML)];
-  const shown = month ? all.slice(0, 3) : all;
   const loadPct = sum.cap ? Math.min(100, (sum.planned / sum.cap) * 100) : 0;
   let h = '<div class="' + cls + '" data-drop="day:' + d + '">' +
     '<div class="cell-head"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"><span>' + (month ? "" : WEEKDAYS[weekday(d)]) + "</span><b>" + Number(d.slice(8)) + "</b></button>" +
+    '<button type="button" class="cm-t' + (commute ? " on" : "") + '" data-act="commute" data-date="' + d + '" aria-pressed="' + commute + '" title="' + (commute ? "Commute day — click to clear" : "Mark as a commute day") + '">' + icon("commute") + "</button>" +
     (month ? "" : capEdit === d
       ? '<input class="cap-input num" type="number" min="0" step="15" data-cap-input="' + d + '" data-keep="cap-' + d + '" value="' + sum.cap + '" title="Minutes available · 0 = rest day · empty = weekly default">'
       : '<button type="button" class="cap num' + (capOver ? " set" : "") + '" data-act="cap" data-date="' + d + '" title="Available minutes this day — click to change">' + (sum.rest ? "rest" : fmtMin(sum.cap)) + "</button>") + "</div>" +
     '<div class="load"><i style="width:' + loadPct + '%"></i></div>' +
+    (commute ? '<div class="cm-band">Commute</div>' : "") +
     (line && !month ? '<div class="ln num">line ' + fmtMin(line) + "</div>" : "") +
-    shown.join("") +
-    (month && all.length > 3 ? '<button type="button" class="more-ev" data-act="open-day" data-date="' + d + '">+' + (all.length - 3) + " more</button>" : "");
+    all.join("");
   if (!month) {
     h += adding === d
       ? '<form class="cell-form" data-cell-add="' + d + '"><input name="title" data-keep="cell-add-' + d + '" placeholder="Task 30" autocomplete="off"></form>'
@@ -67,14 +69,14 @@ export function calendarHTML(c) {
     const s = startOfWeek(anchor, weekStart());
     const e = addDays(s, 6);
     title = fmtShort(s) + " – " + (s.slice(5, 7) === e.slice(5, 7) ? Number(e.slice(8)) : fmtShort(e));
-    body = '<div class="week">' + range(s, e).map((d) => cellHTML(c, d)).join("") + "</div>";
+    body = '<div class="cal-scroll"><div class="week">' + range(s, e).map((d) => cellHTML(c, d)).join("") + "</div></div>";
   } else {
     const m0 = startOfMonth(anchor);
     const s = startOfWeek(m0, weekStart());
     title = MONTHS_LONG[Number(m0.slice(5, 7)) - 1] + " " + m0.slice(0, 4);
     const heads = range(s, addDays(s, 6)).map((d) => "<span>" + WEEKDAYS[weekday(d)] + "</span>").join("");
-    body = '<div class="month-head">' + heads + '</div><div class="month">' +
-      range(s, addDays(s, 41)).map((d) => cellHTML(c, d, { month: true, outside: d.slice(0, 7) !== m0.slice(0, 7) })).join("") + "</div>";
+    body = '<div class="cal-scroll"><div class="month-head">' + heads + '</div><div class="month">' +
+      range(s, addDays(s, 41)).map((d) => cellHTML(c, d, { month: true, outside: d.slice(0, 7) !== m0.slice(0, 7) })).join("") + "</div></div>";
   }
   const { line, done } = lineInfo(c, c.today);
   const scale = Math.max(line * 1.2, done, 60);
@@ -158,6 +160,7 @@ export function initCalendar(rerender) {
     else if (act === "pool-toggle") store.setLocal({ pool: !store.local().pool });
     else if (act === "edit-task") openTaskEditor(el.dataset.id);
     else if (act === "open-ghost") { const id = store.materialize(el.dataset.key); if (id) openTaskEditor(id); }
+    else if (act === "commute") store.toggleCommute(el.dataset.date);
     else if (act === "open-day") {
       openDay = el.dataset.date;
       openModal(dayModalHTML(store.ctx(), openDay), { wide: true, close: () => { openDay = ""; } });

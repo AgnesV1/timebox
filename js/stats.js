@@ -4,6 +4,8 @@
 
 import { addDays, diffDays, range, weekday, startOfWeek, startOfMonth, addMonths, daysInMonth, isoOf } from "./dates.js";
 import * as E from "./engine.js";
+import { parseTimes } from "./times.js";
+import { hourMinutes, isCommute, COMMUTE_BLOCKS } from "./day.js";
 
 export const PERIODS = { week: "Week", d30: "30 days", month: "Month", year: "Year" };
 
@@ -127,4 +129,49 @@ export function projectRows(ctx, from, last) {
       health: E.health(ctx, p)
     };
   }).filter((r) => r.planned || r.spent);
+}
+
+// ---------- 热力图：每天每个钟点计了多少分钟 ----------
+// 只算写了起止钟点的计时段；小时从 6:00 起（和今天页的圆盘一样），h = 0 是 6:00–7:00。
+// 通勤日顺便记下固定时段占了哪几个小时（fixed），画成灰的。
+
+const commuteHours = () => {
+  const out = {};
+  for (const b of COMMUTE_BLOCKS) for (const [h, m] of Object.entries(hourMinutes(b.from, b.to))) out[h] = (out[h] || 0) + m;
+  return out;
+};
+
+export function hourGrid(ctx, from, to) {
+  const last = to < ctx.today ? to : ctx.today;
+  const days = from <= last ? range(from, last) : [];
+  const at = new Map(days.map((d) => [d, Array(24).fill(0)]));
+  for (const t of ctx.tasks) {
+    const hours = at.get(t.date);
+    if (!hours) continue;
+    for (const seg of parseTimes(t.times)) {
+      if (!seg.from || !seg.to) continue;
+      for (const [h, m] of Object.entries(hourMinutes(seg.from, seg.to))) hours[h] += m;
+    }
+  }
+  const fixed = commuteHours();
+  return days.map((d) => ({ date: d, hours: at.get(d), fixed: isCommute(ctx.commute, d) ? fixed : {} }));
+}
+
+// 星期几 × 钟点的平均分钟（这段时间里每个星期几有几天就除以几）
+export function heatByWeekday(grid) {
+  return Array.from({ length: 7 }, (_, wd) => {
+    const ds = grid.filter((x) => weekday(x.date) === wd);
+    return { wd, days: ds.length, hours: Array.from({ length: 24 }, (_, h) => (ds.length ? ds.reduce((a, x) => a + x.hours[h], 0) / ds.length : 0)) };
+  });
+}
+
+// 按周分组（最近的在前）：[{from, days: [7 天，没有的那天是 null]}]
+export function heatWeeks(grid, weekStartsOn) {
+  const weeks = new Map();
+  for (const x of grid) {
+    const w = startOfWeek(x.date, weekStartsOn);
+    if (!weeks.has(w)) weeks.set(w, Array(7).fill(null));
+    weeks.get(w)[(weekday(x.date) - weekday(w) + 7) % 7] = x;
+  }
+  return [...weeks.entries()].map(([from, days]) => ({ from, days })).sort((a, b) => b.from.localeCompare(a.from));
 }

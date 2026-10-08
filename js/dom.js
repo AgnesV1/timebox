@@ -45,6 +45,7 @@ const ICONS = {
   trash: '<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  commute: '<rect x="5" y="3.5" width="14" height="13" rx="3"/><path d="M5 10h14M8.5 13.5h.01M15.5 13.5h.01M8 16.5 6.5 20M16 16.5l1.5 3.5"/>',
   reading: '<path d="M4.5 5.5A2.5 2.5 0 0 1 7 3h12.5v15H7a2.5 2.5 0 0 0-2.5 2.5v-15Z"/><path d="M4.5 20.5A2.5 2.5 0 0 1 7 18h12.5v3H7"/>'
 };
 

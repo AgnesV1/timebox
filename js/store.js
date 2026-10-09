@@ -854,3 +854,115 @@ export function deleteTime(id) {
   list.splice(n, 1);
   change(() => writeTimes(taskId, list), "Deleted time");
 }
+
+// ---------- 备餐（Meals 页，只在电脑上） ----------
+// 都存在 Settings 页里，一样东西一行（不用改 Code.gs，一格也不会太长）：
+//   meal-ing:<id> 常买的东西 / meal-box:<id> 一顿 / meal-pack:<id> 一天（几顿打包成 Day pack）/
+//   meal-week:<这周第一天> 这周：days（日期 → 吃什么）、粗排 rough、买了没有 got、shopped、skip、note / meal-prefs 目标
+const MEAL_RE = /^meal-(ing|box|pack|week):(.+)$/;
+const mealKey = (kind, id) => "meal-" + kind + ":" + id;
+
+export function meals() {
+  const D = { ing: {}, box: {}, pack: {}, week: {}, days: {} };
+  for (const [key, r] of Object.entries(S.data.settings)) {
+    const m = MEAL_RE.exec(key);
+    if (m && r.value && typeof r.value === "object") D[m[1]][m[2]] = { ...r.value, id: m[2] };
+  }
+  // 每天吃什么存在那周的行里；改过「一周从周几开始」也照样找得到
+  for (const w of Object.values(D.week)) Object.assign(D.days, w.days || {});
+  return D;
+}
+
+export const mealPrefs = () => ({ kcal: 1800, budget: 0, shopDay: 0, ...(setting("meal-prefs", {}) || {}) });
+
+function putMeal(kind, id, row) {
+  const { id: _id, ...value } = row;
+  put("settings", { id: mealKey(kind, id), key: mealKey(kind, id), value });
+}
+
+export function saveMeal(kind, row, label, opts) {
+  const id = row.id || newId().replace(/-/g, "").slice(0, 10);
+  change(() => putMeal(kind, id, row), label, opts);
+  return id;
+}
+
+// 删一样东西，用到它的地方一起改（一次撤销全回来）：
+// 食材 → 从各个 Box 里拿掉；Box → 从 Day pack 和每天里拿掉；Day pack → 从每天和粗排里拿掉
+function removeMeal(kind, id) {
+  const D = meals();
+  if (kind === "ing") {
+    for (const b of Object.values(D.box)) if ((b.parts || []).some((p) => p.ing === id)) putMeal("box", b.id, { ...b, parts: b.parts.filter((p) => p.ing !== id) });
+  }
+  if (kind === "box") {
+    for (const p of Object.values(D.pack)) if ((p.boxes || []).includes(id)) putMeal("pack", p.id, { ...p, boxes: p.boxes.filter((x) => x !== id) });
+  }
+  if (kind === "box" || kind === "pack") {
+    for (const w of Object.values(D.week)) {
+      let touched = false;
+      const days = {};
+      for (const [d, e] of Object.entries(w.days || {})) {
+        if (kind === "pack" && e?.pack === id) { touched = true; continue; }
+        if (kind === "box" && e?.boxes?.includes(id)) {
+          touched = true;
+          const left = e.boxes.filter((x) => x !== id);
+          if (left.length) days[d] = { ...e, boxes: left };
+          continue;
+        }
+        days[d] = e;
+      }
+      const rough = (w.rough || []).filter((r) => kind !== "pack" || r.pack !== id);
+      if (touched || rough.length !== (w.rough || []).length) putMeal("week", w.id, { ...w, days, rough });
+    }
+  }
+  drop("settings", mealKey(kind, id));
+}
+
+export function deleteMeal(kind, id, label) {
+  change(() => removeMeal(kind, id), label);
+}
+
+export function saveWeek(start, patch, label, opts) {
+  change(() => {
+    const cur = meals().week[start] || {};
+    putMeal("week", start, { ...cur, ...(typeof patch === "function" ? patch(cur) : patch) });
+  }, label, opts);
+}
+
+// 某天吃什么（entry = null 就清空）。别的周的行里要是也有这天（改过一周从周几开始），一起清掉
+export function setMealDay(start, date, entry, label) {
+  change(() => {
+    const D = meals();
+    for (const w of Object.values(D.week)) {
+      if (w.id === start || !w.days?.[date]) continue;
+      const days = { ...w.days };
+      delete days[date];
+      putMeal("week", w.id, { ...w, days });
+    }
+    const cur = D.week[start] || {};
+    const days = { ...(cur.days || {}) };
+    if (entry) days[date] = entry;
+    else delete days[date];
+    putMeal("week", start, { ...cur, days });
+  }, label);
+}
+
+// 这一轮看过了：sale = {price, until} 在打折；null = 没打折。
+// 两周以上一轮的，这次打折当新一轮的开始，下次照这个往后推
+export function checkDeal(id, sale) {
+  const ing = meals().ing[id];
+  if (!ing) return;
+  const T = today();
+  const next = { ...ing, checked: T, sale: sale ? { price: Number(sale.price) || 0, from: T, until: sale.until || T } : null };
+  if (sale && (Number(ing.every) || 0) >= 2) next.from = T;
+  change(() => putMeal("ing", id, next), (sale ? "On sale: " : "Checked: ") + ing.name);
+}
+
+export function addMealExamples(rows) {
+  change(() => { for (const kind of ["ing", "box", "pack", "week"]) for (const r of rows[kind] || []) putMeal(kind, r.id, r); }, "Examples added — remove them under Groceries");
+}
+
+export function clearMealExamples() {
+  change(() => {
+    for (const kind of ["pack", "box", "ing"]) for (const id of Object.keys(meals()[kind])) if (id.startsWith("ex-")) removeMeal(kind, id);
+  }, "Examples removed");
+}

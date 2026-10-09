@@ -1,6 +1,7 @@
 // 拖放：日历里的任务、任务池里的条目。
 // 可拖的元素带 data-drag="task:<id>"、"item:<id>"、"regular:<计划 id>"（池里的规律计划）或 "ghost:<rt id>"（以后某天的预览）；
 // 能放的地方带 data-drop="day:<日期>" 或 "pool"。
+// 备餐页：data-drag="pack:<Day pack id>" 或 "mcopy:<日期>"（复制那天），放到 "mday:<日期>"；Day pack 也能放到之后某周 "mweek:<周一>"。
 // 鼠标按下移动 5px 才算开始拖，所以单击还是单击。拖到窗口上下边缘会自动滚动。
 
 let drag = null;
@@ -45,7 +46,10 @@ function move(e) {
 
 function accepts(payload, target) {
   if (target === "pool") return payload.startsWith("task:");
-  return target.startsWith("day:");
+  const meal = payload.startsWith("pack:") || payload.startsWith("mcopy:");
+  if (target.startsWith("mday:")) return meal;
+  if (target.startsWith("mweek:")) return payload.startsWith("pack:");
+  return !meal && target.startsWith("day:");
 }
 
 function tick() {

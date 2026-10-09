@@ -1,11 +1,12 @@
-// 苦昼短：入口。管页面切换（#today / #calendar / #projects / #stats / #reading / #settings）、主题、同步时机、整页重画。
-// 手机（≤760px）只有「今天」、阅读和设置；电脑有侧栏、日历和任务池、项目、统计。两边底部都有计时浮条。
+// 苦昼短：入口。管页面切换（#today / #calendar / #projects / #stats / #meals / #reading / #settings）、主题、同步时机、整页重画。
+// 手机（≤760px）只有「今天」、阅读和设置；电脑有侧栏、日历和任务池、项目、统计、备餐。两边底部都有计时浮条。
 
 import * as store from "./store.js";
 import * as sync from "./sync.js";
 import * as reading from "./reading.js";
 import * as E from "./engine.js";
 import * as R from "./routines.js";
+import * as Meal from "./meals.js";
 import { esc, on, icon } from "./dom.js";
 import { fmtMin } from "./dates.js";
 import { paintPatterns } from "./patterns.js";
@@ -21,12 +22,13 @@ import { initDnd } from "./ui/dnd.js";
 import { statsHTML, initStats } from "./ui/stats.js";
 import { dockHTML, initTimer, tick } from "./ui/timer.js";
 import { readingHTML, initReading } from "./ui/reading.js";
+import { mealsHTML, initMeals, refreshMealEditor, mealDrop } from "./ui/meals.js";
 import { renderSun, initSun } from "./ui/sun.js";
 import { animateNext, takeTransition, nameParts } from "./motion.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
-const VIEWS = ["today", "calendar", "projects", "stats", "reading", "settings"];
+const VIEWS = ["today", "calendar", "projects", "stats", "meals", "reading", "settings"];
 const side = document.getElementById("side");
 const main = document.getElementById("main");
 const pool = document.getElementById("pool");
@@ -52,7 +54,8 @@ function applyTheme() {
 
 function sidebarHTML(c, view) {
   const todayOpen = c.tasks.filter((t) => t.date === c.today && !t.status).length;
-  const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""], ["reading", "Reading", ""], ["settings", "Settings", ""]];
+  const deals = Meal.toCheck(store.meals(), c.today).length;   // 这一轮还没看的打折
+  const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""], ["meals", "Meals", deals || ""], ["reading", "Reading", ""], ["settings", "Settings", ""]];
   // 项目（group）下面缩进列子项目
   const sub = (p) => {
     const reg = E.isRegular(p);
@@ -123,7 +126,7 @@ function draw() {
   document.body.classList.toggle("phone", phone);
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
-  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : todayHTML(c, phone);
+  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : todayHTML(c, phone);
   if (document.startViewTransition) nameParts(main, true);
   // 打开阅读页：同步时顺便拉一次阅读表格的列表（查重用）
   reading.want(view === "reading");
@@ -145,6 +148,7 @@ function draw() {
   refreshEditor();
   refreshDayModal();
   refreshProjectEditor();
+  refreshMealEditor();
   celebrate(c, view);
 }
 
@@ -198,10 +202,11 @@ initCalendar(render);
 initProjects(render);
 initSettings(applyTheme);
 initEditor();
-initDnd(handleDrop);
+initDnd((payload, target) => (target.startsWith("m") ? mealDrop(payload, target) : handleDrop(payload, target)));
 initStats(render);
 initTimer(render);
 initReading(render);
+initMeals(render);
 initSun();
 
 store.subscribe((meta) => {

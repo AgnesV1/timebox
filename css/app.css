@@ -17,7 +17,7 @@
   --r: 14px; --r-sm: 10px;
   --leo-spot: #0B0B0B; --leo-inner: #FF3EA5; --zebra-ink: #0B0B0B;
   --k-Main: #719507; --k-Work: #1B4BFE; --k-Fun: #E40187; --k-Chore: #E36B02; --k-None: #85858F; --k-accent: #7E04F5; --grid: #ECECE6;
-  --sun-day: #F5E6B5; --sun-night: #DCDDEA;
+  --sun-day: #E9E9E5; --sun-night: #CFCFCA;
   --display: "Unbounded", -apple-system, "PingFang SC", sans-serif;
   --body: "Space Grotesk", -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
   --num: "Space Grotesk", -apple-system, sans-serif;
@@ -36,7 +36,7 @@
   --hard: 0 0 0 1px rgba(204, 255, 0, .05), 0 0 24px rgba(204, 255, 0, .06) inset; --hard-lg: 0 0 40px rgba(0, 229, 255, .06); --glow: 0 0 14px rgba(204, 255, 0, .5);
   --leo-spot: #FF2BD6; --leo-inner: rgba(255, 43, 214, .35); --zebra-ink: rgba(255, 255, 255, .85);
   --k-Main: #7BA208; --k-Work: #0083FC; --k-Fun: #F504A2; --k-Chore: #DB7206; --k-None: #6A6A80; --k-accent: #9E71FE; --grid: #1F1F2D;
-  --sun-day: #302C42; --sun-night: #1A1A2E;
+  --sun-day: #34343B; --sun-night: #202026;
   --num: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -763,11 +763,11 @@ body.phone .reading { padding: 0 2px 90px; }
 .sun-c b { font: 700 14px var(--display); overflow-wrap: anywhere; }
 .sun-c span { color: var(--muted); }
 .sun-c em { padding: 1px 8px; border-radius: 999px; background: var(--surface); font-style: normal; font-size: 11px; font-weight: 700; color: var(--muted); }
-/* 落着时：一点淡淡的晨光 */
-.sun::after { content: ""; position: absolute; inset: 12%; z-index: -1; border-radius: 50%; background: radial-gradient(circle, rgba(255, 196, 0, .35), transparent 70%); opacity: calc(1 - var(--p)); pointer-events: none; }
+/* 落着时：底下垫一点淡淡的光（灰的，不抢颜色） */
+.sun::after { content: ""; position: absolute; inset: 12%; z-index: -1; border-radius: 50%; background: radial-gradient(circle, rgba(120, 120, 120, .22), transparent 70%); opacity: calc(1 - var(--p)); pointer-events: none; }
 [data-theme="dark"] .sun .arc.lit { filter: drop-shadow(0 0 4px var(--c, transparent)); }
 [data-theme="dark"] .sun .sweep { filter: drop-shadow(0 0 5px var(--accent)); }
-[data-theme="dark"] .sun::after { background: radial-gradient(circle, rgba(255, 43, 214, .3), transparent 70%); }
+[data-theme="dark"] .sun::after { background: radial-gradient(circle, rgba(255, 255, 255, .09), transparent 70%); }
 @keyframes breathe { 50% { opacity: .55; } }
 /* 今天页底下多留一点，最后几行别被半圆挡住 */
 body[data-view="today"] #main, body.phone.has-dock[data-view="today"] #main { padding-bottom: calc(var(--dock-h, 0px) + 110px + env(safe-area-inset-bottom)); }

@@ -1,70 +1,68 @@
-// 备餐（Meals 页，只在电脑上）的纯计算：包装单位换算、一顿（Box）和一天（Day pack）的价格和热量、
-// 打折一轮一轮的周期（这一轮看过没有、现在打不打折）、某周的购物单、之后几周的粗排。
-// 数据从 store.meals() 来：{ ing, box, pack, week, days }，前四个是 id → 行，days 是 日期 → 那天吃什么。
-// 这里不碰 store，测试直接喂数据。
+// 备餐（Meals 页）的纯计算。不记克数、不算卡路里数字：
+//   常买的东西：一次买多少钱、够吃几天（几天份）、热量低中高（Low 菜和水果 / Mid 正常 / High 油炸、肥的、甜的）、打折几周一轮
+//   一个 Box = 一顿 = 几样东西（用量随便写）；Box 有多「重」= 最重的那样，一半以上是 Low 就降一级；也可以手动定
+//   每天直接放几个 Box；每周 High 的 Box 有个限额（分配，不是算数）
+//   购物单：这周哪几天要用到某样东西 ÷ 一次买够几天 = 买几次；之前勾了「买了」的会往后顶掉几天（米这种一买吃一个月的不会每周都出现）
+// 数据从 store.meals() 来：{ ing, box, week, days }，days 是 日期 → {boxes} / {off}。这里不碰 store，测试直接喂数据。
 
 import { addDays, diffDays, weekday, range } from "./dates.js";
 
-// 包装上写的单位 → 基本单位：重量算 g，体积算 ml，按个数算 each
-export const UNITS = {
-  g: ["g", 1], kg: ["g", 1000], oz: ["g", 28.3495], lb: ["g", 453.592],
-  ml: ["ml", 1], L: ["ml", 1000], "fl oz": ["ml", 29.5735], gal: ["ml", 3785.41],
-  each: ["each", 1]
-};
-const unitRow = (ing) => UNITS[ing?.packUnit] || UNITS.each;
-export const unitOf = (ing) => unitRow(ing)[0];
-export const packSize = (ing) => (Number(ing?.packQty) || 0) * unitRow(ing)[1];
-
 export const SLOTS = [["breakfast", "Breakfast"], ["lunch", "Lunch"], ["dinner", "Dinner"], ["snack", "Snack"]];
+export const LEVELS = [["low", "Low", "veg, fruit"], ["mid", "Mid", "normal: grains, lean meat, dairy"], ["high", "High", "fried, fatty, sweet"]];
 export const EVERY = [0, 1, 2, 3, 4, 6, 8];   // 打折几周一轮；0 = 不追
+export const STORES = ["Longo's", "Farm Boy", "Dodo", "T&T", "Eataly", "Loblaws"];
+const RANK = { low: 1, mid: 2, high: 3 };
+const BY_RANK = ["", "low", "mid", "high"];
 
 export const byName = (a, b) => String(a.name || "").localeCompare(String(b.name || ""));
 export const byStore = (a, b) => (!a.store - !b.store) || String(a.store || "").localeCompare(String(b.store || "")) || byName(a, b);
+export const levelName = (lv) => (LEVELS.find(([k]) => k === lv) || LEVELS[1])[1];
 
-// ---------- 价格、热量 ----------
+// ---------- 常买的东西 ----------
+
+export const levelOf = (ing) => (RANK[ing?.level] ? ing.level : "mid");
+export const lastsOf = (ing) => Math.max(1, Math.round(Number(ing?.lasts) || 7));   // 没填 = 一周一次
 
 // 这天在打折：填了打折价，日期落在 sale.from ~ sale.until 里
 export function onSale(ing, date) {
   const s = ing?.sale;
   return Boolean(s && Number(s.price) > 0 && s.until && date <= s.until && (!s.from || date >= s.from));
 }
-export const packPrice = (ing, date) => (onSale(ing, date) ? Number(ing.sale.price) : Number(ing?.price) || 0);
-// 1 g / 1 ml / 1 个 多少钱
-export function perUnit(ing, date) {
-  const n = packSize(ing);
-  return n > 0 ? packPrice(ing, date) / n : 0;
-}
-export const partCost = (ing, qty, date) => (Number(qty) || 0) * perUnit(ing, date);
-// 热量：g / ml 按每 100 算，each 按每个算
-export const partKcal = (ing, qty) => ((Number(qty) || 0) * (Number(ing?.kcal) || 0)) / (unitOf(ing) === "each" ? 1 : 100);
+export const buyPrice = (ing, date) => (onSale(ing, date) ? Number(ing.sale.price) : Number(ing?.price) || 0);
+// 吃一天份大概多少钱：一次买的钱 ÷ 够吃几天
+export const useCost = (ing, date) => buyPrice(ing, date) / lastsOf(ing);
 
-export function boxTotals(D, box, date) {
-  let kcal = 0, cost = 0;
-  for (const p of box?.parts || []) {
-    const ing = D.ing[p.ing];
-    if (!ing) continue;
-    kcal += partKcal(ing, p.qty);
-    cost += partCost(ing, p.qty, date);
-  }
-  return { kcal, cost };
+// ---------- 一顿（Box） ----------
+
+// 最重的那样定调；一半以上是 Low 就降一级；常备的（油盐）不算；手动选了就用手动的
+export function autoLevel(D, box) {
+  const ranks = (box?.parts || []).map((p) => D.ing[p.ing]).filter((i) => i && !i.staple).map((i) => RANK[levelOf(i)]);
+  if (!ranks.length) return "mid";
+  const top = Math.max(...ranks), lows = ranks.filter((r) => r === 1).length;
+  return BY_RANK[top > 1 && lows * 2 >= ranks.length ? top - 1 : top];
+}
+export const boxLevel = (D, box) => (RANK[box?.level] ? box.level : autoLevel(D, box));
+
+export function boxCost(D, box, date) {
+  let cost = 0;
+  for (const p of box?.parts || []) if (D.ing[p.ing]) cost += useCost(D.ing[p.ing], date);
+  return cost;
 }
 
+// 几个 Box 加起来：花多少、低中高各几个
 export function sumBoxes(D, ids, date) {
-  let kcal = 0, cost = 0;
+  const levels = { low: 0, mid: 0, high: 0 };
+  let cost = 0;
   for (const id of ids) {
-    const t = boxTotals(D, D.box[id], date);
-    kcal += t.kcal; cost += t.cost;
+    cost += boxCost(D, D.box[id], date);
+    levels[boxLevel(D, D.box[id])]++;
   }
-  return { kcal, cost };
+  return { cost, levels };
 }
 
-export const packBoxes = (D, pack) => (pack?.boxes || []).filter((id) => D.box[id]);
-export const packTotals = (D, pack, date) => sumBoxes(D, packBoxes(D, pack), date);
-
-// 某天吃的几顿：{pack} 用那个 Day pack；{boxes} 自己挑的；{off} 不做饭
 export function boxesOfDay(D, entry) {
   if (!entry || entry.off) return [];
-  return entry.pack ? packBoxes(D, D.pack[entry.pack]) : (entry.boxes || []).filter((id) => D.box[id]);
+  return (entry.boxes || []).filter((id) => D.box[id]);
 }
 
 // ---------- 打折一轮一轮来 ----------
@@ -106,176 +104,196 @@ export function roundsIn(D, from, to) {
 
 export const daysOf = (start) => range(start, addDays(start, 6));
 
-// 采购日（像 HelloFresh 的截单日）：这周第一天当天或之前、最近的那个星期几；这周单独改过就用改的
+// 采购日（像 meal kit 的截单日）：这周第一天当天或之前、最近的那个星期几；这周单独改过就用改的
 export function shopDate(start, shopDay, override) {
   if (override) return override;
   return addDays(start, -((weekday(start) - (Number(shopDay) || 0) + 7) % 7));
 }
 
-// 按天排的一周：每天几顿、热量、按采购日的价格算的花费
+// 按天排的一周：每天几个 Box、花多少（按采购日的价格）、低中高各几个
 export function weekPlan(D, start, priceDate) {
+  const levels = { low: 0, mid: 0, high: 0 };
   const days = daysOf(start).map((date) => {
     const entry = D.days[date] || null;
     const boxes = boxesOfDay(D, entry);
-    return { date, entry, boxes, ...sumBoxes(D, boxes, priceDate) };
+    const t = sumBoxes(D, boxes, priceDate);
+    for (const k in levels) levels[k] += t.levels[k];
+    return { date, entry, boxes, ...t };
   });
   const planned = days.filter((d) => d.boxes.length);
-  return {
-    days,
-    planned: planned.length,
-    cost: planned.reduce((a, d) => a + d.cost, 0),
-    kcal: planned.length ? planned.reduce((a, d) => a + d.kcal, 0) / planned.length : 0
-  };
+  return { days, planned: planned.length, cost: planned.reduce((a, d) => a + d.cost, 0), levels };
 }
 
-// 这周每天每顿的用量加起来
-export function needs(D, start) {
-  const need = {};
-  for (const date of daysOf(start)) {
-    for (const bid of boxesOfDay(D, D.days[date])) {
-      for (const p of D.box[bid].parts || []) {
-        if (D.ing[p.ing] && Number(p.qty) > 0) need[p.ing] = (need[p.ing] || 0) + Number(p.qty);
-      }
+// ---------- 购物单 ----------
+
+// 每样东西哪几天要用（一天里用几次也只算一天），日期从早到晚
+export function usage(D) {
+  const out = {};
+  for (const [date, entry] of Object.entries(D.days)) {
+    const seen = new Set();
+    for (const bid of boxesOfDay(D, entry)) for (const p of D.box[bid].parts || []) if (D.ing[p.ing]) seen.add(p.ing);
+    for (const id of seen) (out[id] = out[id] || []).push(date);
+  }
+  for (const k in out) out[k].sort();
+  return out;
+}
+
+// 别的周里买过 / 家里还有的：{ id: [{ date, start, n, have }] }
+function buyEvents(D, shopDay, except) {
+  const out = {};
+  for (const w of Object.values(D.week)) {
+    if (w.id === except) continue;
+    const date = shopDate(w.id, shopDay, w.shopOn);
+    for (const [id, g] of Object.entries(w.got || {})) {
+      const ev = g === "have" ? { date, start: w.id, have: true } : { date, start: w.id, n: Math.max(1, Number(g?.n) || 1) };
+      (out[id] = out[id] || []).push(ev);
     }
   }
-  return need;
+  for (const k in out) out[k].sort((a, b) => a.date.localeCompare(b.date));
+  return out;
 }
 
-// 某周的购物单：用量按包装往上取整，按超市分；价格按采购日那天（在打折就用打折价）。
-// 常备的（油盐）不买，只列出来提醒家里要有。got[id] = "bought" 买了 / "have" 家里还有（不算钱）。
-// leftFrom：上周买的整包用剩多少（基本单位），够这周用就提示一句
-export function shoppingList(D, start, priceDate, leftFrom = {}) {
-  const got = D.week[start]?.got || {};
+// 已经有着落的那几天：买一次够吃 lasts 天，从买的那天往后数要用的日子；「家里还有」顶那一周
+function covered(dates, events, lasts) {
+  const done = new Set();
+  for (const ev of events) {
+    if (ev.have) { const end = addDays(ev.start, 6); for (const d of dates) if (d >= ev.start && d <= end) done.add(d); continue; }
+    let left = lasts * ev.n;
+    for (const d of dates) {
+      if (left <= 0) break;
+      if (d < ev.date || done.has(d)) continue;
+      done.add(d);
+      left--;
+    }
+  }
+  return done;
+}
+
+// 某周的购物单（from 之前的日子不算，比如这周已经过了几天）。每样：买几次、多少钱（采购日在打折就按打折价）。
+// got[id] = {n} 买了几次 / "have" 家里还有（不算钱）；extra[id] = 手动加的几次。常备的（油盐）只提醒，不进单子
+export function shopList(D, start, shopDay, from = start) {
+  const w = D.week[start] || {};
+  const shop = shopDate(start, shopDay, w.shopOn), end = addDays(start, 6);
+  const use = usage(D), events = buyEvents(D, shopDay, start);
+  const got = w.got || {}, extra = w.extra || {};
   const groups = new Map(), staples = [];
   let total = 0, count = 0, open = 0;
-  for (const [id, qty] of Object.entries(needs(D, start))) {
+  for (const id of new Set([...Object.keys(use), ...Object.keys(extra)])) {
     const ing = D.ing[id];
-    if (ing.staple) { staples.push(ing); continue; }
-    const size = packSize(ing);
-    const packs = size > 0 ? Math.ceil(qty / size - 1e-9) : 0;
-    const state = got[id] || "";
-    const cost = state === "have" ? 0 : packs * packPrice(ing, priceDate);
-    const row = { ing, qty, packs, cost, left: packs * size - qty, sale: onSale(ing, priceDate), state, carry: Number(leftFrom[id]) || 0 };
+    if (!ing) continue;
+    const lasts = lastsOf(ing), dates = use[id] || [];
+    const cov = covered(dates, events[id] || [], lasts);
+    const uses = dates.filter((d) => d >= from && d <= end && !cov.has(d)).length;
+    const add = Math.max(0, Math.round(Number(extra[id]) || 0));
+    const g = got[id];
+    const state = g === "have" ? "have" : g ? "bought" : "";
+    if (ing.staple && !add && state !== "bought") { if (uses) staples.push(ing); continue; }   // 常备的：家里本来就有，手动加了才买
+    const n = state === "bought" && Number(g.n) > 0 ? Number(g.n) : (ing.staple ? 0 : Math.ceil(uses / lasts)) + add;
+    if (!n) continue;
+    const cost = state === "have" ? 0 : n * buyPrice(ing, shop);
     const key = String(ing.store || "").trim();
     if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(row);
+    groups.get(key).push({ ing, n, uses, extra: add, cost, sale: onSale(ing, shop), state });
     total += cost; count++;
     if (!state) open++;
   }
   const list = [...groups.entries()].map(([store, items]) => ({ store, items: items.sort((a, b) => byName(a.ing, b.ing)), cost: items.reduce((a, r) => a + r.cost, 0) }))
     .sort((a, b) => (!a.store - !b.store) || a.store.localeCompare(b.store));
-  return { groups: list, total, count, open, staples: staples.sort(byName) };
+  return { start, shop, from, groups: list, total, count, open, staples: staples.sort(byName) };
 }
 
-// 上周的单子里每样用剩多少（真买了的整包、这周还能接着用的）：勾了买了的，或者整周标了已采购
-export function leftovers(list, shopped = false) {
-  const out = {};
-  for (const g of list.groups) for (const r of g.items) if (r.left > 0 && (r.state === "bought" || (shopped && r.state !== "have"))) out[r.ing.id] = r.left;
-  return out;
+// 下次去买：这周和下周里第一个还没买（没标 Shopped、没跳过）的；这周剩下的日子什么都不缺就看下周
+export function nextShop(D, today, w0, shopDay) {
+  for (const start of [w0, addDays(w0, 7)]) {
+    const w = D.week[start] || {};
+    if (w.skip || w.shopped) continue;
+    const list = shopList(D, start, shopDay, start < today ? today : start);
+    if (list.count || start !== w0) return list;
+  }
+  return null;
 }
 
-// ---------- 之后几周：只排「Day A × 3」，不排哪天 ----------
+// ---------- 之后几周：只排「哪个 Box × 几次」，不排哪天 ----------
 
 export function roughTotals(D, w, priceDate) {
-  let days = 0, cost = 0, kcal = 0;
+  const levels = { low: 0, mid: 0, high: 0 };
+  let meals = 0, cost = 0;
   for (const r of w?.rough || []) {
-    const n = Number(r.n) || 0;
-    if (!D.pack[r.pack] || n <= 0) continue;
-    const t = packTotals(D, D.pack[r.pack], priceDate);
-    days += n; cost += t.cost * n; kcal += t.kcal * n;
+    const n = Number(r.n) || 0, b = D.box[r.box];
+    if (!b || n <= 0) continue;
+    meals += n; cost += boxCost(D, b, priceDate) * n; levels[boxLevel(D, b)] += n;
   }
-  return { days, cost, kcal: days ? kcal / days : 0 };
+  return { meals, cost, levels };
 }
 
-// 粗排里还没排到具体哪天的（已经放了同一个 Day pack 的日子先抵掉）
+// 粗排里还没放到具体哪天的（这周已经放了的先抵掉）
 export function roughLeft(D, start, w) {
   const queue = [];
-  for (const r of w?.rough || []) if (D.pack[r.pack]) for (let i = 0; i < (Number(r.n) || 0); i++) queue.push(r.pack);
-  for (const date of daysOf(start)) {
-    const i = queue.indexOf(D.days[date]?.pack);
+  for (const r of w?.rough || []) if (D.box[r.box]) for (let i = 0; i < (Number(r.n) || 0); i++) queue.push(r.box);
+  for (const date of daysOf(start)) for (const id of boxesOfDay(D, D.days[date])) {
+    const i = queue.indexOf(id);
     if (i >= 0) queue.splice(i, 1);
   }
   return queue;
 }
 
-// 粗排变细排：按顺序把剩下的 Day pack 填进还空着的日子（标了不做饭的也算占着）。返回 日期 → {pack}
+// 粗排变细排：还空着的日子（from 之后、没标不做饭），按早中晚各放一个；没标哪顿的补到一天 3 个。返回 日期 → {boxes}
 export function fillFromRough(D, start, w, from = start) {
-  const queue = roughLeft(D, start, w), out = {};
+  const bySlot = {};
+  for (const id of roughLeft(D, start, w)) (bySlot[D.box[id].slot || ""] = bySlot[D.box[id].slot || ""] || []).push(id);
+  const out = {};
   for (const date of daysOf(start)) {
-    if (!queue.length) break;
     if (date < from || D.days[date]) continue;
-    out[date] = { pack: queue.shift() };
+    const day = [];
+    for (const [s] of SLOTS) if (bySlot[s]?.length) day.push(bySlot[s].shift());
+    while (day.length < 3 && bySlot[""]?.length) day.push(bySlot[""].shift());
+    if (!day.length) break;
+    out[date] = { boxes: day };
   }
   return out;
 }
 
-// ---------- 显示 ----------
-
-const trim = (v, d = 1) => String(Math.round(v * 10 ** d) / 10 ** d);
-
-export function fmtQty(qty, unit) {
-  const v = Number(qty) || 0;
-  if (unit === "each") return trim(v) + " ea";
-  if (v >= 1000) return trim(v / 1000, 2) + (unit === "g" ? " kg" : " L");
-  return Math.round(v) + " " + unit;
-}
-
-export function packLabel(ing) {
-  const q = Number(ing?.packQty) || 0;
-  if (unitOf(ing) === "each") return q === 1 ? "each" : trim(q, 2) + " ct";
-  return trim(q, 2) + " " + (ing.packUnit || "");
-}
-
-// 单价：按包装上用的单位习惯（lb / oz 包装就按每磅）
-export function unitPrice(ing, date) {
-  const u = perUnit(ing, date), pu = ing?.packUnit;
-  if (!u) return null;
-  if (unitOf(ing) === "g") return pu === "lb" || pu === "oz" ? { v: u * 453.592, per: "lb" } : { v: u * 1000, per: "kg" };
-  if (unitOf(ing) === "ml") return pu === "gal" ? { v: u * 3785.41, per: "gal" } : pu === "fl oz" ? { v: u * 29.5735, per: "fl oz" } : { v: u * 1000, per: "L" };
-  return { v: u, per: "ea" };
-}
-
-// ---------- 例子：北美超市、大概的价格（美元）和热量（USDA 的大概数），id 都以 ex- 开头，一键能删 ----------
+// ---------- 例子：多伦多常去的超市、大概的价格（加元），id 都以 ex- 开头，一键能删 ----------
 
 export function examples(today, weekStart, D = { days: {}, week: {} }) {
-  const lastWed = addDays(today, -((weekday(today) - 3 + 7) % 7));
+  const last = (wd) => addDays(today, -((weekday(today) - wd + 7) % 7));   // 最近一个星期几（传单开始那天）
   const ing = [
-    ["chicken", "Chicken breast", "Safeway", 3, "lb", 11.97, 120, { every: 4, from: addDays(today, -18), checked: addDays(today, -18) }],
-    ["eggs", "Eggs, large", "Safeway", 12, "each", 3.99, 72, { every: 1, from: lastWed }],
-    ["sweetpotato", "Sweet potatoes", "Safeway", 3, "lb", 3.99, 86],
-    ["beans", "Black beans, canned", "Safeway", 15, "oz", 1.29, 91],
-    ["pepper", "Bell pepper", "Safeway", 1, "each", 1.29, 37],
-    ["yogurt", "Greek yogurt, plain", "Costco", 48, "oz", 6.49, 59, { every: 4, from: addDays(today, -3), checked: addDays(today, -3), sale: { price: 4.99, from: addDays(today, -3), until: addDays(today, 12) } }],
-    ["salmon", "Salmon fillet", "Costco", 3, "lb", 29.99, 208, { every: 4, from: addDays(today, -6) }],
-    ["berries", "Frozen mixed berries", "Costco", 4, "lb", 13.99, 50],
-    ["oil", "Olive oil", "Costco", 2, "L", 17.99, 810, { staple: true }],
-    ["rice", "Brown rice (dry)", "Trader Joe's", 2, "lb", 3.49, 367],
-    ["oats", "Rolled oats", "Trader Joe's", 2, "lb", 3.29, 379],
-    ["broccoli", "Broccoli florets", "Trader Joe's", 12, "oz", 2.99, 34],
-    ["spinach", "Baby spinach", "Trader Joe's", 6, "oz", 2.49, 23],
-    ["tortilla", "Whole wheat tortillas", "Trader Joe's", 8, "each", 2.99, 130],
-    ["pb", "Peanut butter", "Trader Joe's", 16, "oz", 2.99, 588],
-    ["banana", "Banana", "Trader Joe's", 1, "each", 0.23, 105]
-  ].map(([id, name, store, packQty, packUnit, price, kcal, more]) => ({ id: "ex-" + id, name, store, packQty, packUnit, price, kcal, staple: false, every: 0, from: "", checked: "", sale: null, ...(more || {}) }));
-  const part = (i, qty) => ({ ing: "ex-" + i, qty });
+    ["chicken", "Chicken breast", "Loblaws", 13.99, 3, "mid", { every: 1, from: last(4), checked: last(4) }],
+    ["eggs", "Eggs, dozen", "Loblaws", 4.49, 4, "mid", { every: 1, from: last(4) }],
+    ["yogurt", "Greek yogurt", "Farm Boy", 6.99, 5, "mid", { every: 4, from: addDays(today, -3), checked: addDays(today, -3), sale: { price: 5.49, from: addDays(today, -3), until: addDays(today, 12) } }],
+    ["spinach", "Baby spinach", "Farm Boy", 4.99, 3, "low"],
+    ["broccoli", "Broccoli", "Farm Boy", 2.99, 2, "low"],
+    ["salmon", "Salmon fillet", "Longo's", 15.99, 2, "mid", { every: 4, from: addDays(today, -6) }],
+    ["berries", "Frozen berries", "Longo's", 7.99, 7, "low"],
+    ["oats", "Rolled oats", "Longo's", 4.99, 14, "mid"],
+    ["rice", "Jasmine rice, 8 lb", "T&T", 12.99, 30, "mid"],
+    ["bokchoy", "Baby bok choy", "T&T", 2.99, 2, "low"],
+    ["dumplings", "Frozen dumplings", "T&T", 8.99, 4, "high", { every: 2, from: addDays(today, -9), checked: addDays(today, -9) }],
+    ["banana", "Bananas", "Dodo", 1.49, 5, "low"],
+    ["pasta", "Fresh pasta", "Eataly", 8.5, 2, "mid"],
+    ["pesto", "Pesto", "Eataly", 9.9, 4, "high"],
+    ["oil", "Olive oil", "Eataly", 19.9, 60, "high", { staple: true }]
+  ].map(([id, name, store, price, lasts, level, more]) => ({ id: "ex-" + id, name, store, price, lasts, level, staple: false, every: 0, from: "", checked: "", sale: null, ...(more || {}) }));
+  const part = (i, amt) => ({ ing: "ex-" + i, amt });
   const box = [
-    ["oats", "Oats & berries", "breakfast", [part("oats", 50), part("yogurt", 150), part("berries", 80), part("pb", 16)]],
-    ["wrap", "Egg & spinach wrap", "breakfast", [part("eggs", 3), part("spinach", 40), part("tortilla", 1), part("oil", 5)]],
-    ["bowl", "Chicken rice bowl", "lunch", [part("chicken", 150), part("rice", 75), part("broccoli", 120), part("oil", 5)]],
-    ["salmon", "Salmon & sweet potato", "dinner", [part("salmon", 140), part("sweetpotato", 200), part("spinach", 50), part("oil", 5)]],
-    ["burrito", "Burrito bowl", "dinner", [part("chicken", 120), part("beans", 120), part("rice", 60), part("pepper", 1)]],
-    ["snack", "Banana & peanut butter", "snack", [part("banana", 1), part("pb", 16)]]
-  ].map(([id, name, slot, parts]) => ({ id: "ex-" + id, name, slot, parts, note: "" }));
-  const pack = [
-    { id: "ex-a", name: "Day A", boxes: ["ex-oats", "ex-bowl", "ex-salmon", "ex-snack"] },
-    { id: "ex-b", name: "Day B", boxes: ["ex-wrap", "ex-bowl", "ex-burrito"] }
-  ];
+    ["oats", "Oats & berries", "breakfast", [part("oats", "½ cup"), part("yogurt", "¾ cup"), part("berries", "a handful")]],
+    ["eggs", "Egg & spinach scramble", "breakfast", [part("eggs", "3"), part("spinach", "2 handfuls"), part("oil", "1 tsp")]],
+    ["bowl", "Chicken rice bowl", "lunch", [part("chicken", "1 breast"), part("rice", "1 cup cooked"), part("broccoli", "1 cup")]],
+    ["salmon", "Salmon & bok choy", "dinner", [part("salmon", "1 fillet"), part("bokchoy", "2 heads"), part("rice", "1 cup cooked")]],
+    ["dumplings", "Pan-fried dumplings", "dinner", [part("dumplings", "10"), part("bokchoy", "1 head"), part("oil", "1 tbsp")]],
+    ["pasta", "Pesto pasta", "dinner", [part("pasta", "½ pack"), part("pesto", "2 tbsp"), part("spinach", "a handful")]],
+    ["banana", "Banana", "snack", [part("banana", "1")]]
+  ].map(([id, name, slot, parts]) => ({ id: "ex-" + id, name, slot, level: "", parts, note: "" }));
   // 下周按天排上（空着的日子才放）；再下周粗排一下
   const next = addDays(weekStart, 7), later = addDays(weekStart, 14);
-  const week = [];
+  const plan = [["oats", "bowl", "salmon", "banana"], ["eggs", "bowl", "dumplings"], ["oats", "bowl", "salmon"], ["eggs", "bowl", "pasta"], ["oats", "bowl", "dumplings", "banana"], ["eggs", "pasta"], null];
   const days = {};
-  daysOf(next).forEach((d, i) => { if (!D.days[d]) days[d] = { pack: i % 2 ? "ex-b" : "ex-a" }; });
+  daysOf(next).forEach((d, i) => { if (!D.days[d]) days[d] = plan[i] ? { boxes: plan[i].map((b) => "ex-" + b) } : { off: true }; });
+  const week = [];
   if (Object.keys(days).length) week.push({ ...(D.week[next] || {}), id: next, days: { ...(D.week[next]?.days || {}), ...days } });
-  if (!D.week[later]?.rough?.length) week.push({ ...(D.week[later] || {}), id: later, rough: [{ pack: "ex-a", n: 4 }, { pack: "ex-b", n: 3 }], note: D.week[later]?.note || "Costco run" });
-  return { ing, box, pack, week };
+  if (!D.week[later]?.rough?.length) {
+    week.push({ ...(D.week[later] || {}), id: later, note: D.week[later]?.note || "T&T run",
+      rough: [["oats", 4], ["eggs", 3], ["bowl", 5], ["salmon", 2], ["dumplings", 2], ["pasta", 1]].map(([b, n]) => ({ box: "ex-" + b, n })) });
+  }
+  return { ing, box, week };
 }

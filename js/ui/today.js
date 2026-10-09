@@ -12,6 +12,7 @@ import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
 import { animateNext } from "../motion.js";
 import { cheer } from "../fx.js";
+import { shopCount } from "./meals.js";
 
 const openDesc = new Set();
 const logOpen = new Set();   // 已经有计时记录、又点了「+ time」要再补一段的任务
@@ -157,9 +158,10 @@ function phoneHTML(c) {
   const lineText = line > 0 ? (done >= line - 1 ? "Line " + fmtMin(line) + " ✓" : "Line " + fmtMin(line) + " · " + fmtMin(line - done) + " to go") : "";
   const meta = '<div class="stripmeta' + (day.cap > 0 && day.planned > day.cap ? " over" : "") + '"><span>' + Math.round(day.done) + " / " + day.planned + " min done</span><span>" + lineText + "</span></div>";
   const bar = '<div class="strip">' + tasks.map((t) => '<i style="flex-grow:' + Math.max(5, Number(t.est) || 0) + ";" + segStyle(t) + '"></i>').join("") + "</div>";
+  const toBuy = shopCount(c);   // 下次采购还剩几样（顶栏的 🛒）
   return '<div class="dayview phone-day" data-date="' + d + '">' +
     '<header class="phead"><div class="l"><h1 data-act="day-today">' + fmtDay(d) + '</h1><span class="ball" data-act="ball" role="button" aria-label="Sparkles"></span></div>' +
-    '<div class="r"><span class="psync" data-sync-status></span><a class="pread" href="#reading">' + icon("reading") + '<span>Reading</span></a><a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
+    '<div class="r"><span class="psync" data-sync-status></span><a class="pread pshop" href="#shop" aria-label="Next shop">' + icon("cart") + (toBuy ? "<span>" + toBuy + "</span>" : "") + '</a><a class="pread" href="#reading">' + icon("reading") + '<span>Reading</span></a><a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
     (store.local().url ? bar + meta + '<div class="list" data-list="' + d + '">' +
       (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + ghostsHTML(c, d) + "</div>" + addHTML(c, d, true)
       : connectHTML()) + "</div>";

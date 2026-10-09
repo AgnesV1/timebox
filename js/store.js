@@ -855,12 +855,14 @@ export function deleteTime(id) {
   change(() => writeTimes(taskId, list), "Deleted time");
 }
 
-// ---------- 备餐（Meals 页，只在电脑上） ----------
+// ---------- 备餐（Meals 页；手机上只有「下次采购」那张单子） ----------
 // 都存在 Settings 页里，一样东西一行（不用改 Code.gs，一格也不会太长）：
-//   meal-ing:<id> 常买的东西 / meal-box:<id> 一顿 / meal-pack:<id> 一天（几顿打包成 Day pack）/
-//   meal-week:<这周第一天> 这周：days（日期 → 吃什么）、粗排 rough、买了没有 got、shopped、skip、note / meal-prefs 目标
+//   meal-ing:<id> 常买的东西 / meal-box:<id> 一顿 / meal-week:<这周第一天> 这周：days（日期 → {boxes} / {off}）、
+//   粗排 rough（[{box, n}]）、买了没有 got、手动加的 extra、shopped、skip、note / meal-prefs 目标
+//   （meal-pack:<id> 是 10-08 那版的 Day pack，现在只在读旧数据时展开成 Box）
 const MEAL_RE = /^meal-(ing|box|pack|week):(.+)$/;
 const mealKey = (kind, id) => "meal-" + kind + ":" + id;
+const OLD_UNIT = { g: "g", kg: "g", oz: "g", lb: "g", ml: "ml", L: "ml", "fl oz": "ml", gal: "ml" };
 
 export function meals() {
   const D = { ing: {}, box: {}, pack: {}, week: {}, days: {} };
@@ -868,12 +870,33 @@ export function meals() {
     const m = MEAL_RE.exec(key);
     if (m && r.value && typeof r.value === "object") D[m[1]][m[2]] = { ...r.value, id: m[2] };
   }
+  // 旧格式读的时候换成新的：用量的数字 → 文字；某天 {pack} → 那个 pack 里的 Box；粗排 {pack, n} → 每个 Box × n
+  for (const b of Object.values(D.box)) {
+    b.parts = (b.parts || []).map((p) => (p.amt !== undefined || p.qty === undefined ? p
+      : { ing: p.ing, amt: p.qty === "" || p.qty === null ? "" : p.qty + (OLD_UNIT[D.ing[p.ing]?.packUnit] ? " " + OLD_UNIT[D.ing[p.ing].packUnit] : "") }));
+  }
+  const unpack = (id) => (D.pack[id]?.boxes || []).filter((b) => D.box[b]);
+  for (const w of Object.values(D.week)) {
+    const days = {};
+    for (const [d, e] of Object.entries(w.days || {})) days[d] = e?.pack ? { boxes: unpack(e.pack) } : e;
+    w.days = days;
+    const rough = [];
+    for (const r of w.rough || []) {
+      for (const box of r.pack ? unpack(r.pack) : [r.box]) {
+        const hit = rough.find((x) => x.box === box);
+        if (hit) hit.n += Number(r.n) || 0;
+        else rough.push({ box, n: Number(r.n) || 0 });
+      }
+    }
+    w.rough = rough;
+  }
   // 每天吃什么存在那周的行里；改过「一周从周几开始」也照样找得到
-  for (const w of Object.values(D.week)) Object.assign(D.days, w.days || {});
+  for (const w of Object.values(D.week)) Object.assign(D.days, w.days);
   return D;
 }
 
-export const mealPrefs = () => ({ kcal: 1800, budget: 0, shopDay: 0, ...(setting("meal-prefs", {}) || {}) });
+// high = 每周 High 的 Box 最多几个；budget = 每周预算（0 = 不比）；shopDay = 星期几去买
+export const mealPrefs = () => ({ high: 3, budget: 0, shopDay: 0, ...(setting("meal-prefs", {}) || {}) });
 
 function putMeal(kind, id, row) {
   const { id: _id, ...value } = row;
@@ -886,32 +909,24 @@ export function saveMeal(kind, row, label, opts) {
   return id;
 }
 
-// 删一样东西，用到它的地方一起改（一次撤销全回来）：
-// 食材 → 从各个 Box 里拿掉；Box → 从 Day pack 和每天里拿掉；Day pack → 从每天和粗排里拿掉
+// 删一样东西，用到它的地方一起改（一次撤销全回来）：食材 → 从各个 Box 里拿掉；Box → 从每天和粗排里拿掉
 function removeMeal(kind, id) {
   const D = meals();
   if (kind === "ing") {
-    for (const b of Object.values(D.box)) if ((b.parts || []).some((p) => p.ing === id)) putMeal("box", b.id, { ...b, parts: b.parts.filter((p) => p.ing !== id) });
+    for (const b of Object.values(D.box)) if (b.parts.some((p) => p.ing === id)) putMeal("box", b.id, { ...b, parts: b.parts.filter((p) => p.ing !== id) });
   }
   if (kind === "box") {
-    for (const p of Object.values(D.pack)) if ((p.boxes || []).includes(id)) putMeal("pack", p.id, { ...p, boxes: p.boxes.filter((x) => x !== id) });
-  }
-  if (kind === "box" || kind === "pack") {
     for (const w of Object.values(D.week)) {
       let touched = false;
       const days = {};
-      for (const [d, e] of Object.entries(w.days || {})) {
-        if (kind === "pack" && e?.pack === id) { touched = true; continue; }
-        if (kind === "box" && e?.boxes?.includes(id)) {
-          touched = true;
-          const left = e.boxes.filter((x) => x !== id);
-          if (left.length) days[d] = { ...e, boxes: left };
-          continue;
-        }
-        days[d] = e;
+      for (const [d, e] of Object.entries(w.days)) {
+        if (!e?.boxes?.includes(id)) { days[d] = e; continue; }
+        touched = true;
+        const left = e.boxes.filter((x) => x !== id);
+        if (left.length) days[d] = { ...e, boxes: left };
       }
-      const rough = (w.rough || []).filter((r) => kind !== "pack" || r.pack !== id);
-      if (touched || rough.length !== (w.rough || []).length) putMeal("week", w.id, { ...w, days, rough });
+      const rough = w.rough.filter((r) => r.box !== id);
+      if (touched || rough.length !== w.rough.length) putMeal("week", w.id, { ...w, days, rough });
     }
   }
   drop("settings", mealKey(kind, id));
@@ -963,6 +978,6 @@ export function addMealExamples(rows) {
 
 export function clearMealExamples() {
   change(() => {
-    for (const kind of ["pack", "box", "ing"]) for (const id of Object.keys(meals()[kind])) if (id.startsWith("ex-")) removeMeal(kind, id);
+    for (const kind of ["box", "ing", "pack"]) for (const id of Object.keys(meals()[kind])) if (id.startsWith("ex-")) removeMeal(kind, id);
   }, "Examples removed");
 }

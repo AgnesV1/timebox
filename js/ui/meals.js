@@ -2,7 +2,7 @@
 //   Groceries（#meals/groceries）：常买的东西：哪个超市、一次买多少钱、够吃几天、热量低中高、几周一轮打折、这一轮看过没有
 //   Boxes（#meals/boxes）：一个 Box = 一顿 = 几样东西（用量随便写），低中高自动定（也能手动），一天份大概多少钱
 //   Plan（#meals）：最上面是「下次采购」的单子；然后是这一轮还没看的打折、这周和下周按天放 Box、之后四周四个框粗排
-// 「下次采购」手机上也有：顶栏的 🛒 进 #shop，只看、打勾、家里有。
+// 「下次采购」手机上也有：顶栏的 🛒 进 #shop，只列要买的东西（不写价钱和说明），在超市里打勾。
 
 import * as store from "../store.js";
 import * as M from "../meals.js";
@@ -93,6 +93,9 @@ function nextShopHTML(D, c, phone) {
   const n = diffDays(c.today, L.shop);
   const when = n > 1 ? fmtDay(L.shop) + " · in " + n + " days" : n === 1 ? "Tomorrow" : n === 0 ? "Today" : fmtDay(L.shop) + " · " + -n + (n === -1 ? " day ago" : " days ago");
   const budget = Number(pr.budget) || 0;
+  // 手机上只列东西：勾、名字、买几次；家里有的不列
+  const phoneRow = (r) => r.state === "have" ? "" : '<li class="' + (r.state ? "st-" + r.state : "") + '"><label class="lname"><input type="checkbox" data-got="bought" data-week="' + L.start + '" data-id="' + esc(r.ing.id) + '" data-n="' + r.n + '"' + (r.state === "bought" ? " checked" : "") + ">" +
+    "<span>" + esc(r.ing.name) + "</span>" + (r.n > 1 ? '<b class="lx">×' + r.n + "</b>" : "") + "</label></li>";
   const row = (r) => {
     const id = esc(r.ing.id);
     const note = [r.uses ? r.uses + (r.uses === 1 ? " day" : " days") + " of meals · one buy ≈ " + M.lastsOf(r.ing) + " days" : "",
@@ -106,13 +109,13 @@ function nextShopHTML(D, c, phone) {
   };
   return '<section class="mcard nextshop"><header><h3>Next shop</h3>' +
     '<span class="shopday ' + (L.open && n <= 1 ? (n < 0 ? "late" : "due") : "") + '">' + esc(when) + "</span>" +
-    '<span class="msub">for ' + fmtShort(L.from) + " – " + fmtShort(addDays(L.start, 6)) + "</span>" +
+    (phone ? "" : '<span class="msub">for ' + fmtShort(L.from) + " – " + fmtShort(addDays(L.start, 6)) + "</span>" +
     '<span class="mw-sum"><span class="budget' + (budget && L.total > budget ? " over" : "") + '"><b>' + money(L.total) + "</b>" + (budget ? " / $" + budget : "") + "</span>" +
-    (L.count ? "<span><b>" + L.open + "</b> of " + L.count + " left</span>" : "") + "</span>" +
+    (L.count ? "<span><b>" + L.open + "</b> of " + L.count + " left</span>" : "") + "</span>") +
     (L.count ? '<button type="button" class="btn primary" data-act="shopped" data-week="' + L.start + '">Mark shopped</button>' : "") + "</header>" +
-    (L.count ? '<div class="mstores">' + L.groups.map((g) => "<section><h4>" + esc(g.store || "Anywhere") + " <small>" + money(g.cost) + "</small></h4><ul>" + g.items.map(row).join("") + "</ul></section>").join("") + "</div>"
+    (L.count ? '<div class="mstores">' + L.groups.map((g) => "<section><h4>" + esc(g.store || "Anywhere") + (phone ? "" : " <small>" + money(g.cost) + "</small>") + "</h4><ul>" + g.items.map(phone ? phoneRow : row).join("") + "</ul></section>").join("") + "</div>"
       : '<p class="msub">Nothing to buy yet — put some boxes on the days.</p>') +
-    (L.staples.length ? '<p class="msub staples">Have at home: ' + L.staples.map((i) => esc(i.name)).join(", ") + "</p>" : "") +
+    (L.staples.length && !phone ? '<p class="msub staples">Have at home: ' + L.staples.map((i) => esc(i.name)).join(", ") + "</p>" : "") +
     (phone || !Object.keys(D.ing).length ? "" : '<div class="shopadd"><select data-act="shop-add" data-week="' + L.start + '" aria-label="Add a grocery to this shop">' + ingOptions(D, "", "+ Add something else…") + "</select></div>") +
     "</section>";
 }

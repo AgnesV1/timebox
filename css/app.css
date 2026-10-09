@@ -991,8 +991,9 @@ body.phone .rconnect input, body.phone .radd input, body.phone .radd textarea { 
 .pshop span { font: 700 12px var(--num); }
 body.phone .shop-page { padding-bottom: 90px; }
 body.phone .nextshop { margin: 4px 0 0; padding: 12px; }
+body.phone .nextshop > header { margin-bottom: 12px; }
 body.phone .nextshop > header .btn { margin-left: 0; }
 body.phone .mstores { grid-template-columns: minmax(0, 1fr); }
-body.phone .mstores li { padding: 9px 0; font-size: 15px; }
+body.phone .mstores li { grid-template-columns: minmax(0, 1fr); padding: 10px 0; font-size: 15.5px; }
 body.phone .lname input { width: 20px; height: 20px; }
 body.phone .lnote { padding-left: 44px; }

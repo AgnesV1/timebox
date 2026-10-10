@@ -2,21 +2,26 @@
 //   常买的东西：一次买多少钱、够吃几天（几天份）、热量低中高（Low 菜和水果 / Mid 正常 / High 油炸、肥的、甜的）、打折几周一轮
 //   一个 Box = 一顿 = 几样东西（用量随便写）；Box 有多「重」= 最重的那样，一半以上是 Low 就降一级；也可以手动定
 //   每天直接放几个 Box；每周 High 的 Box 有个限额（分配，不是算数）
+//   东西分类（肉 / 菜 / 碳水 / 常驻 / 零食）；Box 里可以放「随便哪种肉」（Any meat）：买的时候再挑，等级和价钱按这一类估
 //   购物单：这周哪几天要用到某样东西 ÷ 一次买够几天 = 买几次；之前勾了「买了」的会往后顶掉几天（米这种一买吃一个月的不会每周都出现）
+//   Restock：规律要换 / 要补的非食物（维生素、牙刷头、手机）：价格 + 周期 + 下次哪天，按月看接下来要花的钱
 // 数据从 store.meals() 来：{ ing, box, week, days }，days 是 日期 → {boxes} / {off}。这里不碰 store，测试直接喂数据。
 
-import { addDays, diffDays, weekday, range } from "./dates.js";
+import { addDays, addMonths, daysInMonth, diffDays, startOfMonth, weekday, range, MONTHS } from "./dates.js";
 
 export const SLOTS = [["breakfast", "Breakfast"], ["lunch", "Lunch"], ["dinner", "Dinner"], ["snack", "Snack"]];
 export const LEVELS = [["low", "Low", "veg, fruit"], ["mid", "Mid", "normal: grains, lean meat, dairy"], ["high", "High", "fried, fatty, sweet"]];
 export const EVERY = [0, 1, 2, 3, 4, 6, 8];   // 打折几周一轮；0 = 不追
-export const STORES = ["Longo's", "Farm Boy", "Dodo", "T&T", "Eataly", "Loblaws"];
+export const STORES = ["Longo's", "Farm Boy", "Dodo", "T&T", "Eataly", "Loblaws", "Costco", "IKEA"];
+export const CATS = [["meat", "Meat"], ["veg", "Veg"], ["carb", "Carb"], ["basic", "Basics"], ["snack", "Snack"]];   // 没分类的 = Other（调料这些）
+export const ANY = { meat: "mid", veg: "low", carb: "mid", snack: "mid" };   // 能放「随便哪种」的类别 → 算哪一档
 const RANK = { low: 1, mid: 2, high: 3 };
 const BY_RANK = ["", "low", "mid", "high"];
 
 export const byName = (a, b) => String(a.name || "").localeCompare(String(b.name || ""));
 export const byStore = (a, b) => (!a.store - !b.store) || String(a.store || "").localeCompare(String(b.store || "")) || byName(a, b);
 export const levelName = (lv) => (LEVELS.find(([k]) => k === lv) || LEVELS[1])[1];
+export const catName = (c) => (CATS.find(([k]) => k === c) || ["", "Other"])[1];
 
 // ---------- 常买的东西 ----------
 
@@ -34,9 +39,21 @@ export const useCost = (ing, date) => buyPrice(ing, date) / lastsOf(ing);
 
 // ---------- 一顿（Box） ----------
 
+// 「随便哪种肉」当成一样东西：一天份一买，价钱 = 这一类平均一天份多少钱
+export const anyId = (cat) => "any:" + cat;
+export function anyIng(D, cat, date) {
+  if (!ANY[cat]) return null;
+  const list = Object.values(D.ing).filter((i) => i.cat === cat);
+  const price = list.length ? list.reduce((a, i) => a + useCost(i, date), 0) / list.length : 0;
+  return { id: anyId(cat), any: cat, name: "Any " + catName(cat).toLowerCase(), store: "", price, lasts: 1, level: ANY[cat] };
+}
+// Box 里的一样：具体的东西 {ing}，或者某一类随便哪种 {any}
+export const partIng = (D, p, date) => (p?.any ? anyIng(D, p.any, date) : D.ing[p?.ing] || null);
+const ingById = (D, id, date) => (id.startsWith("any:") ? anyIng(D, id.slice(4), date) : D.ing[id] || null);
+
 // 最重的那样定调；一半以上是 Low 就降一级；常备的（油盐）不算；手动选了就用手动的
 export function autoLevel(D, box) {
-  const ranks = (box?.parts || []).map((p) => D.ing[p.ing]).filter((i) => i && !i.staple).map((i) => RANK[levelOf(i)]);
+  const ranks = (box?.parts || []).map((p) => partIng(D, p)).filter((i) => i && !i.staple).map((i) => RANK[levelOf(i)]);
   if (!ranks.length) return "mid";
   const top = Math.max(...ranks), lows = ranks.filter((r) => r === 1).length;
   return BY_RANK[top > 1 && lows * 2 >= ranks.length ? top - 1 : top];
@@ -45,7 +62,7 @@ export const boxLevel = (D, box) => (RANK[box?.level] ? box.level : autoLevel(D,
 
 export function boxCost(D, box, date) {
   let cost = 0;
-  for (const p of box?.parts || []) if (D.ing[p.ing]) cost += useCost(D.ing[p.ing], date);
+  for (const p of box?.parts || []) { const i = partIng(D, p, date); if (i) cost += useCost(i, date); }
   return cost;
 }
 
@@ -131,7 +148,9 @@ export function usage(D) {
   const out = {};
   for (const [date, entry] of Object.entries(D.days)) {
     const seen = new Set();
-    for (const bid of boxesOfDay(D, entry)) for (const p of D.box[bid].parts || []) if (D.ing[p.ing]) seen.add(p.ing);
+    for (const bid of boxesOfDay(D, entry)) for (const p of D.box[bid].parts || []) {
+      if (p.any ? ANY[p.any] : D.ing[p.ing]) seen.add(p.any ? anyId(p.any) : p.ing);
+    }
     for (const id of seen) (out[id] = out[id] || []).push(date);
   }
   for (const k in out) out[k].sort();
@@ -170,7 +189,9 @@ function covered(dates, events, lasts) {
 }
 
 // 某周的购物单（from 之前的日子不算，比如这周已经过了几天）。每样：买几次、多少钱（采购日在打折就按打折价）。
-// got[id] = {n} 买了几次 / "have" 家里还有（不算钱）；extra[id] = 手动加的几次。常备的（油盐）只提醒，不进单子
+// notes[id] = 这一次采购给这样东西写的备注（「蔬菜」这次买哪几种、Any meat 买什么）；
+// got[id] = {n} 买了几次 / "have" 家里还有（不算钱）；extra[id] = 手动加的几次。常备的（油盐）只提醒，不进单子；
+// 一直要有的（keep：牛奶、鸡蛋）每天都算要用，排没排 Box 都会按「够吃几天」回到单子上
 export function shopList(D, start, shopDay, from = start) {
   const w = D.week[start] || {};
   const shop = shopDate(start, shopDay, w.shopOn), end = addDays(start, 6);
@@ -178,22 +199,26 @@ export function shopList(D, start, shopDay, from = start) {
   const got = w.got || {}, extra = w.extra || {};
   const groups = new Map(), staples = [];
   let total = 0, count = 0, open = 0;
-  for (const id of new Set([...Object.keys(use), ...Object.keys(extra)])) {
-    const ing = D.ing[id];
+  const keeps = Object.values(D.ing).filter((i) => i.keep).map((i) => i.id);
+  for (const id of new Set([...Object.keys(use), ...Object.keys(extra), ...keeps])) {
+    const ing = ingById(D, id, shop);
     if (!ing) continue;
-    const lasts = lastsOf(ing), dates = use[id] || [];
-    const cov = covered(dates, events[id] || [], lasts);
+    const lasts = lastsOf(ing), evs = events[id] || [];
+    const first = evs.reduce((a, ev) => [a, ev.date, ev.start].sort()[0], from);
+    const dates = ing.keep ? range(first, end) : use[id] || [];
+    const cov = covered(dates, evs, lasts);
     const uses = dates.filter((d) => d >= from && d <= end && !cov.has(d)).length;
     const add = Math.max(0, Math.round(Number(extra[id]) || 0));
     const g = got[id];
     const state = g === "have" ? "have" : g ? "bought" : "";
-    if (ing.staple && !add && state !== "bought") { if (uses) staples.push(ing); continue; }   // 常备的：家里本来就有，手动加了才买
-    const n = state === "bought" && Number(g.n) > 0 ? Number(g.n) : (ing.staple ? 0 : Math.ceil(uses / lasts)) + add;
+    const hand = ing.staple && !ing.keep;
+    if (hand && !add && state !== "bought") { if (uses) staples.push(ing); continue; }   // 常备的：家里本来就有，手动加了才买
+    const n = state === "bought" && Number(g.n) > 0 ? Number(g.n) : (hand ? 0 : Math.ceil(uses / lasts)) + add;
     if (!n) continue;
     const cost = state === "have" ? 0 : n * buyPrice(ing, shop);
     const key = String(ing.store || "").trim();
     if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push({ ing, n, uses, extra: add, cost, sale: onSale(ing, shop), state });
+    groups.get(key).push({ ing, n, uses, extra: add, cost, sale: onSale(ing, shop), state, note: String((w.notes || {})[id] || "") });
     total += cost; count++;
     if (!state) open++;
   }
@@ -251,6 +276,92 @@ export function fillFromRough(D, start, w, from = start) {
     out[date] = { boxes: day };
   }
   return out;
+}
+
+// ---------- 规律要换 / 要补的东西（Restock） ----------
+// 一样：{ name, store, price, n, unit, next }：每 n 个 unit（天 / 周 / 月 / 年）一次，next = 下次预计哪天
+
+export const CYCLES = [["d", "day"], ["w", "week"], ["m", "month"], ["y", "year"]];
+const cycleN = (s) => Math.max(0, Math.round(Number(s?.n) || 0));
+export function cycleText(s) {
+  const n = cycleN(s), unit = (CYCLES.find(([k]) => k === s?.unit) || CYCLES[2])[1];
+  return n ? "every " + (n === 1 ? unit : n + " " + unit + "s") : "";
+}
+
+// 往后 n 个月的同一天（31 号遇到小月就落在月底）
+function plusMonths(date, n) {
+  const first = addMonths(date, n);
+  return first.slice(0, 8) + String(Math.min(Number(date.slice(8)), daysInMonth(first))).padStart(2, "0");
+}
+
+// 从 date 往后一个周期；没填周期就没有下一次
+export function nextAfter(date, s) {
+  const n = cycleN(s);
+  if (!n || !date) return "";
+  return s.unit === "d" ? addDays(date, n) : s.unit === "w" ? addDays(date, 7 * n) : plusMonths(date, s.unit === "y" ? 12 * n : n);
+}
+
+// 接下来几个月（这个月算第一个）要花钱的：过期的单列（当成今天换，再往后推）；周期短的一样会出现好几次
+export function coming(D, today, months = 3) {
+  const first = startOfMonth(today), end = addDays(addMonths(first, months), -1);
+  const out = { overdue: [], months: [] };
+  for (let i = 0; i < months; i++) {
+    const m = addMonths(first, i);
+    out.months.push({ key: m.slice(0, 7), label: MONTHS[Number(m.slice(5, 7)) - 1], total: 0, items: [] });
+  }
+  for (const sup of Object.values(D.sup || {})) {
+    let date = sup.next;
+    if (!date) continue;
+    if (date < today) { out.overdue.push({ sup, date }); date = nextAfter(today, sup); }
+    for (let k = 0; date && date <= end && k < 36; k++, date = nextAfter(date, sup)) {
+      const m = out.months.find((x) => x.key === date.slice(0, 7));
+      if (m) { m.items.push({ sup, date }); m.total += Number(sup.price) || 0; }
+    }
+  }
+  const byDate = (a, b) => a.date.localeCompare(b.date) || byName(a.sup, b.sup);
+  out.overdue.sort(byDate);
+  for (const m of out.months) m.items.sort(byDate);
+  return out;
+}
+
+// ---------- 导入一份清单（核对表里整理好的）：按名字对，已经有的更新、没有的新加；Box 里的东西也按名字找 ----------
+
+const ING_FIELDS = ["store", "price", "lasts", "level", "cat", "keep", "staple", "every", "from", "checked", "sale"];
+const BOX_FIELDS = ["slot", "level", "note"];
+const SUP_FIELDS = ["store", "price", "n", "unit", "next", "note"];
+const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+const pick = (r, fields) => Object.fromEntries(fields.filter((f) => r[f] !== undefined).map((f) => [f, r[f]]));
+
+export function importRows(D, payload, newId) {
+  const names = new Map(Object.values(D.ing).map((i) => [norm(i.name), i]));
+  const ing = [];
+  for (const r of payload?.ing || []) {
+    const name = String(r?.name || "").trim(), old = names.get(norm(name));
+    if (!name) continue;
+    const row = { store: "", price: 0, lasts: "", level: "mid", cat: "", keep: false, staple: false, every: 0, from: "", checked: "", sale: null, ...(old || {}), ...pick(r, ING_FIELDS), name, id: old?.id || newId() };
+    names.set(norm(name), row);
+    ing.push(row);
+  }
+  const boxes = new Map(Object.values(D.box).map((b) => [norm(b.name), b]));
+  const box = [];
+  for (const r of payload?.box || []) {
+    const name = String(r?.name || "").trim(), old = boxes.get(norm(name));
+    if (!name) continue;
+    const parts = (r.parts || []).map((p) => (p?.any ? { any: p.any, amt: p.amt || "" } : { ing: names.get(norm(p?.ing))?.id || "", amt: p?.amt || "" })).filter((p) => (p.any ? ANY[p.any] : p.ing));
+    const row = { slot: "", level: "", note: "", ...(old || {}), ...pick(r, BOX_FIELDS), name, parts, id: old?.id || newId() };
+    boxes.set(norm(name), row);
+    box.push(row);
+  }
+  const sups = new Map(Object.values(D.sup || {}).map((s) => [norm(s.name), s]));
+  const sup = [];
+  for (const r of payload?.sup || []) {
+    const name = String(r?.name || "").trim(), old = sups.get(norm(name));
+    if (!name) continue;
+    const row = { store: "", price: 0, n: "", unit: "m", next: "", note: "", ...(old || {}), ...pick(r, SUP_FIELDS), name, id: old?.id || newId() };
+    sups.set(norm(name), row);
+    sup.push(row);
+  }
+  return { ing, box, sup };
 }
 
 // ---------- 例子：多伦多常去的超市、大概的价格（加元），id 都以 ex- 开头，一键能删 ----------

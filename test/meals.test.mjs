@@ -168,3 +168,79 @@ test("old data (day packs, grams) reads as boxes and free-text amounts", () => {
   assert.equal(D2.days["2030-01-08"], undefined);
   assert.deepEqual(D2.week["2030-01-07"].rough, [{ box: "old-a", n: 2 }]);
 });
+
+test("any meat: a box can hold 'whichever' of a type — its level and cost are the type's, and it lands on the list per day", () => {
+  const D = data({ [NEXT]: { days: { "2026-10-12": { boxes: ["any"] }, "2026-10-13": { boxes: ["any"] } } } });
+  D.ing["ex-chicken"].cat = "meat"; D.ing["ex-salmon"].cat = "meat";
+  D.box.any = { id: "any", name: "Curry", level: "", parts: [{ any: "meat", amt: "" }, { any: "veg", amt: "" }, { ing: "ex-rice", amt: "" }] };
+  D.days = {}; for (const w of Object.values(D.week)) Object.assign(D.days, w.days || {});
+  assert.equal(M.boxLevel(D, D.box.any), "mid");   // mid + low + mid
+  close(M.boxCost(D, D.box.any, TODAY), (13.99 / 3 + 15.99 / 2) / 2 + 12.99 / 30);   // 肉 = 两种的平均；菜这一类还没东西 = 0
+  const rows = rowsOf(M.shopList(D, NEXT, 0));
+  assert.equal(rows["any:meat"].n, 2);
+  assert.equal(rows["any:meat"].ing.name, "Any meat");
+  assert.equal(M.partIng(D, { any: "nope" }), null);
+});
+
+test("always in stock: milk comes back every 'lasts' days whether or not a box uses it", () => {
+  const D = data();
+  D.ing.milk = { id: "milk", name: "Milk", store: "Longo's", price: 6, lasts: 10, level: "mid", keep: true };
+  let rows = rowsOf(M.shopList(D, NEXT, 0));
+  assert.equal(rows.milk.n, 1);                    // 7 天 ÷ 10
+  D.week[NEXT] = { ...D.week[NEXT], got: { milk: { n: 1 } } };   // 10-11 周日买的，够到 10-20
+  rows = rowsOf(M.shopList(D, LATER, 0));
+  assert.equal(rows.milk.uses, 5);                 // 10-21 ~ 10-25 没着落
+  assert.equal(rows.milk.n, 1);
+  D.ing.milk.lasts = 15;   // 10-11 买的够到 10-25，正好盖住再下一周
+  assert.equal(rowsOf(M.shopList(D, LATER, 0)).milk, undefined, "a 15-day buy covers the week after too");
+});
+
+test("import: matched by name — existing rows are updated, new ones added, box parts found by name", () => {
+  const D = data();
+  let n = 0;
+  const out = M.importRows(D, {
+    ing: [{ name: " eggs, dozen ", price: 8, cat: "basic", keep: true, junk: 1 }, { name: "牛奶", store: "Longo's", price: 6, lasts: 10 }, { name: "" }],
+    box: [{ name: "Banana", parts: [{ ing: "牛奶" }, { any: "meat" }, { any: "nope" }, { ing: "missing" }] }, { name: "咖喱饭", parts: [{ ing: "Eggs, dozen", amt: "2" }] }]
+  }, () => "new" + ++n);
+  assert.equal(out.ing.length, 2);
+  assert.deepEqual([out.ing[0].id, out.ing[0].price, out.ing[0].store, out.ing[0].keep, out.ing[0].junk], ["ex-eggs", 8, "Loblaws", true, undefined]);
+  assert.equal(out.ing[1].id, "new1");
+  assert.equal(out.box[0].id, "ex-banana");
+  assert.deepEqual(out.box[0].parts, [{ ing: "new1", amt: "" }, { any: "meat", amt: "" }]);
+  assert.deepEqual(out.box[1].parts, [{ ing: "ex-eggs", amt: "2" }]);
+});
+
+test("a note written on a shopping list line stays with that week's list", () => {
+  const D = data({ [NEXT]: { notes: { "ex-chicken": "thighs if they're on sale" } } });
+  const rows = rowsOf(M.shopList(D, NEXT, 0));
+  assert.equal(rows["ex-chicken"].note, "thighs if they're on sale");
+  assert.equal(rows["ex-broccoli"].note, "");
+});
+
+test("restock: the date one cycle on, and what's coming in the next three months", () => {
+  assert.equal(M.nextAfter("2026-10-08", { n: 30, unit: "d" }), "2026-11-07");
+  assert.equal(M.nextAfter("2026-10-08", { n: 2, unit: "w" }), "2026-10-22");
+  assert.equal(M.nextAfter("2026-01-31", { n: 1, unit: "m" }), "2026-02-28");   // 小月落在月底
+  assert.equal(M.nextAfter("2026-10-08", { n: 2, unit: "y" }), "2028-10-08");
+  assert.equal(M.nextAfter("2026-10-08", { n: "", unit: "m" }), "");
+  assert.equal(M.cycleText({ n: 1, unit: "m" }), "every month");
+  assert.equal(M.cycleText({ n: 6, unit: "w" }), "every 6 weeks");
+  const D = { sup: {
+    vit: { id: "vit", name: "Vitamin D", price: 20, n: 30, unit: "d", next: "2026-10-20" },
+    brush: { id: "brush", name: "Brush heads", price: 35, n: 3, unit: "m", next: "2026-09-15" },
+    phone: { id: "phone", name: "Phone", price: 900, n: 3, unit: "y", next: "2027-03-01" },
+    blank: { id: "blank", name: "No date yet", price: 5, n: 1, unit: "m", next: "" }
+  } };
+  const C = M.coming(D, TODAY);
+  assert.deepEqual(C.overdue.map((x) => x.sup.id), ["brush"]);
+  assert.deepEqual(C.months.map((m) => m.key + " " + m.label), ["2026-10 Oct", "2026-11 Nov", "2026-12 Dec"]);
+  // 维生素 30 天一次：三个月里出现三次；牙刷头过期了，当成今天换，下一次在三个月后（窗口外）；手机和没填日期的不在
+  assert.deepEqual(C.months.map((m) => m.items.map((x) => x.sup.id + " " + x.date)), [["vit 2026-10-20"], ["vit 2026-11-19"], ["vit 2026-12-19"]]);
+  assert.deepEqual(C.months.map((m) => m.total), [20, 20, 20]);
+});
+
+test("import also takes things to restock, matched by name", () => {
+  const D = { ing: {}, box: {}, sup: { a: { id: "a", name: "Vitamin D", price: 20, n: 30, unit: "d", next: "2026-10-20" } } };
+  const out = M.importRows(D, { sup: [{ name: "vitamin d", store: "Costco" }, { name: "Shampoo" }, { name: " " }] }, () => "new");
+  assert.deepEqual(out.sup.map((x) => [x.id, x.store, x.price, x.unit]), [["a", "Costco", 20, "d"], ["new", "", 0, "m"]]);
+});

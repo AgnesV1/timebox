@@ -2,6 +2,7 @@
 // 可拖的元素带 data-drag="task:<id>"、"item:<id>"、"regular:<计划 id>"（池里的规律计划）或 "ghost:<rt id>"（以后某天的预览）；
 // 能放的地方带 data-drop="day:<日期>" 或 "pool"。
 // 备餐页：data-drag="box:<Box id>" 或 "mcopy:<日期>"（复制那天），放到 "mday:<日期>"；Box 也能放到之后某周 "mweek:<周一>"（粗排 +1）。
+// Boxes 页：data-drag="ing:<食材 id>" 或 "any:<类别>"（随便哪种），放到 "mbox:<Box id>"（"mbox:new" = 新开一个 Box）。
 // 鼠标按下移动 5px 才算开始拖，所以单击还是单击。拖到窗口上下边缘会自动滚动。
 
 let drag = null;
@@ -46,8 +47,10 @@ function move(e) {
 
 function accepts(payload, target) {
   if (target === "pool") return payload.startsWith("task:");
-  const meal = payload.startsWith("box:") || payload.startsWith("mcopy:");
-  if (target.startsWith("mday:")) return meal;
+  const part = payload.startsWith("ing:") || payload.startsWith("any:");
+  const meal = part || payload.startsWith("box:") || payload.startsWith("mcopy:");
+  if (target.startsWith("mbox:")) return part;
+  if (target.startsWith("mday:")) return meal && !part;
   if (target.startsWith("mweek:")) return payload.startsWith("box:");
   return !meal && target.startsWith("day:");
 }

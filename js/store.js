@@ -859,13 +859,14 @@ export function deleteTime(id) {
 // 都存在 Settings 页里，一样东西一行（不用改 Code.gs，一格也不会太长）：
 //   meal-ing:<id> 常买的东西 / meal-box:<id> 一顿 / meal-week:<这周第一天> 这周：days（日期 → {boxes} / {off}）、
 //   粗排 rough（[{box, n}]）、买了没有 got、手动加的 extra、shopped、skip、note / meal-prefs 目标
+//   meal-sup:<id> 规律要换 / 要补的东西（Restock：价格、每隔多久、下次哪天）；这周的行里还有 notes（采购单上写的备注）
 //   （meal-pack:<id> 是 10-08 那版的 Day pack，现在只在读旧数据时展开成 Box）
-const MEAL_RE = /^meal-(ing|box|pack|week):(.+)$/;
+const MEAL_RE = /^meal-(ing|box|pack|week|sup):(.+)$/;
 const mealKey = (kind, id) => "meal-" + kind + ":" + id;
 const OLD_UNIT = { g: "g", kg: "g", oz: "g", lb: "g", ml: "ml", L: "ml", "fl oz": "ml", gal: "ml" };
 
 export function meals() {
-  const D = { ing: {}, box: {}, pack: {}, week: {}, days: {} };
+  const D = { ing: {}, box: {}, pack: {}, week: {}, sup: {}, days: {} };
   for (const [key, r] of Object.entries(S.data.settings)) {
     const m = MEAL_RE.exec(key);
     if (m && r.value && typeof r.value === "object") D[m[1]][m[2]] = { ...r.value, id: m[2] };
@@ -974,6 +975,12 @@ export function checkDeal(id, sale) {
 
 export function addMealExamples(rows) {
   change(() => { for (const kind of ["ing", "box", "pack", "week"]) for (const r of rows[kind] || []) putMeal(kind, r.id, r); }, "Examples added — remove them under Groceries");
+}
+
+export function importMeals(rows) {
+  const n = (rows.ing || []).length, b = (rows.box || []).length, s = (rows.sup || []).length;
+  change(() => { for (const kind of ["ing", "box", "sup"]) for (const r of rows[kind] || []) putMeal(kind, r.id, r); },
+    "Imported " + n + (n === 1 ? " grocery" : " groceries") + " · " + b + (b === 1 ? " box" : " boxes") + (s ? " · " + s + " to restock" : ""));
 }
 
 export function clearMealExamples() {

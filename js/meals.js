@@ -197,7 +197,6 @@ function covered(dates, events, lasts) {
 }
 
 // 某周的购物单（from 之前的日子不算，比如这周已经过了几天）。每样：买几次、多少钱（采购日在打折就按打折价）。
-// notes[id] = 这一次采购给这样东西写的备注（「蔬菜」这次买哪几种、Any meat 买什么）；
 // got[id] = {n} 买了几次 / "have" 家里还有（不算钱）；extra[id] = 手动加的几次。常备的（油盐）只提醒，不进单子；
 // 一直要有的（keep：牛奶、鸡蛋）每天都算要用，排没排 Box 都会按「够吃几天」回到单子上
 export function shopList(D, start, shopDay, from = start) {
@@ -226,13 +225,21 @@ export function shopList(D, start, shopDay, from = start) {
     const cost = state === "have" ? 0 : n * buyPrice(ing, shop);
     const key = String(ing.store || "").trim();
     if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push({ ing, n, uses, extra: add, cost, sale: onSale(ing, shop), state, note: String((w.notes || {})[id] || "") });
+    groups.get(key).push({ ing, n, uses, extra: add, cost, sale: onSale(ing, shop), state });
     total += cost; count++;
     if (!state) open++;
   }
   const list = [...groups.entries()].map(([store, items]) => ({ store, items: items.sort((a, b) => byName(a.ing, b.ing)), cost: items.reduce((a, r) => a + r.cost, 0) }))
     .sort((a, b) => (!a.store - !b.store) || a.store.localeCompare(b.store));
   return { start, shop, from, groups: list, total, count, open, staples: staples.sort(byName) };
+}
+
+// 这一次采购的备注：一个大框（week.memo），标了 Shopped 就清掉。
+// 以前是每样东西各写一条（notes[id]）：还没改过的，先拼成「名字: 备注」一行一条给大框
+export function shopMemo(D, w) {
+  if (typeof w?.memo === "string") return w.memo;
+  return Object.entries(w?.notes || {}).filter(([, text]) => String(text || "").trim())
+    .map(([id, text]) => { const name = ingById(D, id)?.name; return (name ? name + ": " : "") + String(text).trim(); }).join("\n");
 }
 
 // 下次去买：这周和下周里第一个还没买（没标 Shopped、没跳过）的；这周剩下的日子什么都不缺就看下周

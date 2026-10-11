@@ -210,11 +210,14 @@ test("import: matched by name — existing rows are updated, new ones added, box
   assert.deepEqual(out.box[1].parts, [{ ing: "ex-eggs", amt: "2" }]);
 });
 
-test("a note written on a shopping list line stays with that week's list", () => {
-  const D = data({ [NEXT]: { notes: { "ex-chicken": "thighs if they're on sale" } } });
-  const rows = rowsOf(M.shopList(D, NEXT, 0));
-  assert.equal(rows["ex-chicken"].note, "thighs if they're on sale");
-  assert.equal(rows["ex-broccoli"].note, "");
+test("one note for the whole shop; older per-line notes are carried into it", () => {
+  const old = data({ [NEXT]: { notes: { "ex-chicken": "thighs if they're on sale", "any:veg": " bok choy ", "gone": "x", "ex-broccoli": "" } } });
+  assert.equal(M.shopMemo(old, old.week[NEXT]), "Chicken breast: thighs if they're on sale\nAny veg: bok choy\nx");
+  const D = data({ [NEXT]: { memo: "ask about the fish", notes: { "ex-chicken": "old" } } });
+  assert.equal(M.shopMemo(D, D.week[NEXT]), "ask about the fish");
+  assert.equal(M.shopMemo(data({ [NEXT]: { memo: "", notes: { "ex-chicken": "old" } } }), { memo: "", notes: { "ex-chicken": "old" } }), "", "cleared stays cleared");
+  assert.equal(M.shopMemo(D, undefined), "");
+  assert.equal(rowsOf(M.shopList(D, NEXT, 0))["ex-chicken"].note, undefined);
 });
 
 test("restock: the date one cycle on, and what's coming in the next three months", () => {

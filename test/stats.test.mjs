@@ -6,12 +6,15 @@ const TODAY = "2026-10-05";
 const ctx = (over = {}) => ({ today: TODAY, projects: [], items: [], tasks: [], capacity: { default: 240, weekly: null, overrides: {} }, log: {}, level: true, ...over });
 
 test("period ranges and the one before", () => {
-  assert.deepEqual(S.periodRange("d30", TODAY), { from: "2026-09-06", to: TODAY });
+  assert.deepEqual(S.periodRange("season", TODAY), { from: "2026-10-01", to: "2026-12-31" });
+  assert.deepEqual(S.periodRange("season", "2027-02-14"), { from: "2027-01-01", to: "2027-03-31" });
   assert.deepEqual(S.periodRange("week", TODAY), { from: "2026-10-05", to: "2026-10-11" });
   assert.deepEqual(S.periodRange("month", TODAY), { from: "2026-10-01", to: "2026-10-31" });
   assert.deepEqual(S.periodRange("year", TODAY), { from: "2026-01-01", to: "2026-12-31" });
   assert.deepEqual(S.previousRange("month", S.periodRange("month", TODAY)), { from: "2026-09-01", to: "2026-09-30" });
-  assert.deepEqual(S.previousRange("d30", S.periodRange("d30", TODAY)), { from: "2026-08-07", to: "2026-09-05" });
+  assert.deepEqual(S.previousRange("season", S.periodRange("season", TODAY)), { from: "2026-07-01", to: "2026-09-30" });
+  assert.equal(S.shiftAnchor("season", "2026-11-20", 1), "2027-02-01");
+  assert.equal(S.shiftAnchor("season", "2026-02-20", -1), "2025-11-01");
   assert.equal(S.shiftAnchor("month", "2026-01-31", 1), "2026-02-01");
 });
 

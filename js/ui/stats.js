@@ -1,4 +1,4 @@
-// 统计页（电脑）。最上面：看哪段时间（Day / Week / Month / Year / 30 days / 自己选两头）、只看哪个项目 / 计划、只看深度。
+// 统计页（电脑）。最上面：看哪段时间（Day / Week / Month / Season / Year / 自己选两头）、只看哪个项目 / 计划、只看深度。
 // 下面两个页签：
 //   Time —— 时间去哪了：花了多久、其中多少是深度、每天的柱子、一天 24 小时的饼图、时间表（项目 × 日子）、几点在干活
 //   Plan —— 计划执行得怎样：做完多少、守住几天线、估时准不准、各项目、没做完的原因、项目健康
@@ -8,7 +8,7 @@ import * as store from "../store.js";
 import * as S from "../stats.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
-import { fmtMin, fmtShort, fmtDay, fmtClock, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays } from "../dates.js";
+import { fmtMin, fmtShort, fmtDay, fmtClock, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf } from "../dates.js";
 import { healthPill, groupsOf, projectOptions } from "./common.js";
 import { hourLabel } from "../day.js";
 import { parseTimes } from "../times.js";
@@ -24,14 +24,14 @@ let pieMode = "day";  // 饼图：day = 一天 24 小时都算 / logged = 只看
 let adjust = false;   // 饼图底下「Adjust」开着
 const tips = {};   // 图表 id → 每根柱子的读数
 
-const PREV = { day: "the day before", week: "last week", d30: "the 30 days before", month: "last month", year: "last year", custom: "the stretch before" };
+const PREV = { day: "the day before", week: "last week", month: "last month", season: "last season", year: "last year", custom: "the stretch before" };
 const pct = (v) => Math.round(v * 100) + "%";
 const share = (v, total) => (total > 0 ? (v / total < 0.005 ? "<1%" : pct(v / total)) : "—");
 const groupName = (p) => String(p.group || "").trim() || p.name || "";
 
 function remember() {
   const l = store.local();
-  if (!kind) kind = S.PERIODS[l.statsKind] ? l.statsKind : "d30";
+  if (!kind) kind = S.PERIODS[l.statsKind] ? l.statsKind : "season";
   if (!tab) tab = l.statsTab === "plan" ? "plan" : "time";
 }
 
@@ -64,6 +64,7 @@ function rangeLabel(r) {
   const other = (d) => (d.slice(0, 4) !== String(new Date().getFullYear()) ? ", " + d.slice(0, 4) : "");
   if (kind === "day") return fmtDay(r.from) + other(r.from);
   if (kind === "month") return MONTHS_LONG[Number(r.from.slice(5, 7)) - 1] + " " + y;
+  if (kind === "season") return "Q" + quarterOf(r.from) + " " + y;
   if (kind === "year") return y;
   return fmtShort(r.from) + " – " + fmtShort(r.to) + other(r.to);
 }

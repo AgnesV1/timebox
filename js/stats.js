@@ -1,27 +1,30 @@
 // 统计的计算：只算数，不碰页面。时间单位都是分钟。
-// 看的是一段时间（一天 / 一周 / 一个月 / 一年 / 最近 30 天 / 自己选的两头）里：花了多少时间、其中多少是深度（Deep）、
+// 看的是一段时间（一天 / 一周 / 一个月 / 一个季度 / 一年 / 自己选的两头）里：花了多少时间、其中多少是深度（Deep）、
 // 做完了多少、守住了几天安全线、估时准不准、各项目、星期几、没做完的原因；
 // 时间去向（一天 24 小时：睡觉、吃饭洗澡、家务按默认值算，剩下 = 记下来的 + 没记的）、时间表（项目 × 日子）。
 // 只看某个项目 / 只看深度：页面先把 ctx.tasks 筛好再传进来，这里不用管。
 
-import { addDays, diffDays, range, weekday, startOfWeek, startOfMonth, addMonths, daysInMonth, isoOf } from "./dates.js";
+import { addDays, diffDays, range, weekday, startOfWeek, startOfMonth, startOfQuarter, addMonths, daysInMonth, isoOf } from "./dates.js";
 import * as E from "./engine.js";
 import { parseTimes } from "./times.js";
 import { hourMinutes, isCommute, COMMUTE_BLOCKS } from "./day.js";
 
-export const PERIODS = { day: "Day", week: "Week", month: "Month", year: "Year", d30: "30 days", custom: "Custom" };
+export const PERIODS = { day: "Day", week: "Week", month: "Month", season: "Season", year: "Year", custom: "Custom" };
 
 export function periodRange(kind, anchor, weekStartsOn = "monday") {
   if (kind === "day") return { from: anchor, to: anchor };
   if (kind === "week") { const from = startOfWeek(anchor, weekStartsOn); return { from, to: addDays(from, 6) }; }
   if (kind === "month") { const from = startOfMonth(anchor); return { from, to: addDays(from, daysInMonth(from) - 1) }; }
   if (kind === "year") { const y = Number(anchor.slice(0, 4)); return { from: isoOf(y, 1, 1), to: isoOf(y, 12, 31) }; }
-  return { from: addDays(anchor, -29), to: anchor };
+  // 季度（Season）：Q1 = 1–3 月……
+  const from = startOfQuarter(anchor);
+  return { from, to: addDays(addMonths(from, 3), -1) };
 }
 
 // 上一段：同样长短、紧挨着的前一段
 export function previousRange(kind, r, weekStartsOn) {
   if (kind === "month") return periodRange("month", addMonths(r.from, -1), weekStartsOn);
+  if (kind === "season") return periodRange("season", addMonths(r.from, -3), weekStartsOn);
   if (kind === "year") return periodRange("year", isoOf(Number(r.from.slice(0, 4)) - 1, 1, 1), weekStartsOn);
   const len = diffDays(r.from, r.to) + 1;
   return { from: addDays(r.from, -len), to: addDays(r.from, -1) };
@@ -32,7 +35,7 @@ export function shiftAnchor(kind, anchor, n) {
   if (kind === "week") return addDays(anchor, 7 * n);
   if (kind === "month") return addMonths(anchor, n);
   if (kind === "year") return isoOf(Number(anchor.slice(0, 4)) + n, Number(anchor.slice(5, 7)), 1);
-  return addDays(anchor, 30 * n);
+  return addMonths(anchor, 3 * n);
 }
 
 const num = (v) => Number(v) || 0;

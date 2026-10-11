@@ -3,9 +3,13 @@
 // 通勤日的固定时段画灰，正在计时的那段画到现在；「现在」是横在当前那圈上的一道短线。
 // 平时它是屏幕下方一个半透明的半圆（在计时浮条上面）；往上拖，它跟着手指升起、变大，时间段从 6 点起一段段亮起；
 // 松手过了三分之一就升到屏幕中间，不然落回去；甩一下也行（看松手前的速度）。点一下也能升起 / 落下；升起时点外面、往下拖、按 Esc 落回。
+// 落着的时候只有两圈环本身接手指（样式里 pointer-events: stroke），别的地方的点击穿过去给下面的列表；
+// 圆盘正下方（浮条上沿）一个小签：这一天做了多少深度（◆ Deep），设了每天的目标就带上目标。
 
 import * as store from "../store.js";
 import * as D from "../day.js";
+import * as E from "../engine.js";
+import { lifeOf } from "../stats.js";
 import { parseTimes } from "../times.js";
 import { esc, on } from "../dom.js";
 import { fmtDay, fmtMin } from "../dates.js";
@@ -46,6 +50,17 @@ function collect(c, d) {
   return D.arcs(list);
 }
 
+// 这一天的深度分钟：标了 Deep 的任务花掉的时间；正在计时的那个算到现在
+function deepMin(c, d) {
+  const run = store.timer();
+  return store.tasksOn(d).reduce((a, t) => a + (t.deep ? E.spentMin(t) + (run?.taskId === t.id && d === c.today && t.status !== "done" ? Math.floor((Date.now() - Number(run.start)) / 60000) : 0) : 0), 0);
+}
+
+function deepText(c, d) {
+  const min = deepMin(c, d), goal = lifeOf(c).deepGoal;
+  return min > 0 || (goal > 0 && d === c.today) ? "◆ Deep " + fmtMin(min) + (goal > 0 ? " / " + fmtMin(goal) : "") : "";
+}
+
 function centerHTML(c, d) {
   const x = pieces[picked];
   if (x) {
@@ -53,8 +68,9 @@ function centerHTML(c, d) {
       (x.kind === "fixed" ? "<em>Commute day</em>" : x.kind === "live" ? "<em>Running</em>" : "<em class=\"num\">" + fmtMin(x.min) + "</em>");
   }
   const total = store.tasksOn(d).reduce((a, t) => a + parseTimes(t.times).reduce((s, x) => s + x.min, 0), 0);
+  const deep = deepText(c, d);
   return "<b>" + esc(fmtDay(d)) + "</b><span class=\"num\">" + (total ? fmtMin(total) + " timed" : "Nothing timed yet") + "</span>" +
-    (store.isCommuteDay(d) ? "<em>Commute day</em>" : "");
+    (deep ? "<span class=\"num\">" + esc(deep) + "</span>" : "") + (store.isCommuteDay(d) ? "<em>Commute day</em>" : "");
 }
 
 function sunHTML(c, d) {
@@ -75,7 +91,8 @@ function sunHTML(c, d) {
     '<circle class="trk day" r="' + RO + '"/><circle class="trk night" r="' + RI + '"/>' +
     '<path class="sweep" data-ring="outer" d=""/><path class="sweep" data-ring="inner" d=""/>' +
     '<g class="arcs">' + arcs + "</g>" + now + '<g class="hours">' + labels + "</g></svg>" +
-    '<div class="sun-c">' + centerHTML(c, d) + "</div></div>";
+    '<div class="sun-c">' + centerHTML(c, d) + "</div></div>" +
+    (deepText(c, d) ? '<p class="sun-deep num">' + esc(deepText(c, d)) + "</p>" : "");
 }
 
 // 按 p 点亮：从 6 点起，已经「升过」的时间段亮起来；扫过的那一截画一道光
@@ -83,6 +100,7 @@ function paint() {
   const el = host?.querySelector(".sun");
   if (!el) return;
   el.style.setProperty("--p", p.toFixed(3));
+  host.style.setProperty("--p", p.toFixed(3));   // 小签跟着淡出
   const lit = p * 1440;
   el.querySelectorAll(".arc").forEach((a) => a.classList.toggle("lit", Number(a.dataset.t) < lit || p >= 0.999));
   const outer = Math.min(lit, 720), inner = Math.max(lit, 720);

@@ -14,7 +14,7 @@ let scope = "this";    // 重复任务改动作用到哪些：this / following /
 let delAsk = false;    // 删重复任务时正在问删哪些
 let rep = null;        // 正在设重复：{pattern, days, len, until}
 
-const SERIES_FIELDS = ["title", "est", "optional"];
+const SERIES_FIELDS = ["title", "est", "optional", "deep"];
 const PATTERNS = [["", "Doesn't repeat"], ["daily", "Every day"], ["weekdays", "Weekdays (Mon–Fri)"], ["weekly", "Every week, same day"], ["custom", "Pick days…"]];
 const weekOrder = () => (store.prefs().weekStartsOn === "sunday" ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0]);
 // 这个任务属于哪个规律计划：给出它的规则（带计划 id）；不是重复的就是 null
@@ -89,6 +89,7 @@ function editorHTML(t) {
     (rule ? "" : '<label class="field"><span>Plan</span><select data-f="projectId">' + projectOptions(projects, t.projectId) + "</select></label>") +
     (item ? '<p class="hint">Part of <b>' + esc(item.title) + "</b> · " + fmtMin(st.progress) + " of " + fmtMin(st.est) + " done</p>" : "") +
     '<label class="check"><input type="checkbox" data-f="optional"' + (t.optional ? " checked" : "") + "> Optional — nice to do, not a must</label>" +
+    '<label class="check"><input type="checkbox" data-f="deep"' + (t.deep ? " checked" : "") + "> ◆ Deep work — focused, one thing at a time</label>" +
     repeatHTML(t, rule) +
     '<label class="field"><span>Details</span><textarea data-f="desc" rows="4" placeholder="Steps, links, anything">' + esc(t.desc || "") + "</textarea></label>" +
     footHTML(t, rule) + "</div>";

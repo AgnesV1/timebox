@@ -3,6 +3,7 @@
 //   Boxes（#meals/boxes）：一个 Box = 一顿 = 几样东西（用量随便写），低中高自动定（也能手动），一天份大概多少钱；
 //     左边一排架子按类别摆着常买的东西，拖到 Box 上就加进去；每类最前面的「Any meat」= 随便哪种，买的时候再挑
 //   Plan（#meals）：最上面是「下次采购」的单子；然后是这一轮还没看的打折、这周和下周按天放 Box、之后四周四个框粗排
+//     （到了周五，这周就不再显示，从下周看起）
 //   Restock（#meals/restock）：规律要换 / 要补的非食物：价格、每隔多久、下次哪天；最上面按月列接下来三个月要花的
 // 「下次采购」手机上也有：顶栏的 🛒 进 #shop，只列要买的东西（不写价钱和说明，写了备注的带着备注），在超市里打勾；下面挤着一张「Coming up」。
 
@@ -25,6 +26,10 @@ const fmtDue = (d, T) => fmtDay(d) + (d.slice(0, 4) === T.slice(0, 4) ? "" : ", 
 const dueText = (d, T) => { const n = diffDays(T, d); return n > 1 ? "in " + n + " days" : n === 1 ? "tomorrow" : n === 0 ? "today" : -n + (n === -1 ? " day late" : " days late"); };
 const slotName = (s) => (M.SLOTS.find(([k]) => k === s) || ["", "Any"])[1];
 const weekOf = (date) => startOfWeek(date, store.prefs().weekStartsOn);
+// 排餐和采购从哪一周看起：到了周五就是下一周（见 M.planStart）
+const planWeek = (today) => M.planStart(today, store.prefs().weekStartsOn);
+// 一周相对今天叫什么
+const weekName = (start, today) => ["This week", "Next week", "Week after"][diffDays(weekOf(today), start) / 7] || "Week of " + fmtShort(start);
 const sel = (yes) => (yes ? " selected" : "");
 const afterRender = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));   // 重画排在下一帧
 const dot = (lv) => '<i class="lvdot lv-' + lv + '" title="' + M.levelName(lv) + '"></i>';
@@ -78,7 +83,7 @@ export function shopHTML(c, phone) {
 
 // 手机顶栏 🛒 上的数字：下次采购还剩几样没买
 export function shopCount(c) {
-  const L = M.nextShop(store.meals(), c.today, weekOf(c.today), store.mealPrefs().shopDay);
+  const L = M.nextShop(store.meals(), c.today, planWeek(c.today), store.mealPrefs().shopDay);
   return L ? L.open : 0;
 }
 
@@ -95,8 +100,8 @@ function introHTML(onGroceries = false) {
 
 function nextShopHTML(D, c, phone) {
   const pr = store.mealPrefs();
-  const L = M.nextShop(D, c.today, weekOf(c.today), pr.shopDay);
-  if (!L) return '<section class="mcard nextshop"><header><h3>Next shop</h3><span class="msub">This week and next are both shopped or skipped.</span></header></section>';
+  const L = M.nextShop(D, c.today, planWeek(c.today), pr.shopDay);
+  if (!L) return '<section class="mcard nextshop"><header><h3>Next shop</h3><span class="msub">Both weeks are shopped or skipped.</span></header></section>';
   const n = diffDays(c.today, L.shop);
   const when = n > 1 ? fmtDay(L.shop) + " · in " + n + " days" : n === 1 ? "Tomorrow" : n === 0 ? "Today" : fmtDay(L.shop) + " · " + -n + (n === -1 ? " day ago" : " days ago");
   const budget = Number(pr.budget) || 0;
@@ -140,7 +145,7 @@ function nextShopHTML(D, c, phone) {
 
 function planHTML(D, c) {
   if (!Object.keys(D.box).length && !Object.keys(D.ing).length) return introHTML();
-  const pr = store.mealPrefs(), w0 = weekOf(c.today);
+  const pr = store.mealPrefs(), w0 = planWeek(c.today), w1 = addDays(w0, 7);
   const boxes = Object.values(D.box).sort(bySlot);
   const palette = boxes.length
     ? '<div class="mpalette"><span class="msub">Drag a box onto a day</span>' + boxes.map((b) =>
@@ -148,7 +153,7 @@ function planHTML(D, c) {
       dot(M.boxLevel(D, b)) + "<b>" + esc(b.name || "Untitled") + "</b><small>" + slotName(b.slot) + "</small></span>").join("") + "</div>"
     : '<p class="mpalette msub">No boxes yet — <a href="#meals/boxes">make a few</a>, then drag them onto the days.</p>';
   return nextShopHTML(D, c, false) + dealsHTML(D, c.today) + palette +
-    weekHTML(D, c, w0, "This week", pr) + weekHTML(D, c, addDays(w0, 7), "Next week", pr) +
+    weekHTML(D, c, w0, weekName(w0, c.today), pr) + weekHTML(D, c, w1, weekName(w1, c.today), pr) +
     '<section class="mlater"><h3 class="msec">Later <small>four weeks, rough</small></h3><div class="rgrid">' +
     [2, 3, 4, 5].map((k) => roughHTML(D, addDays(w0, 7 * k), pr, boxes)).join("") + "</div></section>";
 }
@@ -523,7 +528,7 @@ export function initMeals(rerender) {
     if (el.matches("select, textarea, input")) return;
     const act = el.dataset.act, D = store.meals(), T = store.today();
     const start = el.dataset.week, id = el.dataset.id;
-    if (act === "meal-examples") store.addMealExamples(M.examples(T, weekOf(T), D));
+    if (act === "meal-examples") store.addMealExamples(M.examples(T, planWeek(T), D));
     else if (act === "meal-clear-examples") store.clearMealExamples();
     else if (act === "meal-prefs") openEditor({ kind: "prefs" });
     else if (act === "meal-import") openEditor({ kind: "import" });

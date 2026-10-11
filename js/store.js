@@ -15,7 +15,7 @@ const KEYED = { log: "date", settings: "key" };
 
 // 只把这些字段发给表格；项目名这种是表格自己填的
 const FIELDS = {
-  tasks: ["date", "title", "est", "actual", "order", "status", "reason", "optional", "projectId", "itemId", "times", "desc"],
+  tasks: ["date", "title", "est", "actual", "order", "status", "reason", "optional", "deep", "projectId", "itemId", "times", "desc"],
   projects: ["name", "group", "kind", "place", "status", "deadline", "start", "early", "rule", "color", "order", "calib"],
   items: ["title", "module", "est", "origEst", "order", "projectId"],
   log: ["date", "need", "projects"],
@@ -167,7 +167,8 @@ export function ctx() {
     log,
     level: prefs().level !== false,
     weekStartsOn: prefs().weekStartsOn,
-    commute: setting("commute", null)
+    commute: setting("commute", null),
+    life: setting("life", null)
   };
   return ctxCache;
 }
@@ -276,6 +277,7 @@ function normalize(t, raw) {
     r.status = r.status || "";
     r.est = Number(r.est) || 0;
     r.optional = Boolean(r.optional);
+    r.deep = Boolean(r.deep);
     r.projectId = r.projectId || "";
     r.itemId = r.itemId || "";
     r.times = r.times || "";
@@ -357,7 +359,7 @@ export function addTask(fields) {
   change(() => {
     const itemId = fields.projectId && !fields.itemId ? itemFor(fields.projectId, fields.title, fields.est) : fields.itemId || "";
     put("tasks", {
-      id, title: "", est: 30, actual: null, status: "", reason: "", optional: false, projectId: "", times: "", desc: "",
+      id, title: "", est: 30, actual: null, status: "", reason: "", optional: false, deep: planDeep(fields.projectId), projectId: "", times: "", desc: "",
       ...fields, date, itemId, order: nextOrder(date)
     });
   });
@@ -457,7 +459,7 @@ export function scheduleItem(itemId, date) {
   const id = newId();
   change(() => put("tasks", {
     id, date, title: item.title, est: Math.round(est), actual: null, status: "", reason: "",
-    optional: false, projectId: item.projectId, itemId, times: "", desc: "", order: nextOrder(date)
+    optional: false, deep: planDeep(item.projectId), projectId: item.projectId, itemId, times: "", desc: "", order: nextOrder(date)
   }), "Scheduled");
   return id;
 }
@@ -488,6 +490,8 @@ const nextPlanOrder = () => all("projects").reduce((m, x) => Math.max(m, Number(
 const colorFor = (group) => all("projects").find((x) => group && x.group === group)?.color || PROJECT_COLORS[all("projects").length % PROJECT_COLORS.length];
 // 任务挂着的计划属于哪个项目（没有 group 的计划自己就是项目）
 const groupFor = (projectId) => { const p = get("projects", projectId); return p ? p.group || p.name || "" : ""; };
+// 计划的「默认深度」（rule.deep）：从它来的任务一开始就标成 Deep
+export const planDeep = (projectId) => Boolean(projectId && get("projects", projectId)?.rule?.deep);
 
 // p.total（分钟）：新建整块计划时只填了总时长，就建一个同名的大条目
 export function saveProject(p) {
@@ -505,6 +509,17 @@ export function saveProject(p) {
   // 刚变成「自动排」的：今天的那份马上排进来
   if (E.isAuto(row) && E.isActive(row) && (!prev || !E.isAuto(prev) || !E.isActive(prev))) autoToday(id);
   return id;
+}
+
+// 改计划的「默认深度」：已经有的任务一起改（之后单个任务还能各自改）
+export function setPlanDeep(id, on) {
+  const p = get("projects", id);
+  if (!p) return;
+  const deep = Boolean(on);
+  change(() => {
+    put("projects", { ...p, rule: { ...(p.rule || {}), deep } });
+    for (const t of all("tasks")) if (t.projectId === id && Boolean(t.deep) !== deep) put("tasks", { ...t, deep });
+  }, deep ? "Marked as deep work" : "No longer deep work");
 }
 
 // 删计划：条目一起删；做过的任务留着当记录，只是不再挂在计划上；自动排出来还没动的删掉
@@ -587,14 +602,14 @@ export function toggleCommute(date) {
 
 // 自动排出来的任务（generated：改动时间记成 1，哪台设备真改过它都比这个新）
 function putAuto(x) {
-  put("tasks", { actual: null, status: "", reason: "", optional: false, itemId: "", times: "", desc: "", ...x, order: nextOrder(x.date) }, { generated: true });
+  put("tasks", { actual: null, status: "", reason: "", optional: false, deep: false, itemId: "", times: "", desc: "", ...x, order: nextOrder(x.date) }, { generated: true });
 }
 
 // 规律计划（Auto）今天该出现、还没有的那一次
 function regularsDueToday(c) {
   return c.projects.filter((p) => E.isActive(p) && E.isRegular(p) && E.isAuto(p)).map((p) => {
     const id = R.routineTaskId(p.id, c.today), est = R.dueOn(R.ruleOf(p), c.today);
-    return est && !get("tasks", id) ? { id, date: c.today, title: p.name, est, projectId: p.id, optional: Boolean(p.rule?.optional) } : null;
+    return est && !get("tasks", id) ? { id, date: c.today, title: p.name, est, projectId: p.id, optional: Boolean(p.rule?.optional), deep: Boolean(p.rule?.deep) } : null;
   }).filter(Boolean);
 }
 
@@ -630,7 +645,7 @@ export function materialize(key) {
   if (!p) return "";
   if (!get("tasks", key)) {
     const est = R.dueOn(R.ruleOf(p), x.date) || R.minutesOn(R.ruleOf(p), x.date);
-    change(() => put("tasks", { id: key, date: x.date, title: p.name, est, actual: null, status: "", reason: "", optional: Boolean(p.rule?.optional),
+    change(() => put("tasks", { id: key, date: x.date, title: p.name, est, actual: null, status: "", reason: "", optional: Boolean(p.rule?.optional), deep: Boolean(p.rule?.deep),
       projectId: p.id, itemId: "", times: "", desc: "", order: nextOrder(x.date) }));
   }
   return key;
@@ -640,7 +655,7 @@ export function materialize(key) {
 export function placeRegular(pid, date) {
   const p = get("projects", pid);
   if (!p) return "";
-  return addTask({ date, title: p.name, est: Number(p.rule?.min) || 30, projectId: pid, optional: Boolean(p.rule?.optional) });
+  return addTask({ date, title: p.name, est: Number(p.rule?.min) || 30, projectId: pid, optional: Boolean(p.rule?.optional), deep: Boolean(p.rule?.deep) });
 }
 
 // ---------- 项目 / 子项目 ----------
@@ -677,14 +692,14 @@ const repeatLabel = (end) => (end ? "Repeats until " + fmtShort(end) : "Repeats 
 // 加任务时直接设重复：days 是一周七天的分钟数，end 是最后一天（空 = 一直）。返回第一次的 ID（那天要做的话）
 export function addRepeating(fields, days, end) {
   const start = fields.date || today();
-  const p = newRegular(fields.title, fields.projectId, { days, start, end: R.clampEnd(start, end), optional: Boolean(fields.optional) });
+  const p = newRegular(fields.title, fields.projectId, { days, start, end: R.clampEnd(start, end), optional: Boolean(fields.optional), deep: Boolean(fields.deep) });
   let first = "";
   change(() => {
     put("projects", p);
     const est = R.dueOn(R.ruleOf(p), start);
     if (est) {
       first = R.routineTaskId(p.id, start);
-      put("tasks", { id: first, date: start, title: p.name, est, actual: null, status: "", reason: "", optional: Boolean(fields.optional),
+      put("tasks", { id: first, date: start, title: p.name, est, actual: null, status: "", reason: "", optional: Boolean(fields.optional), deep: Boolean(fields.deep),
         projectId: p.id, itemId: "", times: "", desc: "", order: nextOrder(start) });
     }
   }, repeatLabel(p.rule.end));
@@ -695,7 +710,7 @@ export function addRepeating(fields, days, end) {
 export function repeatTask(id, days, end) {
   const t = get("tasks", id);
   if (!t) return id;
-  const p = newRegular(t.title, t.projectId, { days, start: t.date, end: R.clampEnd(t.date, end), optional: Boolean(t.optional) });
+  const p = newRegular(t.title, t.projectId, { days, start: t.date, end: R.clampEnd(t.date, end), optional: Boolean(t.optional), deep: Boolean(t.deep) });
   const nid = R.routineTaskId(p.id, t.date);
   change(() => {
     put("projects", p);
@@ -722,9 +737,9 @@ export function replanSeries(id, days, end) {
   }, "Repeat updated");
 }
 
-const SERIES_FIELDS = ["title", "est", "optional"];
+const SERIES_FIELDS = ["title", "est", "optional", "deep"];
 
-// 改名字、分钟、可选：只改这一次 / 这次和以后 / 全部（做过的不动，除了这一次自己）
+// 改名字、分钟、可选、深度：只改这一次 / 这次和以后 / 全部（做过的不动，除了这一次自己）
 export function editSeries(id, patch, scope) {
   const t = get("tasks", id), p = routineOf(id);
   if (!t || !p || scope === "this") return updateTask(id, patch, null, { quiet: patch.title !== undefined });
@@ -737,6 +752,7 @@ export function editSeries(id, patch, scope) {
     const plan = get("projects", p.id);
     const rule = { ...(plan.rule || {}) };
     if ("optional" in fields) rule.optional = Boolean(fields.optional);
+    if ("deep" in fields) rule.deep = Boolean(fields.deep);
     if ("est" in fields) rule.days = (rule.days || []).map((v) => (Number(v) > 0 ? Number(fields.est) || 0 : 0));
     put("projects", { ...plan, ...("title" in fields ? { name: fields.title } : {}), rule });
   }, null, { quiet: patch.title !== undefined });
@@ -844,6 +860,17 @@ export function logTime(taskId, min, to) {
   min = Math.round(Number(min) || 0);
   if (min < 1 || !get("tasks", taskId)) return;
   change(() => addTime(taskId, min, to || ""), "Logged " + min + " min");
+}
+
+// 补记一段已经做完的：哪天、几点到几点（过了零点也算）。存成那天一条 Done 的任务，带这一段时间。返回任务 id
+export function addLogged(fields, from, to) {
+  const min = (((toMin(to) - toMin(from)) % 1440) + 1440) % 1440;
+  if (min < 1) return "";
+  let id = "";
+  change(() => {
+    id = addTask({ ...fields, est: min, actual: min, status: "done", times: formatTimes([{ from: fromMin(toMin(from)), to: fromMin(toMin(to)), min }]) });
+  }, "Logged " + min + " min");
+  return id;
 }
 
 export function deleteTime(id) {

@@ -157,7 +157,9 @@ function editorHTML(p) {
     '<div class="field"><span>Place</span>' + seg("pplace", place, [["auto", "Auto"], ["pool", "Pool"]]) + "</div></div>" +
     '<p class="hint">' + HINT[kind + " " + place] + "</p>" +
     '<div class="field"><span>Color</span><div class="swatches">' + store.PROJECT_COLORS.map((col) => '<label><input type="radio" name="pcolor" data-pf="color" value="' + col + '"' + (p.color === col ? " checked" : "") + '><i style="background:' + col + '"></i></label>').join("") + "</div></div>" +
-    (kind === "regular" ? regularFields(p) : totalFields(p, isNew));
+    (kind === "regular" ? regularFields(p) : totalFields(p, isNew)) +
+    '<label class="check deepdef"><input type="checkbox" data-pdeep' + (p.rule?.deep ? " checked" : "") + "> <span>◆ Deep work by default <small>" +
+    (isNew ? "Tasks from this plan start out marked Deep." : "Marks every task of this plan, earlier ones too. Single tasks can still be changed.") + "</small></span></label>";
   if (isNew) {
     return h + '<div class="sheet-foot"><span></span><button type="button" class="btn cta" data-act="create-project">Create</button></div></div>';
   }
@@ -215,6 +217,7 @@ function readDraft(box) {
   draft.rule = { ...(draft.rule || {}) };
   box.querySelectorAll("[data-rf]").forEach((el) => { draft.rule[el.dataset.rf] = el.value; });
   if (box.querySelector("[data-rday]")) draft.rule.days = readDays(box);
+  draft.rule.deep = Boolean(box.querySelector("[data-pdeep]")?.checked);
 }
 
 function redrawDraft() {
@@ -242,9 +245,10 @@ function createPlan(box) {
   if (!name) { box.querySelector('[data-pf="name"]').focus(); return; }
   const regular = draft.kind === "regular", r = draft.rule || {};
   const start = r.start || store.today(), end = R.clampEnd(start, r.end || "");
-  const rule = !regular ? null : draft.place === "auto"
-    ? { days: r.days || [0, 0, 0, 0, 0, 0, 0], start, end }
-    : { perWeek: Math.max(1, Number(r.perWeek) || 1), min: Math.max(5, Number(r.min) || 30), start, end };
+  const deep = r.deep ? { deep: true } : {};
+  const rule = !regular ? (r.deep ? deep : null) : draft.place === "auto"
+    ? { days: r.days || [0, 0, 0, 0, 0, 0, 0], start, end, ...deep }
+    : { perWeek: Math.max(1, Number(r.perWeek) || 1), min: Math.max(5, Number(r.min) || 30), start, end, ...deep };
   if (regular && draft.place === "auto" && !rule.days.some((v) => v > 0)) { box.querySelector("[data-rday]")?.focus(); return; }
   editing = store.saveProject({
     name, group: String(draft.group || "").trim(), color: draft.color, kind: draft.kind, place: draft.place, rule,
@@ -330,6 +334,12 @@ export function initProjects(rerender) {
     }
     store.saveProject({ id: pid, rule });
     refreshProjectEditor();
+  });
+
+  // 默认深度：已有的计划一改，它的任务跟着一起改（新建框里的等 Create）
+  on(document, "change", ".project-editor [data-pdeep]", (e, el) => {
+    const pid = el.closest("[data-pid]").dataset.pid;
+    if (pid) store.setPlanDeep(pid, el.checked);
   });
 
   on(document, "change", ".project-editor [data-if]", (e, el) => {

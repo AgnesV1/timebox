@@ -6,13 +6,13 @@ var SECRET = 'CHANGE_ME';
 // 每张表：页名、主键、[字段, 表头, 类型, 标记]。列按表头文字找，可以挪位置、中间插自己的列。
 // 类型 text / num / date / bool / json / status / pstatus / clock（钟点 09:10，存成文字）。
 // 标记 calc = 脚本自己算，App 不写；hide = setup 时把这列藏起来（右键可取消隐藏）。
-var VERSION = 3;   // 页面和脚本对版本：页面不是这个版本就不收它的数据，免得新旧格式混在一起
+var VERSION = 4;   // 页面和脚本对版本：页面不是这个版本就不收它的数据，免得新旧格式混在一起
 var T = {
   // 计时记录在 Times 一格里：「09:10-09:40 30m; 20m」
   tasks: { sheet: 'Tasks', key: 'id', main: 'title', cols: [
     ['date', 'Date', 'date'], ['title', 'Task', 'text'], ['est', 'Est min', 'num'], ['actual', 'Actual min', 'num'],
     ['status', 'Status', 'status'], ['reason', 'Reason', 'text'], ['project', 'Project', 'text', 'calc'],
-    ['optional', 'Optional', 'bool'], ['times', 'Times', 'text'], ['order', 'Order', 'num', 'hide'],
+    ['optional', 'Optional', 'bool'], ['deep', 'Deep', 'bool'], ['times', 'Times', 'text'], ['order', 'Order', 'num', 'hide'],
     ['id', 'ID', 'text', 'hide'], ['projectId', 'Project ID', 'text', 'hide'], ['itemId', 'Item ID', 'text', 'hide'],
     ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide'],
     ['desc', 'Description', 'text']] },                               // Description 永远最后一列

@@ -102,3 +102,42 @@ test("times text: parse and format round-trip, hand edits in the Sheet still rea
   assert.deepEqual(T.parseTimes("  ; nonsense; 0m"), []);
   assert.equal(T.formatTimes(T.parseTimes("09:10-09:40 30m; 20m")), "09:10-09:40 30m; 20m");
 });
+
+test("logging something already done: a finished task with its time, undoable as one step", () => {
+  const id = store.addLogged({ date: "2026-10-03", title: "Reading", deep: true }, "14:00", "15:10");
+  const t = store.get("tasks", id);
+  assert.equal(t.status, "done");
+  assert.equal(t.est, 70);
+  assert.equal(t.actual, 70);
+  assert.equal(t.times, "14:00-15:10 70m");
+  assert.equal(t.deep, true);
+  assert.equal(t.date, "2026-10-03");
+  assert.equal(store.addLogged({ title: "Zero" }, "09:00", "09:00"), "", "nothing to log");
+  const late = store.get("tasks", store.addLogged({ title: "Late" }, "23:30", "0:20"));
+  assert.equal(late.actual, 50);
+  assert.equal(late.times, "23:30-00:20 50m");
+});
+
+test("deep work: a plan's default marks its tasks, old ones too, and repeats carry it", () => {
+  const pid = store.saveProject({ name: "IELTS", kind: "total", place: "pool" });
+  const before = store.addTask({ title: "Passage 1", projectId: pid });
+  assert.equal(store.get("tasks", before).deep, false);
+  store.setPlanDeep(pid, true);
+  assert.equal(store.get("projects", pid).rule.deep, true);
+  assert.equal(store.get("tasks", before).deep, true, "tasks it already had are marked");
+  assert.equal(store.get("tasks", store.addTask({ title: "Passage 2", projectId: pid })).deep, true, "new ones start out deep");
+  assert.equal(store.get("tasks", store.addTask({ title: "Light one", projectId: pid, deep: false })).deep, false, "unless you say otherwise");
+  const other = store.addTask({ title: "Dishes" });
+  assert.equal(store.get("tasks", other).deep, false);
+  store.setPlanDeep(pid, false);
+  assert.equal(store.get("tasks", before).deep, false);
+
+  const T = store.today();
+  const first = store.addRepeating({ date: T, title: "Shadowing", est: 20, deep: true }, [20, 20, 20, 20, 20, 20, 20], "");
+  assert.equal(store.get("tasks", first).deep, true);
+  const plan = store.routineOf(first);
+  assert.equal(plan.rule.deep, true);
+  store.editSeries(first, { deep: false }, "all");
+  assert.equal(store.routineOf(first).rule.deep, false);
+  assert.equal(store.get("tasks", first).deep, false);
+});

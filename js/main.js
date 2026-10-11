@@ -79,7 +79,7 @@ function sidebarHTML(c, view) {
 function captureKeep() {
   const keep = {};
   document.querySelectorAll("#main [data-keep], #pool [data-keep]").forEach((el) => {
-    keep[el.dataset.keep] = { value: el.value, start: el.selectionStart, end: el.selectionEnd };
+    keep[el.dataset.keep] = { value: el.value, checked: el.checked, start: el.selectionStart, end: el.selectionEnd };
   });
   const a = document.activeElement;
   return { keep, active: a?.dataset?.keep && a.closest("#main, #pool") ? a.dataset.keep : "" };
@@ -89,6 +89,7 @@ function restoreKeep({ keep, active }) {
   for (const [k, v] of Object.entries(keep)) {
     const el = document.querySelector('#main [data-keep="' + k + '"], #pool [data-keep="' + k + '"]');
     if (!el) continue;
+    if (el.type === "checkbox") { el.checked = Boolean(v.checked); continue; }
     if (el.value !== v.value) el.value = v.value;
     if (k === active) {
       el.focus({ preventScroll: true });
@@ -142,6 +143,7 @@ function draw() {
   // 圆盘落着的时候坐在浮条上面
   document.body.style.setProperty("--dock-h", dock.firstElementChild ? dock.firstElementChild.offsetHeight + 22 + "px" : "0px");
   renderSun(c, view === "today" && (!phone || store.local().url) ? shownDate() : "");
+  underSun();
   tick();
   restoreKeep(kept);
   paintSync();
@@ -157,7 +159,9 @@ function paintSync() {
   const pending = store.pendingCount();
   const text = st.text === "Syncing…" || st.bad || !pending ? st.text : sync.configured() ? "Unsynced changes" : st.text;
   document.querySelectorAll("[data-sync-status]").forEach((el) => {
-    el.textContent = text;
+    // 手机顶栏放不下一句话（会压住日期）：只画一个点，点一下再说是什么
+    if (el.classList.contains("psync")) { el.title = text; el.setAttribute("aria-label", text || "Sync"); el.classList.toggle("wait", !st.bad && !/^Synced/.test(text)); }
+    else el.textContent = text;
     el.closest(".sync-pill, .sync-status, .psync")?.classList.toggle("bad", st.bad);
   });
 }
@@ -231,6 +235,10 @@ setInterval(() => { if (document.visibilityState === "visible") syncThenLog(); }
 setInterval(tickDay, 60000);
 
 on(document, "click", "[data-act=sync]", () => syncThenLog());
+on(document, "click", ".psync", (e, el) => { if (el.title) toast(el.title); syncThenLog(); });
+// 圆盘落着的时候盖在列表上：下面还有内容（没滚到底）就再淡一点
+const underSun = () => document.getElementById("sun")?.classList.toggle("over", document.documentElement.scrollHeight - innerHeight - scrollY > 8);
+addEventListener("scroll", underSun, { passive: true });
 on(document, "click", "[data-act=ball]", (e, el) => { const b = el.getBoundingClientRect(); burst(b.left + b.width / 2, b.top + b.height / 2); });
 on(document, "click", "[data-act=theme-cycle]", () => {
   const next = { auto: "light", light: "dark", dark: "auto" }[store.local().theme] || "auto";

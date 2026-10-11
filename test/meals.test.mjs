@@ -244,3 +244,15 @@ test("import also takes things to restock, matched by name", () => {
   const out = M.importRows(D, { sup: [{ name: "vitamin d", store: "Costco" }, { name: "Shampoo" }, { name: " " }] }, () => "new");
   assert.deepEqual(out.sup.map((x) => [x.id, x.store, x.price, x.unit]), [["a", "Costco", 20, "d"], ["new", "", 0, "m"]]);
 });
+
+test("from Friday the plan starts at next week", () => {
+  assert.equal(M.planStart("2026-10-08"), W0, "Thursday: still this week");
+  assert.equal(M.planStart("2026-10-09"), NEXT, "Friday: jump");
+  assert.equal(M.planStart("2026-10-11"), NEXT, "Sunday, last day of a Monday week");
+  assert.equal(M.planStart("2026-10-12"), NEXT, "Monday: it is this week now");
+  // 一周从周日开始：周日到周四还是这周，周五、周六翻
+  assert.equal(M.planStart("2026-10-08", "sunday"), "2026-10-04");
+  assert.equal(M.planStart("2026-10-09", "sunday"), "2026-10-11");
+  assert.equal(M.planStart("2026-10-10", "sunday"), "2026-10-11");
+  assert.equal(M.planStart("2026-10-11", "sunday"), "2026-10-11");
+});

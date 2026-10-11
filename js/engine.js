@@ -474,7 +474,7 @@ export function autoChunks(ctx, shares, pids) {
       const left = itemState(ctx, item).unscheduled;
       if (left < 5) continue;
       const est = Math.min(need, Math.round(left));
-      out.push({ id: "au:" + item.id + ":" + ctx.today, date: ctx.today, title: item.title, est, projectId: p.id, itemId: item.id });
+      out.push({ id: "au:" + item.id + ":" + ctx.today, date: ctx.today, title: item.title, est, projectId: p.id, itemId: item.id, deep: Boolean(p.rule?.deep) });
       need -= est;
     }
   }

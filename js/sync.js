@@ -6,7 +6,7 @@ import * as store from "./store.js";
 import * as reading from "./reading.js";
 import { debounce } from "./dom.js";
 
-export const VERSION = 3;
+export const VERSION = 4;
 
 let busy = false, again = false;
 let status = { text: "", bad: false };

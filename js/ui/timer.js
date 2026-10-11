@@ -36,6 +36,8 @@ export function elapsed(start) {
 }
 
 const titleOf = (t) => '<b class="dk-title">' + esc(t.title) + "</b>";
+// ◆：这个任务是不是深度（要专心做的）。按 Start 的时候顺手定，计时中也能改
+const deepBtn = (t) => '<button type="button" class="dk-deep' + (t.deep ? " on" : "") + '" data-act="dock-deep" data-id="' + t.id + '" aria-pressed="' + Boolean(t.deep) + '" title="Deep work">◆<span>Deep</span></button>';
 
 // 浮条：在计时 → 时间 + Stop；刚停下 → Done / Partial；看着今天 → 选中的任务 + Start；别的时候不出现
 export function dockHTML(c, onToday) {
@@ -46,7 +48,7 @@ export function dockHTML(c, onToday) {
     const next = p && p !== rt.id && onToday ? store.get("tasks", p) : null;
     return '<div class="dock run" style="--bar:' + colorOf(rt) + '">' +
       '<i class="pulse" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Since ' + store.clockOf(run.start) + "</span>" + titleOf(rt) + "</div>" +
-      '<span class="dk-time num" data-since="' + run.start + '">' + elapsed(run.start) + "</span>" +
+      deepBtn(rt) + '<span class="dk-time num" data-since="' + run.start + '">' + elapsed(run.start) + "</span>" +
       '<button type="button" class="dk-btn stop" data-act="timer-stop"><i class="sq"></i>Stop</button>' +
       '<button type="button" class="icon-btn dk-x" data-act="timer-discard" aria-label="Discard this timer" title="Discard">×</button>' +
       (next ? '<button type="button" class="dk-switch" data-act="timer-start" data-id="' + next.id + '">Switch to <b>' + esc(next.title) + "</b> ▶</button>" : "") + "</div>";
@@ -63,7 +65,7 @@ export function dockHTML(c, onToday) {
   const t = store.get("tasks", pickedId(c));
   if (!t) return "";
   return '<div class="dock idle" style="--bar:' + colorOf(t) + '">' +
-    '<i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected · ' + t.est + " min planned</span>" + titleOf(t) + "</div>" +
+    '<i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected · ' + t.est + " min planned</span>" + titleOf(t) + "</div>" + deepBtn(t) +
     '<button type="button" class="dk-btn start" data-act="timer-start" data-id="' + t.id + '"><i class="tri"></i>Start</button></div>';
 }
 
@@ -103,5 +105,6 @@ export function initTimer(rerender) {
     else rerender();
   });
   on(document, "click", "[data-act=dock-close]", () => { stopped = null; rerender(); });
+  on(document, "click", "[data-act=dock-deep]", (e, el) => { const t = store.get("tasks", el.dataset.id); if (t) store.updateTask(t.id, { deep: !t.deep }); });
   setInterval(tick, 1000);
 }

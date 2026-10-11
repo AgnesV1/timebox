@@ -75,6 +75,12 @@ export function fmtShort(s) {
   return MONTHS[m - 1] + " " + d;
 }
 
+// 76 → "1:16"（时间表的格子）
+export function fmtClock(min) {
+  const v = Math.max(0, Math.round(Number(min) || 0));
+  return Math.floor(v / 60) + ":" + pad(v % 60);
+}
+
 // 45 → "45m"，90 → "1h 30m"，120 → "2h"
 export function fmtMin(min) {
   const v = Math.max(0, Math.round(Number(min) || 0));

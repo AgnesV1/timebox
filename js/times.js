@@ -26,3 +26,14 @@ export function formatTimes(list) {
 }
 
 export const sumTimes = (list) => (list || []).reduce((a, x) => a + (Number(x.min) || 0), 0);
+
+// 加任务框里一句话补记：「Reading 14:00-15:10」「Read 2:30-3」→ { title, from, to }；不是这种写法就是 null。
+// 至少一头要带冒号，「Chapter 3-4」这种不算；钟点不合理的也不算。
+export function parseLogLine(text) {
+  const m = /^(.*\S)\s+(\d{1,2})(?::(\d{2}))?\s*[-–~]\s*(\d{1,2})(?::(\d{2}))?$/.exec(String(text || "").trim());
+  if (!m || (m[3] === undefined && m[5] === undefined)) return null;
+  const [h1, m1, h2, m2] = [m[2], m[3] || 0, m[4], m[5] || 0].map(Number);
+  if (h1 > 23 || h2 > 24 || m1 > 59 || m2 > 59 || (h2 === 24 && m2 > 0)) return null;
+  if (h1 === h2 % 24 && m1 === m2) return null;
+  return { title: m[1], from: pad2(h1) + ":" + pad2(m1), to: pad2(h2 % 24) + ":" + pad2(m2) };
+}

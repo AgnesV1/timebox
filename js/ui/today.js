@@ -6,6 +6,7 @@ import * as store from "../store.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, WEEKDAYS } from "../dates.js";
+import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
 import { heroHTML, stripHTML, billHTML, colorOf, projectOf, projectOptions, segStyle, lineInfo, toast, STATUS } from "./common.js";
 import { openTaskEditor } from "./editor.js";
@@ -19,6 +20,7 @@ const logOpen = new Set();   // 已经有计时记录、又点了「+ time」要
 const seen = new Set();
 let overdueOpen = false;
 let viewDate = "";
+let focus = "";   // 点开的那一行（四个状态按钮只在这一行）
 
 export const shownDate = () => viewDate || store.today();
 export function showDate(d) { viewDate = d === store.today() ? "" : d; }
@@ -47,33 +49,52 @@ function logFormHTML(c, t, list) {
     '<button type="button" class="btn" data-act="time-log">Log</button></div>';
 }
 
-function rowHTML(c, t, tasks, phone = false) {
+// 这一天展开的是哪一行：点过的那行；没点过的话，今天 = 浮条上选中的那个，别的日子都收着
+function openOf(c, d, tasks) {
+  if (focus && tasks.some((t) => t.id === focus)) return focus;
+  return d === c.today ? pickedId(c) : "";
+}
+
+const STATUS_WORD = { done: "Done ✓", partial: "Partial", later: "Later", drop: "Drop" };
+
+// 一行任务。只有展开的那行（openId）带四个状态按钮、计时记录、补时间的框和原因；
+// 别的行只有一行字：分钟、名字、计划，右边是记了多久和状态。电脑上鼠标移上去，状态按钮浮在右边
+function rowHTML(c, t, tasks, phone = false, openId = "") {
   const p = projectOf(t);
+  const open = t.id === openId;
   const fin = t.status === "done" || t.status === "partial";
   const why = t.status === "partial" || t.status === "later" || t.status === "drop";
-  const open = openDesc.has(t.id);
+  const desc = open && openDesc.has(t.id);
   const fresh = !seen.has(t.id);
   seen.add(t.id);
   const movedOn = t.status === "later" && c.tasks.some((x) => !x.status && x.date > t.date && x.title === t.title);
   const list = store.timeOf(t.id);
-  const form = fin && t.date <= c.today && (!list.length || logOpen.has(t.id));
+  const form = open && fin && t.date <= c.today && (!list.length || logOpen.has(t.id));
   const picked = timeable(t, c.today) && pickedId(c) === t.id;
-  const running = store.timer()?.taskId === t.id;
-  return '<div class="row st-' + (t.status || "open") + (t.optional ? " opt" : "") + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + '" data-id="' + t.id + '" style="--i:' + tasks.indexOf(t) + '">' +
+  const run = store.timer();
+  const running = run?.taskId === t.id;
+  const chips = '<div class="chips' + (open ? "" : " hov") + '">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
+    (open && t.status === "later" && !movedOn && !phone ? '<button type="button" class="chip ghost" data-act="tomorrow">→ Tomorrow</button>' : "") + "</div>";
+  const total = store.timeTotal(t.id);
+  const side = open ? "" : '<span class="rside">' +
+    (running ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : total ? '<span class="num">' + fmtMin(total) + "</span>" : "") +
+    (t.status ? '<b class="stw">' + STATUS_WORD[t.status] + "</b>" : "") + "</span>";
+  return '<div class="row st-' + (t.status || "open") + (t.optional ? " opt" : "") + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + (open ? " open" : "") + '" data-id="' + t.id + '" style="--i:' + tasks.indexOf(t) + '">' +
     '<div class="est num" data-drag-row title="Drag to reorder"><b>' + t.est + '</b><i class="grip"></i></div>' +
     '<div class="bar" style="--bar:' + colorOf(t) + '"></div>' +
     '<div class="body"><div class="line">' +
     '<div class="task" data-act="desc">' + (t.optional ? '<span class="tag">Optional</span>' : "") + esc(t.title) +
     (E.isRoutine(t) ? ' <span class="rt" title="Routine">↻</span>' : "") +
+    (t.deep ? ' <span class="dp" title="Deep work">◆ Deep</span>' : "") +
     (p && p.name.trim().toLowerCase() !== t.title.trim().toLowerCase() ? ' <span class="pj" style="--pc:' + esc(p.color) + '">' + esc(p.name) + "</span>" : "") +
-    (t.desc && !open ? '<span class="more"> ⋯</span>' : "") + "</div>" +
+    (t.desc && !desc ? '<span class="more"> ⋯</span>' : "") + "</div>" + side +
     (phone ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") +
-    "</div>" + timesHTML(c, t, list, form) +
-    (open ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Details">' + esc(t.desc || "") + "</textarea>" : "") +
-    '<div class="chips">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
-    (t.status === "later" && !movedOn && !phone ? '<button type="button" class="chip ghost" data-act="tomorrow">→ Tomorrow</button>' : "") + "</div>" +
+    "</div>" + (open ? timesHTML(c, t, list, form) : "") +
+    (desc ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Details">' + esc(t.desc || "") + "</textarea>" : "") +
+    (open || !phone ? chips : "") +
     (form ? logFormHTML(c, t, list) : "") +
-    (why ? '<input class="reason" data-act="reason" data-keep="reason-' + t.id + '" placeholder="Why?" value="' + esc(t.reason || "") + '">' : "") +
+    (why && open ? '<input class="reason" data-act="reason" data-keep="reason-' + t.id + '" placeholder="Why?" value="' + esc(t.reason || "") + '">' : "") +
+    (why && !open && t.reason ? '<p class="why">' + esc(t.reason) + "</p>" : "") +
     "</div></div>";
 }
 
@@ -93,14 +114,16 @@ function overdueHTML(c) {
     '<div class="od-actions"><button type="button" class="btn primary" data-act="spread">Spread them out</button><button type="button" class="btn" data-act="all-today">All to today</button></div></section>';
 }
 
-// 加任务；电脑上多两个下拉：怎么重复、重复多久（一键排好整段时间）
+// 加任务；电脑上多两个下拉：怎么重复、重复多久（一键排好整段时间）。◆ Deep = 这是要专心做的（选了计划就跟计划的默认）。
+// 名字后面带一段钟点（Reading 14:00-15:10）= 已经做完的，直接记成一条 Done
 function addHTML(c, d, phone = false) {
   const projects = c.projects.filter(E.isActive);
   return '<form class="add" data-add="' + d + '" autocomplete="off">' +
-    '<div class="add-main"><input name="title" data-keep="add-title-' + d + '" placeholder="Add a task" enterkeyhint="done">' +
+    '<div class="add-main"><input name="title" data-keep="add-title-' + d + '" placeholder="' + (phone || d > c.today ? "Add a task" : "Add a task, or log one: Reading 14:00-15:10") + '" enterkeyhint="done">' +
     '<input name="est" class="min num" data-keep="add-est-' + d + '" type="number" inputmode="numeric" value="30" min="5" step="5" aria-label="Minutes">' +
     '<button class="btn cta" type="submit">Add</button></div>' +
-    '<div class="add-more">' + (projects.length ? '<select name="project" aria-label="Plan">' + projectOptions(projects) + "</select>" : "") +
+    '<div class="add-more">' + (projects.length ? '<select name="project" data-keep="add-plan-' + d + '" aria-label="Plan">' + projectOptions(projects) + "</select>" : "") +
+    '<label class="deep-tog" title="Deep work: focused, one thing at a time"><input type="checkbox" name="deep" data-keep="add-deep-' + d + '"><span>◆ Deep</span></label>' +
     (phone ? "" : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
       '<option value="weekdays">↻ Weekdays</option><option value="weekly">↻ Every ' + WEEKDAYS[weekday(d)] + "</option></select>" +
       '<select name="for" aria-label="For how long">' + R.LENGTHS.map(([v, l]) => '<option value="' + v + '"' + (v === R.DEFAULT_LENGTH ? " selected" : "") + ">for " + l + "</option>").join("") + "</select>") +
@@ -110,12 +133,13 @@ function addHTML(c, d, phone = false) {
 export function dayParts(c, d) {
   const tasks = store.tasksOn(d);
   const isToday = d === c.today;
+  const openId = openOf(c, d, tasks);
   return {
     hero: heroHTML(c, d),
     strip: stripHTML(c, d, tasks),
     bill: isToday ? billHTML(E.yesterdayBill(c)) : "",
     overdue: isToday ? overdueHTML(c) : "",
-    list: '<div class="list" data-list="' + d + '">' + (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">No tasks for this day.</div>') + ghostsHTML(c, d) + "</div>",
+    list: '<div class="list" data-list="' + d + '">' + (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, false, openId)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">No tasks for this day.</div>') + ghostsHTML(c, d) + "</div>",
     add: addHTML(c, d)
   };
 }
@@ -149,6 +173,7 @@ function phoneHTML(c) {
   let d = shownDate();
   if (Math.abs(diffDays(c.today, d)) > PHONE_SPAN) { showDate(c.today); d = c.today; }
   const tasks = store.tasksOn(d);
+  const openId = openOf(c, d, tasks);
   const days = Array.from({ length: PHONE_SPAN * 2 + 1 }, (_, i) => addDays(c.today, i - PHONE_SPAN));
   const strip = '<nav class="daystrip" aria-label="Days">' + days.map((x) =>
     '<button type="button" class="dpill' + (x === c.today ? " today" : "") + (x === d ? " on" : "") + (x < c.today ? " past" : "") + '" data-act="day-pick" data-date="' + x + '" aria-label="' + fmtDay(x) + '">' +
@@ -161,9 +186,9 @@ function phoneHTML(c) {
   const toBuy = shopCount(c);   // 下次采购还剩几样（顶栏的 🛒）
   return '<div class="dayview phone-day" data-date="' + d + '">' +
     '<header class="phead"><div class="l"><h1 data-act="day-today">' + fmtDay(d) + '</h1><span class="ball" data-act="ball" role="button" aria-label="Sparkles"></span></div>' +
-    '<div class="r"><span class="psync" data-sync-status></span><a class="pread pshop" href="#shop" aria-label="Next shop">' + icon("cart") + (toBuy ? "<span>" + toBuy + "</span>" : "") + '</a><a class="pread" href="#reading">' + icon("reading") + '<span>Reading</span></a><a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
+    '<div class="r"><button type="button" class="psync" data-sync-status aria-label="Sync"></button><a class="pread pshop" href="#shop" aria-label="Next shop">' + icon("cart") + (toBuy ? "<span>" + toBuy + "</span>" : "") + '</a><a class="pread" href="#reading">' + icon("reading") + '<span>Reading</span></a><a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
     (store.local().url ? bar + meta + '<div class="list" data-list="' + d + '">' +
-      (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + ghostsHTML(c, d) + "</div>" + addHTML(c, d, true)
+      (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true, openId)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + ghostsHTML(c, d) + "</div>" + addHTML(c, d, true)
       : connectHTML()) + "</div>";
 }
 
@@ -199,6 +224,7 @@ export function initToday(rerender) {
     if (act !== "edit" && !act.startsWith("day-")) animateNext();
     if (act === "status") {
       logOpen.delete(id);
+      focus = id;   // 标完接着要填原因 / 补时间：这一行展开
       if (store.get("tasks", id)?.status !== el.dataset.s) cheer(el, el.dataset.s);
       store.setStatus(id, el.dataset.s);
     } else if (act === "edit") openTaskEditor(id);
@@ -217,15 +243,27 @@ export function initToday(rerender) {
     else if (act === "day-pick") go(el.dataset.date);
   });
 
-  // 点任务：今天能计时的、还没选中的 → 选中它（底部浮条换成它）；已经选中的再点名字 → 展开说明
-  on(document, "click", ".dayview .row", (e, row) => {
+  // 点任务：还没展开的 → 展开它（今天能计时的同时选中，底部浮条换成它）；已经展开的再点名字 → 展开说明
+  on(document, "click", ".dayview .row[data-id]", (e, row) => {
     if (e.target.closest("button, input, textarea, select, label, a, [data-drag-row]")) return;
     const id = row.dataset.id, c = store.ctx();
-    if (timeable(store.get("tasks", id), c.today) && pickedId(c) !== id) { animateNext(); pick(id); rerender(); return; }
+    if (!row.classList.contains("open")) {
+      focus = id;
+      if (timeable(store.get("tasks", id), c.today) && pickedId(c) !== id) pick(id);
+      animateNext();
+      rerender();
+      return;
+    }
     if (!e.target.closest("[data-act=desc]")) return;
     if (openDesc.has(id)) openDesc.delete(id); else openDesc.add(id);
     animateNext();
     rerender();
+  });
+
+  // 加任务时选了计划：Deep 跟着这个计划的默认
+  on(document, "change", ".dayview form[data-add] select[name=project]", (e, el) => {
+    const box = el.form.querySelector("[name=deep]");
+    if (box) box.checked = store.planDeep(el.value);
   });
 
   // 「几小时几分」只留数字
@@ -251,14 +289,29 @@ export function initToday(rerender) {
     // 「Gym 40」「Gym 40m」：末尾的数字当分钟
     const m = title.match(/^(.*\S)\s+(\d{1,3})\s*(m|min|mins)?$/i);
     if (m && Number(m[2]) >= 5) { title = m[1]; est = Number(m[2]); }
-    const fields = { date: form.dataset.add, title, est, projectId: String(f.get("project") || "") };
+    const fields = { date: form.dataset.add, title, est, projectId: String(f.get("project") || ""), deep: f.get("deep") === "on" };
     animateNext();
+    const clear = () => {
+      const input = document.querySelector('[data-keep="add-title-' + form.dataset.add + '"]');
+      if (input) { input.value = ""; input.focus(); }
+      const deep = document.querySelector('[data-keep="add-deep-' + form.dataset.add + '"]');
+      if (deep) deep.checked = false;
+      const plan = document.querySelector('[data-keep="add-plan-' + form.dataset.add + '"]');
+      if (plan) plan.value = "";
+    };
+    // 「Reading 14:00-15:10」：已经做完的，记成一条 Done（以后的日子不认）
+    const log = fields.date <= store.today() ? parseLogLine(String(f.get("title") || "")) : null;
+    if (log) {
+      focus = store.addLogged({ date: fields.date, title: log.title, projectId: fields.projectId, deep: fields.deep }, log.from, log.to);
+      clear();
+      return;
+    }
     const how = String(f.get("repeat") || "");
     const id = how ? store.addRepeating(fields, R.daysFor(how, fields.date, est), R.endFor(fields.date, Number(f.get("for")))) : store.addTask(fields);
     if (how) form.querySelector("[name=repeat]").value = "";
+    focus = id;
     if (form.dataset.add === store.today()) { pick(id); rerender(); }   // 加完就选中，底部点 Start 就能开始
-    const input = document.querySelector('[data-keep="add-title-' + form.dataset.add + '"]');
-    if (input) { input.value = ""; input.focus(); }
+    clear();
   });
 
   // 按住左边的分钟数上下拖，调整顺序；拖到屏幕边缘会自动滚动

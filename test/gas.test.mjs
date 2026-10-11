@@ -42,6 +42,7 @@ test("setup migrates the old sheet in place, with backups, and slims it", () => 
   const head = tasks.header();
   assert.equal(head[head.length - 1], "Description");
   assert.ok(head.includes("ID") && head.includes("Project ID") && head.includes("Optional") && head.includes("Times"));
+  assert.ok(head.includes("Deep") && head.indexOf("Deep") < head.indexOf("Description"), "the new Deep column is added before Description");
   assert.ok(!head.includes("Category") && !head.includes("Done order"), head.join(","));
   const rows = tasks.objects();
   assert.equal(rows.length, 6);
@@ -83,7 +84,7 @@ test("pull, push, LWW, delete and log merge", () => {
   const raw = (body) => JSON.parse(g.sandbox.doPost({ postData: { contents: JSON.stringify(body) } }).getContent());
   assert.equal(raw({ secret: "CHANGE_ME", pull: true, push: { rows: { tasks: [{ id: "x", title: "old", updated: 9e15 }] } } }).error, "old page", "pages without a version are turned away");
   const hello = g.post({ secret: "CHANGE_ME" });
-  assert.equal(hello.version, 3);
+  assert.equal(hello.version, 4);
   const all = g.post({ secret: "CHANGE_ME", pull: true, since: 0 });
   assert.equal(all.ok, true);
   assert.equal(all.pull.tables.tasks.length, 6);
@@ -293,4 +294,21 @@ test("reading: every tab is searched, new things go to a Want tab, duplicates ar
   assert.equal(bear.mark, "😊");
   assert.equal(bear.note, "=chef");
   assert.ok(!again.types.includes("Want"));
+});
+
+test("deep work: the flag goes up, shows as a tick in the Deep column, and comes back", () => {
+  const g = oldSheet();
+  g.sandbox.setup();
+  const now = Date.now() + 1000;
+  const res = g.post({ secret: "CHANGE_ME", pull: true, since: 0, push: { rows: { tasks: [
+    { id: "deep-1", date: "2026-10-04", title: "Mock test", est: 60, deep: true, updated: now },
+    { id: "deep-2", date: "2026-10-04", title: "Dishes", est: 15, deep: false, updated: now }
+  ] } } });
+  const back = Object.fromEntries(res.pull.tables.tasks.map((t) => [t.id, t]));
+  assert.equal(back["deep-1"].deep, true);
+  assert.equal(back["deep-2"].deep, false);
+  const rows = g.ss.getSheetByName("Tasks").objects();
+  assert.equal(rows.find((r) => r.ID === "deep-1").Deep, true);
+  assert.equal(rows.find((r) => r.ID === "deep-2").Deep, "");
+  assert.equal(back[Object.keys(back).find((k) => back[k].title === "Gym")].deep, false, "old rows are simply not deep");
 });

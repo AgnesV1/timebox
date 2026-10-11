@@ -1,20 +1,58 @@
-// 统计页（电脑）：选一段时间，看花了多少、做完多少、守住几天线、估时准不准，
-// 每天用了多少 vs 计划多少、各分类、星期几的节奏、没做完的原因、各项目计划和实际。
-// 图都是 HTML 画的；每张图都有「表格」可以展开，鼠标移上去有读数。
+// 统计页（电脑）。最上面：看哪段时间（Day / Week / Month / Year / 30 days / 自己选两头）、只看哪个项目 / 计划、只看深度。
+// 下面两个页签：
+//   Time —— 时间去哪了：花了多久、其中多少是深度、每天的柱子、一天 24 小时的饼图、时间表（项目 × 日子）、几点在干活
+//   Plan —— 计划执行得怎样：做完多少、守住几天线、估时准不准、各项目、没做完的原因、项目健康
+// 图都是 HTML / SVG 画的，鼠标移上去有读数，数字都另有一份表格 / 图例可以看。「+ Add time」补一段忘了记的时间。
 
 import * as store from "../store.js";
 import * as S from "../stats.js";
+import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
-import { fmtMin, fmtShort, fmtDay, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays } from "../dates.js";
-import { healthPill, groupsOf } from "./common.js";
+import { fmtMin, fmtShort, fmtDay, fmtClock, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays } from "../dates.js";
+import { healthPill, groupsOf, projectOptions } from "./common.js";
 import { hourLabel } from "../day.js";
+import { parseTimes } from "../times.js";
+import { openModal, closeModal, modalSheet } from "./modal.js";
 
-let kind = "d30";
+let kind = "";        // 档位；上次选的记在这台设备上
+let tab = "";         // time / plan
 let anchor = "";
+let custom = null;    // 自己选的两头 { from, to }
+let pick = "";        // 只看："" 全部 / "g:<项目>" / "p:<计划 id>" / "none" 没挂计划的
+let deepOnly = false;
+let pieMode = "day";  // 饼图：day = 一天 24 小时都算 / logged = 只看记下来的
+let adjust = false;   // 饼图底下「Adjust」开着
 const tips = {};   // 图表 id → 每根柱子的读数
 
-const PREV = { week: "last week", d30: "the 30 days before", month: "last month", year: "last year" };
+const PREV = { day: "the day before", week: "last week", d30: "the 30 days before", month: "last month", year: "last year", custom: "the stretch before" };
 const pct = (v) => Math.round(v * 100) + "%";
+const share = (v, total) => (total > 0 ? (v / total < 0.005 ? "<1%" : pct(v / total)) : "—");
+const groupName = (p) => String(p.group || "").trim() || p.name || "";
+
+function remember() {
+  const l = store.local();
+  if (!kind) kind = S.PERIODS[l.statsKind] ? l.statsKind : "d30";
+  if (!tab) tab = l.statsTab === "plan" ? "plan" : "time";
+}
+
+function rangeOf(c) {
+  if (kind !== "custom") return S.periodRange(kind, anchor, store.prefs().weekStartsOn);
+  if (!custom) custom = { from: addDays(c.today, -6), to: c.today };
+  return { ...custom };
+}
+
+// 只看某个项目 / 计划 / 没挂计划的 / 深度：把任务（和计划）先筛好，后面的计算照旧
+function scope(c) {
+  if (pick && pick !== "none" && !c.projects.some((p) => pick === "p:" + p.id || pick === "g:" + groupName(p))) pick = "";   // 选的那个已经没了
+  if (!pick && !deepOnly) return { c, by: "group", on: false };
+  const plans = new Set(c.projects.filter((p) => (pick.startsWith("p:") ? p.id === pick.slice(2) : pick.startsWith("g:") && groupName(p) === pick.slice(2))).map((p) => p.id));
+  const known = new Set(c.projects.map((p) => p.id));
+  const inPick = (t) => !pick || (pick === "none" ? !known.has(t.projectId) : plans.has(t.projectId));
+  return {
+    c: { ...c, tasks: c.tasks.filter((t) => inPick(t) && (!deepOnly || t.deep)), projects: pick ? c.projects.filter((p) => plans.has(p.id)) : c.projects },
+    by: pick && pick !== "none" ? "plan" : "group", on: true
+  };
+}
 
 function niceMax(v) {
   const steps = [30, 60, 90, 120, 180, 240, 300, 360, 480, 600, 720, 900, 1200, 1500, 1800, 2400, 3000, 3600, 4800, 6000, 7200, 9000, 12000, 18000];
@@ -23,9 +61,11 @@ function niceMax(v) {
 
 function rangeLabel(r) {
   const y = r.from.slice(0, 4);
+  const other = (d) => (d.slice(0, 4) !== String(new Date().getFullYear()) ? ", " + d.slice(0, 4) : "");
+  if (kind === "day") return fmtDay(r.from) + other(r.from);
   if (kind === "month") return MONTHS_LONG[Number(r.from.slice(5, 7)) - 1] + " " + y;
   if (kind === "year") return y;
-  return fmtShort(r.from) + " – " + fmtShort(r.to) + (r.to.slice(0, 4) !== String(new Date().getFullYear()) ? ", " + r.to.slice(0, 4) : "");
+  return fmtShort(r.from) + " – " + fmtShort(r.to) + other(r.to);
 }
 
 // 和上一段比：▲ / ▼ 加文字，涨了是好事就用「好」的颜色
@@ -41,39 +81,44 @@ function tile(label, value, sub, dlt = "") {
   return '<div class="tile"><p class="tl">' + label + '</p><p class="tv">' + value + "</p>" + (sub ? '<p class="ts">' + sub + "</p>" : "") + dlt + "</div>";
 }
 
-function kpis(s, p) {
+// Time 页签：花了多久、其中多少深度、有几天动了（看一天时换成做完几个）
+function timeKpis(s, p) {
+  const deepSub = s.goal
+    ? (kind === "day" ? "of your " + fmtMin(s.goal) + " goal" : "Goal " + fmtMin(s.goal) + " a day · reached on " + s.goalHit + " of " + s.goalDays + (s.goalDays === 1 ? " day" : " days"))
+    : s.deep ? pct(s.deep / s.spent) + " of the time you logged" : "Mark a task ◆ Deep to see this";
+  return '<div class="kpis three">' +
+    tile("Time spent", fmtMin(s.spent), kind === "day" ? fmtMin(s.planned) + " planned" : s.days ? "About " + fmtMin(s.avgSpent) + " a day" : "Nothing yet", delta(s.spent, p.spent, fmtMin)) +
+    tile("◆ Deep work", fmtMin(s.deep), deepSub, delta(s.deep, p.deep, fmtMin)) +
+    (kind === "day"
+      ? tile("Tasks done", String(s.done), s.counted ? "of " + s.counted + " planned" : "No tasks that day", delta(s.done, p.done, String))
+      : tile("Active days", String(s.active), "of " + s.days + " days", delta(s.active, p.active, String))) +
+    "</div>";
+}
+
+// Plan 页签：做完多少、守住几天线、估时准不准。只看某个项目时线不显示（线是按全部计划算的）
+function planKpis(s, p, filtered) {
   const acc = s.accuracy;
   const accText = acc === null ? "Fill in Actual min on done tasks to see this"
     : Math.abs(acc - 1) < 0.05 ? "Your estimates are about right"
     : acc > 1 ? "Tasks take " + pct(acc - 1) + " longer than planned" : "Tasks take " + pct(1 - acc) + " less than planned";
-  return '<div class="kpis">' +
-    tile("Time spent", fmtMin(s.spent), s.days ? "About " + fmtMin(s.avgSpent) + " a day" : "Nothing yet", delta(s.spent, p.spent, fmtMin)) +
+  const line = !filtered && s.lineDays;
+  return '<div class="kpis three">' +
     tile("Tasks done", String(s.done), s.counted ? pct(s.rate) + " of " + s.counted + " planned" : "No tasks yet", delta(s.done, p.done, String)) +
-    tile("Line held", s.lineDays ? s.held + " / " + s.lineDays : "—", s.lineDays ? "days you reached the project line" : "Projects with deadlines set a line", s.lineDays && p.lineDays ? delta(s.held / s.lineDays, p.held / p.lineDays, pct) : "") +
-    tile("Active days", String(s.active), "of " + s.days + " days", delta(s.active, p.active, String)) +
+    tile("Line held", line ? s.held + " / " + s.lineDays : "—", filtered ? "Shown when you look at everything" : s.lineDays ? "days you reached the project line" : "Projects with deadlines set a line", line && p.lineDays ? delta(s.held / s.lineDays, p.held / p.lineDays, pct) : "") +
     tile("Estimates", acc === null ? "—" : acc.toFixed(2) + "×", accText + (s.timed ? " · " + s.timed + " timed" : "")) +
     "</div>";
 }
 
-// ---------- 每天用了多少（柱）vs 计划多少（底色）和当天的线（横线） ----------
+// ---------- 每天的柱子：Time 页签看记了多久（深度在底下），Plan 页签看做了多少 vs 计划多少 ----------
 
-function trendHTML(s) {
-  const ws = store.prefs().weekStartsOn;
-  const rows = kind === "year" ? S.weekly(s.daily, ws) : s.daily;
-  const max = niceMax(Math.max(60, ...rows.map((r) => Math.max(r.spent, r.planned, r.line))));
-  const h = (v) => Math.min(100, (v / max) * 100).toFixed(2) + "%";
-  const unit = kind === "year" ? "week" : "day";
-  tips.trend = rows.map((r) => ({
-    title: kind === "year" ? "Week of " + fmtShort(r.date) : fmtDay(r.date),
-    rows: [["Done", fmtMin(r.spent), "dn"], ["Planned", fmtMin(r.planned), "pl"], ["Line", r.line ? fmtMin(r.line) : "—", "ln"]]
-  }));
-  // 横轴只标几个点：周 = 星期几；年 = 每月第一周标月份（按这一周的周四算，跨年那周不会多标一个月）；其他 = 1 号和 5 的倍数。
-  // 离上一个标签不到 3 根柱子的就不标，免得挤在一起
+// 横轴标签：一周以内 = 星期几；按周合起来的 = 每月第一周标月份（按这一周的周四算，跨年那周不会多标一个月）；其他 = 1 号和 5 的倍数。
+// 离上一个标签不到 3 根柱子的就不标，免得挤在一起
+function axisLabels(rows, byWeek) {
   let lastShown = -9;
-  const label = (r, i) => {
-    if (kind === "week") return WEEKDAYS[weekday(r.date)];
+  return rows.map((r, i) => {
+    if (rows.length <= 7 && !byWeek) return WEEKDAYS[weekday(r.date)];
     let text = "";
-    if (kind === "year") {
+    if (byWeek) {
       const m = addDays(r.date, 3).slice(5, 7);
       if (i === 0 || addDays(rows[i - 1].date, 3).slice(5, 7) !== m) text = MONTHS[Number(m) - 1];
     } else {
@@ -84,19 +129,65 @@ function trendHTML(s) {
     if (!text || i - lastShown < 3) return "";
     lastShown = i;
     return text;
-  };
+  });
+}
+
+// 三个多月以上一天一根太挤，按周合起来
+const trendRows = (s) => { const byWeek = s.daily.length > 92; return { byWeek, rows: byWeek ? S.weekly(s.daily, store.prefs().weekStartsOn) : s.daily }; };
+
+// Time 页签的柱子：每天记了多久，底下深色那段是深度；设了深度目标就画一条虚线
+function timeTrendHTML(s) {
+  const { byWeek, rows } = trendRows(s);
+  const max = niceMax(Math.max(60, ...rows.map((r) => Math.max(r.spent, r.goal || 0))));
+  const h = (v) => Math.min(100, (v / max) * 100).toFixed(2) + "%";
+  const top = Math.max(...rows.map((r) => r.spent));
+  const labels = axisLabels(rows, byWeek);
+  tips.ttrend = rows.map((r) => ({
+    title: byWeek ? "Week of " + fmtShort(r.date) : fmtDay(r.date),
+    rows: [["Logged", fmtMin(r.spent), "dn"], ["Deep", fmtMin(r.deep), "dp"], ...(r.goal ? [["Deep goal", fmtMin(r.goal), "gl"]] : [])]
+  }));
+  const insight = s.days
+    ? "You logged <b>" + fmtMin(s.avgSpent) + "</b> a day on average" + (s.deep ? ", <b>" + fmtMin(s.deep / s.days) + "</b> of it deep." : ".")
+    : "This period hasn't started yet.";
+  return '<figure class="card chart"><figcaption><div><h3>Time per ' + (byWeek ? "week" : "day") + "</h3><p>" + insight + "</p></div>" +
+    '<div class="legend"><span><i class="k dp"></i>Deep</span><span><i class="k dn"></i>Other</span>' + (s.goal ? '<span><i class="k gl"></i>Deep goal</span>' : "") + "</div></figcaption>" +
+    '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtMin(max * f) : "0") + "</span></i>").join("") +
+    '<div class="cols" data-chart="ttrend">' + rows.map((r, i) =>
+      '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.ttrend[i].title + ": " + fmtMin(r.spent) + " logged, " + fmtMin(r.deep) + " deep") + '">' +
+      (r.spent ? '<i class="dn solo" style="height:' + h(r.spent) + '"></i>' : "") +
+      (r.deep ? '<i class="dp' + (r.deep >= r.spent - 0.5 ? " full" : "") + '" style="height:' + h(r.deep) + '"></i>' : "") +
+      (r.goal && !r.future ? '<i class="gl" style="bottom:' + h(r.goal) + '"></i>' : "") +
+      (top > 0 && r.spent === top ? '<b class="cap-label num" style="bottom:' + h(r.spent) + '">' + fmtMin(r.spent) + "</b>" : "") + "</div>").join("") + "</div></div>" +
+    '<div class="xaxis">' + labels.map((t) => "<span>" + t + "</span>").join("") + "</div>" +
+    '<details class="tview"><summary>Show as table</summary><table><thead><tr><th>' + (byWeek ? "Week of" : "Day") + "</th><th>Logged</th><th>Deep</th></tr></thead><tbody>" +
+    rows.filter((r) => !r.future).map((r) => "<tr><td>" + fmtShort(r.date) + '</td><td class="num">' + fmtMin(r.spent) + '</td><td class="num">' + fmtMin(r.deep) + "</td></tr>").join("") +
+    "</tbody></table></details></figure>";
+}
+
+// Plan 页签的柱子：每天做了多少（柱）、计划多少（底色）、当天的线（横线；只看某个项目时不画，线是按全部计划算的）
+function trendHTML(s, filtered) {
+  const { byWeek, rows: all } = trendRows(s);
+  const rows = filtered ? all.map((r) => ({ ...r, line: 0 })) : all;
+  const max = niceMax(Math.max(60, ...rows.map((r) => Math.max(r.spent, r.planned, r.line))));
+  const h = (v) => Math.min(100, (v / max) * 100).toFixed(2) + "%";
+  const unit = byWeek ? "week" : "day";
+  const labels = axisLabels(rows, byWeek);
+  tips.trend = rows.map((r) => ({
+    title: byWeek ? "Week of " + fmtShort(r.date) : fmtDay(r.date),
+    rows: [["Done", fmtMin(r.spent), "dn"], ["Planned", fmtMin(r.planned), "pl"], ["Line", r.line ? fmtMin(r.line) : "—", "ln"]]
+  }));
   const insight = s.days
     ? "On average you planned <b>" + fmtMin(s.avgPlanned) + "</b> and spent <b>" + fmtMin(s.avgSpent) + "</b> a day" + (s.avgCap ? ", with " + fmtMin(s.avgCap) + " available." : ".")
     : "This period hasn't started yet.";
-  return '<figure class="card chart"><figcaption><div><h3>Time per ' + unit + "</h3><p>" + insight + "</p></div>" +
-    '<div class="legend"><span><i class="k dn"></i>Done</span><span><i class="k pl"></i>Planned</span><span><i class="k ln"></i>Project line</span></div></figcaption>' +
+  return '<figure class="card chart"><figcaption><div><h3>Planned and done, per ' + unit + "</h3><p>" + insight + "</p></div>" +
+    '<div class="legend"><span><i class="k dn"></i>Done</span><span><i class="k pl"></i>Planned</span>' + (filtered ? "" : '<span><i class="k ln"></i>Project line</span>') + "</div></figcaption>" +
     '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtMin(max * f) : "0") + "</span></i>").join("") +
     '<div class="cols" data-chart="trend">' + rows.map((r, i) =>
       '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.trend[i].title + ": " + fmtMin(r.spent) + " done of " + fmtMin(r.planned) + " planned") + '">' +
       '<i class="pl" style="height:' + h(r.planned) + '"></i>' + (r.future ? "" : '<i class="dn" style="height:' + h(r.spent) + '"></i>') +
       (r.line ? '<i class="ln" style="bottom:' + h(r.line) + '"></i>' : "") + "</div>").join("") + "</div></div>" +
-    '<div class="xaxis">' + rows.map((r, i) => "<span>" + label(r, i) + "</span>").join("") + "</div>" +
-    '<details class="tview"><summary>Show as table</summary><table><thead><tr><th>' + (kind === "year" ? "Week of" : "Day") + "</th><th>Done</th><th>Planned</th><th>Line</th></tr></thead><tbody>" +
+    '<div class="xaxis">' + labels.map((t) => "<span>" + t + "</span>").join("") + "</div>" +
+    '<details class="tview"><summary>Show as table</summary><table><thead><tr><th>' + (byWeek ? "Week of" : "Day") + "</th><th>Done</th><th>Planned</th><th>Line</th></tr></thead><tbody>" +
     rows.filter((r) => !r.future).map((r) => "<tr><td>" + fmtShort(r.date) + '</td><td class="num">' + fmtMin(r.spent) + '</td><td class="num">' + fmtMin(r.planned) + '</td><td class="num">' + (r.line ? fmtMin(r.line) : "—") + "</td></tr>").join("") +
     "</tbody></table></details></figure>";
 }
@@ -208,20 +299,162 @@ function projectsHTML(c, s) {
     "</tbody></table></div></section>";
 }
 
-export function statsHTML(c) {
-  if (!anchor) anchor = c.today;
-  const ws = store.prefs().weekStartsOn;
-  const r = S.periodRange(kind, anchor, ws);
-  const p = S.previousRange(kind, r, ws);
-  const s = S.summarize(c, r.from, r.to);
-  const prev = S.summarize(c, p.from, p.to);
-  return '<div class="stats"><header class="page-head"><div><h2>' + rangeLabel(r) + "</h2></div>" +
+// ---------- 时间去向：一天 24 小时的饼图 ----------
+// 粗的那圈：睡觉 / 吃饭洗澡 / 家务（灰，按默认值算）→ 各项目（计划的颜色）→ 没挂计划 → 没记的；外面细的一圈 = 每个项目里深度的那段。
+// 右边的图例就是表格：名字、时长、占比。项目超过 6 个，后面的合成一片。
+
+const LIFE_COLOR = { sleep: "var(--k-sleep)", care: "var(--k-care)", chores: "var(--k-chores)" };
+const HATCH = "repeating-linear-gradient(45deg, var(--muted) 0 1.5px, var(--k-blank) 1.5px 5px)";
+
+function pieParts(pie) {
+  const proj = pie.parts.filter((x) => x.kind === "project");
+  if (proj.length <= 6) return pie.parts;
+  const keep = new Set(proj.slice(0, 5).map((x) => x.key));
+  const tail = proj.filter((x) => !keep.has(x.key));
+  const sum = (k) => tail.reduce((a, x) => a + (x[k] || 0), 0);
+  const more = { key: "more", name: tail.length + " more", min: sum("min"), deep: sum("deep"), kind: "more" };
+  const out = [];
+  for (const x of pie.parts) {
+    if (x.kind !== "project" || keep.has(x.key)) out.push(x);
+    else if (!out.includes(more)) out.push(more);
+  }
+  return out;
+}
+
+function pieHTML(c, s, rest) {
+  const logged = pieMode === "logged";
+  const pie = S.clockPie(c, s, { trackedOnly: logged, rest });
+  const parts = pieParts(pie), life = S.lifeOf(c);
+  const color = (x) => (x.kind === "life" ? LIFE_COLOR[x.key] : x.kind === "blank" ? "var(--k-blank)" : x.kind === "rest" ? "url(#st-hatch)" : x.kind === "more" ? "var(--k-None)" : esc(x.color || "var(--c-None)"));
+  const swatch = (x) => (x.kind === "rest" ? HATCH : color(x));
+  const what = logged ? "of what you logged" : "of the whole " + (kind === "day" ? "day" : "period");
+  tips.pie = parts.map((x) => ({ title: x.name, rows: [[what, fmtMin(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.deep > 0 ? [["deep", fmtMin(x.deep), "dp"]] : [])] }));
+  // 每片之间留一条缝（周长的 0.5% ≈ 2px）；pathLength = 100，所以长度直接写百分比
+  let at = 0;
+  const arcs = parts.map((x, i) => {
+    const len = (x.min / pie.total) * 100, start = at;
+    at += len;
+    const dash = (v) => { const d = Math.max(0.2, v - (parts.length > 1 ? 0.5 : 0)); return d.toFixed(3) + " " + (100 - d).toFixed(3); };
+    return '<circle class="slice" data-i="' + i + '" r="42" pathLength="100" stroke="' + color(x) + '" stroke-dasharray="' + dash(len) + '" stroke-dashoffset="' + (-start).toFixed(3) + '"/>' +
+      (x.deep > 0 ? '<circle class="dring" r="53" pathLength="100" stroke-dasharray="' + dash((x.deep / pie.total) * 100) + '" stroke-dashoffset="' + (-start).toFixed(3) + '"/>' : "");
+  }).join("");
+  const legend = parts.map((x) => '<li title="' + esc(x.name + (x.deep > 0 ? " · " + fmtMin(x.deep) + " deep" : "")) + '"><i style="background:' + swatch(x) + '"></i><span>' + esc(x.name) +
+    '</span><b class="num">' + fmtMin(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("");
+  const lede = logged ? "Only the time you logged." : "24 hours a day, up to today. Sleep, meals &amp; care and weekend chores are your usual amounts.";
+  const field = (k, label, unit, v) => "<label><span>" + label + '</span><input class="num" type="number" min="0" max="24" step="0.5" data-life="' + k + '" data-keep="life-' + k + '" value="' + (v ? Math.round(v / 6) / 10 : "") + '" placeholder="' + (k === "deepGoal" ? "none" : "0") + '"><em>' + unit + "</em></label>";
+  return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">' + lede +
+    ' <button type="button" class="link" data-act="life-adjust" aria-expanded="' + adjust + '">' + (adjust ? "Done" : "Adjust") + "</button></p></div>" +
+    '<span class="seg"><button type="button" data-act="pie-mode" data-v="day"' + (logged ? "" : ' class="on"') + '>24h</button><button type="button" data-act="pie-mode" data-v="logged"' + (logged ? ' class="on"' : "") + ">Logged only</button></span></header>" +
+    (adjust ? '<div class="life-form">' + field("sleep", "Sleep", "h a day", life.sleep) + field("care", "Meals, dishes, shower", "h a day", life.care) +
+      field("chores", "Chores", "h a weekend", life.chores) + field("deepGoal", "Deep goal", "h a work day", life.deepGoal) + "</div>" : "") +
+    (pie.total > 0
+      ? '<div class="pie-wrap"><div class="pie" data-chart="pie"><svg viewBox="-60 -60 120 120" role="img" aria-label="' + esc(parts.map((x) => x.name + " " + share(x.min, pie.total)).join(", ")) + '">' +
+        '<defs><pattern id="st-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="var(--k-blank)"/><rect width="1.5" height="5" fill="var(--muted)"/></pattern></defs>' +
+        '<g transform="rotate(-90)">' + arcs + "</g></svg>" +
+        '<div class="pie-c"><b class="num">' + fmtMin(pie.tracked) + "</b><span>logged</span>" + (pie.deep > 0 ? '<span class="num" title="Deep work">◆ ' + fmtMin(pie.deep) + "</span>" : "") + "</div></div>" +
+        '<ul class="pie-legend">' + legend + "</ul></div>"
+      : '<p class="empty">' + (s.days ? "Nothing logged in this period." : "This period hasn't started yet.") + "</p>") +
+    "</section>";
+}
+
+// ---------- 时间表：项目 × 日子 ----------
+
+function colLabel(col) {
+  if (col.kind === "day") return "<span>" + WEEKDAYS[weekday(col.from)] + "</span><b>" + Number(col.from.slice(8)) + "</b>";
+  if (col.kind === "week") return "<span>Week of</span><b>" + fmtShort(col.from) + "</b>";
+  return "<span>" + col.from.slice(0, 4) + "</span><b>" + MONTHS[Number(col.from.slice(5, 7)) - 1] + "</b>";
+}
+
+function sheetHTML(c, s, by) {
+  const sh = S.sheet(c, s.from, s.to, { weekStartsOn: store.prefs().weekStartsOn, by });
+  if (!sh.rows.length) return '<section class="card"><h3>Timesheet</h3><p class="empty">Nothing logged in this period.</p></section>';
+  const cell = (v, i) => '<td class="num' + (sh.cols[i].future ? " future" : "") + '">' + (v ? fmtClock(v) : "") + "</td>";
+  return '<section class="card"><h3>Timesheet</h3><p class="lede">Hours and minutes logged on each ' + (by === "plan" ? "plan" : "project") + ".</p>" +
+    '<div class="table-wrap"><table class="tsheet"><thead><tr><th>' + (by === "plan" ? "Plan" : "Project") + "</th>" + sh.cols.map((x) => "<th" + (x.future ? ' class="future"' : "") + ">" + colLabel(x) + "</th>").join("") + "<th>Total</th></tr></thead><tbody>" +
+    sh.rows.map((r) => '<tr><th><span class="pdot" style="background:' + esc(r.color || "var(--c-None)") + '"></span>' + esc(r.name || "No plan") + "</th>" + r.cells.map(cell).join("") + '<td class="num sum">' + fmtClock(r.total) + "</td></tr>").join("") +
+    "</tbody><tfoot>" +
+    (sh.deepSum ? "<tr><th>◆ Deep</th>" + sh.deep.map(cell).join("") + '<td class="num sum">' + fmtClock(sh.deepSum) + "</td></tr>" : "") +
+    '<tr class="total"><th>Total</th>' + sh.total.map(cell).join("") + '<td class="num sum">' + fmtClock(sh.sum) + "</td></tr></tfoot></table></div></section>";
+}
+
+// ---------- 看一天：那天做了什么 ----------
+
+function dayListHTML(c, s) {
+  const tasks = c.tasks.filter((t) => t.date === s.from).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  if (!tasks.length) return '<section class="card"><h3>That day</h3><p class="empty">Nothing planned or logged.</p></section>';
+  const when = (t) => parseTimes(t.times).filter((x) => x.from && x.to).map((x) => x.from + "–" + x.to).join(", ");
+  return '<section class="card"><h3>That day</h3><div class="table-wrap"><table class="ptable"><thead><tr><th>Task</th><th>Plan</th><th>When</th><th>Time</th></tr></thead><tbody>' +
+    tasks.map((t) => {
+      const p = t.projectId ? E.projectById(c, t.projectId) : null;
+      return '<tr><td><span class="pdot" style="background:' + esc(p?.color || "var(--c-None)") + '"></span>' + esc(t.title) + (t.deep ? ' <span class="dp">◆ Deep</span>' : "") + "</td><td>" + esc(p ? p.name : "—") +
+        '</td><td class="num">' + (when(t) || "—") + '</td><td class="num">' + (E.spentMin(t) ? fmtMin(E.spentMin(t)) : "—") + (t.status && t.status !== "done" ? " <small>" + t.status + "</small>" : "") + "</td></tr>";
+    }).join("") + "</tbody></table></div></section>";
+}
+
+// ---------- 整页 ----------
+
+function headHTML(c, r) {
+  const filter = '<select data-st="pick" aria-label="Show which project"><option value="">All projects</option>' +
+    groupsOf(c.projects).map((g) => {
+      const opt = (v, label) => '<option value="' + esc(v) + '"' + (pick === v ? " selected" : "") + ">" + esc(label) + "</option>";
+      if (!g.name) return g.subs.map((p) => opt("p:" + p.id, p.name)).join("");
+      return '<optgroup label="' + esc(g.name) + '">' + (g.subs.length > 1 ? opt("g:" + g.name, "All of " + g.name) : "") + g.subs.map((p) => opt("p:" + p.id, p.name)).join("") + "</optgroup>";
+    }).join("") + '<option value="none"' + (pick === "none" ? " selected" : "") + ">No plan</option></select>";
+  return '<header class="page-head"><div><h2>' + rangeLabel(r) + "</h2></div>" +
     '<div class="tools"><span class="seg">' + Object.entries(S.PERIODS).map(([k, t]) => '<button type="button" data-act="period" data-k="' + k + '"' + (k === kind ? ' class="on"' : "") + ">" + t + "</button>").join("") + "</span>" +
+    (kind === "custom" ? '<span class="st-range"><input type="date" data-st="from" value="' + r.from + '" max="' + r.to + '" aria-label="From">–<input type="date" data-st="to" value="' + r.to + '" min="' + r.from + '" aria-label="To"></span>' : "") +
     '<button type="button" class="nav" data-act="st-prev" aria-label="Earlier">' + icon("left") + '</button><button type="button" class="nav" data-act="st-today">Now</button>' +
     '<button type="button" class="nav" data-act="st-next" aria-label="Later"' + (r.to >= c.today ? " disabled" : "") + ">" + icon("right") + "</button></div></header>" +
-    kpis(s, prev) + trendHTML(s) + heatHTML(c, s) +
-    '<div class="stat-grid">' + projectHTML(s) + weekdayHTML(s) + reasonsHTML(s) + "</div>" +
-    projectsHTML(c, s) + "</div>";
+    '<div class="st-bar"><span class="seg"><button type="button" data-act="st-tab" data-v="time"' + (tab === "time" ? ' class="on"' : "") + '>Time</button><button type="button" data-act="st-tab" data-v="plan"' + (tab === "plan" ? ' class="on"' : "") + ">Plan</button></span>" +
+    filter + '<button type="button" class="dk-deep' + (deepOnly ? " on" : "") + '" data-act="deep-only" aria-pressed="' + deepOnly + '">◆<span>Deep only</span></button>' +
+    '<button type="button" class="btn primary st-add" data-act="add-time">' + icon("plus") + " Add time</button></div>";
+}
+
+export function statsHTML(c) {
+  remember();
+  if (!anchor) anchor = c.today;
+  const ws = store.prefs().weekStartsOn;
+  const r = rangeOf(c);
+  const p = S.previousRange(kind, r, ws);
+  const sc = scope(c);
+  const s = S.summarize(sc.c, r.from, r.to, { by: sc.by });
+  const prev = S.summarize(sc.c, p.from, p.to, { by: sc.by });
+  const day = kind === "day";
+  let body;
+  if (tab === "plan") {
+    body = planKpis(s, prev, sc.on) + (day ? "" : trendHTML(s, sc.on)) +
+      '<div class="stat-grid">' + projectHTML(s) + reasonsHTML(s) + "</div>" + projectsHTML(sc.c, s);
+  } else {
+    // 筛选之外记下来的时间：饼图里合成「Everything else」一片
+    const rest = sc.on ? Math.max(0, S.summarize(c, r.from, r.to).spent - s.spent) : 0;
+    body = timeKpis(s, prev) +
+      '<div class="st-two' + (day ? " solo" : "") + '">' + (day ? "" : timeTrendHTML(s)) + pieHTML(sc.c, s, rest) + "</div>" +
+      (day ? dayListHTML(sc.c, s) : sheetHTML(sc.c, s, sc.by) + heatHTML(sc.c, s) + '<div class="stat-grid">' + weekdayHTML(s) + "</div>");
+  }
+  return '<div class="stats">' + headHTML(c, r) + body + "</div>";
+}
+
+// ---------- 补一段时间 ----------
+
+function addTimeHTML(c) {
+  const date = kind === "day" && anchor <= c.today ? anchor : c.today;
+  const projects = c.projects.filter(E.isActive);
+  return '<form class="addtime" autocomplete="off"><h2 class="sheet-title">Add time</h2>' +
+    '<label class="field"><span>What</span><input name="title" placeholder="What did you do?" required></label>' +
+    (projects.length ? '<label class="field"><span>Plan</span><select name="project">' + projectOptions(projects) + "</select></label>" : "") +
+    '<div class="field-row three"><label class="field"><span>Date</span><input type="date" name="date" value="' + date + '" max="' + c.today + '" required></label>' +
+    '<label class="field"><span>Start</span><input type="time" name="from" required></label>' +
+    '<label class="field"><span>Stop</span><input type="time" name="to" value="' + (date === c.today ? store.clockNow() : "") + '" required></label></div>' +
+    '<label class="deep-tog"><input type="checkbox" name="deep"><span>◆ Deep</span></label>' +
+    '<div class="sheet-foot"><span class="hint num" data-at-len></span><button type="submit" class="btn primary">Add</button></div></form>';
+}
+
+// 弹窗里边填边显示这一段有多长
+function paintLen(form) {
+  const m = (v) => { const [h, mm] = String(v).split(":").map(Number); return h * 60 + mm; };
+  const el = form.querySelector("[data-at-len]");
+  const from = form.from.value, to = form.to.value;
+  el.textContent = from && to ? fmtMin((((m(to) - m(from)) % 1440) + 1440) % 1440) + (m(to) < m(from) ? " · past midnight" : "") : "";
 }
 
 // ---------- 交互：切时间段、读数提示 ----------
@@ -236,10 +469,11 @@ function showTip(col) {
   title.className = "tt";
   title.textContent = data.title;
   tip.appendChild(title);
-  for (const [name, value, cls] of data.rows) {
+  for (const [name, value, cls, color] of data.rows) {
     const row = document.createElement("p");
     const k = document.createElement("i");
     k.className = "k " + cls;
+    if (color) k.style.background = color;
     const v = document.createElement("b");
     v.textContent = value;
     row.append(k, v, " " + name);
@@ -265,17 +499,61 @@ export function initStats(rerender) {
   tip.className = "ctip";
   tip.hidden = true;
   document.body.appendChild(tip);
+  // 自己选的两头整段往前 / 往后挪
+  const shiftCustom = (n) => {
+    const len = diffDays(custom.from, custom.to) + 1;
+    custom = { from: addDays(custom.from, n * len), to: addDays(custom.to, n * len) };
+  };
   on(document, "click", ".stats [data-act]", (e, el) => {
-    const act = el.dataset.act;
-    if (act === "period") kind = el.dataset.k;
-    else if (act === "st-prev") anchor = S.shiftAnchor(kind, anchor || store.today(), -1);
-    else if (act === "st-next") anchor = S.shiftAnchor(kind, anchor || store.today(), 1);
-    else if (act === "st-today") anchor = store.today();
-    if (anchor > store.today()) anchor = store.today();
+    const act = el.dataset.act, T = store.today();
+    if (act === "period") {
+      // 换成 Custom：先接着现在看的这段
+      if (el.dataset.k === "custom" && kind !== "custom") { const r = S.periodRange(kind, anchor || T, store.prefs().weekStartsOn); custom = { from: r.from, to: r.to > T ? T : r.to }; }
+      kind = el.dataset.k;
+      store.setLocal({ statsKind: kind });
+    } else if (act === "st-tab") { tab = el.dataset.v; store.setLocal({ statsTab: tab }); }
+    else if (act === "st-prev" || act === "st-next") {
+      const n = act === "st-prev" ? -1 : 1;
+      if (kind === "custom") shiftCustom(n);
+      else anchor = S.shiftAnchor(kind, anchor || T, n);
+    } else if (act === "st-today") {
+      anchor = T;
+      if (kind === "custom") { const len = diffDays(custom.from, custom.to); custom = { from: addDays(T, -len), to: T }; }
+    } else if (act === "pie-mode") pieMode = el.dataset.v;
+    else if (act === "life-adjust") adjust = !adjust;
+    else if (act === "deep-only") deepOnly = !deepOnly;
+    else if (act === "add-time") { openModal(addTimeHTML(store.ctx())); modalSheet()?.querySelector("[name=title]")?.focus(); return; }
+    if (anchor > T) anchor = T;
     rerender();
   });
-  on(document, "pointerover", ".stats .col, .stats .hc", (e, col) => showTip(col));
-  on(document, "pointerout", ".stats .col, .stats .hc", (e, col) => hideTip(col));
+  on(document, "change", ".stats [data-st]", (e, el) => {
+    const f = el.dataset.st;
+    if (f === "pick") pick = el.value;
+    else if (el.value) {
+      custom = { ...custom, [f]: el.value };
+      if (custom.from > custom.to) custom = { from: el.value, to: el.value };
+    }
+    rerender();
+  });
+  // 饼图底下的默认值：填的是小时，存成分钟（空着的深度目标 = 不设）
+  on(document, "change", ".stats [data-life]", (e, el) => {
+    const life = { ...S.LIFE, ...(store.setting("life", {}) || {}) };
+    life[el.dataset.life] = Math.max(0, Math.min(24, Number(el.value) || 0)) * 60;
+    store.setSetting("life", life);
+  });
+
+  on(document, "input", ".addtime [name=from], .addtime [name=to]", (e, el) => paintLen(el.form));
+  on(document, "change", ".addtime [name=project]", (e, el) => { el.form.deep.checked = store.planDeep(el.value); });
+  on(document, "submit", ".addtime", (e, form) => {
+    e.preventDefault();
+    const title = form.title.value.trim();
+    if (!title || !form.from.value || !form.to.value) return;
+    const id = store.addLogged({ date: form.date.value || store.today(), title, projectId: form.project?.value || "", deep: form.deep.checked }, form.from.value, form.to.value);
+    if (!id) { form.to.focus(); return; }
+    closeModal();
+  });
+  on(document, "pointerover", ".stats .col, .stats .hc, .stats .slice", (e, col) => showTip(col));
+  on(document, "pointerout", ".stats .col, .stats .hc, .stats .slice", (e, col) => hideTip(col));
   on(document, "focusin", ".stats .col", (e, col) => showTip(col));
   on(document, "focusout", ".stats .col", (e, col) => hideTip(col));
   document.addEventListener("toggle", (e) => {

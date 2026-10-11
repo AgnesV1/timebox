@@ -7,7 +7,7 @@
 //   Restock：规律要换 / 要补的非食物（维生素、牙刷头、手机）：价格 + 周期 + 下次哪天，按月看接下来要花的钱
 // 数据从 store.meals() 来：{ ing, box, week, days }，days 是 日期 → {boxes} / {off}。这里不碰 store，测试直接喂数据。
 
-import { addDays, addMonths, daysInMonth, diffDays, startOfMonth, weekday, range, MONTHS } from "./dates.js";
+import { addDays, addMonths, daysInMonth, diffDays, startOfMonth, startOfWeek, weekday, range, MONTHS } from "./dates.js";
 
 export const SLOTS = [["breakfast", "Breakfast"], ["lunch", "Lunch"], ["dinner", "Dinner"], ["snack", "Snack"]];
 export const LEVELS = [["low", "Low", "veg, fruit"], ["mid", "Mid", "normal: grains, lean meat, dairy"], ["high", "High", "fried, fatty, sweet"]];
@@ -120,6 +120,14 @@ export function roundsIn(D, from, to) {
 // ---------- 周 ----------
 
 export const daysOf = (start) => range(start, addDays(start, 6));
+
+// 排餐从哪一周看起：平时是这一周；到了这周的周五就翻到下一周——剩下那两三天不用再排、再买了。
+// today 已经按「一天从几点开始」算过，所以默认是周五凌晨 4 点翻
+export function planStart(today, weekStartsOn = "monday") {
+  const w0 = startOfWeek(today, weekStartsOn);
+  const friday = (5 - weekday(w0) + 7) % 7;
+  return diffDays(w0, today) >= friday ? addDays(w0, 7) : w0;
+}
 
 // 采购日（像 meal kit 的截单日）：这周第一天当天或之前、最近的那个星期几；这周单独改过就用改的
 export function shopDate(start, shopDay, override) {

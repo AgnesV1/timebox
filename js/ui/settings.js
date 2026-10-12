@@ -1,9 +1,12 @@
-// 设置：连表格、每天能用多少时间、新的一天从几点开始、外观、导出备份（手机上只有外观和连表格）
+// 设置：连表格、每天能用多少时间、新的一天从几点开始、各个大类算不算数和每周的门槛、季度表、阅读表格、外观、
+// 这台设备的存储（快满了可以归档）、导出备份（手机上只有外观和连表格）
 
 import * as store from "../store.js";
 import * as sync from "../sync.js";
 import { esc, on, icon } from "../dom.js";
-import { WEEKDAYS } from "../dates.js";
+import { WEEKDAYS, isoOf, fmtShort } from "../dates.js";
+import { WEEKLY } from "../stats.js";
+import { toast } from "./common.js";
 import { looksLikeSheet } from "../reading.js";
 import { saveReadingLink } from "./reading.js";
 
@@ -43,11 +46,41 @@ export function settingsHTML(phone) {
   const backup = '<section class="card"><h3>Backup</h3><p class="hint">Everything is in your Sheet already. This saves a copy of this device\'s data as a file.</p>' +
     '<button type="button" class="btn" data-act="export">Export JSON</button></section>';
 
+  // 各个大类：算不算季度表的 progress、算不算成长（全部 / 只算 Deep，剩下的是 Relax）、任务能不能选「和谁」；每周四个门槛（小时）
+  const wk = { ...WEEKLY, ...(store.setting("weekly", {}) || {}) };
+  const hours = (k) => '<input class="num" type="number" min="0" step="1" data-wk="' + k + '" value="' + (Number(wk[k]) > 0 ? Math.round(Number(wk[k]) / 6) / 10 : "") + '" placeholder="off">';
+  const groups = '<section class="card"><h3>Projects</h3><p class="hint">What each project counts towards. Rename, recolour and add projects on the Projects page.</p>' +
+    '<div class="table-wrap"><table class="gtable"><thead><tr><th>Project</th><th>Progress <small>quarter sheet</small></th><th>Growth <small>weekly check</small></th><th>With… <small>pick people</small></th></tr></thead><tbody>' +
+    store.groups().map((g) => '<tr data-group="' + esc(g.name) + '"><th><i class="gdot" style="background:' + esc(g.color || "var(--c-None)") + '"></i>' + esc(g.name) + "</th>" +
+      '<td><input type="checkbox" data-gf="labor"' + (g.labor ? " checked" : "") + ' aria-label="Counts as progress"></td>' +
+      '<td><select data-gf="grow" aria-label="Growth">' + [["all", "All of it"], ["deep", "Only ◆ Deep — the rest is Relax"], ["", "Doesn't count"]].map(([v, l]) => '<option value="' + v + '"' + ((g.grow || "") === v ? " selected" : "") + ">" + l + "</option>").join("") + "</select></td>" +
+      '<td><input type="checkbox" data-gf="friends"' + (g.friends ? " checked" : "") + ' aria-label="Tasks can pick people"></td></tr>').join("") + "</tbody></table></div>" +
+    '<div class="wk-row"><span>Each week, remind me when growth is under</span>' + hours("growMin") + "<span>h or over</span>" + hours("growMax") + "<span>h, and relax is under</span>" + hours("relaxMin") + "<span>h or over</span>" + hours("relaxMax") + "<span>h.</span></div>" +
+    '<p class="hint">Last week\'s numbers show on Today when one of them is off. Leave a box empty to skip that check.</p></section>';
+
+  const q = store.setting("quarter", null) || {};
+  const quarter = '<section class="card"><h3>Quarter sheet</h3>' +
+    '<label class="field"><span>Link to the Sheet with your quarter tabs</span><input data-quarter="url" value="' + esc(q.url || "") + '" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false"></label>' +
+    '<label class="field small"><span>Fill from</span><input type="date" data-quarter="from" value="' + esc(q.from || "") + '" max="' + store.today() + '"></label>' +
+    '<p class="hint">Each day from that date, two cells are filled on the tab named like <b>2026 Q4</b>: <b>progress</b> (hours on projects ticked above × 10) and <b>focus</b> (◆ Deep hours ÷ 10). Days before it, and every other cell, are left alone.</p>' +
+    (q.url && l.quarterNote ? '<p class="hint qnote">' + esc(l.quarterNote) + "</p>" : "") + "</section>";
+
+  // 这台设备的存储：用了多少、还能撑多久；一年多以前的任务可以搬进表格的 Archive 页
+  const use = store.storage(), cut = isoOf(Number(store.today().slice(0, 4)) - 1, 1, 1);
+  const room = !isFinite(use.daysLeft) ? "Nothing logged in the last 7 days."
+    : "At the pace of the last 7 days (" + use.recent + (use.recent === 1 ? " task" : " tasks") + ") there's room for about " + (use.daysLeft > 730 ? Math.round(use.daysLeft / 365) + " years" : use.daysLeft > 60 ? Math.round(use.daysLeft / 30) + " months" : Math.round(use.daysLeft) + " days") + ".";
+  const storage = '<section class="card' + (use.warn ? " warn" : "") + '"><h3>Storage</h3>' +
+    '<p class="st-line"><b class="num">' + use.tasks.toLocaleString("en") + "</b> tasks on this device · <b class=\"num\">" + (use.used / 1e6).toFixed(2) + " MB</b> of about " + use.limit / 1e6 + " MB</p>" +
+    '<div class="st-meter"><i style="width:' + Math.min(100, (use.used / use.limit) * 100).toFixed(1) + '%"></i></div>' +
+    '<p class="hint">' + (use.full ? "<b>This device is full</b> — new changes aren't being saved here. Archive below to make room." : room) + "</p>" +
+    '<div class="btns"><button type="button" class="btn" data-act="archive" data-before="' + cut + '"' + (l.url ? "" : " disabled") + ">Archive tasks before " + fmtShort(cut) + ", " + cut.slice(0, 4) + "</button></div>" +
+    '<p class="hint">Moves them to an <b>Archive</b> tab in your Sheet (still there to read) and off this device. This year and last year stay; tasks a running plan still counts on stay too.</p></section>';
+
   if (phone) {
     return '<div class="settings phone-settings"><header class="phead"><div class="l"><a class="nav" href="#today">‹ Today</a></div></header>' +
       '<header class="page-head"><div><h2>Settings</h2></div></header>' + look + sheet + "</div>";
   }
-  return '<div class="settings"><header class="page-head"><div><h2>Settings</h2></div></header>' + sheet + time + read + look + backup + "</div>";
+  return '<div class="settings"><header class="page-head"><div><h2>Settings</h2></div></header>' + sheet + time + groups + quarter + read + look + storage + backup + "</div>";
 }
 
 // 每周那一排：全空 = 每天都用默认值；填了几个就只改那几天
@@ -75,8 +108,37 @@ export function initSettings(applyTheme) {
     const v = el.type === "checkbox" ? el.checked : el.value;
     store.setSetting("prefs", { ...store.prefs(), [el.dataset.pref]: v });
   });
+  // 大类的三样设置、每周的四个门槛（填的是小时，存成分钟；空着 = 不提醒）
+  on(document, "change", ".settings [data-gf]", (e, el) => {
+    const f = el.dataset.gf;
+    store.saveGroup(el.closest("[data-group]").dataset.group, { [f]: f === "grow" ? el.value : el.checked });
+  });
+  on(document, "change", ".settings [data-wk]", (e, el) => {
+    store.setSetting("weekly", { ...WEEKLY, ...(store.setting("weekly", {}) || {}), [el.dataset.wk]: Math.max(0, Number(el.value) || 0) * 60 });
+  });
+  // 季度表：贴了链接就存；第一次贴的时候「从哪天开始填」定成今天，之前手填的不动
+  const saveQuarter = (root) => {
+    const url = root.querySelector('[data-quarter="url"]').value.trim(), from = root.querySelector('[data-quarter="from"]').value;
+    const cur = store.setting("quarter", null) || {};
+    if ((cur.url || "") === url && (cur.from || "") === (from || cur.from || "")) return;
+    store.setLocal({ quarterSent: {}, quarterNote: "" });
+    store.setSetting("quarter", url ? { url, from: from || cur.from || store.today() } : { url: "" });
+    if (url) sync.sync();
+  };
+  on(document, "input", '.settings [data-quarter="url"]', (e, el) => { if (looksLikeSheet(el.value)) saveQuarter(el.closest(".settings")); });
+  on(document, "change", ".settings [data-quarter]", (e, el) => saveQuarter(el.closest(".settings")));
+
   on(document, "click", ".settings [data-act]", (e, el) => {
     const act = el.dataset.act;
+    if (act === "archive") {
+      const before = el.dataset.before;
+      if (!confirm("Move every task before " + before + " to the Archive tab of your Sheet? They leave this app; the Sheet keeps them.")) return;
+      sync.sync({ archive: { before } }).then((ok) => {
+        const n = store.local().archived;
+        toast(ok ? (n ? "Archived " + n + (n === 1 ? " task" : " tasks") : "Nothing that old to archive") : "Couldn't reach the Sheet — nothing was moved");
+      });
+      return;
+    }
     if (act === "theme") { store.setLocal({ theme: el.dataset.v }); applyTheme(); }
     else if (act === "full") sync.sync({ full: true });
     else if (act === "export") {

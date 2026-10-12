@@ -76,9 +76,24 @@ if (g.spreadsheet) {
   tab("Game", [[], ["Year", "Month", "Name", "这一切真的值得吗"], [2026, "May", "古剑奇谭3", "🥰", "", "天行健"]]);
 }
 
+// 一个假的季度表格（一页一个季度，页名「2026 Q4」，表头写着 progress / focus）：
+// 在页面设置的 Quarter sheet 里填 https://docs.google.com/spreadsheets/d/FAKE-QUARTER-0000000000000000/edit ；GET /quarter 看它现在的样子
+let quarterBook = null;
+if (g.spreadsheet) {
+  quarterBook = g.spreadsheet("https://docs.google.com/spreadsheets/d/FAKE-QUARTER-0000000000000000");
+  const now = new Date(), y = now.getFullYear(), q = Math.floor(now.getMonth() / 3);
+  const sh = quarterBook.insertSheet(y + " Q" + (q + 1));
+  const rows = [["", "", "+", "-", "progress", "focus", "read", "note"], ["", 1.25, 116, 50, 70, 0.4, 10, ""]];
+  for (let d = new Date(y, q * 3, 1); d.getMonth() < q * 3 + 3 && d.getFullYear() === y; d.setDate(d.getDate() + 1)) rows.push([new Date(d), "", "", "", d < now - 2 * 864e5 ? 33 : "", d < now - 2 * 864e5 ? 0.1 : "", "", d < now - 2 * 864e5 ? "by hand" : ""]);
+  rows.forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v)));
+}
+const dump = (ss) => Object.fromEntries(ss.getSheets().map((sh) => [sh.getName(), sh.rows.slice(0, sh.getLastRow()).map((r) => r.slice(0, sh.getLastColumn()).map((v) => (v instanceof Date ? iso(new Date(v.getTime() - v.getTimezoneOffset() * 60000)) : v)))]));
+
 http.createServer((req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   if (req.method === "OPTIONS") { res.setHeader("Access-Control-Allow-Headers", "*"); res.end(); return; }
+  if (req.method !== "POST" && req.url.startsWith("/quarter")) { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(quarterBook ? dump(quarterBook) : {})); return; }
+  if (req.method !== "POST" && req.url.startsWith("/dump")) { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(dump(g.ss))); return; }
   if (req.method !== "POST") { res.setHeader("Content-Type", "application/json"); res.end(g.sandbox.doGet().getContent()); return; }
   let body = "";
   req.on("data", (c) => (body += c));

@@ -5,7 +5,7 @@
 // 任务可以直接挂在大类上（task.group），不一定要挂在哪个计划下面。只算数，不碰页面和存储。
 
 // 颜色照油画颜料来：绿 viridian、蓝 ultramarine、橘 cadmium orange、紫 mauve、白 ivory、棕 burnt sienna、赭黄 ochre、茜红 alizarin
-export const PALETTE = ["#3E8E6E", "#3F62B5", "#E07A2B", "#8B62AE", "#EFE6D2", "#9A5A36", "#D2A52E", "#B5413F"];
+export const PALETTE = ["#3E8E6E", "#3F62B5", "#E07A2B", "#8B62AE", "#E6DCC3", "#9A5A36", "#D2A52E", "#B5413F"];
 const [GREEN, BLUE, ORANGE, PURPLE, IVORY, BROWN, OCHRE, CRIMSON] = PALETTE;
 
 export const DEFAULTS = [

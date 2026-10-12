@@ -1042,15 +1042,18 @@ export function doneNext(friendId, note) {
 // 整份数据是 localStorage 里的一段文字，上限大约 5MB。算一算用了多少、按最近 7 天的量还能撑多久（十分钟内不重算）。
 const LIMIT = 5e6;
 let usage = null;
+// used = 现在用了多少字符；each = 一条任务平均多少字符；recent = 最近 7 天记了几条。
+// warn = 已经存不进去了、用过九成了、或者照这个量两周内会满
+export function usageOf(used, each, recent, isFull = false, limit = LIMIT) {
+  const perDay = (recent / 7) * each;
+  const daysLeft = perDay > 0 ? Math.max(0, (limit - used) / perDay) : Infinity;
+  return { used, limit, recent, daysLeft, full: isFull, warn: isFull || used / limit > 0.9 || daysLeft < 14 };
+}
 export function storage() {
   if (usage && Date.now() - usage.at < 6e5 && usage.full === full) return usage;
   const tasks = all("tasks"), T = today(), from = addDays(T, -6);
-  const used = JSON.stringify(S).length, taskChars = JSON.stringify(S.data.tasks).length;
-  const each = tasks.length ? taskChars / tasks.length : 420;
-  const recent = tasks.filter((t) => t.date >= from && t.date <= T).length;
-  const perDay = (recent / 7) * each;
-  const daysLeft = perDay > 0 ? Math.max(0, (LIMIT - used) / perDay) : Infinity;
-  usage = { at: Date.now(), tasks: tasks.length, used, limit: LIMIT, recent, daysLeft, full, warn: full || used / LIMIT > 0.9 || daysLeft < 14 };
+  const each = tasks.length ? JSON.stringify(S.data.tasks).length / tasks.length : 420;
+  usage = { at: Date.now(), tasks: tasks.length, ...usageOf(JSON.stringify(S).length, each, tasks.filter((t) => t.date >= from && t.date <= T).length, full) };
   return usage;
 }
 export const forgetStorage = () => { usage = null; };

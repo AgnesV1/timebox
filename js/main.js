@@ -1,4 +1,4 @@
-// 苦昼短：入口。管页面切换（#today / #calendar / #projects / #stats / #meals / #shop / #reading / #settings）、主题、同步时机、整页重画。
+// 苦昼短：入口。管页面切换（#today / #calendar / #projects / #stats / #meals / #shop / #reading / #friends / #settings）、主题、同步时机、整页重画。
 // 手机（≤760px）只有「今天」、下次采购的单子、阅读和设置；电脑有侧栏、日历和任务池、项目、统计、备餐。两边底部都有计时浮条。
 
 import * as store from "./store.js";
@@ -22,12 +22,13 @@ import { statsHTML, initStats } from "./ui/stats.js";
 import { dockHTML, initTimer, tick } from "./ui/timer.js";
 import { readingHTML, initReading } from "./ui/reading.js";
 import { mealsHTML, shopHTML, initMeals, refreshMealEditor, mealDrop } from "./ui/meals.js";
+import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/friends.js";
 import { renderSun, initSun } from "./ui/sun.js";
 import { animateNext, takeTransition, nameParts } from "./motion.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
-const VIEWS = ["today", "calendar", "projects", "stats", "meals", "shop", "reading", "settings"];
+const VIEWS = ["today", "calendar", "projects", "stats", "meals", "shop", "reading", "friends", "settings"];
 const side = document.getElementById("side");
 const main = document.getElementById("main");
 const pool = document.getElementById("pool");
@@ -54,7 +55,7 @@ function applyTheme() {
 function sidebarHTML(c, view) {
   const todayOpen = c.tasks.filter((t) => t.date === c.today && !t.status).length;
   const deals = Meal.toCheck(store.meals(), c.today).length;   // 这一轮还没看的打折
-  const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""], ["meals", "Meals", deals || ""], ["reading", "Reading", ""], ["settings", "Settings", ""]];
+  const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""], ["meals", "Meals", deals || ""], ["reading", "Reading", ""], ["friends", "Friends", friendsDue(c.today) || ""], ["settings", "Settings", ""]];
   const theme = store.local().theme;
   const st = sync.getStatus();
   // 收起来只剩一列图标（记在这台设备上）：名字放进 title，角标缩成一个点
@@ -121,7 +122,7 @@ function draw() {
   document.body.classList.toggle("side-min", !phone && Boolean(store.local().sideMin));
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
-  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : todayHTML(c, phone);
+  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : view === "friends" ? friendsHTML(c) : todayHTML(c, phone);
   if (document.startViewTransition) nameParts(main, true);
   // 打开阅读页：同步时顺便拉一次阅读表格的列表（查重用）
   reading.want(view === "reading");
@@ -145,19 +146,24 @@ function draw() {
   refreshDayModal();
   refreshProjectEditor();
   refreshMealEditor();
+  refreshFriendEditor();
   celebrate(c, view);
 }
 
 function paintSync() {
   const st = sync.getStatus();
   const pending = store.pendingCount();
-  const text = st.text === "Syncing…" || st.bad || !pending ? st.text : sync.configured() ? "Unsynced changes" : st.text;
+  // 这台设备的存储满了 / 快满了：也算在同步状态里（手机上那个小圆点变红，点一下说该怎么办）
+  const use = store.storage();
+  const room = use.full ? "This device is full — archive older tasks in Settings on your computer" : use.warn ? "Storage almost full — archive older tasks in Settings on your computer" : "";
+  const text = use.full ? room : st.text === "Syncing…" || st.bad || !pending ? st.text : sync.configured() ? "Unsynced changes" : st.text;
+  const bad = st.bad || use.full;
   document.querySelectorAll("[data-sync-status]").forEach((el) => {
     // 手机顶栏放不下一句话（会压住日期）：只画一个点，点一下再说是什么
-    if (el.classList.contains("psync")) { el.title = text; el.setAttribute("aria-label", text || "Sync"); el.classList.toggle("wait", !st.bad && !/^Synced/.test(text)); }
+    if (el.classList.contains("psync")) { el.title = room || text; el.setAttribute("aria-label", room || text || "Sync"); el.classList.toggle("wait", !st.bad && !room && !/^Synced/.test(text)); el.classList.toggle("bad", bad || Boolean(room)); return; }
     else el.textContent = text;
     el.closest(".sync-pill")?.setAttribute("title", text ? text + " — click to sync" : "Sync now");   // 侧栏收起时只剩图标，状态看这里
-    el.closest(".sync-pill, .sync-status, .psync")?.classList.toggle("bad", st.bad);
+    el.closest(".sync-pill, .sync-status")?.classList.toggle("bad", bad);
   });
 }
 
@@ -174,7 +180,7 @@ function celebrate(c, view) {
 
 // ---------- 同步时机 ----------
 
-// 第一次用上大类：现有的计划按名字归进六个大类（要先拿到表格里最新的；没连表格就直接归）
+// 第一次用上大类：现有的计划按名字归进六个大类（等从表格拉到最新的再归，见下面的 subscribe；没连表格就直接归）
 function adoptGroups() {
   const done = store.adoptGroups();
   if (done) toast("Projects sorted into " + done.names.join(", "), done.undo);
@@ -182,8 +188,7 @@ function adoptGroups() {
 
 // 同步完：拍今天的安全线快照
 async function syncThenLog() {
-  const ok = await sync.sync();
-  if (ok || !sync.configured()) adoptGroups();
+  await sync.sync();
   store.ensureTodayLog();
 }
 
@@ -215,9 +220,11 @@ initStats(render);
 initTimer(render);
 initReading(render);
 initMeals(render);
+initFriends(render);
 initSun();
 
 store.subscribe((meta) => {
+  if (meta.pulled) adoptGroups();
   if (meta.local) setFx(store.local().fx !== false);
   if (!meta.quiet) render();
   else paintSync();

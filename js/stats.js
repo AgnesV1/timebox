@@ -258,7 +258,7 @@ export function clockPie(ctx, s, { trackedOnly = false, rest = 0 } = {}) {
   const parts = [
     { key: "sleep", name: "Sleep", min: sum.sleep, kind: "life" },
     { key: "care", name: "Meals & care", min: sum.care, kind: "life" },
-    { key: "chores", name: "Chores", min: sum.chores, kind: "life" },
+    { key: "chores", name: "Housework", min: sum.chores, kind: "life" },
     ...projects,
     { key: "rest", name: "Everything else", min: Math.max(0, rest), kind: "rest" },
     { key: "blank", name: "Untracked", min: blank, kind: "blank" }

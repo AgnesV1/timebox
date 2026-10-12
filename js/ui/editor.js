@@ -8,6 +8,7 @@ import { esc, on, icon } from "../dom.js";
 import { fmtMin, fmtShort, weekday, WEEKDAYS } from "../dates.js";
 import { projectOptions, pickTarget, targetOf } from "./common.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
+import { taskMeetHTML } from "./friends.js";
 
 let editing = "";
 let scope = "this";    // 重复任务改动作用到哪些：this / following / all
@@ -87,6 +88,7 @@ function editorHTML(t) {
     '<div class="field-row"><label class="field"><span>Date</span><input type="date" data-f="date" value="' + esc(t.date) + '"></label>' +
     '<label class="field"><span>Minutes</span><input type="number" class="num" min="0" step="5" data-f="est" value="' + esc(t.est) + '"></label></div>' +
     (rule ? "" : '<label class="field"><span>Project or plan</span><select data-f="projectId">' + projectOptions(projects, targetOf(t)) + "</select></label>") +
+    (store.meetOfTask(t.id) || store.groupByName(store.groupOf(t))?.friends ? '<div class="field"><span>With · notes · remember</span>' + taskMeetHTML(t.id) + "</div>" : "") +
     (item ? '<p class="hint">Part of <b>' + esc(item.title) + "</b> · " + fmtMin(st.progress) + " of " + fmtMin(st.est) + " done</p>" : "") +
     '<label class="check"><input type="checkbox" data-f="optional"' + (t.optional ? " checked" : "") + "> Optional — nice to do, not a must</label>" +
     '<label class="check"><input type="checkbox" data-f="deep"' + (t.deep ? " checked" : "") + "> ◆ Deep work — focused, one thing at a time</label>" +

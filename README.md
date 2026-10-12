@@ -56,7 +56,11 @@
 ## 三、每天怎么用
 
 **电脑**
-- `Projects`：按项目分区，区里是计划。点「New plan」或某个项目的「+ Plan」，选 Total / Regular 和 Auto / Pool；
+- `Projects`：最上面是**目标板**（这个月 / 这个季度 / 下个季度 / 今年，和之后五年；每条有标签、打算哪个月做到，勾了以后记实际哪个月做到，
+  两个都能点开改；栏目跟着日子自己滚，过期没做完的滚进当前那栏）和各项目占了多少时间（Week / Month / Season）。
+  下面按项目分区：Work / Fitness / Chores / Build / Leisure / Friends 六个一直都在（Rename 可以改名、换颜色、并进别的项目，空的可以 Remove）。
+  **任务可以直接挂在项目上**，不一定要有计划：加任务时下拉里每个项目自己是一项，下面才是它的计划。
+  区里是计划。点「New plan」或某个项目的「+ Plan」，选 Total / Regular 和 Auto / Pool；
   Total 填 Deadline 和总时长或条目（可以一行一个批量加，也能用 Numbered 生成「Unit 1…10」），
   Regular 填每个星期几做几分钟（Auto）或每周几次、每次几分钟（Pool）；「Rename」改项目名，下面的计划一起改
 - **重复的快捷方式**：在加任务框里选「↻ Every day / Weekdays / Every 周几」和「for good / for 1 week …」再点 Add，
@@ -87,7 +91,7 @@
 今天做了多少深度写在圆盘正下方的小签上；Stats 页有 Deep 那一块，饼图外圈细的一圈、时间表最下面一行也是它。
 想给自己定个量：Stats 饼图底下 Adjust → Deep goal（每个工作日几小时）。
 
-- `Stats`：选一段时间（一天 / 周 / 月 / 年 / 30 天 / Custom 自己选两头），可以只看某个项目、某个计划，或者只看深度。两个页签：
+- `Stats`：选一段时间（一天 / 周 / 月 / Season 当季 / 年 / Custom 自己选两头），可以只看某几个项目、某几个计划（勾选，能勾好几个；一个都不勾 = 全部，按项目分），或者只看深度。两个页签：
   - **Time**（时间去哪了）：花了多久、其中多少深度、每天的柱子（底下深色那段是深度）、**一天 24 小时的饼图**、
     **时间表**（项目 × 日子，长了自动按周 / 按月）、**几点在干活的热力图**（星期几 × 24 小时，从 6 点起；「Week by week」展开每一周）、星期几的节奏。
     饼图按每天 24 小时算：睡觉 7h、吃饭做饭洗碗洗澡 3h（每天）、家务每个周末共 2h 是默认值（点 Adjust 改），
@@ -121,14 +125,29 @@
 列表里只有点开的那一行带 Done / Partial / Later / Drop 四个按钮（别的行右边只写状态）；Done 和 Partial 下面填用了多久、几点结束，没做完的写原因；
 按住左边的分钟数上下拖，调整顺序；列表最下面可以加任务（「Gym 40」末尾的数字当分钟）。排计划、设置都在电脑上做。
 
+**Friends（电脑；手机上只在任务里选人、写两句）**：一页人、每次的记录、接下来要做的事。每个人记哪些格子自己定：
+页面右上齿轮 → Fields，一行一个（表格里手动加一列也行）。Friends 项目的任务可以选「With…」，点开那行写 Notes / Remember，
+记录跟着任务走（任务改日期、删掉，它都跟着）。People 表可以搜、可以按任何一格筛；To do 里点 Done 就在这个人的记录里记一条。
+
+**季度表**：Settings → Quarter sheet 贴你那个表格的链接（每个季度一页，页名 `2026 Q4`）。从 Fill from 那天起，每天自动填两格：
+`progress` = 算进 progress 的项目当天实际花的小时 × 10，`focus` = 当天 ◆ Deep 的小时 ÷ 10（四舍五入到整小时）。别的格子不碰。
+哪些项目算 progress、哪些算成长（全部 / 只算 Deep，剩下的是 Relax）在 Settings → Projects 里勾；
+上周成长或 Relax 的时间太少、太多，今天页右边会提醒一句（四个门槛也在那里改）。
+
+**存储**：Settings → Storage 能看到这台设备存了多少、照最近的量还能撑多久；两周内可能写满时今天页会提醒。
+到时候点 Archive：去年 1 月 1 日以前的任务搬到表格的 Archive 页（表格里还能看），这台设备腾出地方。
+
 **进度条的花纹**：做完 = 纯色，部分完成 = 豹纹，还没做 = 斑马纹，Later 只剩描边。
 Optional（可选）的任务有个 Optional 标签；夜间那套底下还垫一层淡豹纹。
 
-**表格里怎么对应**：平时只露出 Tasks / Projects / Items 三页。Projects 页一行是一个计划，`Group` 列 = 项目，
+**表格里怎么对应**：平时露出 Tasks / Projects / Items / Friends / Catch-ups 几页（归档过就多一页 Archive）。Tasks 的 `Group` 列 = 任务属于哪个项目
+（可以直接挂在项目上、`Project` 列空着）。Friends 页除了 Name / Next / By / Last，别的列都是你自己定的格子（表头写什么就叫什么）；
+Catch-ups 一行是一次记录。Projects 页一行是一个计划，`Group` 列 = 项目，
 `Project` 列 = 计划名，`Kind` / `Place` 是种类和放法，Regular 的规则在隐藏的 `Rule` 列；
 自动出现的任务 ID 以 `rt:`（Regular）或 `au:`（Total 的今日份额）开头；
 计时记录在 Tasks 的 `Times` 列，是不是深度在 `Deep` 列（打勾 = 是，可以直接在表格里改）；
 正在跑的计时器、每天单独改的可用时间、通勤日、阅读表格链接、饼图的默认值和深度目标（`life`）在（隐藏的）Settings 页。
+项目清单（名字、颜色、算不算 progress / 成长）是 Settings 页的 `groups`，目标一条一行 `goal:<id>`，每周的门槛 `weekly`，季度表链接 `quarter`，Friends 的格子 `friend-fields`。
 备餐的东西也在 Settings 页，一样一行：`meal-ing:` 常买的东西、`meal-box:` 一顿、`meal-week:<这周第一天>` 这周排了什么 / 买了没有、`meal-prefs` 设置（`meal-pack:` 是旧版的 Day pack，读的时候自动展开成 Box）。
 
 ## 同步是怎么工作的

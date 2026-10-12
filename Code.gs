@@ -61,7 +61,7 @@ var RENAME = {
   '拟定顺序': 'Order', '分类': 'Category', '是否完成': 'Status', '实际次序（自动）': 'Done order',
   '任务描述': 'Description', '可用时长（分钟）': 'Available min'
 };
-var COLORS = ['#3E8E6E', '#3F62B5', '#E07A2B', '#8B62AE', '#EFE6D2', '#9A5A36', '#D2A52E', '#B5413F'];
+var COLORS = ['#3E8E6E', '#3F62B5', '#E07A2B', '#8B62AE', '#E6DCC3', '#9A5A36', '#D2A52E', '#B5413F'];
 
 // ================= 第一次用，以及每次更新代码后：选 setup 点「运行」 =================
 // 老表（Tasks 里还没有 ID 列）会先整页备份成「Backup …」，再原地升级：补列、补 ID、
@@ -996,12 +996,16 @@ function doPost(e) {
     var now = Date.now(), touched = 0, out = { ok: true };
     PLAN_NAMES = null;
     var push = body.push || {}, rows = push.rows || {}, dels = push.deletes || [], dead = deadMap_();
-    Object.keys(rows).forEach(function (name) { if (T[name]) touched += upsert_(name, rows[name], now, dead); });
+    // Settings 先写：Friends 页的列按网页里排好的顺序建好，再写每个人的那几格
+    var fields = (rows.settings || []).some(function (r) { return (r.key || r.id) === 'friend-fields'; });
+    Object.keys(rows).sort(function (a, b) { return (a === 'settings' ? 0 : 1) - (b === 'settings' ? 0 : 1); }).forEach(function (name) {
+      if (T[name]) touched += upsert_(name, rows[name], now, dead);
+      if (name === 'settings' && fields) friendCols_();
+    });
     touched += remove_(dels, now);
     // 脚本自己填的列：哪张表这次被动到了才重填（任务 / 条目的计划名在写入时已经顺手填了）
     var hit = function (name) { return (rows[name] && rows[name].length) || dels.some(function (d) { return d.table === name; }); };
     try {
-      if ((rows.settings || []).some(function (r) { return (r.key || r.id) === 'friend-fields'; })) friendCols_();
       if (hit('projects')) recount_();
       if (hit('friends') || hit('meets')) recountFriends_();
     } catch (err) { out.recount = String(err); }   // 名字列出问题不能影响同步，但要能看见

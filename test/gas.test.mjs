@@ -381,6 +381,14 @@ test("friends: your own columns come and go by their header; With and Last are f
   assert.deepEqual(g.ss.getSheetByName("Friends").objects().map((r) => r.Name), ["Ana"]);
 });
 
+test("friends: fields and people sent together still get their columns in the order you set", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  push(g, { friends: [{ id: "f1", name: "Ana", more: { "Field B": "b", "Field A": "a" }, updated: 1 }], settings: [{ key: "friend-fields", value: ["Field A", "Field B", "Field C"], updated: 1 }] });
+  assert.deepEqual(g.ss.getSheetByName("Friends").header().slice(0, 5), ["Name", "Field A", "Field B", "Field C", "Next"]);
+  assert.equal(g.ss.getSheetByName("Friends").objects()[0]["Field B"], "b");
+});
+
 test("quarter sheet: only the two cells of that day are written", () => {
   const g = load(CODE);
   g.sandbox.setup();

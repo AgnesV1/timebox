@@ -1,0 +1,151 @@
+// 大类：旧名字归位、任务直接挂在大类上、改名 / 并进别的大类；Friends：任务带的那条记录跟着任务走
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import * as GR from "../js/groups.js";
+import * as F from "../js/friends.js";
+import * as store from "../js/store.js";
+
+console.warn = () => {};   // store 在 node 里存不下来，只是提示
+
+test("old project names find their new home; unknown ones stay as they are", () => {
+  assert.deepEqual(["Work 1", "work", "Main - Gym", "Main - Fitness", "Main - English", "Main - French", "Fun", "Chores", "Friends", "Garden", ""].map(GR.match),
+    ["Work", "Work", "Fitness", "Fitness", "Build", "Build", "Leisure", "Chores", "Friends", "", ""]);
+  const [green, blue, orange, purple] = GR.PALETTE;
+  const { groups, moves } = GR.adopt([
+    { id: "a", name: "Deck", group: "Work 1", color: "#2F5BFF" }, { id: "b", name: "IELTS", group: "Main - English", color: "#FF3EA5" },
+    { id: "c", name: "Gym", group: "", color: "#FF7A1A" }, { id: "d", name: "Tomatoes", group: "Garden", color: "#9B5CFF" },
+    { id: "e", name: "Beans", group: "Garden", color: "#FFC400" }, { id: "f", name: "Loose plan", group: "", color: "#ABCDEF" },
+    { id: "g", name: "Emails", group: "Work", color: blue }
+  ]);
+  assert.deepEqual(groups.map((g) => g.name), ["Work", "Fitness", "Chores", "Build", "Leisure", "Friends", "Garden"]);
+  assert.deepEqual(moves, [
+    { id: "a", group: "Work", color: blue }, { id: "b", group: "Build", color: green }, { id: "c", group: "Fitness", color: orange },
+    { id: "d", group: "Garden", color: purple }, { id: "e", group: "Garden", color: purple }
+  ], "plans keep their own names; a plan with no project is matched by its name; untouched ones aren't listed");
+  assert.equal(groups.find((g) => g.name === "Garden").color, purple, "an unknown project keeps going, in the new palette");
+  assert.deepEqual(GR.withPlans(GR.DEFAULTS, [{ group: "Garden", color: "#111" }, { group: "Work" }]).map((g) => g.name).slice(-2), ["Friends", "Garden"]);
+});
+
+test("the six projects, sorted into once, with an undo", () => {
+  const a = store.saveProject({ name: "IELTS", group: "Main - English", kind: "regular", place: "pool", rule: { perWeek: 3, min: 30 }, color: "#FF3EA5" });
+  const b = store.saveProject({ name: "Gym", group: "", kind: "regular", place: "pool", rule: { perWeek: 3, min: 30 }, color: "#FF7A1A" });
+  assert.deepEqual(store.groups().map((g) => g.name), ["Work", "Fitness", "Chores", "Build", "Leisure", "Friends", "Main - English"], "before sorting: the defaults plus what's there");
+  const done = store.adoptGroups();
+  assert.deepEqual(done.names.sort(), ["Build", "Fitness"]);
+  assert.deepEqual([store.get("projects", a).group, store.get("projects", b).group], ["Build", "Fitness"]);
+  assert.equal(store.get("projects", a).color, store.groupByName("Build").color);
+  assert.equal(store.adoptGroups(), null, "only once");
+  done.undo();
+  assert.deepEqual([store.get("projects", a).group, store.get("projects", b).group, store.get("projects", a).color], ["Main - English", "", "#FF3EA5"]);
+  assert.deepEqual(store.groups().map((g) => g.name), ["Work", "Fitness", "Chores", "Build", "Leisure", "Friends", "Main - English"]);
+  assert.equal(store.adoptGroups(), null, "undone stays undone");
+});
+
+test("a task sits on a project directly, or follows its plan", () => {
+  const plan = store.saveProject({ name: "Deck", group: "Work", kind: "regular", place: "pool", rule: { perWeek: 1, min: 30 } });
+  const t1 = store.addTask({ title: "Vacuum", group: "Chores" }), t2 = store.addTask({ title: "Slides", projectId: plan, group: "Chores" });
+  assert.equal(store.get("tasks", t1).group, "Chores");
+  assert.equal(store.get("tasks", t2).group, "Work", "with a plan, the plan's project wins");
+  assert.equal(store.groupOf(store.get("tasks", t2)), "Work");
+  store.setTaskProject(t2, "", "Leisure");
+  assert.deepEqual([store.get("tasks", t2).projectId, store.get("tasks", t2).group], ["", "Leisure"]);
+  store.setTaskProject(t2, plan);
+  assert.equal(store.get("tasks", t2).group, "Work");
+  assert.equal(store.outgoing().rows.tasks.find((r) => r.id === t1).group, "Chores", "the group goes to the Sheet");
+  // 改名：计划、直接挂着的任务都跟着
+  store.renameGroup("Chores", "Home");
+  assert.equal(store.get("tasks", t1).group, "Home");
+  assert.ok(store.groupByName("Home") && !store.groupByName("Chores"));
+  // 改成已经有的名字 = 并进去
+  store.renameGroup("Home", "Work");
+  assert.equal(store.get("tasks", t1).group, "Work");
+  assert.ok(!store.groupByName("Home"));
+  // 删计划：做过的任务还留在原来那个大类里
+  store.setStatus(t2, "done");
+  store.deleteProject(plan);
+  assert.deepEqual([store.get("tasks", t2).projectId, store.get("tasks", t2).group], ["", "Work"]);
+  // 换颜色：还用着原来颜色的计划跟着换
+  const p2 = store.saveProject({ name: "Run", group: "Fitness", kind: "regular", place: "pool", rule: { perWeek: 1, min: 30 } });
+  assert.equal(store.get("projects", p2).color, store.groupByName("Fitness").color);
+  store.saveGroup("Fitness", { color: "#123456", grow: "deep" });
+  assert.deepEqual([store.get("projects", p2).color, store.groupByName("Fitness").grow], ["#123456", "deep"]);
+  store.addGroup("Garden");
+  assert.ok(store.groupByName("Garden"));
+  store.removeGroup("Garden");
+  store.removeGroup("Fitness");
+  assert.ok(!store.groupByName("Garden") && store.groupByName("Fitness"), "only an empty project can be removed");
+});
+
+test("friends: the record a task carries follows the task", () => {
+  const ana = store.saveFriend({ name: "Ana", more: { City: "Toronto" } }), bo = store.saveFriend({ name: "Bo" });
+  store.setSetting("friend-fields", ["Field A", "City"]);
+  assert.deepEqual(store.friendFields(), ["Field A", "City"]);
+  store.saveFriend({ id: bo, more: { Extra: "x" } });
+  assert.deepEqual(store.friendFields(), ["Field A", "City", "Extra"], "a column that only exists on a person shows up too");
+  const T = store.today();
+  const t = store.addTask({ title: "Coffee", group: "Friends" });
+  store.setTaskMeet(t, { note: "" });
+  assert.equal(store.meetOfTask(t), null, "nothing to keep yet");
+  store.setTaskMeet(t, { friends: [ana, bo] });
+  store.setTaskMeet(t, { note: "caught up" });
+  assert.deepEqual([store.meetOfTask(t).friends, store.meetOfTask(t).note, store.meetOfTask(t).date], [[ana, bo], "caught up", T]);
+  assert.deepEqual(store.lastContact(), { [ana]: T, [bo]: T });
+  // Later：这次没见成，不算；挪到明天的那条带着这条记录
+  store.toTomorrow(t);
+  assert.equal(store.meetOfTask(t), null);
+  const copy = store.all("tasks").find((x) => x.title === "Coffee" && x.id !== t);
+  assert.deepEqual([store.meetOfTask(copy.id).friends, store.meetOfTask(copy.id).date], [[ana, bo], copy.date]);
+  assert.deepEqual(store.lastContact(), {}, "tomorrow hasn't happened");
+  store.moveTask(copy.id, T);
+  assert.equal(store.meetOfTask(copy.id).date, T, "moving the task moves the record");
+  // 做完了该做的事：记一条、清掉
+  store.saveFriend({ id: ana, next: "send the notes", nextDate: "2026-01-01" });
+  assert.equal(F.todo(store.friends(), T).due, 1);
+  store.doneNext(ana, "sent");
+  assert.deepEqual([store.get("friends", ana).next, store.get("friends", ana).nextDate], ["", ""]);
+  assert.ok(store.meets().some((m) => m.note === "sent" && m.friends.join() === ana && m.date === T));
+  // 删一个人：他一个人的记录一起删，几个人的那条只把他拿掉；删任务：它带的记录一起删
+  store.deleteFriend(ana);
+  assert.ok(!store.meets().some((m) => m.note === "sent"));
+  assert.deepEqual(store.meetOfTask(copy.id).friends, [bo]);
+  store.deleteTask(copy.id);
+  assert.equal(store.all("meets").length, 0);
+});
+
+test("friends: last contact, to-dos and filters", () => {
+  const T = "2026-10-11";
+  const people = [
+    { id: "a", name: "Ana", more: { City: "Toronto", Field: "Design" }, next: "lunch", nextDate: "2026-10-09" },
+    { id: "b", name: "Bo", more: { City: "Montreal" }, next: "call", nextDate: "2026-10-20" },
+    { id: "c", name: "Cy", more: { City: "Toronto" }, next: "", nextDate: "" },
+    { id: "d", name: "Di", more: {}, next: "someday", nextDate: "" }
+  ];
+  const meets = [{ id: "1", date: "2026-10-01", friends: ["a", "b"] }, { id: "2", date: "2026-08-01", friends: ["c"] }, { id: "3", date: "2026-10-12", friends: ["c"] }, { id: "mt:x", date: "2026-10-10", friends: ["b"], taskId: "x" }];
+  const last = F.lastContact(meets, T, (id) => (id === "x" ? "drop" : ""));
+  assert.deepEqual(last, { a: "2026-10-01", b: "2026-10-01", c: "2026-08-01" }, "a dropped task or a future date isn't a contact");
+  const td = F.todo(people, T);
+  assert.deepEqual(td.list.map((x) => x.friend.name + (x.late ? "!" : "")), ["Ana!", "Bo", "Di"]);
+  assert.equal(td.due, 1);
+  const names = (opts) => F.filter(people, opts, last, T).map((f) => f.name).join("");
+  assert.equal(names({ q: "toro" }), "AnaCy");
+  assert.equal(names({ where: [{ field: "City", value: "toronto" }, { field: "Field", value: "des" }] }), "Ana");
+  assert.equal(names({ todo: "has" }), "AnaBoDi");
+  assert.equal(names({ todo: "late" }), "Ana");
+  assert.equal(names({ seen: "never" }), "Di");
+  assert.equal(names({ seen: "30" }), "CyDi");
+  assert.deepEqual(F.valuesOf(people, "City"), ["Toronto", "Montreal"]);
+  assert.deepEqual(F.parseFields(" One \n\nTwo\none\n"), ["One", "Two"]);
+  assert.deepEqual([F.ago("2026-10-11", T), F.ago("2026-10-09", T), F.ago("2026-10-13", T), F.ago("", T)], ["today", "2 days ago", "in 2 days", ""]);
+});
+
+test("storage: warns two weeks before this device fills up", () => {
+  const fine = store.usageOf(400000, 420, 49);            // 7 a day: years of room
+  assert.ok(!fine.warn && fine.daysLeft > 1000);
+  assert.equal(store.usageOf(4960000, 420, 49).warn, true, "13 days of room left at this pace");
+  assert.equal(store.usageOf(4700000, 420, 0).warn, true, "over 90% used, even with nothing logged lately");
+  assert.equal(store.usageOf(1000, 420, 0).daysLeft, Infinity);
+  assert.equal(store.usageOf(1000, 420, 7, true).warn, true, "the last save didn't fit");
+  const now = store.storage();   // node 里没有 localStorage：每次都存不进去，所以这里是 full
+  assert.ok(now.tasks >= 0 && now.used > 0 && now.limit === 5e6);
+  assert.equal(now.warn, now.full);
+});

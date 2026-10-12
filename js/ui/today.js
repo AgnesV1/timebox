@@ -5,7 +5,8 @@
 import * as store from "../store.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
-import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, WEEKDAYS } from "../dates.js";
+import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, startOfWeek, WEEKDAYS } from "../dates.js";
+import * as S from "../stats.js";
 import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
 import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickTarget, segStyle, lineInfo, toast, STATUS } from "./common.js";
@@ -14,6 +15,7 @@ import { pickedId, pick, timeable, elapsed } from "./timer.js";
 import { animateNext } from "../motion.js";
 import { cheer } from "../fx.js";
 import { shopCount } from "./meals.js";
+import { withHTML, taskMeetHTML, withText, takeWith } from "./friends.js";
 
 const openDesc = new Set();
 const logOpen = new Set();   // 已经有计时记录、又点了「+ time」要再补一段的任务
@@ -21,6 +23,9 @@ const seen = new Set();
 let overdueOpen = false;
 let viewDate = "";
 let focus = "";   // 点开的那一行（四个状态按钮只在这一行）
+const addTarget = {};   // 加任务框里选的是哪个项目 / 计划（日期 → 下拉的值）：能选「和谁」的大类要多画一块
+// 这个任务能不能选「和谁」：已经带着一条记录，或者它那个大类开了这一项
+const meetable = (t) => Boolean(store.meetOfTask(t.id) || store.groupByName(store.groupOf(t))?.friends);
 
 export const shownDate = () => viewDate || store.today();
 export function showDate(d) { viewDate = d === store.today() ? "" : d; }
@@ -87,11 +92,13 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
     (E.isRoutine(t) ? ' <span class="rt" title="Routine">↻</span>' : "") +
     (t.deep ? ' <span class="dp" title="Deep work">◆ Deep</span>' : "") +
     (p && p.name.trim().toLowerCase() !== t.title.trim().toLowerCase() ? ' <span class="pj" style="--pc:' + esc(p.color) + '">' + esc(p.name) + "</span>" : "") +
+    (!open && withText(t.id) ? ' <span class="wth">' + esc(withText(t.id)) + "</span>" : "") +
     (t.desc && !desc ? '<span class="more"> ⋯</span>' : "") + "</div>" + side +
     (phone ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") +
     "</div>" + (open ? timesHTML(c, t, list, form) : "") +
     (desc ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Details">' + esc(t.desc || "") + "</textarea>" : "") +
     (open || !phone ? chips : "") +
+    (open && meetable(t) ? taskMeetHTML(t.id) : "") +
     (form ? logFormHTML(c, t, list) : "") +
     (why && open ? '<input class="reason" data-act="reason" data-keep="reason-' + t.id + '" placeholder="Why?" value="' + esc(t.reason || "") + '">' : "") +
     (why && !open && t.reason ? '<p class="why">' + esc(t.reason) + "</p>" : "") +
@@ -114,15 +121,36 @@ function overdueHTML(c) {
     '<div class="od-actions"><button type="button" class="btn primary" data-act="spread">Spread them out</button><button type="button" class="btn" data-act="all-today">All to today</button></div></section>';
 }
 
+// 两种提醒（电脑今天页右边）：上周成长 / Relax 的时间太少或太多；这台设备的存储快满了
+function noticesHTML(c) {
+  let h = "";
+  const start = addDays(startOfWeek(c.today, store.prefs().weekStartsOn), -7), end = addDays(start, 6);
+  if (store.local().weekSeen !== start && c.tasks.some((t) => t.date >= start && t.date <= end && E.spentMin(t) > 0)) {
+    const w = S.weekCheck(c, start, end, store.setting("weekly", {}));
+    if (w.warn.length) {
+      h += '<div class="note"><p><b>Last week</b> — ' + w.warn.map((x) => "<b>" + fmtMin(x.min) + "</b> " + (x.what === "growth" ? "of growth" : "to relax") + ", " + (x.dir === "low" ? "under" : "over") + " your " + fmtMin(x.limit)).join("; ") + ".</p>" +
+        '<button type="button" class="link" data-act="week-seen" data-week="' + start + '">Got it</button></div>';
+    }
+  }
+  const use = store.storage();
+  if (use.warn) {
+    h += '<div class="note warn"><p><b>' + (use.full ? "This device is full." : "Storage on this device runs out in about " + Math.max(1, Math.round(use.daysLeft)) + " days.") + '</b> Archive older tasks to make room.</p><a class="link" href="#settings">Settings → Storage</a></div>';
+  }
+  return h;
+}
+
 // 加任务；电脑上多两个下拉：怎么重复、重复多久（一键排好整段时间）。◆ Deep = 这是要专心做的（选了计划就跟计划的默认）。
 // 名字后面带一段钟点（Reading 14:00-15:10）= 已经做完的，直接记成一条 Done
 function addHTML(c, d, phone = false) {
   const projects = c.projects.filter(E.isActive);
+  const target = addTarget[d] || "";
+  const people = store.groupByName(store.groupOf(pickTarget(target)))?.friends;
   return '<form class="add" data-add="' + d + '" autocomplete="off">' +
     '<div class="add-main"><input name="title" data-keep="add-title-' + d + '" placeholder="' + (phone || d > c.today ? "Add a task" : "Add a task, or log one: Reading 14:00-15:10") + '" enterkeyhint="done">' +
     '<input name="est" class="min num" data-keep="add-est-' + d + '" type="number" inputmode="numeric" value="30" min="5" step="5" aria-label="Minutes">' +
     '<button class="btn cta" type="submit">Add</button></div>' +
-    '<div class="add-more"><select name="project" data-keep="add-plan-' + d + '" aria-label="Project or plan">' + projectOptions(projects) + "</select>" +
+    '<div class="add-more"><select name="project" data-keep="add-plan-' + d + '" aria-label="Project or plan">' + projectOptions(projects, target) + "</select>" +
+    (people ? withHTML("add:" + d) : "") +
     '<label class="deep-tog" title="Deep work: focused, one thing at a time"><input type="checkbox" name="deep" data-keep="add-deep-' + d + '"><span>◆ Deep</span></label>' +
     (phone ? "" : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
       '<option value="weekdays">↻ Weekdays</option><option value="weekly">↻ Every ' + WEEKDAYS[weekday(d)] + "</option></select>" +
@@ -138,6 +166,7 @@ export function dayParts(c, d) {
     hero: heroHTML(c, d),
     strip: stripHTML(c, d, tasks),
     bill: isToday ? billHTML(E.yesterdayBill(c)) : "",
+    notices: isToday ? noticesHTML(c) : "",
     overdue: isToday ? overdueHTML(c) : "",
     list: '<div class="list" data-list="' + d + '">' + (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, false, openId)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">No tasks for this day.</div>') + ghostsHTML(c, d) + "</div>",
     add: addHTML(c, d)
@@ -201,7 +230,7 @@ export function todayHTML(c, phone) {
     '<header class="page-head"><div><h2>' + fmtDay(d) + " <small>" + (isToday ? "Today" : d < store.today() ? "Looking back" : "Looking ahead") + "</small></h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="day-prev" aria-label="Previous day">' + icon("left") + '</button><button type="button" class="nav" data-act="day-today">Today</button><button type="button" class="nav" data-act="day-next" aria-label="Next day">' + icon("right") + "</button></div></header>" +
     '<div class="today-grid"><div class="today-main">' + x.strip + x.list + x.add + "</div>" +
-    '<div class="today-side">' + x.hero + x.bill + x.overdue + "</div></div></div>";
+    '<div class="today-side">' + x.hero + x.bill + x.notices + x.overdue + "</div></div></div>";
 }
 
 // ---------- 交互（挂在 document 上，今天页和弹出的某一天都能用） ----------
@@ -233,6 +262,7 @@ export function initToday(rerender) {
     else if (act === "time-log") logFromRow(el.closest(".row"));
     else if (act === "tomorrow") store.toTomorrow(id);
     else if (act === "od-toggle") { overdueOpen = !overdueOpen; rerender(); }
+    else if (act === "week-seen") store.setLocal({ weekSeen: el.dataset.week });
     else if (act === "spread") store.spreadOverdue();
     else if (act === "all-today") {
       const c = store.ctx();
@@ -260,10 +290,12 @@ export function initToday(rerender) {
     rerender();
   });
 
-  // 加任务时选了计划：Deep 跟着这个计划的默认
+  // 加任务时选了计划：Deep 跟着这个计划的默认；选的大类能选「和谁」就多画那一块
   on(document, "change", ".dayview form[data-add] select[name=project]", (e, el) => {
     const box = el.form.querySelector("[name=deep]");
     if (box) box.checked = store.planDeep(el.value);
+    addTarget[el.form.dataset.add] = el.value;
+    rerender();
   });
 
   // 「几小时几分」只留数字
@@ -298,17 +330,23 @@ export function initToday(rerender) {
       if (deep) deep.checked = false;
       const plan = document.querySelector('[data-keep="add-plan-' + form.dataset.add + '"]');
       if (plan) plan.value = "";
+      addTarget[form.dataset.add] = "";
     };
+    // 选好的「和谁」：任务建好后记到它带的那条记录里
+    const people = takeWith("add:" + form.dataset.add);
+    const withThem = (id) => { if (id && people.length) store.setTaskMeet(id, { friends: people }); };
     // 「Reading 14:00-15:10」：已经做完的，记成一条 Done（以后的日子不认）
     const log = fields.date <= store.today() ? parseLogLine(String(f.get("title") || "")) : null;
     if (log) {
       focus = store.addLogged({ date: fields.date, title: log.title, projectId: fields.projectId, group: fields.group, deep: fields.deep }, log.from, log.to);
+      withThem(focus);
       clear();
       return;
     }
     const how = String(f.get("repeat") || "");
     const id = how ? store.addRepeating(fields, R.daysFor(how, fields.date, est), R.endFor(fields.date, Number(f.get("for")))) : store.addTask(fields);
     if (how) form.querySelector("[name=repeat]").value = "";
+    withThem(id);
     focus = id;
     if (form.dataset.add === store.today()) { pick(id); rerender(); }   // 加完就选中，底部点 Start 就能开始
     clear();

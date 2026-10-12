@@ -348,13 +348,13 @@ function pieHTML(c, s, rest) {
   }).join("");
   const legend = parts.map((x) => '<li title="' + esc(x.name + (x.deep > 0 ? " · " + fmtMin(x.deep) + " deep" : "")) + '"><i style="background:' + swatch(x) + '"></i><span>' + esc(x.name) +
     '</span><b class="num">' + fmtMin(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("");
-  const lede = logged ? "Only the time you logged." : "24 hours a day, up to today. Sleep, meals &amp; care and weekend chores are your usual amounts.";
+  const lede = logged ? "Only the time you logged." : "24 hours a day, up to today. Sleep, meals &amp; care and weekend housework are your usual amounts.";
   const field = (k, label, unit, v) => "<label><span>" + label + '</span><input class="num" type="number" min="0" max="24" step="0.5" data-life="' + k + '" data-keep="life-' + k + '" value="' + (v ? Math.round(v / 6) / 10 : "") + '" placeholder="' + (k === "deepGoal" ? "none" : "0") + '"><em>' + unit + "</em></label>";
   return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">' + lede +
     ' <button type="button" class="link" data-act="life-adjust" aria-expanded="' + adjust + '">' + (adjust ? "Done" : "Adjust") + "</button></p></div>" +
     '<span class="seg"><button type="button" data-act="pie-mode" data-v="day"' + (logged ? "" : ' class="on"') + '>24h</button><button type="button" data-act="pie-mode" data-v="logged"' + (logged ? ' class="on"' : "") + ">Logged only</button></span></header>" +
     (adjust ? '<div class="life-form">' + field("sleep", "Sleep", "h a day", life.sleep) + field("care", "Meals, dishes, shower", "h a day", life.care) +
-      field("chores", "Chores", "h a weekend", life.chores) + field("deepGoal", "Deep goal", "h a work day", life.deepGoal) + "</div>" : "") +
+      field("chores", "Housework you don't log", "h a weekend", life.chores) + field("deepGoal", "Deep goal", "h a work day", life.deepGoal) + "</div>" : "") +
     (pie.total > 0
       ? '<div class="pie-wrap"><div class="pie" data-chart="pie"><svg viewBox="-60 -60 120 120" role="img" aria-label="' + esc(parts.map((x) => x.name + " " + share(x.min, pie.total)).join(", ")) + '">' +
         '<defs><pattern id="st-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="var(--k-blank)"/><rect width="1.5" height="5" fill="var(--muted)"/></pattern></defs>' +

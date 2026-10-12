@@ -1257,6 +1257,20 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 .fdone input { flex: 1; min-width: 0; padding: 5px 9px; border: var(--b-ctl); font-size: 13px; }
 .fdone .btn { padding: 5px 12px; font-size: 12.5px; }
 .fdone .link { font-size: 12px; }
+/* 三个记号：暗的 = 没有，点一下亮起来 */
+.fmarks { display: inline-flex; align-items: center; gap: 1px; flex-shrink: 0; }
+.fmark { padding: 1px 2px; border: 0; border-radius: 6px; background: none; font-size: 15px; line-height: 1.1; filter: grayscale(1); opacity: .25; transition: opacity .15s, filter .15s, transform .15s var(--ease); }
+.fmark:hover { opacity: .6; }
+.fmark.on { filter: none; opacity: 1; }
+.fmark:active { transform: scale(.88); }
+.fmark:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.ftable td.fm-cell { width: 1%; padding-left: 0; padding-right: 4px; overflow: visible; white-space: nowrap; }
+.fr-bar .fmarks { gap: 2px; padding: 2px 8px; border: var(--b-ctl); border-radius: 999px; background: var(--bg); }
+[data-theme="dark"] .fr-bar .fmarks { background: var(--surface); }
+.fname-row { display: flex; align-items: flex-end; gap: 10px; }
+.fname-row .field { flex: 1; min-width: 0; }
+.fname-row .fmarks { gap: 4px; margin-bottom: 14px; }
+.fname-row .fmark { font-size: 22px; padding: 2px 3px; }
 /* 一个人的 Dates（生日、问候、关键日子）和页面右边的 Coming up */
 .fdates { display: grid; gap: 8px; margin-bottom: 12px; }
 .fd-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }

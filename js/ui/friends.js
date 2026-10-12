@@ -1,5 +1,6 @@
 // Friends 页（电脑）：People 表（搜索 + 筛选）、Recent（最近的记录）、右边 To do（谁、做什么、哪天）。
 // 每个人的资料有哪些格子是自己定的：右上齿轮 → Fields，一行一个；表格里手动加的列也会出现。
+// 三个记号（🎩 🧠 🫂）：每个人可以点亮其中几个——表里那一行、点开的编辑框里都能点；筛选条上点亮哪个就只看带那个的人。
 // 特别的日子：点开一个人，Dates 那块记生日、哪几个节要问候、自己的关键日子；页面右边 Coming up 列接下来的，
 // 到了日子点一下名字 = 在他的记录里记一条。Gift 字段填了东西的人，生日那条带 🎁。
 // 已经记在别的表格里的人：People 那块右上角 Import，整片粘进来。带着表头那一行（Name、各字段的名字）就按表头对列，
@@ -20,6 +21,7 @@ let td = "", seen = "";     // 两个现成的筛选：有没有要做的事、�
 let editing = null;         // 弹出来的：{ kind: "friend" | "meet" | "fields", id, draft }
 let doneFor = "";           // To do 里正在记「做完了」的那个人
 let newFor = "";            // 正在当场新建一个人的那一块（key）
+const markOn = new Set();   // 筛选：点亮了哪几个记号
 let upSpan = 30;            // Coming up 往后看多少天：30 / 364（一整年少一天，免得今天的生日明年那次也冒出来）
 const drafts = new Map();   // 还没存的「和谁」：加任务框 add:<日期>、新记录 meet:new
 let redraw = () => {};
@@ -78,6 +80,15 @@ export function withText(taskId) {
 
 // ---------- 页面 ----------
 
+// 这个人的特别字段叫什么：字段清单里已经有（不管怎么写的）就用那个，没有就用标准的名字
+const spName = (k) => store.friendSpecial()[k] || F.SPECIAL_NAME[k];
+// 普通的字段：去掉有专门地方改的那几个（生日、问候、关键日子、记号）
+const plainFields = () => { const sp = store.friendSpecial(); return store.friendFields().filter((k) => ![sp.birthday, sp.greet, sp.dates, sp.marks].includes(k)); };
+
+// 三个记号：亮的 = 有。act = 点了做什么（mark 改这个人的 / mark-filter 改筛选）
+const marksHTML = (have, act, label) => '<span class="fmarks" role="group" aria-label="' + label + '">' + F.MARKS.map((m) =>
+  '<button type="button" class="fmark' + (have.includes(m) ? " on" : "") + '" data-act="' + act + '" data-m="' + m + '" aria-pressed="' + have.includes(m) + '" aria-label="' + m + '">' + m + "</button>").join("") + "</span>";
+
 function filterBarHTML(all, fields) {
   const opt = (v, l, cur) => '<option value="' + esc(v) + '"' + (v === cur ? " selected" : "") + ">" + esc(l) + "</option>";
   const chips = where.map((w, i) => '<span class="fchip"><b>' + esc(w.field) + "</b> " + esc(w.value) + '<button type="button" data-act="where-x" data-i="' + i + '" aria-label="Remove this filter">×</button></span>').join("");
@@ -86,17 +97,18 @@ function filterBarHTML(all, fields) {
   else if (pending) add = '<select data-ff="value" aria-label="' + esc(pending.field) + '"><option value="">' + esc(pending.field) + " is…</option>" + F.valuesOf(all, pending.field).slice(0, 40).map((v) => opt(v, v, "")).join("") + '<option value="__text">Contains…</option><option value="__cancel">Cancel</option></select>';
   else if (fields.length) add = '<select data-ff="field" aria-label="Add a filter"><option value="">+ Filter…</option>' + fields.map((f) => opt(f, f, "")).join("") + "</select>";
   return '<div class="fr-bar"><input type="search" data-fq data-keep="fr-q" value="' + esc(q) + '" placeholder="Search" aria-label="Search people">' +
+    marksHTML([...markOn], "mark-filter", "Only people with these marks") +
     '<select data-ff="todo" aria-label="To do">' + opt("", "To do: any", td) + opt("has", "Has a to-do", td) + opt("late", "Overdue", td) + "</select>" +
     '<select data-ff="seen" aria-label="Last contact">' + opt("", "Last: any time", seen) + opt("30", "30+ days ago", seen) + opt("90", "90+ days ago", seen) + opt("never", "Never", seen) + "</select>" +
-    chips + add + (q || where.length || td || seen ? '<button type="button" class="link" data-act="fr-clear">Clear</button>' : "") + "</div>";
+    chips + add + (q || where.length || td || seen || markOn.size ? '<button type="button" class="link" data-act="fr-clear">Clear</button>' : "") + "</div>";
 }
 
 function peopleHTML(all, shown, fields, last, T) {
   const cols = fields.slice(0, 2);
   const next = (f) => (low(f.next) ? '<span class="fnext' + (f.nextDate && f.nextDate < T ? " late" : "") + '">' + esc(f.next) + (f.nextDate ? " <small>" + fmtShort(f.nextDate) + "</small>" : "") + "</span>" : "");
   const table = shown.length
-    ? '<div class="table-wrap"><table class="ftable"><thead><tr><th>Name</th>' + cols.map((f) => "<th>" + esc(f) + "</th>").join("") + "<th>Last</th><th>Next</th></tr></thead><tbody>" +
-      shown.map((f) => '<tr data-act="edit-friend" data-id="' + esc(f.id) + '" tabindex="0"><td><b>' + esc(f.name || "Untitled") + "</b></td>" +
+    ? '<div class="table-wrap"><table class="ftable"><thead><tr><th>Name</th><th aria-label="Marks"></th>' + cols.map((f) => "<th>" + esc(f) + "</th>").join("") + "<th>Last</th><th>Next</th></tr></thead><tbody>" +
+      shown.map((f) => '<tr data-act="edit-friend" data-id="' + esc(f.id) + '" tabindex="0"><td><b>' + esc(f.name || "Untitled") + '</b></td><td class="fm-cell">' + marksHTML(F.marksOf(f.more?.[spName("marks")]), "mark", "Marks") + "</td>" +
         cols.map((k) => "<td>" + esc(f.more?.[k] || "") + "</td>").join("") + '<td class="num">' + esc(F.ago(last[f.id], T)) + "</td><td>" + next(f) + "</td></tr>").join("") + "</tbody></table></div>"
     : '<p class="empty">' + (all.length ? "Nobody matches." : "Nobody here yet. Add a person, or pick “New person…” on a task.") + "</p>";
   return '<section class="card"><header class="fr-head"><h3>People</h3><span class="msub">' + (shown.length === all.length ? all.length : shown.length + " of " + all.length) + '</span><button type="button" class="link fr-import" data-act="fr-import">Import</button></header>' +
@@ -139,9 +151,9 @@ function comingHTML(c) {
 }
 
 export function friendsHTML(c) {
-  const all = store.friends(), last = store.lastContact(), fields = store.friendFields();
+  const all = store.friends(), last = store.lastContact(), fields = plainFields();
   where = where.filter((w) => fields.includes(w.field));
-  const shown = F.filter(all, { q, where, todo: td, seen }, last, c.today);
+  const shown = F.filter(all, { q, where, todo: td, seen, marks: [...markOn], marksField: spName("marks") }, last, c.today);
   return '<div class="friends"><header class="page-head"><div><h2>Friends</h2></div><div class="tools">' +
     '<button type="button" class="btn cta" data-act="new-friend">' + icon("plus") + " Person</button>" +
     '<button type="button" class="btn" data-act="new-meet">' + icon("plus") + " Catch-up</button>" +
@@ -153,9 +165,6 @@ export function friendsHTML(c) {
 export const friendsDue = (today) => F.todo(store.all("friends"), today).due + F.comingUp(store.all("friends"), store.friendSpecial(), today, { ahead: 3, back: 7 }, store.occasionDone).due;
 
 // ---------- 弹出来的三种：一个人、一条记录、字段清单 ----------
-
-// 这个人的特别字段叫什么：字段清单里已经有（不管怎么写的）就用那个，没有就用标准的名字
-const spName = (k) => store.friendSpecial()[k] || F.SPECIAL_NAME[k];
 
 // 一个人的 Dates：生日（年份可以不填）、哪几个节要问候、自己记的关键日子（每年 / 只这一次）
 function datesHTML(f) {
@@ -178,12 +187,11 @@ function datesHTML(f) {
 function friendEditorHTML() {
   const isNew = !editing.id, f = isNew ? editing.draft : store.get("friends", editing.id);
   if (!f) return "";
-  const sp = store.friendSpecial(), T = store.today();
-  const fields = store.friendFields().filter((k) => k !== sp.birthday && k !== sp.greet && k !== sp.dates);   // 这三个在下面的 Dates 里改
+  const fields = plainFields(), T = store.today();   // 生日、问候、关键日子在下面的 Dates 里改，记号在名字旁边
   const st = (id) => store.get("tasks", id)?.status || "";
   const hist = isNew ? [] : store.meets().filter((m) => (m.friends || []).includes(f.id));
   let h = '<div class="friend-editor" data-fid="' + esc(f.id || "") + '"><h2 class="sheet-title">' + (isNew ? "New person" : "Person") + "</h2>" +
-    '<label class="field"><span>Name</span><input data-pf="name" value="' + esc(f.name || "") + '" autocomplete="off"></label>' +
+    '<div class="fname-row"><label class="field"><span>Name</span><input data-pf="name" value="' + esc(f.name || "") + '" autocomplete="off"></label>' + marksHTML(F.marksOf(f.more?.[spName("marks")]), "mark", "Marks") + "</div>" +
     (fields.length ? '<div class="fgrid">' + fields.map((k) => '<label class="field"><span>' + esc(k) + '</span><textarea rows="1" data-more="' + esc(k) + '">' + esc(f.more?.[k] || "") + "</textarea></label>").join("") + "</div>" : "") +
     datesHTML(f) +
     '<div class="field-row"><label class="field"><span>Next — what to do</span><input data-pf="next" value="' + esc(f.next || "") + '" autocomplete="off"></label>' +
@@ -332,7 +340,13 @@ export function initFriends(rerender) {
     else if (act === "fr-fields") openEditor({ kind: "fields" }, "textarea");
     else if (act === "fr-import") openEditor({ kind: "import" }, "textarea");
     else if (act === "where-x") { where.splice(Number(el.dataset.i), 1); rerender(); }
-    else if (act === "fr-clear") { q = ""; where = []; pending = null; td = ""; seen = ""; rerender(); }
+    else if (act === "fr-clear") { q = ""; where = []; pending = null; td = ""; seen = ""; markOn.clear(); rerender(); }
+    else if (act === "mark-filter") { if (markOn.has(el.dataset.m)) markOn.delete(el.dataset.m); else markOn.add(el.dataset.m); rerender(); }
+    else if (act === "mark") {
+      // 编辑框里点：改正在看的这个人（新建的记在草稿里）；表里点：改那一行的人
+      if (el.closest(".friend-editor")) setSpecial("marks", F.toggleMark(person()?.more?.[spName("marks")], el.dataset.m));
+      else { const f = store.get("friends", id); if (f) store.saveFriend({ id, more: { ...(f.more || {}), [spName("marks")]: F.toggleMark(f.more?.[spName("marks")], el.dataset.m) } }); }
+    }
     else if (act === "up-span") { upSpan = Number(el.dataset.v) || 30; rerender(); }
     else if (act === "oc-toggle") store.toggleOccasion(el.dataset.oc, el.dataset.friend, el.dataset.note);
     else if (act === "kd-x") { const list = F.parseDates(person()?.more?.[spName("dates")]); list.splice(Number(el.dataset.i), 1); setSpecial("dates", F.formatDates(list)); }

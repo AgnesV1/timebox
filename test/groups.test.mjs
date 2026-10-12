@@ -219,8 +219,8 @@ test("friends: birthdays, greetings and key dates", () => {
   assert.equal(F.formatDates(dates), "06-20 graduation; 2027-05-01 moving day; 07-04");
   assert.deepEqual(F.greetKeys("christmas, New years eve、Teachers' Day, Easter"), ["teachers", "christmas", "new-year-eve"]);
   assert.equal(F.formatGreet(["lunar-eve", "christmas"]), "Christmas, Lunar New Year's Eve");
-  assert.deepEqual(F.specialFields(["Field A", "birthday", "GIFT", "Key Dates", "Greetings"]), { birthday: "birthday", greet: "Greetings", dates: "Key Dates", gift: "GIFT" });
-  assert.deepEqual(F.specialFields(["Field A"]), { birthday: "", greet: "", dates: "", gift: "" });
+  assert.deepEqual(F.specialFields(["Field A", "birthday", "GIFT", "Key Dates", "Greetings"]), { birthday: "birthday", greet: "Greetings", dates: "Key Dates", gift: "GIFT", marks: "" });
+  assert.deepEqual(F.specialFields(["Field A", "MARKS"]), { birthday: "", greet: "", dates: "", gift: "", marks: "MARKS" });
 
   const names = { birthday: "Birthday", greet: "Greetings", dates: "Key dates", gift: "Gift" };
   const ana = { id: "a", name: "Ana", more: { Birthday: "1995-10-25", Gift: "tea set", Greetings: "Christmas, Lunar New Year's Eve", "Key dates": "10-20 thesis day; 2026-11-01 moving" } };
@@ -250,7 +250,7 @@ test("friends: ticking a day off logs it once, and can be undone", () => {
   store.setSetting("friend-fields", ["Field A", "gift"]);
   const T = store.today(), md = T.slice(5);
   const gil = store.saveFriend({ name: "Gil", more: { gift: "tea", Birthday: md, Greetings: "Christmas" } });
-  assert.deepEqual(store.friendSpecial(), { birthday: "Birthday", greet: "Greetings", dates: "", gift: "gift" }, "the three date fields are found once someone has them; Gift is the user's own");
+  assert.deepEqual(store.friendSpecial(), { birthday: "Birthday", greet: "Greetings", dates: "", gift: "gift", marks: "" }, "the three date fields are found once someone has them; Gift is the user's own");
   assert.deepEqual(store.friendFields(), ["Field A", "gift", "Birthday", "Greetings"]);
   const up = () => F.comingUp(store.friends(), store.friendSpecial(), T, { ahead: 3, back: 0 }, store.occasionDone);
   const [oc] = up().groups[0].items;
@@ -261,4 +261,17 @@ test("friends: ticking a day off logs it once, and can be undone", () => {
   assert.equal(store.lastContact()[gil], T);
   store.toggleOccasion(oc.id, gil, "Birthday (gift)");
   assert.deepEqual([up().groups[0].items[0].done, store.meets().length], [false, 0]);
+});
+
+test("friends: three marks that light up, and filtering by them", () => {
+  const [hat, mind, hug] = F.MARKS;
+  assert.deepEqual(F.marksOf("x " + hug + hat + " y"), [hat, hug], "always in the same order, whatever else is in the cell");
+  assert.deepEqual([F.marksOf(""), F.marksOf(undefined)], [[], []]);
+  assert.equal(F.toggleMark("", mind), mind);
+  assert.equal(F.toggleMark(hug + mind, hat), hat + mind + hug);
+  assert.equal(F.toggleMark(hat + mind + hug, mind), hat + hug);
+  assert.equal(F.toggleMark(hat, hat), "");
+  const people = [{ id: "a", name: "Ana", more: { Marks: hat + mind } }, { id: "b", name: "Bo", more: { Marks: mind } }, { id: "c", name: "Cy", more: {} }];
+  const names = (marks) => F.filter(people, { marks, marksField: "Marks" }, {}, "2026-10-12").map((f) => f.name).join("");
+  assert.deepEqual([names([]), names([mind]), names([hat, mind]), names([hug])], ["AnaBoCy", "AnaBo", "Ana", ""], "every lit mark has to be there");
 });

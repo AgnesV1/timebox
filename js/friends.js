@@ -39,12 +39,14 @@ export function valuesOf(friends, field) {
 const daysBetween = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 864e5);
 
 // 筛选：q 搜名字和所有字段；where = [{ field, value }]（字段里包含这段字，几个条件都要满足）；
-// todo = "has" 有事要做 / "late" 过期了；seen = "30" / "90" 这么多天没联系 / "never" 从没记过
-export function filter(friends, { q = "", where = [], todo: td = "", seen = "" } = {}, last = {}, today = "") {
+// todo = "has" 有事要做 / "late" 过期了；seen = "30" / "90" 这么多天没联系 / "never" 从没记过；
+// marks = 只看带着这几个记号的人（记号存在 marksField 那个字段里）
+export function filter(friends, { q = "", where = [], todo: td = "", seen = "", marks = [], marksField = "" } = {}, last = {}, today = "") {
   const needle = low(q);
   return friends.filter((f) => {
     if (needle && !low(f.name).includes(needle) && !Object.values(f.more || {}).some((v) => low(v).includes(needle)) && !low(f.next).includes(needle)) return false;
     for (const w of where) if (w.field && low(w.value) && !low(f.more?.[w.field]).includes(low(w.value))) return false;
+    if (marks.length && !marks.every((m) => marksOf(f.more?.[marksField]).includes(m))) return false;   // 点亮了几个记号就都要有
     if (td === "has" && !low(f.next)) return false;
     if (td === "late" && !(low(f.next) && f.nextDate && f.nextDate < today)) return false;
     if (seen === "never" && last[f.id]) return false;
@@ -129,8 +131,14 @@ export function parseFields(text) {
 // Gift 是自己加的字段：填了东西的人，生日那条带上 🎁 和填的字。
 // 到了日子点一下 = 在这个人的记录里记一条，记录的 id 是 oc:<人>:<哪个日子>:<哪一年>，所以每年每个日子只记一次、也不用另存「发过没有」。
 
-const ALIASES = { birthday: ["birthday", "bday", "生日"], greet: ["greetings", "greeting", "greet", "问候"], dates: ["keydates", "dates", "节点", "关键节点"], gift: ["gift", "gifts", "礼物"] };
-export const SPECIAL_NAME = { birthday: "Birthday", greet: "Greetings", dates: "Key dates" };
+const ALIASES = { birthday: ["birthday", "bday", "生日"], greet: ["greetings", "greeting", "greet", "问候"], dates: ["keydates", "dates", "节点", "关键节点"], gift: ["gift", "gifts", "礼物"], marks: ["marks", "mark", "标注", "记号"] };
+export const SPECIAL_NAME = { birthday: "Birthday", greet: "Greetings", dates: "Key dates", marks: "Marks" };
+
+// 三个记号：每个人可以点亮其中几个（各代表什么，用的人自己知道）。存在 Marks 字段里，值就是点亮的那几个连在一起
+export const MARKS = ["🎩", "🧠", "🫂"];
+export const marksOf = (text) => MARKS.filter((m) => String(text ?? "").includes(m));
+export const formatMarks = (list) => MARKS.filter((m) => (list || []).includes(m)).join("");
+export const toggleMark = (text, m) => { const have = marksOf(text); return formatMarks(have.includes(m) ? have.filter((x) => x !== m) : [...have, m]); };
 
 // 字段清单里哪个是生日、问候、关键日子、礼物（名字不分大小写、空格）；没有的是空
 export function specialFields(fields) {

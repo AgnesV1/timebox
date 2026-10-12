@@ -7,6 +7,7 @@ import * as store from "./store.js";
 import * as reading from "./reading.js";
 import * as S from "./stats.js";
 import { debounce } from "./dom.js";
+import { quarterOf } from "./dates.js";
 
 export const VERSION = 5;
 const KEEP_DELETED_DAYS = 14;   // 表格里的删除记录只留这么久：更久没同步的设备整表重拉一次
@@ -101,10 +102,14 @@ async function quarter(url, secret) {
   const sent = store.local().quarterSent || {};
   const mark = (r) => r.progress + "|" + r.focus;
   const all = S.quarterRows(store.ctx(), q.from || store.today());
-  const rows = all.filter((r) => sent[r.date] !== mark(r));
+  let rows = all.filter((r) => sent[r.date] !== mark(r));
+  // 没有要填的（比如刚贴链接、今天还没记东西）：还没说过话就先探一下——只发今天的日期、不带数，表格那边什么都不写，
+  // 只回这一天那一行找不找得到。这样贴完链接马上知道对不对
+  const T = store.today(), probe = !rows.length && !store.local().quarterNote;
+  if (probe) rows = [{ date: T }];
   if (!rows.length) return;
   // 上次发的就是这几行、没填进去（比如那个季度的页签还没建）：十分钟内不重发
-  const key = JSON.stringify(rows);
+  const key = q.url + JSON.stringify(rows);   // 换了链接就不算「上次发过」
   if (key === tried.key && Date.now() - tried.at < 6e5) return;
   tried = { key, at: Date.now() };
   let note = "", done = [];
@@ -114,12 +119,12 @@ async function quarter(url, secret) {
     else {
       done = res.done || [];
       const miss = (res.missing || [])[0];
-      note = miss ? miss.why : done.length ? "Filled through " + done.slice().sort().pop() : "";
+      note = miss ? miss.why : !done.length ? "" : probe ? "Connected — found today on the " + T.slice(0, 4) + " Q" + quarterOf(T) + " tab. It fills in once you log something today." : "Filled through " + done.slice().sort().pop();
     }
   } catch (e) { note = e.message || "Couldn't reach the quarter sheet"; }
   // 只记着还在这两周里的日子
   const keep = Object.fromEntries(all.map((r) => [r.date, sent[r.date]]).filter(([, v]) => v !== undefined));
-  for (const r of rows) if (done.includes(r.date)) keep[r.date] = mark(r);
+  if (!probe) for (const r of rows) if (done.includes(r.date)) keep[r.date] = mark(r);
   if (JSON.stringify(keep) !== JSON.stringify(sent) || (note && note !== store.local().quarterNote)) store.setLocal({ quarterSent: keep, ...(note ? { quarterNote: note } : {}) });
 }
 

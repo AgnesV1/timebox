@@ -406,6 +406,9 @@ test("quarter sheet: only the two cells of that day are written", () => {
   assert.deepEqual(res.missing.map((m) => m.why), ["No row for 2026-10-13 on 2026 Q4", "No tab named 2027 Q1"]);
   assert.deepEqual(sh.rows.slice(2, 6).map((r) => [r[4], r[5], r[6], r[7]]), [[65, 0.2, 8, "by hand"], [10, 0, 6, "by hand"], [60, 0.3, "", "keep me"], [0, 0, "", ""]]);
   assert.deepEqual(sh.rows[1].slice(1, 6), [1.25, 116, 50, 70, 0.4], "the row under the header is left alone");
+  // 只发日期、不带数：什么都不写，只回这一天找不找得到（贴完链接先探一下用）
+  assert.deepEqual(ask([{ date: "2026-10-12" }, { date: "2026-10-20" }]), { done: ["2026-10-12"], missing: [{ date: "2026-10-20", why: "No row for 2026-10-20 on 2026 Q4" }] });
+  assert.deepEqual(sh.rows[5].slice(4, 6), [0, 0], "a look-up without numbers writes nothing");
   // 没有这个页签、但整个表格就叫这个名字：用第一页
   const solo = g.spreadsheet("https://docs.google.com/spreadsheets/d/1SoloQuarterIdAbcdefghijklmnopq");
   solo.name = "2027 Q1";

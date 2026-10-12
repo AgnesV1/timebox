@@ -58,6 +58,9 @@
 **电脑**
 - `Projects`：最上面是**目标板**（这个月 / 这个季度 / 下个季度 / 今年，和之后五年；每条有标签、打算哪个月做到，勾了以后记实际哪个月做到，
   两个都能点开改；栏目跟着日子自己滚，过期没做完的滚进当前那栏）和各项目占了多少时间（Week / Month / Season）。
+  下面每个项目看的东西不一样（Settings → Projects 的 Watch 一列能改）：**Build** 看计划的进度（进度条、健康度、时间轴）；
+  **Fitness** 看最近 7 天够不够 3 小时、**Leisure** 看最近 7 天的 Relax 在不在每周门槛之间（默认 5–20 小时）、**Friends** 看最近两周有没有联系过——
+  都只是一句话，不达标是红的，侧栏 Projects 上会有个数；**Work / Chores** 不看，只列计划。
   下面按项目分区：Work / Fitness / Chores / Build / Leisure / Friends 六个一直都在（Rename 可以改名、换颜色、并进别的项目，空的可以 Remove）。
   **任务可以直接挂在项目上**，不一定要有计划：加任务时下拉里每个项目自己是一项，下面才是它的计划。
   区里是计划。点「New plan」或某个项目的「+ Plan」，选 Total / Regular 和 Auto / Pool；

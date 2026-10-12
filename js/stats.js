@@ -6,6 +6,7 @@
 
 import { addDays, diffDays, range, weekday, startOfWeek, startOfMonth, startOfQuarter, addMonths, daysInMonth, isoOf } from "./dates.js";
 import * as E from "./engine.js";
+import * as GR from "./groups.js";
 import { parseTimes } from "./times.js";
 import { hourMinutes, isCommute, COMMUTE_BLOCKS } from "./day.js";
 
@@ -219,6 +220,34 @@ export function weekCheck(ctx, from, to, limits = {}) {
   check("growth", growth, L.growMin, L.growMax);
   check("relax", relax, L.relaxMin, L.relaxMax);
   return { from, to, growth, relax, warn };
+}
+
+// ---------- 各大类自己的「健康」：Projects 页大类头上那一句（不是进度条） ----------
+// 看什么由大类自己定（groups.js 的 trackOf）；只有下面三种有话说，别的返回 null。level：ok / low / high
+//   min     最近 7 天（含今天）在这个大类记了多少分钟，够不够 g.min（默认 3 小时）
+//   range   最近 7 天这个大类的 Relax（大类是「只有 Deep 算成长」的，就不算标了 ◆ Deep 的）在不在每周门槛 relaxMin–relaxMax 之间；0 = 那一头不查
+//   contact 最近一次联系到今天几天了（lastContact = 那一天，从没有过是空）；超过 14 天算久
+export const CONTACT_DAYS = 14;
+export function groupHealth(ctx, g, { weekly = {}, lastContact = "" } = {}) {
+  const track = GR.trackOf(g);
+  if (track === "contact") {
+    const days = lastContact ? Math.max(0, diffDays(lastContact, ctx.today)) : null;
+    return { kind: track, days, limit: CONTACT_DAYS, level: days !== null && days <= CONTACT_DAYS ? "ok" : "low" };
+  }
+  if (track !== "min" && track !== "range") return null;
+  const from = addDays(ctx.today, -6);
+  let min = 0;
+  for (const t of ctx.tasks) {
+    if (!t.date || t.date < from || t.date > ctx.today || rowOf(ctx, t, "group").name !== g.name) continue;
+    if (track === "range" && g.grow === "deep" && t.deep) continue;
+    min += E.spentMin(t);
+  }
+  if (track === "min") {
+    const limit = num(g.min) > 0 ? num(g.min) : GR.TRACK_MIN;
+    return { kind: track, min, limit, level: min >= limit ? "ok" : "low" };
+  }
+  const L = { ...WEEKLY, ...(weekly || {}) }, lo = num(L.relaxMin), hi = num(L.relaxMax);
+  return { kind: track, min, lo, hi, level: lo > 0 && min < lo ? "low" : hi > 0 && min > hi ? "high" : "ok" };
 }
 
 // ---------- 季度表的两格 ----------

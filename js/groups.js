@@ -2,6 +2,7 @@
 //   labor    这个大类的时间算进季度表的 progress
 //   grow     "all" 全部时间算成长 / "deep" 只有标了 ◆ Deep 的算成长，没标的算 Relax / "" 都不算
 //   friends  这个大类的任务可以选「和谁」
+//   track    Projects 页上看它什么（进度 / 每周够不够钟点 / Relax 在不在范围里 / 多久没联系 / 不看），见最下面的 trackOf；min = 够不够的那个钟点（分钟）
 // 任务可以直接挂在大类上（task.group），不一定要挂在哪个计划下面。只算数，不碰页面和存储。
 
 // 颜色照油画颜料来：绿 viridian、蓝 ultramarine、橘 cadmium orange、紫 mauve、白 ivory、棕 burnt sienna、赭黄 ochre、茜红 alizarin
@@ -70,3 +71,20 @@ export function adopt(projects) {
 }
 
 export const byName = (list, name) => (list || []).find((g) => g.name === name) || null;
+
+// 这个大类在 Projects 页上看什么（g.track，Settings 里能改）：
+//   "progress" 计划的进度（进度条、健康度）        "min"     最近 7 天至少做够 g.min 分钟（默认 3 小时）
+//   "range"    最近 7 天的 Relax 在每周的门槛之间    "contact" 最近两周里至少联系过一次        ""  不看
+// 没设过就猜：能选人的 = contact；没标 Deep 算 Relax 的那种 = range；名字像 Work / Chores 的不看（进度不由自己定），
+// 像 Fitness 的看够不够钟点，像 Build 的看进度；认不出的照旧看进度。
+export const TRACKS = ["progress", "min", "range", "contact", ""];
+export const TRACK_MIN = 180;
+const TRACK_BY_NAME = { Work: "", Chores: "", Build: "progress", Fitness: "min", Leisure: "range", Friends: "contact" };
+export function trackOf(g) {
+  if (!g) return "progress";
+  if (TRACKS.includes(g.track)) return g.track;
+  if (g.friends) return "contact";
+  if (g.grow === "deep") return "range";
+  const known = match(g.name);
+  return known in TRACK_BY_NAME ? TRACK_BY_NAME[known] : "progress";
+}

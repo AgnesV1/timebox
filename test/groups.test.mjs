@@ -280,3 +280,31 @@ test("friends: three marks that light up, and filtering by them", () => {
   const names = (marks) => F.filter(people, { marks, marksField: "Marks" }, {}, "2026-10-12").map((f) => f.name).join("");
   assert.deepEqual([names([]), names([mind]), names([hall, mind]), names([spark])], ["AnaBoCy", "AnaBo", "Ana", ""], "every lit mark has to be there");
 });
+
+test("projects: what each one is watched for, and its health over the last week", async () => {
+  const GR = await import("../js/groups.js");
+  const S = await import("../js/stats.js");
+  assert.deepEqual(["Work", "Chores", "Build", "Fitness", "Leisure", "Friends"].map((name) => GR.trackOf(GR.DEFAULTS.find((g) => g.name === name))), ["", "", "progress", "min", "range", "contact"]);
+  assert.equal(GR.trackOf({ name: "Gym" }), "min", "a name that reads like one of them");
+  assert.equal(GR.trackOf({ name: "Side gig" }), "progress", "unknown ones keep showing progress");
+  assert.equal(GR.trackOf({ name: "Work", track: "progress" }), "progress", "a saved choice wins");
+  assert.equal(GR.trackOf({ name: "Build", track: "" }), "");
+  assert.equal(GR.trackOf(null), "progress");
+
+  const groups = [{ name: "Fitness", grow: "all" }, { name: "Leisure", grow: "deep" }, { name: "Friends", grow: "", friends: true }, { name: "Work", grow: "all" }];
+  const t = (date, group, actual, extra = {}) => ({ id: date + group + actual, date, group, status: "done", est: actual, actual, ...extra });
+  const ctx = { today: "2026-10-12", groups, items: [], projects: [{ id: "g", name: "Gym", group: "Fitness" }], tasks: [
+    t("2026-10-06", "", 60, { projectId: "g" }), t("2026-10-10", "Fitness", 90), t("2026-10-05", "Fitness", 240),   // the 5th is eight days back
+    t("2026-10-08", "Leisure", 200), t("2026-10-11", "Leisure", 120, { deep: true }), t("2026-10-12", "Work", 500)
+  ] };
+  const fit = S.groupHealth(ctx, groups[0]);
+  assert.deepEqual([fit.kind, fit.min, fit.limit, fit.level], ["min", 150, 180, "low"], "plans and loose tasks of the last 7 days, against 3 hours");
+  assert.equal(S.groupHealth(ctx, { ...groups[0], min: 120 }).level, "ok", "its own number of hours");
+  const lei = S.groupHealth(ctx, groups[1], { weekly: { relaxMin: 300, relaxMax: 1200 } });
+  assert.deepEqual([lei.min, lei.lo, lei.hi, lei.level], [200, 300, 1200, "low"], "deep leisure is growth, not relax");
+  assert.equal(S.groupHealth(ctx, groups[1], { weekly: { relaxMin: 60, relaxMax: 180 } }).level, "high");
+  assert.equal(S.groupHealth(ctx, groups[1], { weekly: { relaxMin: 0, relaxMax: 0 } }).level, "ok", "no limits, nothing to miss");
+  assert.deepEqual([S.groupHealth(ctx, groups[2], { lastContact: "2026-09-28" }).level, S.groupHealth(ctx, groups[2], { lastContact: "2026-09-27" }).level], ["ok", "low"], "fourteen days is still fine");
+  assert.deepEqual(S.groupHealth(ctx, groups[2]), { kind: "contact", days: null, limit: 14, level: "low" });
+  assert.equal(S.groupHealth(ctx, groups[3]), null, "work isn't watched");
+});

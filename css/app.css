@@ -131,7 +131,7 @@ body.phone #main { max-width: 560px; margin: 0 auto; padding: 0 16px calc(40px +
 .sblock[data-b="read"] { --w1: #E07A2B; --w2: #8B62AE; }
 .sblock[data-b="friends"] { --w1: #8B62AE; --w2: #3F62B5; }
 .sblock a:hover { background: color-mix(in srgb, var(--bg) 65%, transparent); }
-.sbot { margin-top: auto; display: grid; gap: 8px; padding-top: 12px; }
+.sbot { margin-top: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding-top: 12px; }   /* minmax：同步状态那句话长了也不许把这一栏撑宽 */
 .sbot .snav { padding: 0 4px; }
 .snav a { display: flex; align-items: center; gap: 9px; padding: 6px 9px; border: 1.5px solid transparent; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13.5px; color: var(--muted); }
 .snav a:hover { background: var(--surface); color: var(--ink); }
@@ -1269,9 +1269,7 @@ body.phone .mcoming { margin-top: 10px; padding: 10px 12px; }
 .pg-top.editing .rename { width: 200px; }
 .pg-top.editing select { padding: 5px 26px 5px 10px; font-size: 12.5px; }
 .pg-top.editing .btn { margin-left: auto; padding: 6px 12px; font-size: 12.5px; }
-.gshare { display: flex; align-items: center; gap: 8px; margin: -3px 0 8px; font-size: 12px; color: var(--muted); }
-.gshare b { color: var(--ink); }
-.gparts { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ghealth { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -2px 0 8px; font-size: 12px; color: var(--muted); }
 .pintro { margin: 0 0 14px; max-width: 640px; }
 .pgroup:has(.pgrid) { margin-bottom: 18px; }
 .pgroup:not(:has(.pgrid)) { margin-bottom: 6px; }
@@ -1417,6 +1415,8 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 .gtable { width: 100%; border-collapse: collapse; font-size: 13px; }
 .gtable th, .gtable td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
 .gtable thead th { font-size: 11.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.gtable select { max-width: 170px; }
+.gtable .gwatch input { width: 56px; margin: 4px 4px 0 0; }
 .gtable thead th small { display: block; font-weight: 500; }
 .gtable tbody th { display: flex; align-items: center; gap: 8px; font-weight: 600; white-space: nowrap; }
 .gtable select { padding: 4px 26px 4px 9px; font-size: 12.5px; }

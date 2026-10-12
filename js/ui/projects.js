@@ -1,5 +1,9 @@
 // 项目页：最上面是目标板（js/ui/goals.js）和各大类的时间占比；下面按「项目」分区（项目 = 大类 = 计划的 group），
-// 清单里的大类一直都在（空的也在），每区汇总进度、今天要做多少、占了多少时间；区头 Rename 可以改名、换颜色、并进别的大类。
+// 清单里的大类一直都在（空的也在）；区头 Rename 可以改名、换颜色、并进别的大类。
+// 每个大类看什么不一样（groups.js 的 trackOf，Settings 里能改）：
+//   看进度的（Build）：区头汇总进度、今天要做多少，计划卡有进度条、健康度、时间轴；
+//   看钟点 / Relax / 联系的（Fitness / Leisure / Friends）：区头一句话（最近 7 天多少、多久没联系），不达标是红的，没有进度条；
+//   不看的（Work / Chores）：只列计划，不显示这周做了几次。
 // 区里每个计划一张卡。计划两种（Kind）× 两种放法（Place），建的时候自由选：
 //   Total（总时长 + 截止日）：健康度、进度、今天要做多少、时间轴、模块进度、估时校准建议
 //   Regular（规律）：怎么重复、这周做了几次
@@ -10,6 +14,7 @@ import * as store from "../store.js";
 import * as E from "../engine.js";
 import * as R from "../routines.js";
 import * as S from "../stats.js";
+import * as GR from "../groups.js";
 import { esc, on, icon } from "../dom.js";
 import { addDays, diffDays, fmtShort, fmtMin, WEEKDAYS } from "../dates.js";
 import { healthPill, groupsOf } from "./common.js";
@@ -36,7 +41,7 @@ function timeline(c, p, plan) {
 
 const placeTag = (p) => '<span class="ptag">' + (E.isAuto(p) ? "Auto" : "Pool") + "</span>";
 
-function regularCardHTML(c, p) {
+function regularCardHTML(c, p, track) {
   const r = R.ruleOf(p);
   const w = E.regularWeek(c, p);
   const today = E.isAuto(p) ? R.dueOn(r, c.today) : 0;
@@ -44,12 +49,22 @@ function regularCardHTML(c, p) {
   return '<article class="pcard regular" data-project="' + p.id + '" style="--pc:' + esc(p.color) + '">' +
     '<header><button type="button" class="pname" data-act="edit-project"><i></i>' + esc(p.name || "Untitled") + "</button>" + placeTag(p) + "</header>" +
     '<p class="psub">↻ ' + esc(sub) + "</p>" +
-    (w.target ? '<div class="pweek" title="This week">' + Array.from({ length: w.target }, (_, k) => '<i class="' + (k < w.done ? "d" : k < w.placed ? "s" : "") + '"></i>').join("") +
+    (w.target && track !== "" ? '<div class="pweek" title="This week">' + Array.from({ length: w.target }, (_, k) => '<i class="' + (k < w.done ? "d" : k < w.placed ? "s" : "") + '"></i>').join("") +
       '<span class="num">' + w.done + "/" + w.target + " this week</span></div>" : "") + "</article>";
 }
 
-function cardHTML(c, p) {
-  if (E.isRegular(p)) return regularCardHTML(c, p);
+// 不看进度的大类里那种有总量的计划：只说是什么、什么时候到期、今天要做多少
+function plainCardHTML(c, p) {
+  const today = Math.round(E.needOn(c, p, c.today));
+  const sub = [p.deadline ? "due " + fmtShort(p.deadline) : "no deadline", today ? "today " + fmtMin(today) : ""].filter(Boolean).join(" · ");
+  return '<article class="pcard" data-project="' + p.id + '" style="--pc:' + esc(p.color) + '">' +
+    '<header><button type="button" class="pname" data-act="edit-project"><i></i>' + esc(p.name || "Untitled") + "</button>" + placeTag(p) + "</header>" +
+    '<p class="psub">' + esc(sub) + "</p></article>";
+}
+
+function cardHTML(c, p, track = "progress") {
+  if (E.isRegular(p)) return regularCardHTML(c, p, track);
+  if (track !== "progress") return plainCardHTML(c, p);
   const h = E.health(c, p);
   const plan = h.plan;
   const pct = plan.total ? Math.round((plan.done / plan.total) * 100) : 0;
@@ -89,13 +104,34 @@ function sharesHTML(sh, kind) {
       '<ul class="sleg">' + sh.groups.map((g) => '<li><i style="background:' + color(g) + '"></i>' + esc(g.name || "No project") + ' <b class="num">' + pctOf(g.min, sh.total) + "</b></li>").join("") + "</ul>" : "") + "</section>";
 }
 
-// 一个大类自己的占比：占全部的百分之几，里面各计划（和直接挂在大类上的）各占多少
-function groupShareHTML(g, total) {
-  if (!g || !g.min) return "";
-  const fade = (k) => Math.max(0.3, 1 - k * 0.2).toFixed(2);
-  return '<div class="gshare" title="Share of the time logged"><b class="num">' + pctOf(g.min, total) + "</b>" +
-    '<span class="sbar thin">' + g.parts.map((x, k) => '<i style="flex-grow:' + x.min + ";background:" + esc(x.color || g.color || "var(--c-None)") + ";opacity:" + fade(k) + '"></i>').join("") + "</span>" +
-    '<span class="gparts">' + g.parts.map((x) => esc(x.name || "General") + " " + pctOf(x.min, g.min)).join(" · ") + "</span></div>";
+// 大类看的是什么（没存过的名字、哪都没归的计划照旧看进度）
+const trackFor = (name) => (name ? GR.trackOf(store.groupByName(name) || { name }) : "progress");
+// 最近一次和谁联系过（任何人）
+const lastContactDate = () => Object.values(store.lastContact()).sort().pop() || "";
+const healthOf = (c, g, last) => S.groupHealth(c, g, { weekly: store.setting("weekly", {}), lastContact: last });
+// 有几个大类不达标（侧栏 Projects 上的角标）
+export function projectAlerts(c) {
+  const last = lastContactDate();
+  return store.groups().filter((g) => { const h = healthOf(c, g, last); return h && h.level !== "ok"; }).length;
+}
+
+// 不看进度的大类头上那一句：最近 7 天做够没有 / Relax 在不在范围里 / 多久没联系了。不达标是红的，后面淡字写着标准
+function groupHealthHTML(c, name, last) {
+  const g = store.groupByName(name), h = g ? healthOf(c, g, last) : null;
+  if (!h) return "";
+  const ok = h.level === "ok";
+  let text, aim;
+  if (h.kind === "contact") {
+    text = h.days === null ? "No catch-up yet" : !ok ? "No catch-up in " + h.days + " days" : "Last catch-up " + (h.days === 0 ? "today" : h.days === 1 ? "yesterday" : h.days + " days ago");
+    aim = "at least one every 2 weeks";
+  } else if (h.kind === "min") {
+    text = fmtMin(h.min) + " in the last 7 days" + (ok ? "" : " · under " + fmtMin(h.limit));
+    aim = "at least " + fmtMin(h.limit) + " a week";
+  } else {
+    text = fmtMin(h.min) + " to relax in the last 7 days" + (h.level === "low" ? " · under " + fmtMin(h.lo) : h.level === "high" ? " · over " + fmtMin(h.hi) : "");
+    aim = h.lo && h.hi ? fmtMin(h.lo) + "–" + fmtMin(h.hi) + " a week" : h.lo ? "at least " + fmtMin(h.lo) + " a week" : h.hi ? "at most " + fmtMin(h.hi) + " a week" : "";
+  }
+  return '<p class="ghealth"><span class="health h-' + (ok ? "safe" : "danger") + '">' + (ok ? "✓ " : "! ") + esc(text) + "</span>" + (aim ? "<span>" + esc(aim) + "</span>" : "") + "</p>";
 }
 
 // 改名的那一排：名字、颜色、并进别的大类、（空的）拿掉
@@ -108,8 +144,9 @@ function renameHTML(name, empty) {
     '<button type="button" class="btn" data-act="rename-done">Done</button>';
 }
 
-// 一个大类（一组计划）的汇总：进度、今天要做多少、最差的那个健康度、占了多少时间
-function groupHead(c, name, subs, share, total, empty) {
+// 一个大类（一组计划）的头：看进度的汇总进度、今天要做多少、最差的那个健康度；别的见 groupHealthHTML
+function groupHead(c, name, subs, empty, track, last) {
+  const progress = track === "progress";
   let sum = 0, done = 0, today = 0, worst = "done", deadline = "";
   for (const p of subs.filter((x) => !E.isRegular(x))) {
     const h = E.health(c, p);
@@ -122,13 +159,12 @@ function groupHead(c, name, subs, share, total, empty) {
   const editing = renaming === name && name;
   const color = store.groupByName(name)?.color;
   const title = editing ? renameHTML(name, empty) : "<h3>" + (color ? '<i class="gdot" style="background:' + esc(color) + '"></i>' : "") + esc(name || "No project") + "</h3>";
-  const meta = [subs.length ? subs.length + " plan" + (subs.length > 1 ? "s" : "") : "No plans yet", sum ? pct + "% done" : "", deadline ? "until " + fmtShort(deadline) : "", today >= 0.5 ? "today " + fmtMin(today) : ""].filter(Boolean).join(" · ");
+  const meta = [subs.length ? subs.length + " plan" + (subs.length > 1 ? "s" : "") : "No plans yet", progress && sum ? pct + "% done" : "", progress && deadline ? "until " + fmtShort(deadline) : "", today >= 0.5 ? "today " + fmtMin(today) : ""].filter(Boolean).join(" · ");
   return '<header class="pg-top' + (editing ? " editing" : "") + '">' + title + (editing ? "" : '<span class="pg-meta">' + esc(meta) + "</span>" +
-    (name && subs.some((x) => !E.isRegular(x)) ? '<span class="health h-' + worst + ' dot-only" title="Most at risk: ' + worst + '">●</span>' : "") +
+    (progress && name && subs.some((x) => !E.isRegular(x)) ? '<span class="health h-' + worst + ' dot-only" title="Most at risk: ' + worst + '">●</span>' : "") +
     '<span class="pg-actions">' + (name ? '<button type="button" class="btn ghosty" data-act="rename-group">Rename</button>' : "") +
     '<button type="button" class="btn" data-act="new-sub">' + icon("plus") + " Plan</button></span>") + "</header>" +
-    groupShareHTML(share, total) +
-    (sum ? '<div class="gbar"><i style="width:' + pct + '%"></i></div>' : "");
+    (progress ? (sum ? '<div class="gbar"><i style="width:' + pct + '%"></i></div>' : "") : groupHealthHTML(c, name, last));
 }
 
 export function projectsHTML(c) {
@@ -138,14 +174,18 @@ export function projectsHTML(c) {
   const kind = shareKind(), r = S.periodRange(kind, c.today, store.prefs().weekStartsOn);
   const sh = S.shares(c, r.from, r.to);
   const hasClosed = (name) => closed.some((p) => (p.group || "") === name);
+  const last = lastContactDate();
   return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div>' +
     '<div class="tools"><button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +
     goalsHTML(c) + sharesHTML(sh, kind) +
     (c.projects.length ? "" : '<p class="hint pintro">A project is an area of your life. Tasks can sit right on it, or under a plan inside it: a <b>Total</b> (so many hours by a deadline) or a <b>Regular</b> one (every Monday, three times a week).</p>') +
-    groups.map((g) => '<section class="pgroup" data-group="' + esc(g.name) + '">' + groupHead(c, g.name, g.subs, sh.groups.find((x) => x.name === g.name), sh.total, !g.subs.length && !hasClosed(g.name)) +
-      (g.subs.length ? '<div class="pgrid">' + g.subs.map((p) => cardHTML(c, p)).join("") + "</div>" : "") + "</section>").join("") +
+    groups.map((g) => {
+      const track = trackFor(g.name);
+      return '<section class="pgroup" data-group="' + esc(g.name) + '">' + groupHead(c, g.name, g.subs, !g.subs.length && !hasClosed(g.name), track, last) +
+        (g.subs.length ? '<div class="pgrid">' + g.subs.map((p) => cardHTML(c, p, track)).join("") + "</div>" : "") + "</section>";
+    }).join("") +
     (closed.length ? '<button type="button" class="link" data-act="toggle-closed">' + (showClosed ? "Hide" : "Show") + " " + closed.length + " closed</button>" +
-      (showClosed ? '<div class="pgrid closed">' + closed.map((p) => cardHTML(c, p)).join("") + "</div>" : "") : "") + "</div>";
+      (showClosed ? '<div class="pgrid closed">' + closed.map((p) => cardHTML(c, p, trackFor(String(p.group || "").trim()))).join("") + "</div>" : "") : "") + "</div>";
 }
 
 // ---------- 编辑框 ----------

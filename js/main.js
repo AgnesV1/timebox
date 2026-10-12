@@ -13,7 +13,7 @@ import { initModal, closeModal } from "./ui/modal.js";
 import { initSelect } from "./ui/select.js";
 import { todayHTML, initToday, shownDate } from "./ui/today.js";
 import { calendarHTML, poolHTML, initCalendar, handleDrop, refreshDayModal } from "./ui/calendar.js";
-import { projectsHTML, initProjects, refreshProjectEditor } from "./ui/projects.js";
+import { projectsHTML, initProjects, refreshProjectEditor, projectAlerts } from "./ui/projects.js";
 import { initGoals } from "./ui/goals.js";
 import { settingsHTML, initSettings } from "./ui/settings.js";
 import { initEditor, refreshEditor } from "./ui/editor.js";
@@ -56,7 +56,7 @@ function sidebarHTML(c, view) {
   const todayOpen = c.tasks.filter((t) => t.date === c.today && !t.status).length;
   const deals = Meal.toCheck(store.meals(), c.today).length;   // 这一轮还没看的打折
   // 四段，各管各的事：排时间的那四页 / 备餐 / 阅读 / 人。每段一层自己的淡底色（css 里 .sblock），不写标题
-  const blocks = [["todo", [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""]]],
+  const blocks = [["todo", [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", projectAlerts(c) || ""], ["stats", "Stats", ""]]],
     ["meals", [["meals", "Meals", deals || ""]]], ["read", [["reading", "Reading", ""]]], ["friends", [["friends", "Friends", friendsDue(c.today) || ""]]]];
   const link = ([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '" title="' + t + '">' + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>";
   const theme = store.local().theme;

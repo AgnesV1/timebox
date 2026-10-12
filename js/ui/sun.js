@@ -1,8 +1,9 @@
 // 今天页的「日出」圆盘（手机和电脑都有）：这一天计过时的每一段画在 24 小时的圆盘上——
 // 外圈 6→18（白天）、内圈 18→6（夜里），6 点在左边、顺时针（几何在 js/day.js）。
-// 底盘是镜面铬：白天那圈亮银、夜里那圈深灰，没做事的时间就是这层金属；最左边（6 点 / 18 点，一圈的头和尾）横着切开一道细缝。
-// 任务的色块用项目颜色的霓虹版（groups.js 的 neon），压在金属上才跳得出来。夜里是发光的整块；
-// 白天画成刷在金属上的油画笔触（brush()：几道并排的笔毛，起笔齐、收笔有几根拖出去，边是毛的），整块的那条弧只留着接手指、标选中。
+// 底盘是灰的，没做事的时间就是这层灰；最左边（6 点 / 18 点，一圈的头和尾）横着切开一道细缝（两个主题都有）。
+// 夜里底盘是镜面铬（白天那圈亮银、夜里那圈深灰），任务是发光的整块，颜色用项目颜色的霓虹版（groups.js 的 neon）。
+// 白天整个是丝网印的画法：两圈平涂的灰，底下各垫一版错开一点的粉和青蓝（套印没对准露出来的边，.reg），整盘压一层颗粒（.sun-grain）；
+// 任务是平涂的霓虹色块、垫一版藏青、压一片网点（print()），整块的那条弧只留着接手指、标选中。
 // 每天晚上 11 点到早上 8 点是休息，通勤日再加来回路上的两段：这些不可用的时段先盖一层磨砂把反光压下去、再压深色细纹；
 // 正在计时的那段画到现在；升起来以后整个圆盘外面有一圈和金属同色的柔光（css 里 .sun 的 box-shadow，压在阴影上面）；
 // 「现在」是从圆心伸出去的一根指针（白天电光蓝、夜里青柠），指到当前那一圈的外沿——升起来以后指针从中间那几行字外面起。
@@ -44,19 +45,12 @@ function arcPath(r, a, b) {
   return "M" + f1(x1) + " " + f1(y1) + "A" + r + " " + r + " 0 " + (span > 180 ? 1 : 0) + " 1 " + f1(x2) + " " + f1(y2);
 }
 
-// 白天的一笔：六道并排的笔毛，各自深一点或浅一点；起笔差不了几分钟，收笔有的拖得长。长短、深浅按这一段的起止定死，重画不会变样。
-// 颜色在 css 里从 --c 调出来（--k = 往白 / 往黑混多少）
-function brush(x, color, boost) {
-  const R0 = x.ring === "outer" ? RO : RI, span = x.b - x.a, n = 6;
-  let h = (Math.round(x.a * 31 + x.b * 17) ^ (x.ring === "outer" ? 0x9E3779B9 : 0x85EBCA6B)) >>> 0;
-  const rnd = () => { h += 0x6D2B79F5; let t = Math.imul(h ^ (h >>> 15), 1 | h); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  let out = "";
-  for (let j = 0; j < n; j++) {
-    const head = Math.min(rnd() * 3, span * 0.1), tail = Math.min(rnd() < 0.35 ? rnd() * 14 : rnd() * 5, span * 0.35), k = rnd();
-    const tone = k < 0.4 ? "lt" : k < 0.75 ? "" : "dk";
-    out += '<path' + (tone ? ' class="' + tone + '" style="--k:' + Math.round(rnd() * 15) + '%"' : "") + ' d="' + arcPath(R0 - 9 + (j + 0.5) * 3, x.a + head, x.b - tail) + '"/>';
-  }
-  return '<g class="brush' + (boost ? " boost" : "") + '" filter="url(#sun-rough)" style="--c0:' + esc(color) + '">' + out + "</g>";
+// 白天的一块：丝网印——平涂的色块（ink），底下错开一点垫一版藏青（sh，像套印没对准露出来的那一版），后半段再压一片网点（dots）。
+// 颜色在 css 里从 --c 给；网点的图案在 <defs> 里（#sun-dots）
+function print(x, color, boost) {
+  const R0 = x.ring === "outer" ? RO : RI, d = arcPath(R0, x.a, x.b);
+  return '<g class="print' + (boost ? " boost" : "") + '" style="--c0:' + esc(color) + '"><path class="sh" transform="translate(1.6 1.6)" d="' + d + '"/><path class="ink" d="' + d + '"/>' +
+    '<path class="dots" stroke="url(#sun-dots)" d="' + arcPath(R0, x.a + (x.b - x.a) * 0.45, x.b) + '"/></g>';
 }
 
 // 这一天要画的：通勤固定时段（灰）、计过时的段（计划颜色）、正在跑的那段（到现在）
@@ -114,17 +108,18 @@ function sunHTML(c, d) {
     (x.kind === "fixed" ? '<path class="frost ' + x.ring + '" d="' + arcPath(x.ring === "outer" ? RO : RI, x.a, x.b) + '"/>' : "") +
     '<path class="arc ' + x.kind + (i === picked ? " on" : "") + (x.color && !neon(x.color) ? " boost" : "") + '" data-i="' + i + '" data-t="' + x.a + '" d="' + arcPath(x.ring === "outer" ? RO : RI, x.a, x.b) + '"' +
     (x.color ? ' style="--c:' + esc(neon(x.color) || x.color) + '"' : "") + "><title>" + esc(x.label + " · " + x.from + "–" + x.to) + "</title></path>" +
-    (x.kind === "fixed" ? "" : brush(x, neon(x.color) || x.color || "#B4B4BC", Boolean(x.color) && !neon(x.color)))).join("");
+    (x.kind === "fixed" ? "" : print(x, neon(x.color) || x.color || "#B4B4BC", Boolean(x.color) && !neon(x.color)))).join("");
   return '<div class="sun" role="button" tabindex="0" aria-label="Your day on a clock — drag up or press Enter">' +
     '<svg viewBox="-120 -120 240 240" aria-hidden="true">' +
     "<defs>" + chrome("day") + chrome("night") +
-    // 笔触的毛边：一层噪声把边推歪一点，再垫一点很浅的影子（颜料有厚度）
-    '<filter id="sun-rough" x="-30%" y="-30%" width="160%" height="160%"><feTurbulence type="fractalNoise" baseFrequency="0.1" numOctaves="2" seed="8" result="n"/>' +
-    '<feDisplacementMap in="SourceGraphic" in2="n" scale="3.2" xChannelSelector="R" yChannelSelector="G"/><feDropShadow dx="0" dy="0.9" stdDeviation="0.5" flood-color="#000" flood-opacity="0.4"/></filter>' +
+    // 白天色块上压的网点（藏青的小圆点，斜着排）
+    '<pattern id="sun-dots" width="4.6" height="4.6" patternUnits="userSpaceOnUse" patternTransform="rotate(28)"><circle cx="2.3" cy="2.3" r="1.05" fill="#171C55"/></pattern>' +
     '<mask id="sun-cut" maskUnits="userSpaceOnUse" x="-120" y="-120" width="240" height="240"><rect x="-120" y="-120" width="240" height="240" fill="#fff"/><rect x="-120" y="-1.7" width="120" height="3.4" fill="#000"/></mask></defs>' +
-    '<g mask="url(#sun-cut)"><circle class="trk day" r="' + RO + '" stroke="url(#sun-g-day)"/><circle class="trk night" r="' + RI + '" stroke="url(#sun-g-night)"/>' + edges +
+    // 白天垫在两圈底下、各错开一点的两版（粉往右下、青蓝往左上）；夜里不画
+    '<g mask="url(#sun-cut)"><g class="reg">' + [RO, RI].map((r) => '<circle class="p" r="' + r + '" transform="translate(2.6 1.9)"/><circle class="c" r="' + r + '" transform="translate(-2.2 -1.5)"/>').join("") + "</g>" +
+    '<circle class="trk day" r="' + RO + '" stroke="url(#sun-g-day)"/><circle class="trk night" r="' + RI + '" stroke="url(#sun-g-night)"/>' + edges +
     '<g class="arcs">' + arcs + "</g></g>" +
-    now + '<g class="hours">' + labels + "</g></svg>" +
+    now + '<g class="hours">' + labels + '</g></svg><i class="sun-grain"></i><i class="sun-grain w"></i>' +
     '<div class="sun-c">' + centerHTML(c, d) + "</div></div>" +
     (deepText(c, d) ? '<p class="sun-deep num">' + esc(deepText(c, d)) + "</p>" : "");
 }

@@ -939,16 +939,33 @@ body.phone .reading { padding: 0 2px 90px; }
 /* 任务的色块压在金属上要跳出来：--c 已经是项目颜色的霓虹版（js/groups.js 的 neon）；自己另选的颜色没有霓虹版（.boost），
    就按同一个色相调亮、调艳（不认这个写法的浏览器留在上面那行的原色）。夜里是发光的整块；白天见下面的笔触 */
 .sun .arc.boost { stroke: oklch(from var(--c, #B4B4BC) calc(l + .12) calc(c * 1.9) h); }
-/* 白天：任务的色块是刷在金属上的油画笔触（.brush，js/ui/sun.js 的 brush()）；整块的那条弧透明着，只接手指，选中时在笔触底下垫一圈墨色。
-   笔毛的颜色从 --c 调：.lt 往白里混一点、.dk 往黑里混一点（--k）。夜里不画笔触，还是发光的整块 */
-.sun .brush { display: none; --c: var(--c0); pointer-events: none; }
-.sun .brush.boost { --c: oklch(from var(--c0) calc(l + .12) calc(c * 1.9) h); }
-[data-theme="light"] .sun .brush { display: inline; opacity: .5; transition: opacity .25s; }
-[data-theme="light"] .sun .brush path { fill: none; stroke: var(--c); stroke-width: 3.9; }
-[data-theme="light"] .sun .brush path.lt { stroke: color-mix(in srgb, var(--c), #FFFFFF var(--k, 8%)); }
-[data-theme="light"] .sun .brush path.dk { stroke: color-mix(in srgb, var(--c), #000000 var(--k, 8%)); }
-[data-theme="light"] .sun .arc.lit + .brush { opacity: 1; }
-[data-theme="light"] .sun .arc.live.lit + .brush { animation: breathe 1.6s ease-in-out infinite; }
+/* 白天整个是丝网印的画法（夜里不变：镜面铬 + 发光的整块）：
+   两圈平涂的灰（盖掉铬的渐变），底下各垫一版错开一点的粉和青蓝（.reg，套印没对准露出来的边）；
+   任务的色块（.print，js/ui/sun.js 的 print()）= 平涂的霓虹色 + 错开垫着的一版藏青 + 后半段一片网点；整块的那条弧透明着，只接手指，选中时垫一圈墨色；
+   最上面压两层颗粒（.sun-grain：深的一层正片叠底、白的一层滤色），是平铺的噪点图，用 mask 切成两圈的形状 */
+[data-theme="light"] .sun .trk.day { stroke: #D6D7DC; }
+[data-theme="light"] .sun .trk.night { stroke: #8B8E9B; }
+.sun .reg { display: none; }
+[data-theme="light"] .sun .reg { display: inline; }
+.sun .reg circle { fill: none; stroke-width: 18; pointer-events: none; }
+.sun .reg .p { stroke: #FF4FA8; }
+.sun .reg .c { stroke: #19C3F0; }
+.sun .print { display: none; --c: var(--c0); pointer-events: none; }
+.sun .print.boost { --c: oklch(from var(--c0) calc(l + .12) calc(c * 1.9) h); }
+[data-theme="light"] .sun .print { display: inline; opacity: .5; transition: opacity .25s; }
+.sun .print path { fill: none; stroke-width: 18; }
+.sun .print .sh { stroke: #171C55; }
+.sun .print .ink { stroke: var(--c); }
+.sun .print .dots { opacity: .3; }
+[data-theme="light"] .sun .arc.lit + .print { opacity: 1; }
+[data-theme="light"] .sun .arc.live.lit + .print { animation: breathe 1.6s ease-in-out infinite; }
+.sun-grain { display: none; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; mix-blend-mode: multiply; opacity: .75;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.15' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .05 0 0 0 0 .06 0 0 0 0 .2 0 0 0 -2.2 1.25'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 180px 180px;
+  -webkit-mask: radial-gradient(closest-side, transparent 50.5%, #000 50.5% 69.5%, transparent 69.5% 72.5%, #000 72.5% 91.5%, transparent 91.5%); mask: radial-gradient(closest-side, transparent 50.5%, #000 50.5% 69.5%, transparent 69.5% 72.5%, #000 72.5% 91.5%, transparent 91.5%); }
+.sun-grain.w { mix-blend-mode: screen; opacity: .5; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='16' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 2.4 -1.45'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E"); }
+[data-theme="light"] .sun-grain { display: block; }
+[data-theme="light"] .sun .now { stroke: var(--hot); }
+[data-theme="light"] .sun .now-dot { fill: var(--hot); }
 [data-theme="light"] .sun .arc:not(.fixed) { stroke-opacity: 0; }
 [data-theme="light"] .sun .arc.on:not(.fixed) { stroke: var(--ink); stroke-opacity: 1; opacity: 1; }
 .sun .arc.lit { opacity: 1; }

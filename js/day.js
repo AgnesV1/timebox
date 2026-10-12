@@ -4,9 +4,12 @@
 
 export const DIAL_START = 360;   // 06:00
 
-// 通勤日固定要花掉的时间（用户定的）
+// 每天都算休息的那一段（用户定的）：晚上 11 点到第二天早上 8 点。圆盘上每天都画成不可用，和通勤日的固定时段一个样子
+export const REST_BLOCK = { from: "23:00", to: "08:00", label: "Sleep · get ready" };
+
+// 通勤日固定要花掉的时间（用户定的）：休息那一段，加上来回路上的两段
 export const COMMUTE_BLOCKS = [
-  { from: "23:00", to: "08:00", label: "Sleep · get ready" },
+  REST_BLOCK,
   { from: "08:00", to: "09:00", label: "Commute · breakfast" },
   { from: "17:00", to: "18:30", label: "Commute" }
 ];

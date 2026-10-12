@@ -3,7 +3,8 @@
 // 底盘是镜面铬：白天那圈亮银、夜里那圈深灰，没做事的时间就是这层金属；最左边（6 点 / 18 点，一圈的头和尾）横着切开一道细缝。
 // 任务的色块用项目颜色的霓虹版（groups.js 的 neon），压在金属上才跳得出来。夜里是发光的整块；
 // 白天画成刷在金属上的油画笔触（brush()：几道并排的笔毛，起笔齐、收笔有几根拖出去，边是毛的），整块的那条弧只留着接手指、标选中。
-// 通勤日的固定时段先盖一层磨砂把反光压下去、再压深色细纹；正在计时的那段画到现在；
+// 每天晚上 11 点到早上 8 点是休息，通勤日再加来回路上的两段：这些不可用的时段先盖一层磨砂把反光压下去、再压深色细纹；
+// 正在计时的那段画到现在；升起来以后整个圆盘外面有一圈和金属同色的柔光（css 里 .sun 的 box-shadow，压在阴影上面）；
 // 「现在」是从圆心伸出去的一根指针（白天电光蓝、夜里青柠），指到当前那一圈的外沿——升起来以后指针从中间那几行字外面起。
 // 平时它是屏幕下方一个半透明的半圆（在计时浮条上面）；往上拖，它跟着手指升起、变大，时间段从 6 点起一段段亮起；
 // 松手过了三分之一就升到屏幕中间，不然落回去；甩一下也行（看松手前的速度）。点一下也能升起 / 落下；升起时点外面、往下拖、按 Esc 落回。
@@ -20,7 +21,7 @@ import { fmtDay, fmtMin } from "../dates.js";
 import { colorOf } from "./common.js";
 import { neon } from "../groups.js";
 
-const RO = 98, RI = 72;   // 外圈、内圈的半径（viewBox ±120，圈宽 18）；两圈之间的缝里画「日出」那道光
+const RO = 98, RI = 72;   // 外圈、内圈的半径（viewBox ±120，圈宽 18）
 const reduce = matchMedia("(prefers-reduced-motion: reduce)");
 
 let host = null;
@@ -61,7 +62,8 @@ function brush(x, color, boost) {
 // 这一天要画的：通勤固定时段（灰）、计过时的段（计划颜色）、正在跑的那段（到现在）
 function collect(c, d) {
   const list = [];
-  if (store.isCommuteDay(d)) D.COMMUTE_BLOCKS.forEach((b) => list.push({ ...b, kind: "fixed", color: "" }));
+  // 每天晚上 11 点到早上 8 点是休息；通勤日再加上来回路上的两段
+  (store.isCommuteDay(d) ? D.COMMUTE_BLOCKS : [D.REST_BLOCK]).forEach((b) => list.push({ ...b, kind: "fixed", color: "", rest: b === D.REST_BLOCK }));
   const run = store.timer();
   for (const t of store.tasksOn(d)) {
     for (const s of parseTimes(t.times)) if (s.from && s.to) list.push({ from: s.from, to: s.to, min: s.min, label: t.title, kind: "time", color: colorOf(t) });
@@ -85,7 +87,7 @@ function centerHTML(c, d) {
   const x = pieces[picked];
   if (x) {
     return "<b>" + esc(x.label) + "</b><span class=\"num\">" + esc(x.from) + "–" + esc(x.to) + "</span>" +
-      (x.kind === "fixed" ? "<em>Commute day</em>" : x.kind === "live" ? "<em>Running</em>" : "<em class=\"num\">" + fmtMin(x.min) + "</em>");
+      (x.kind === "fixed" ? "<em>" + (x.rest ? "Rest" : "Commute day") + "</em>" : x.kind === "live" ? "<em>Running</em>" : "<em class=\"num\">" + fmtMin(x.min) + "</em>");
   }
   const total = store.tasksOn(d).reduce((a, t) => a + parseTimes(t.times).reduce((s, x) => s + x.min, 0), 0);
   const deep = deepText(c, d);
@@ -122,13 +124,12 @@ function sunHTML(c, d) {
     '<mask id="sun-cut" maskUnits="userSpaceOnUse" x="-120" y="-120" width="240" height="240"><rect x="-120" y="-120" width="240" height="240" fill="#fff"/><rect x="-120" y="-1.7" width="120" height="3.4" fill="#000"/></mask></defs>' +
     '<g mask="url(#sun-cut)"><circle class="trk day" r="' + RO + '" stroke="url(#sun-g-day)"/><circle class="trk night" r="' + RI + '" stroke="url(#sun-g-night)"/>' + edges +
     '<g class="arcs">' + arcs + "</g></g>" +
-    '<path class="sweep" data-ring="outer" d=""/><path class="sweep" data-ring="inner" d=""/>' +
     now + '<g class="hours">' + labels + "</g></svg>" +
     '<div class="sun-c">' + centerHTML(c, d) + "</div></div>" +
     (deepText(c, d) ? '<p class="sun-deep num">' + esc(deepText(c, d)) + "</p>" : "");
 }
 
-// 按 p 点亮：从 6 点起，已经「升过」的时间段亮起来；扫过的那一截画一道光
+// 按 p 点亮：从 6 点起，已经「升过」的时间段亮起来
 function paint() {
   const el = host?.querySelector(".sun");
   if (!el) return;
@@ -136,9 +137,6 @@ function paint() {
   host.style.setProperty("--p", p.toFixed(3));   // 小签跟着淡出
   const lit = p * 1440;
   el.querySelectorAll(".arc").forEach((a) => a.classList.toggle("lit", Number(a.dataset.t) < lit || p >= 0.999));
-  const outer = Math.min(lit, 720), inner = Math.max(lit, 720);
-  el.querySelector('.sweep[data-ring="outer"]').setAttribute("d", outer > 1 ? arcPath(RO - 13, 0, outer) : "");
-  el.querySelector('.sweep[data-ring="inner"]').setAttribute("d", inner > 721 ? arcPath(RI - 13, 720, inner) : "");
 }
 
 function settle(up) {

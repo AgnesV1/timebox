@@ -915,7 +915,8 @@ body.phone .reading { padding: 0 2px 90px; }
   bottom: calc((var(--dock-h, 0px) + env(safe-area-inset-bottom)) * (1 - var(--p)) + 50vh * var(--p));
   transform: translate(-50%, 50%) scale(calc(var(--s0) + (1 - var(--s0)) * var(--p)));
   border-radius: 50%; background: color-mix(in srgb, var(--bg) calc(var(--p) * 100%), transparent);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, calc(.25 * var(--p)));
+  /* 升起来以后：外面一圈和金属同色的柔光（前三层），压在底下那片阴影（最后一层）上面 */
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, calc(.55 * var(--p))), 0 0 28px 8px rgba(228, 233, 244, calc(.85 * var(--p))), 0 0 84px 26px rgba(188, 198, 222, calc(.42 * var(--p))), 0 20px 60px rgba(0, 0, 0, calc(.25 * var(--p)));
   opacity: calc(.55 + .45 * var(--p)); pointer-events: none; touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; }
 .sun.dragging { cursor: grabbing; }
 #sun.up .sun, .sun.dragging { pointer-events: auto; }
@@ -934,7 +935,6 @@ body.phone .reading { padding: 0 2px 90px; }
 .sun .trk-e.in { stroke: rgba(0, 0, 0, .22); }
 [data-theme="dark"] .sun .trk-e { stroke: rgba(255, 255, 255, .22); }
 [data-theme="dark"] .sun .trk-e.in { stroke: rgba(0, 0, 0, .6); }
-.sun .sweep { fill: none; stroke: var(--hot); stroke-width: 2.5; stroke-linecap: round; }
 .sun .arc { fill: none; stroke: var(--c, var(--c-None)); stroke-width: 18; opacity: .5; transition: opacity .25s, stroke-width .2s; cursor: pointer; }
 /* 任务的色块压在金属上要跳出来：--c 已经是项目颜色的霓虹版（js/groups.js 的 neon）；自己另选的颜色没有霓虹版（.boost），
    就按同一个色相调亮、调艳（不认这个写法的浏览器留在上面那行的原色）。夜里是发光的整块；白天见下面的笔触 */
@@ -972,7 +972,7 @@ body.phone .reading { padding: 0 2px 90px; }
 /* 落着时：底下垫一点淡淡的光（灰的，不抢颜色） */
 .sun::after { content: ""; position: absolute; inset: 12%; z-index: -1; border-radius: 50%; background: radial-gradient(circle, rgba(120, 120, 120, .22), transparent 70%); opacity: calc(1 - var(--p)); pointer-events: none; }
 [data-theme="dark"] .sun .arc.lit { filter: drop-shadow(0 0 4px var(--c, transparent)); }
-[data-theme="dark"] .sun .sweep { filter: drop-shadow(0 0 5px var(--accent)); }
+[data-theme="dark"] .sun { box-shadow: 0 0 0 1px rgba(176, 184, 206, calc(.4 * var(--p))), 0 0 30px 8px rgba(150, 160, 192, calc(.5 * var(--p))), 0 0 90px 28px rgba(108, 120, 160, calc(.3 * var(--p))), 0 20px 60px rgba(0, 0, 0, calc(.3 * var(--p))); }
 [data-theme="dark"] .sun::after { background: radial-gradient(circle, rgba(255, 255, 255, .09), transparent 70%); }
 @keyframes breathe { 50% { opacity: .55; } }
 /* 今天页底下多留一点，最后几行别被半圆挡住 */

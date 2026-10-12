@@ -25,6 +25,8 @@ test("dial: a stretch splits at 18:00 between rings and at 6:00 between end and 
 });
 
 test("commute blocks land where they should", () => {
+  assert.equal(D.COMMUTE_BLOCKS[0], D.REST_BLOCK, "every day rests from 23:00 to 08:00; a commute day adds to that");
+  assert.deepEqual(D.arcs([D.REST_BLOCK]).map((a) => a.ring + " " + a.a + "→" + a.b), ["inner 1020→1440", "outer 0→120"]);
   const arcs = D.arcs(D.COMMUTE_BLOCKS);
   // 画的时候终点角度 = 起点 + 长度（一圈的末尾不绕回 180°）
   assert.deepEqual(arcs.map((a) => a.ring + " " + D.angleOf(a.a) + "→" + (D.angleOf(a.a) + ((a.b - a.a) / 720) * 360)), [

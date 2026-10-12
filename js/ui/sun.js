@@ -1,6 +1,8 @@
 // 今天页的「日出」圆盘（手机和电脑都有）：这一天计过时的每一段画在 24 小时的圆盘上——
-// 外圈 6→18（白天，底色暖）、内圈 18→6（夜里，底色冷），6 点在左边、顺时针（几何在 js/day.js）。
-// 通勤日的固定时段画灰，正在计时的那段画到现在；「现在」是横在当前那圈上的一道短线。
+// 外圈 6→18（白天）、内圈 18→6（夜里），6 点在左边、顺时针（几何在 js/day.js）。
+// 底盘是镜面铬：白天那圈亮银、夜里那圈深灰，没做事的时间就是这层金属；最左边（6 点 / 18 点，一圈的头和尾）横着切开一道细缝。
+// 通勤日的固定时段先盖一层磨砂把反光压下去、再压深色细纹；正在计时的那段画到现在；
+// 「现在」是从圆心伸出去的一根指针（白天电光蓝、夜里青柠），指到当前那一圈的外沿——升起来以后指针从中间那几行字外面起。
 // 平时它是屏幕下方一个半透明的半圆（在计时浮条上面）；往上拖，它跟着手指升起、变大，时间段从 6 点起一段段亮起；
 // 松手过了三分之一就升到屏幕中间，不然落回去；甩一下也行（看松手前的速度）。点一下也能升起 / 落下；升起时点外面、往下拖、按 Esc 落回。
 // 落着的时候只有两圈环本身接手指（样式里 pointer-events: stroke），别的地方的点击穿过去给下面的列表；
@@ -79,18 +81,27 @@ function sunHTML(c, d) {
     .map(([deg, txt, r]) => { const [x, y] = pt(r, deg); return '<text x="' + f1(x) + '" y="' + f1(y) + '">' + txt + "</text>"; }).join("");
   let now = "";
   if (d === c.today) {
-    const m = D.dialMin(store.clockNow()), r = m < 720 ? RO : RI;
-    const [x1, y1] = pt(r - 13, D.angleOf(m)), [x2, y2] = pt(r + 13, D.angleOf(m));
-    now = '<line class="now" x1="' + f1(x1) + '" y1="' + f1(y1) + '" x2="' + f1(x2) + '" y2="' + f1(y2) + '"/>';
+    const m = D.dialMin(store.clockNow()), r = (m < 720 ? RO : RI) + 13;
+    const [x2, y2] = pt(r, D.angleOf(m));
+    // --cut：升起来以后指针从离圆心 46 的地方起（占全长的百分之几），让开中间的字
+    now = '<line class="now" pathLength="100" style="--cut:' + f1((46 / r) * 100) + '" x1="0" y1="0" x2="' + f1(x2) + '" y2="' + f1(y2) + '"/><circle class="now-dot" r="3.6"/>';
   }
+  // 镜面铬：一条斜着的明暗渐变，七个颜色在 css 里按主题和哪一圈给（--m1 … --m7）
+  const chrome = (ring) => '<linearGradient id="sun-g-' + ring + '" class="chrome ' + ring + '" x1="0" y1="0" x2="1" y2="1">' +
+    [1, 2, 3, 4, 5, 6, 7].map((n, i) => '<stop offset="' + (i / 6).toFixed(3) + '" style="stop-color:var(--m' + n + ')"/>').join("") + "</linearGradient>";
+  const edges = [RO + 9, RO - 9, RI + 9, RI - 9].map((r, i) => '<circle class="trk-e' + (i % 2 ? " in" : "") + '" r="' + r + '"/>').join("");
   const arcs = pieces.map((x, i) =>
+    (x.kind === "fixed" ? '<path class="frost ' + x.ring + '" d="' + arcPath(x.ring === "outer" ? RO : RI, x.a, x.b) + '"/>' : "") +
     '<path class="arc ' + x.kind + (i === picked ? " on" : "") + '" data-i="' + i + '" data-t="' + x.a + '" d="' + arcPath(x.ring === "outer" ? RO : RI, x.a, x.b) + '"' +
     (x.color ? ' style="--c:' + esc(x.color) + '"' : "") + "><title>" + esc(x.label + " · " + x.from + "–" + x.to) + "</title></path>").join("");
   return '<div class="sun" role="button" tabindex="0" aria-label="Your day on a clock — drag up or press Enter">' +
     '<svg viewBox="-120 -120 240 240" aria-hidden="true">' +
-    '<circle class="trk day" r="' + RO + '"/><circle class="trk night" r="' + RI + '"/>' +
+    "<defs>" + chrome("day") + chrome("night") +
+    '<mask id="sun-cut" maskUnits="userSpaceOnUse" x="-120" y="-120" width="240" height="240"><rect x="-120" y="-120" width="240" height="240" fill="#fff"/><rect x="-120" y="-1.7" width="120" height="3.4" fill="#000"/></mask></defs>' +
+    '<g mask="url(#sun-cut)"><circle class="trk day" r="' + RO + '" stroke="url(#sun-g-day)"/><circle class="trk night" r="' + RI + '" stroke="url(#sun-g-night)"/>' + edges +
+    '<g class="arcs">' + arcs + "</g></g>" +
     '<path class="sweep" data-ring="outer" d=""/><path class="sweep" data-ring="inner" d=""/>' +
-    '<g class="arcs">' + arcs + "</g>" + now + '<g class="hours">' + labels + "</g></svg>" +
+    now + '<g class="hours">' + labels + "</g></svg>" +
     '<div class="sun-c">' + centerHTML(c, d) + "</div></div>" +
     (deepText(c, d) ? '<p class="sun-deep num">' + esc(deepText(c, d)) + "</p>" : "");
 }

@@ -1,6 +1,6 @@
 // 数据层：本机存一份（localStorage），所有改动都从这里走，记下哪些行还没推到表格。
 // 每行都有 updated（改动时间），两台设备改了同一行，以后改的为准。
-// 数据和读写都在这个文件里；几块各管一摊的（重复、计时、Friends、目标、备餐）写在 js/store/ 下面，
+// 数据和读写都在这个文件里；几块各管一摊的（重复、计时、Friends、目标、备餐、灵感池）写在 js/store/ 下面，
 // 最底下把它们接回来——对外还是 store.xxx，名字不变。
 
 import { todayIso, addDays, fmtShort } from "./dates.js";
@@ -15,6 +15,7 @@ import timerStore from "./store/timer.js";
 import friendStore from "./store/friends.js";
 import goalStore from "./store/goals.js";
 import mealStore from "./store/meals.js";
+import ideaStore from "./store/ideas.js";
 
 const KEY = "kuzhouduan-v1";
 const OLD_KEY = "timebox-v1";
@@ -245,6 +246,8 @@ function put(t, row, { generated = false } = {}) {
   // 任务带着的那条记录（和谁、聊了什么）日期跟着任务走
   const meet = t === "tasks" ? S.data.meets[F.meetId(row.id)] : null;
   if (meet && meet.date !== row.date) put("meets", { ...meet, date: row.date });
+  // 从灵感池里挑来的：做完了，池子那边记下是哪天
+  if (t === "tasks") ideaTaskPut(row);
 }
 
 function drop(t, id) {
@@ -254,7 +257,7 @@ function drop(t, id) {
   delete S.data[t][id];
   delete S.pending[t + ":" + id];
   S.deletes.push({ table: t, id, at: Date.now() });
-  if (t === "tasks") drop("meets", F.meetId(id));   // 任务删了，它带着的那条记录一起删
+  if (t === "tasks") { drop("meets", F.meetId(id)); ideaTaskDropped(id); }   // 任务删了：它带着的那条记录一起删，挑来的灵感回到池子
 }
 
 export function undo(before) {
@@ -479,6 +482,7 @@ export function toTomorrow(id) {
     const nid = newId();
     put("tasks", { ...t, id: nid, date, status: "", actual: null, times: "", reason: "", order: nextOrder(date) });
     moveMeet(id, nid, date);
+    moveIdea(id, nid);
   }, "Moved to tomorrow");
 }
 
@@ -806,7 +810,11 @@ const fr = friendStore(core);
 export const { friends, meets, meetOfTask, friendFields, lastContact, saveFriend, deleteFriend, saveMeet, deleteMeet, setTaskMeet, importFriends, friendSpecial, adoptMarks, occasionDone, toggleOccasion, doneNext } = fr;
 const { moveMeet } = fr;
 
-const series = seriesStore({ ...core, timer, setTimer: tm.setTimer, moveMeet });
+const idea = ideaStore(core);
+export const { ideas, ideaOf, ideaOfTask, saveIdea, addIdeas, deleteIdea, pickIdea, unpickIdea, settleIdeas } = idea;
+const { ideaTaskPut, ideaTaskDropped, moveIdea } = idea;
+
+const series = seriesStore({ ...core, timer, setTimer: tm.setTimer, moveMeet, moveIdea });
 export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries } = series;
 const { setRule } = series;
 

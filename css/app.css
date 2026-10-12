@@ -1505,3 +1505,47 @@ select.open { border-color: var(--edge); }
 [data-theme="light"] .bar, [data-theme="light"] .pj::before, [data-theme="light"] .pdot { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .22); }
 [data-theme="light"] .ev { box-shadow: inset 3px 0 0 var(--c), inset 4px 0 0 rgba(0, 0, 0, .08); }
 [data-theme="light"] .pie .slice { filter: drop-shadow(0 0 .35px rgba(0, 0, 0, .55)); }
+
+/* ---------- 灵感池（Projects 页的 Ideas）；加任务框底下的候选（.idea-pick）。这一段的类名都以 idea- 开头 ---------- */
+.idea-page { max-width: 760px; }
+.idea-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.idea-add input[name="text"] { flex: 1 1 260px; min-width: 0; padding: 9px 12px; border: var(--b-ctl); border-radius: 12px; background: var(--bg); font-size: 15px; font-weight: 600; }
+.idea-add input[type="date"], .idea-row input[type="date"], .idea-plan input, .idea-plan select { padding: 5px 9px; border: var(--b-ctl); border-radius: 10px; background: var(--bg); font-size: 13px; }
+.idea-add .link { font-size: 12.5px; }
+.idea-kinds { display: inline-flex; gap: 5px; }
+.idea-intro { max-width: 560px; margin: 0 0 14px; }
+.idea-group { margin-bottom: 16px; }
+.idea-h { margin: 0 0 2px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.idea-h small { margin-left: 4px; font-weight: 600; letter-spacing: 0; opacity: .7; }
+.idea-list { margin: 0; padding: 0; list-style: none; }
+.idea-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 36px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.idea-text { padding: 0; border: 0; background: none; font-size: 14.5px; font-weight: 600; text-align: left; }
+.idea-when { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.idea-note { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--muted); }
+.idea-acts { margin-left: auto; opacity: 0; transition: opacity .15s; }
+.idea-row:hover .idea-acts, .idea-row:focus-within .idea-acts { opacity: 1; }
+.idea-acts .link { font-size: 12.5px; }
+.idea-row .idea-kinds .chip { padding: 1px 8px; font-size: 11.5px; color: var(--muted); }
+.idea-row.planned .idea-text, .idea-row.done .idea-text { font-weight: 500; color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.idea-row.missed .idea-text { color: var(--muted); }
+.idea-row.missed .idea-when { color: var(--warn); }
+.idea-row.editing { gap: 8px; padding: 8px 0; }
+.idea-row.editing .idea-kinds .chip.on { color: var(--accent-ink); }
+.idea-in { flex: 1 1 200px; min-width: 0; padding: 6px 10px; border: var(--b-ctl); border-radius: 10px; background: var(--bg); font-size: 14px; font-weight: 600; }
+.idea-in.note { flex-basis: 60%; font-size: 13px; font-weight: 400; }
+.idea-plan { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 2px 0 6px; font-size: 13px; color: var(--muted); }
+.idea-plan .num { width: 62px; text-align: center; color: var(--ink); }
+.idea-plan .btn { padding: 5px 12px; color: var(--ink); }
+.idea-more { display: inline-block; margin: 2px 0 6px; font-size: 12.5px; }
+[data-theme="dark"] .idea-row.editing .idea-kinds .chip.on { color: var(--accent); }
+.idea-pick { display: none; margin-top: 8px; padding: 7px 9px 5px; border: 1px dashed #CDCDC6; border-radius: 10px; }
+.add:focus-within .idea-pick:not(:empty) { display: block; }
+.idea-pick p { margin: 0 0 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.idea-pick ul { display: flex; flex-wrap: wrap; gap: 5px 6px; margin: 0 0 5px; padding: 0; list-style: none; }
+.idea-pick button { padding: 3px 10px; border: var(--b-ctl); border-radius: 999px; background: var(--bg); font-size: 12.5px; font-weight: 600; }
+.idea-pick button:hover { background: var(--surface); }
+.idea-pick button.on { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+.idea-pick button small { margin-left: 6px; font-size: 11px; font-weight: 500; color: var(--muted); }
+[data-theme="dark"] .idea-pick { border-color: var(--edge); }
+[data-theme="dark"] .idea-pick button { background: var(--surface); }
+[data-theme="dark"] .idea-pick button.on { border-color: var(--accent); background: rgba(204, 255, 0, .12); color: var(--accent); }

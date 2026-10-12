@@ -2,6 +2,7 @@
 //   labor    这个大类的时间算进季度表的 progress
 //   grow     "all" 全部时间算成长 / "deep" 只有标了 ◆ Deep 的算成长，没标的算 Relax / "" 都不算
 //   friends  这个大类的任务可以选「和谁」
+//   ideas    这个大类加任务时可以从灵感池里挑（见最下面的 ideasOf）
 //   track    Projects 页上看它什么（进度 / 每周够不够钟点 / Relax 在不在范围里 / 多久没联系 / 不看），见最下面的 trackOf；min = 够不够的那个钟点（分钟）
 // 任务可以直接挂在大类上（task.group），不一定要挂在哪个计划下面。只算数，不碰页面和存储。
 
@@ -101,3 +102,6 @@ export function trackOf(g) {
   const known = match(g.name);
   return known in TRACK_BY_NAME ? TRACK_BY_NAME[known] : "progress";
 }
+
+// 这个大类加任务时能不能从灵感池里挑（g.ideas，Settings 里能改）。没设过就猜：能选人的、没标 Deep 就算 Relax 的那种（Friends、Leisure）
+export const ideasOf = (g) => Boolean(g) && (typeof g.ideas === "boolean" ? g.ideas : Boolean(g.friends) || g.grow === "deep");

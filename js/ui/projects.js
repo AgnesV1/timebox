@@ -1,4 +1,5 @@
-// 项目页：最上面是目标板（js/ui/goals.js）和各大类的时间占比；下面按「项目」分区（项目 = 大类 = 计划的 group），
+// 项目页，页头 Plans | Ideas 两格。Ideas = 灵感池（想去哪玩、想吃什么，没有时长和期限，见 js/ui/ideas.js）；下面说的都是 Plans。
+// 最上面是目标板（js/ui/goals.js）和各大类的时间占比；下面按「项目」分区（项目 = 大类 = 计划的 group），
 // 清单里的大类一直都在（空的也在）；区头 Rename 可以改名、换颜色、并进别的大类。
 // 每个大类看什么不一样（groups.js 的 trackOf，Settings 里能改）：
 //   看进度的（Build）：区头汇总进度、今天要做多少，计划卡有进度条、健康度、时间轴；
@@ -20,6 +21,7 @@ import { addDays, diffDays, fmtShort, fmtMin, WEEKDAYS } from "../dates.js";
 import { healthPill, groupsOf } from "./common.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
 import { goalsHTML } from "./goals.js";
+import { ideasHTML } from "./ideas.js";
 
 let editing = "";
 let draft = null;      // 新建时还没存的：{kind, place, 各个框的值}
@@ -167,7 +169,13 @@ function groupHead(c, name, subs, empty, track, last) {
     (progress ? (sum ? '<div class="gbar"><i style="width:' + pct + '%"></i></div>' : "") : groupHealthHTML(c, name, last));
 }
 
+// 页头的两格：Plans（有总量 / 节奏、引擎帮着排的）| Ideas（灵感池）。记在这台设备上
+const ideasMode = () => store.local().projMode === "ideas";
+const modeSeg = (ideas) => '<span class="seg">' + [["plans", "Plans"], ["ideas", "Ideas"]].map(([v, l]) =>
+  '<button type="button" data-act="proj-mode" data-v="' + v + '"' + ((v === "ideas") === ideas ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
+
 export function projectsHTML(c) {
+  if (ideasMode()) return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div><div class="tools">' + modeSeg(true) + "</div></header>" + ideasHTML(c) + "</div>";
   const open = c.projects.filter(E.isActive);
   const closed = c.projects.filter((p) => !E.isActive(p));
   const groups = groupsOf(open, { all: true });
@@ -176,7 +184,7 @@ export function projectsHTML(c) {
   const hasClosed = (name) => closed.some((p) => (p.group || "") === name);
   const last = lastContactDate();
   return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div>' +
-    '<div class="tools"><button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +
+    '<div class="tools">' + modeSeg(false) + '<button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +
     goalsHTML(c) + sharesHTML(sh, kind) +
     (c.projects.length ? "" : '<p class="hint pintro">A project is an area of your life. Tasks can sit right on it, or under a plan inside it: a <b>Total</b> (so many hours by a deadline) or a <b>Regular</b> one (every Monday, three times a week).</p>') +
     groups.map((g) => {
@@ -352,6 +360,7 @@ export function initProjects(rerender) {
     else if (act === "rename-done") { renaming = null; rerender(); }
     else if (act === "remove-group") { renaming = null; store.removeGroup(group); }
     else if (act === "share-kind") store.setLocal({ shareKind: el.dataset.v });
+    else if (act === "proj-mode") store.setLocal({ projMode: el.dataset.v === "ideas" ? "ideas" : "plans" });
     else if (act === "edit-project") openProjectEditor(pid);
     else if ((act === "pkind" || act === "pplace") && !pid) {
       readDraft(el.closest(".project-editor"));

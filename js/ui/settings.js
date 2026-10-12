@@ -6,7 +6,7 @@ import * as sync from "../sync.js";
 import { esc, on, icon } from "../dom.js";
 import { WEEKDAYS, isoOf, fmtShort } from "../dates.js";
 import { WEEKLY } from "../stats.js";
-import { trackOf, TRACK_MIN } from "../groups.js";
+import { trackOf, ideasOf, TRACK_MIN } from "../groups.js";
 import { toast } from "./common.js";
 import { looksLikeSheet } from "../reading.js";
 import { saveReadingLink } from "./reading.js";
@@ -47,15 +47,16 @@ export function settingsHTML(phone) {
   const backup = '<section class="card"><h3>Backup</h3><p class="hint">Everything is in your Sheet already. This saves a copy of this device\'s data as a file.</p>' +
     '<button type="button" class="btn" data-act="export">Export JSON</button></section>';
 
-  // 各个大类：算不算季度表的 progress、算不算成长（全部 / 只算 Deep，剩下的是 Relax）、任务能不能选「和谁」、Projects 页上看它什么；每周四个门槛（小时）
+  // 各个大类：算不算季度表的 progress、算不算成长（全部 / 只算 Deep，剩下的是 Relax）、任务能不能选「和谁」、加任务时能不能从灵感池里挑、Projects 页上看它什么；每周四个门槛（小时）
   const wk = { ...WEEKLY, ...(store.setting("weekly", {}) || {}) };
   const hours = (k) => '<input class="num" type="number" min="0" step="1" data-wk="' + k + '" value="' + (Number(wk[k]) > 0 ? Math.round(Number(wk[k]) / 6) / 10 : "") + '" placeholder="off">';
   const groups = '<section class="card"><h3>Projects</h3><p class="hint">What each project counts towards. Rename, recolour and add projects on the Projects page.</p>' +
-    '<div class="table-wrap"><table class="gtable"><thead><tr><th>Project</th><th>Progress <small>quarter sheet</small></th><th>Growth <small>weekly check</small></th><th>With… <small>pick people</small></th><th>Watch <small>on Projects</small></th></tr></thead><tbody>' +
+    '<div class="table-wrap"><table class="gtable"><thead><tr><th>Project</th><th>Progress <small>quarter sheet</small></th><th>Growth <small>weekly check</small></th><th>With… <small>pick people</small></th><th>Ideas <small>pick from the pool</small></th><th>Watch <small>on Projects</small></th></tr></thead><tbody>' +
     store.groups().map((g) => '<tr data-group="' + esc(g.name) + '"><th><i class="gdot" style="background:' + esc(g.color || "var(--c-None)") + '"></i>' + esc(g.name) + "</th>" +
       '<td><input type="checkbox" data-gf="labor"' + (g.labor ? " checked" : "") + ' aria-label="Counts as progress"></td>' +
       '<td><select data-gf="grow" aria-label="Growth">' + [["all", "All of it"], ["deep", "Only ◆ Deep — the rest is Relax"], ["", "Doesn't count"]].map(([v, l]) => '<option value="' + v + '"' + ((g.grow || "") === v ? " selected" : "") + ">" + l + "</option>").join("") + "</select></td>" +
       '<td><input type="checkbox" data-gf="friends"' + (g.friends ? " checked" : "") + ' aria-label="Tasks can pick people"></td>' +
+      '<td><input type="checkbox" data-gf="ideas"' + (ideasOf(g) ? " checked" : "") + ' aria-label="Tasks can pick from Ideas"></td>' +
       '<td class="gwatch"><select data-gf="track" aria-label="What to watch on the Projects page">' + [["progress", "Plan progress"], ["min", "Hours a week, at least"], ["range", "Relax within the weekly limits"], ["contact", "A catch-up every 2 weeks"], ["", "Nothing"]].map(([v, l]) => '<option value="' + v + '"' + (trackOf(g) === v ? " selected" : "") + ">" + l + "</option>").join("") + "</select>" +
       (trackOf(g) === "min" ? '<input class="num" type="number" min="0.5" step="0.5" data-gf="min" value="' + Math.round((Number(g.min) > 0 ? Number(g.min) : TRACK_MIN) / 6) / 10 + '" aria-label="Hours a week"><span>h</span>' : "") + "</td></tr>").join("") + "</tbody></table></div>" +
     '<div class="wk-row"><span>Each week, remind me when growth is under</span>' + hours("growMin") + "<span>h or over</span>" + hours("growMax") + "<span>h, and relax is under</span>" + hours("relaxMin") + "<span>h or over</span>" + hours("relaxMax") + "<span>h.</span></div>" +

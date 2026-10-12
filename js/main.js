@@ -15,6 +15,7 @@ import { todayHTML, initToday, shownDate } from "./ui/today.js";
 import { calendarHTML, poolHTML, initCalendar, handleDrop, refreshDayModal } from "./ui/calendar.js";
 import { projectsHTML, initProjects, refreshProjectEditor, projectAlerts } from "./ui/projects.js";
 import { initGoals } from "./ui/goals.js";
+import { initIdeas } from "./ui/ideas.js";
 import { settingsHTML, initSettings } from "./ui/settings.js";
 import { initEditor, refreshEditor } from "./ui/editor.js";
 import { initDnd } from "./ui/dnd.js";
@@ -217,6 +218,7 @@ initToday(render);
 initCalendar(render);
 initProjects(render);
 initGoals(render);
+initIdeas(render);
 initSettings(applyTheme);
 initEditor();
 initDnd((payload, target) => (target.startsWith("m") ? mealDrop(payload, target) : handleDrop(payload, target)));
@@ -228,7 +230,7 @@ initFriends(render);
 initSun();
 
 store.subscribe((meta) => {
-  if (meta.pulled) { adoptGroups(); store.adoptMarks(); store.adoptColors(); }
+  if (meta.pulled) { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); }
   if (meta.local) setFx(store.local().fx !== false);
   if (!meta.quiet) render();
   else paintSync();

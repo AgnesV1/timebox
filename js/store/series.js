@@ -8,7 +8,7 @@ import * as E from "../engine.js";
 import * as R from "../routines.js";
 
 export default function (core) {
-  const { all, get, put, drop, change, newId, today, byOrder, groupFor, colorFor, nextPlanOrder, nextOrder, started, dropTask, deleteTask, updateTask, timer, setTimer, moveMeet } = core;
+  const { all, get, put, drop, change, newId, today, byOrder, groupFor, colorFor, nextPlanOrder, nextOrder, started, dropTask, deleteTask, updateTask, timer, setTimer, moveMeet, moveIdea } = core;
 
   const routines = () => all("projects").filter(E.isRegular).sort(byOrder);
   const routineOf = (taskId) => { const x = R.parseRoutineTaskId(taskId); const p = x ? get("projects", x.rid) : null; return p && E.isRegular(p) ? p : null; };
@@ -56,6 +56,7 @@ export default function (core) {
       put("tasks", { ...t, id: nid, projectId: p.id, itemId: "" });
       if (timer()?.taskId === id) setTimer({ ...timer(), taskId: nid });
       moveMeet(id, nid, t.date);
+      moveIdea(id, nid);
       drop("tasks", id);
     }, repeatLabel(p.rule.end));
     return nid;

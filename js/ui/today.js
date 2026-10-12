@@ -8,6 +8,9 @@ import { esc, on, icon } from "../dom.js";
 import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, startOfWeek, WEEKDAYS } from "../dates.js";
 import * as S from "../stats.js";
 import * as F from "../friends.js";
+import * as I from "../ideas.js";
+import * as GR from "../groups.js";
+import * as reading from "../reading.js";
 import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
 import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickTarget, segStyle, lineInfo, toast, STATUS } from "./common.js";
@@ -25,6 +28,7 @@ let overdueOpen = false;
 let viewDate = "";
 let focus = "";   // 点开的那一行（四个状态按钮只在这一行）
 const addTarget = {};   // 加任务框里选的是哪个项目 / 计划（日期 → 下拉的值）：能选「和谁」的大类要多画一块
+const ideaDraft = {};   // 加任务框里从灵感池挑中的那条（日期 → 灵感 id）：任务建好后挂上去，池子里就划掉了
 // 这个任务能不能选「和谁」：已经带着一条记录，或者它那个大类开了这一项
 const meetable = (t) => Boolean(store.meetOfTask(t.id) || store.groupByName(store.groupOf(t))?.friends);
 
@@ -137,6 +141,9 @@ function noticesHTML(c) {
   const soon = F.comingUp(store.friends(), store.friendSpecial(), c.today, { ahead: 1, back: 0 }, store.occasionDone).groups
     .flatMap((g) => g.items.filter((x) => !x.done).map((x) => (x.friend.name || "Someone") + " — " + g.label + (g.date === c.today ? "" : " tomorrow") + (x.gift ? " 🎁" : "")));
   if (soon.length) h += '<div class="note"><p><b>Friends</b> — ' + soon.map(esc).join("; ") + '.</p><a class="link" href="#friends">Open</a></div>';
+  // 灵感池里快到日子、还没排的（7 天以内）
+  const ideas = I.soon(store.ideas(), taskOf, c.today);
+  if (ideas.length) h += '<div class="note"><p><b>Ideas</b> — ' + ideas.map((i) => esc(i.text + " " + I.whenText(i))).join("; ") + '.</p><button type="button" class="link" data-act="open-ideas">Open</button></div>';
   const use = store.storage();
   if (use.warn) {
     h += '<div class="note warn"><p><b>' + (use.full ? "This device is full." : "Storage on this device runs out in about " + Math.max(1, Math.round(use.daysLeft)) + " days.") + '</b> Archive older tasks to make room.</p><a class="link" href="#settings">Settings → Storage</a></div>';
@@ -144,8 +151,26 @@ function noticesHTML(c) {
   return h;
 }
 
+// 加任务框选的那个大类能不能从灵感池里挑（Settings → Projects 的 Ideas 一列；默认 Leisure 和 Friends）
+const poolFor = (target) => { const g = store.groupByName(store.groupOf(pickTarget(target))); return GR.ideasOf(g) ? g : null; };
+const taskOf = (id) => store.get("tasks", id);
+
+// 标题框底下的候选（电脑）：池子里还没排的灵感，打了字就只留对得上的；不是和人有关的大类再加一小段想看的（Reading 的 Want）。
+// 点一条 = 名字填进标题框；灵感那条在任务建好后挂上去
+function pickHTML(d, query) {
+  const g = poolFor(addTarget[d] || "");
+  if (!g) return "";
+  const ideas = I.match(store.ideas(), taskOf, store.today(), query);
+  const wants = g.friends || !store.setting("reading")?.url ? [] : (reading.titleKey(query) ? reading.search(query, 20).filter((r) => r.want) : reading.wants()).slice(0, 4);
+  const item = (act, id, text, small, on) => '<li><button type="button" data-act="' + act + '" data-id="' + esc(id) + '" data-t="' + esc(text) + '"' + (on ? ' class="on"' : "") + ">" +
+    esc(text) + (small ? "<small>" + esc(small) + "</small>" : "") + "</button></li>";
+  return (ideas.length ? "<p>Ideas</p><ul>" + ideas.map((i) => item("idea-pick", i.id, i.text, i.date && i.date < store.today() ? "was " + fmtShort(i.date) : I.whenText(i), ideaDraft[d] === i.id && I.sameText(i.text, query))).join("") + "</ul>" : "") +
+    (wants.length ? "<p>Want</p><ul>" + wants.map((r) => item("want-pick", "", r.title, r.tab, false)).join("") + "</ul>" : "");
+}
+
 // 加任务；电脑上多两个下拉：怎么重复、重复多久（一键排好整段时间）。◆ Deep = 这是要专心做的（选了计划就跟计划的默认）。
-// 名字后面带一段钟点（Reading 14:00-15:10）= 已经做完的，直接记成一条 Done
+// 名字后面带一段钟点（Reading 14:00-15:10）= 已经做完的，直接记成一条 Done。
+// 手机上多一个 Idea 开关：打开后 Add = 记进灵感池（不建任务），回电脑再归类、挑日子
 function addHTML(c, d, phone = false) {
   const projects = c.projects.filter(E.isActive);
   const target = addTarget[d] || "";
@@ -157,10 +182,10 @@ function addHTML(c, d, phone = false) {
     '<div class="add-more"><select name="project" data-keep="add-plan-' + d + '" aria-label="Project or plan">' + projectOptions(projects, target) + "</select>" +
     (people ? withHTML("add:" + d) : "") +
     '<label class="deep-tog" title="Deep work: focused, one thing at a time"><input type="checkbox" name="deep" data-keep="add-deep-' + d + '"><span>◆ Deep</span></label>' +
-    (phone ? "" : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
+    (phone ? '<label class="deep-tog" title="Save it to Ideas instead of adding a task"><input type="checkbox" name="idea" data-keep="add-idea-' + d + '"><span>Idea</span></label>' : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
       '<option value="weekdays">↻ Weekdays</option><option value="weekly">↻ Every ' + WEEKDAYS[weekday(d)] + "</option></select>" +
       '<select name="for" aria-label="For how long">' + R.LENGTHS.map(([v, l]) => '<option value="' + v + '"' + (v === R.DEFAULT_LENGTH ? " selected" : "") + ">for " + l + "</option>").join("") + "</select>") +
-    "</div></form>";
+    "</div>" + (phone ? "" : '<div class="idea-pick" data-idea-pick="' + d + '">' + pickHTML(d, document.querySelector('[data-keep="add-title-' + d + '"]')?.value || "") + "</div>") + "</form>";
 }
 
 export function dayParts(c, d) {
@@ -268,6 +293,7 @@ export function initToday(rerender) {
     else if (act === "tomorrow") store.toTomorrow(id);
     else if (act === "od-toggle") { overdueOpen = !overdueOpen; rerender(); }
     else if (act === "week-seen") store.setLocal({ weekSeen: el.dataset.week });
+    else if (act === "open-ideas") { store.setLocal({ projMode: "ideas" }); location.hash = "projects"; }
     else if (act === "spread") store.spreadOverdue();
     else if (act === "all-today") {
       const c = store.ctx();
@@ -303,6 +329,20 @@ export function initToday(rerender) {
     rerender();
   });
 
+  // 标题框底下的候选：边打边筛；点一条 = 填进标题框（按下去时不让输入框丢焦点，不然候选先收起来、点不着）
+  on(document, "input", '.dayview form[data-add] input[name="title"]', (e, el) => {
+    const box = el.form.querySelector("[data-idea-pick]");
+    if (box) box.innerHTML = pickHTML(el.form.dataset.add, el.value);
+  });
+  on(document, "mousedown", ".idea-pick button", (e) => e.preventDefault());
+  on(document, "click", ".idea-pick button", (e, el) => {
+    const form = el.closest("form"), d = form.dataset.add, input = form.querySelector('input[name="title"]');
+    input.value = el.dataset.t;
+    ideaDraft[d] = el.dataset.act === "idea-pick" ? el.dataset.id : "";
+    el.closest("[data-idea-pick]").innerHTML = pickHTML(d, input.value);
+    input.focus();
+  });
+
   // 「几小时几分」只留数字
   on(document, "input", ".logtime [data-lt=h], .logtime [data-lt=m]", (e, el) => { el.value = el.value.replace(/\D/g, "").slice(0, 3); });
   on(document, "keydown", ".logtime input", (e, el) => { if (e.key === "Enter") { e.preventDefault(); logFromRow(el.closest(".row")); } });
@@ -336,7 +376,20 @@ export function initToday(rerender) {
       const plan = document.querySelector('[data-keep="add-plan-' + form.dataset.add + '"]');
       if (plan) plan.value = "";
       addTarget[form.dataset.add] = "";
+      ideaDraft[form.dataset.add] = "";
     };
+    // 手机上开着 Idea：不建任务，记进灵感池
+    if (f.get("idea") === "on") {
+      const lines = I.parseLines(String(f.get("title")), store.ideas());
+      if (lines.length) store.addIdeas(lines);
+      toast(lines.length ? "Saved to Ideas" : "Already in your ideas");
+      form.querySelector("[name=idea]").checked = false;
+      clear();
+      return;
+    }
+    // 从灵感池挑的那条：标题没再改过，任务建好就挂上去
+    const picked = store.ideaOf(ideaDraft[form.dataset.add] || "");
+    const fromIdea = (id, name) => { if (id && picked && I.sameText(picked.text, name)) store.pickIdea(picked.id, id); };
     // 选好的「和谁」：任务建好后记到它带的那条记录里
     const people = takeWith("add:" + form.dataset.add);
     const withThem = (id) => { if (id && people.length) store.setTaskMeet(id, { friends: people }); };
@@ -345,6 +398,7 @@ export function initToday(rerender) {
     if (log) {
       focus = store.addLogged({ date: fields.date, title: log.title, projectId: fields.projectId, group: fields.group, deep: fields.deep }, log.from, log.to);
       withThem(focus);
+      fromIdea(focus, log.title);
       clear();
       return;
     }
@@ -352,6 +406,7 @@ export function initToday(rerender) {
     const id = how ? store.addRepeating(fields, R.daysFor(how, fields.date, est), R.endFor(fields.date, Number(f.get("for")))) : store.addTask(fields);
     if (how) form.querySelector("[name=repeat]").value = "";
     withThem(id);
+    if (!how) fromIdea(id, title);
     focus = id;
     if (form.dataset.add === store.today()) { pick(id); rerender(); }   // 加完就选中，底部点 Start 就能开始
     clear();

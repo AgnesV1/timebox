@@ -138,7 +138,20 @@ function axisLabels(rows, byWeek) {
 // 三个多月以上一天一根太挤，按周合起来
 const trendRows = (s) => { const byWeek = s.daily.length > 92; return { byWeek, rows: byWeek ? S.weekly(s.daily, store.prefs().weekStartsOn) : s.daily }; };
 
-// Time 页签的柱子：每天记了多久，底下流着珠光的那段是深度；设了深度目标就画一条虚线
+// 深度那一段上的星芒：几颗、在哪、闪得多快都按日子定死（重画时不会乱跳）。竖着一颗一格地排，不会挤成一堆
+function sparks(seed, count) {
+  let h = 2166136261;
+  for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const rnd = () => { h += 0x6D2B79F5; let t = Math.imul(h ^ (h >>> 15), 1 | h); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const n = Math.max(1, Math.min(7, Math.round(count)));
+  let out = "";
+  for (let i = 0; i < n; i++) {
+    out += '<span class="spk" style="left:' + Math.round(22 + rnd() * 56) + "%;top:" + Math.round(((i + 0.2 + rnd() * 0.6) / n) * 100) + "%;animation-duration:" + (1.6 + rnd() * 1.4).toFixed(2) + "s;animation-delay:-" + (rnd() * 3).toFixed(2) + 's"></span>';
+  }
+  return out;
+}
+
+// Time 页签的柱子：每天记了多久，闪着星芒的那一段是深度（柱子还是一根，不另起颜色）；设了深度目标就画一条虚线
 function timeTrendHTML(s) {
   const { byWeek, rows } = trendRows(s);
   const max = niceMax(Math.max(60, ...rows.map((r) => Math.max(r.spent, r.goal || 0))));
@@ -158,7 +171,7 @@ function timeTrendHTML(s) {
     '<div class="cols" data-chart="ttrend">' + rows.map((r, i) =>
       '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.ttrend[i].title + ": " + fmtMin(r.spent) + " logged, " + fmtMin(r.deep) + " deep") + '">' +
       (r.spent ? '<i class="dn solo" style="height:' + h(r.spent) + '"></i>' : "") +
-      (r.deep ? '<i class="dp' + (r.deep >= r.spent - 0.5 ? " full" : "") + '" style="height:' + h(r.deep) + '"></i>' : "") +
+      (r.deep ? '<i class="dp" style="height:' + h(r.deep) + '">' + sparks(r.date, (Math.min(1, r.deep / max) * 190) / (rows.length > 40 ? 40 : 18)) + "</i>" : "") +
       (r.goal && !r.future ? '<i class="dgoal" style="bottom:' + h(r.goal) + '"></i>' : "") +
       (top > 0 && r.spent === top ? '<b class="cap-label num" style="bottom:' + h(r.spent) + '">' + fmtMin(r.spent) + "</b>" : "") + "</div>").join("") + "</div></div>" +
     '<div class="xaxis">' + labels.map((t) => "<span>" + t + "</span>").join("") + "</div>" +
@@ -323,12 +336,11 @@ function projectsHTML(c, s) {
 }
 
 // ---------- 时间去向：一天 24 小时的饼图 ----------
-// 粗的那圈：睡觉 / 吃饭洗澡 / 家务（灰，按默认值算）→ 各项目（计划的颜色）→ 没挂计划 → 没记的；外面细的一圈 = 每个项目里深度的那段（珠光色）。
+// 粗的那圈：睡觉 / 吃饭洗澡 / 家务（灰，按默认值算）→ 各项目（计划的颜色）→ 没挂计划 → 没记的；外面细的一圈 = 每个项目里深度的那段。
 // 右边的图例就是表格：名字、时长、占比。项目超过 6 个，后面的合成一片。
 
 const LIFE_COLOR = { sleep: "var(--k-sleep)", care: "var(--k-care)", chores: "var(--k-chores)" };
 const HATCH = "repeating-linear-gradient(45deg, var(--muted) 0 1.5px, var(--k-blank) 1.5px 5px)";
-const HOLO = ["#C6FF00", "#6BFFC8", "#6EC3FF", "#B49BFF", "#FF8FD6", "#C6FF00"];   // 深度的那条珠光色带，和 css 里的 --holo 一样
 
 function pieParts(pie) {
   const proj = pie.parts.filter((x) => x.kind === "project");
@@ -360,7 +372,7 @@ function pieHTML(c, s, rest) {
     at += len;
     const dash = (v) => { const d = Math.max(0.2, v - (parts.length > 1 ? 0.5 : 0)); return d.toFixed(3) + " " + (100 - d).toFixed(3); };
     return '<circle class="slice" data-i="' + i + '" r="42" pathLength="100" stroke="' + color(x) + '" stroke-dasharray="' + dash(len) + '" stroke-dashoffset="' + (-start).toFixed(3) + '"/>' +
-      (x.deep > 0 ? '<circle class="dring" r="53" pathLength="100" stroke="url(#st-holo)" stroke-dasharray="' + dash((x.deep / pie.total) * 100) + '" stroke-dashoffset="' + (-start).toFixed(3) + '"/>' : "");
+      (x.deep > 0 ? '<circle class="dring" r="53" pathLength="100" stroke-dasharray="' + dash((x.deep / pie.total) * 100) + '" stroke-dashoffset="' + (-start).toFixed(3) + '"/>' : "");
   }).join("");
   const legend = parts.map((x) => '<li title="' + esc(x.name + (x.deep > 0 ? " · " + fmtMin(x.deep) + " deep" : "")) + '"><i style="background:' + swatch(x) + '"></i><span>' + esc(x.name) +
     '</span><b class="num">' + fmtMin(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("");
@@ -373,8 +385,7 @@ function pieHTML(c, s, rest) {
       field("chores", "Housework you don't log", "h a weekend", life.chores) + field("deepGoal", "Deep goal", "h a work day", life.deepGoal) + "</div>" : "") +
     (pie.total > 0
       ? '<div class="pie-wrap"><div class="pie" data-chart="pie"><svg viewBox="-60 -60 120 120" role="img" aria-label="' + esc(parts.map((x) => x.name + " " + share(x.min, pie.total)).join(", ")) + '">' +
-        '<defs><pattern id="st-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="var(--k-blank)"/><rect width="1.5" height="5" fill="var(--muted)"/></pattern>' +
-        '<linearGradient id="st-holo" gradientUnits="userSpaceOnUse" x1="-56" y1="-56" x2="56" y2="56">' + HOLO.map((c, i) => '<stop offset="' + i / (HOLO.length - 1) + '" stop-color="' + c + '"/>').join("") + "</linearGradient></defs>" +
+        '<defs><pattern id="st-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="var(--k-blank)"/><rect width="1.5" height="5" fill="var(--muted)"/></pattern></defs>' +
         '<g transform="rotate(-90)">' + arcs + "</g></svg>" +
         '<div class="pie-c"><b class="num">' + fmtMin(pie.tracked) + "</b><span>logged</span>" + (pie.deep > 0 ? '<span class="num" title="Deep work">◆ ' + fmtMin(pie.deep) + "</span>" : "") + "</div></div>" +
         '<ul class="pie-legend">' + legend + "</ul></div>"

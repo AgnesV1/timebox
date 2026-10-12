@@ -18,7 +18,7 @@
   --hard: 2px 2px 0 var(--edge); --hard-lg: 3px 3px 0 var(--edge); --glow: none;
   --r: 14px; --r-sm: 10px;
   --leo-spot: #0B0B0B; --leo-inner: #FF3EA5; --zebra-ink: #0B0B0B;
-  --k-Main: #719507; --k-Work: #1B4BFE; --k-Fun: #E40187; --k-Chore: #E36B02; --k-None: #85858F; --k-deep: #0B0B0B; --k-sleep: #5F5F6C; --k-care: #9A9AA6; --k-chores: #D3D3DA; --k-blank: #EFEFEA; --grid: #ECECE6;
+  --k-Main: #719507; --k-Work: #1B4BFE; --k-Fun: #E40187; --k-Chore: #E36B02; --k-None: #85858F; --k-sleep: #5F5F6C; --k-care: #9A9AA6; --k-chores: #D3D3DA; --k-blank: #EFEFEA; --grid: #ECECE6;
   --sun-day: #E9E9E5; --sun-night: #CFCFCA;
   --display: "Unbounded", -apple-system, "PingFang SC", sans-serif;
   --body: "Space Grotesk", -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
@@ -37,7 +37,7 @@
   --b: 1px solid var(--edge); --b-soft: 1px solid #222232; --b-ctl: var(--b);
   --hard: 0 0 0 1px rgba(204, 255, 0, .05), 0 0 24px rgba(204, 255, 0, .06) inset; --hard-lg: 0 0 40px rgba(0, 229, 255, .06); --glow: 0 0 14px rgba(204, 255, 0, .5);
   --leo-spot: #FF2BD6; --leo-inner: rgba(255, 43, 214, .35); --zebra-ink: rgba(255, 255, 255, .85);
-  --k-Main: #7BA208; --k-Work: #0083FC; --k-Fun: #F504A2; --k-Chore: #DB7206; --k-None: #6A6A80; --k-deep: #F4F4F8; --k-sleep: #A2A2BA; --k-care: #666680; --k-chores: #343446; --k-blank: #1B1B28; --grid: #1F1F2D;
+  --k-Main: #7BA208; --k-Work: #0083FC; --k-Fun: #F504A2; --k-Chore: #DB7206; --k-None: #6A6A80; --k-sleep: #A2A2BA; --k-care: #666680; --k-chores: #343446; --k-blank: #1B1B28; --grid: #1F1F2D;
   --sun-day: #34343B; --sun-night: #202026;
   --num: "JetBrains Mono", ui-monospace, monospace;
 }
@@ -622,16 +622,22 @@ body.phone .settings .page-head { margin-top: 4px; }
 .st-two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); gap: 0 12px; align-items: stretch; }
 .st-two > * { margin-bottom: 10px; }
 @media (max-width: 1100px) { .st-two { grid-template-columns: minmax(0, 1fr); } }
-.col .dp { width: min(100%, 24px); border-top: 2px solid var(--bg); border-radius: 0; background: var(--k-deep); }
+/* 深度：不另起一个颜色，就是青柠上流过一层珠光（青柠 → 薄荷 → 天蓝 → 淡紫 → 粉 → 青柠，首尾同色所以一圈圈接得上）。
+   柱子里那一段慢慢往上流；图例、读数里的小方块和饼图外圈是静止的同一条色带 */
+:root { --holo: #C6FF00, #6BFFC8, #6EC3FF, #B49BFF, #FF8FD6, #C6FF00; }
+.col .dp { width: min(100%, 24px); border-radius: 0; background: linear-gradient(0deg, var(--holo)) 0 100% / 100% 240px; box-shadow: inset 0 0 0 1.5px var(--edge); animation: sheen 10s linear infinite; }
+[data-theme="dark"] .col .dp { border-top: 1.5px solid var(--bg); box-shadow: none; }
 .col .dp.full { border-top: 0; border-radius: 4px 4px 0 0; }
+@keyframes sheen { to { background-position: 0 calc(100% - 240px); } }
 .col .dgoal { width: min(100%, 24px); height: 0; border-top: 2px dotted var(--ink); border-radius: 0; }
 /* 按项目叠起来的柱子（Weekly rhythm）：一段一个项目，最多的在最下面 */
 .col .stack { position: absolute; bottom: 0; display: flex; flex-direction: column-reverse; gap: 1px; width: min(100%, 30px); border-radius: 4px 4px 0 0; overflow: hidden; }
 .col .stack i { position: static; flex-basis: 0; min-height: 1px; border-radius: 0; }
 [data-theme="light"] .col .stack i, [data-theme="light"] .legend .k[style] { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
-.k.dp { background: var(--k-deep); }
+.k.dp { background: linear-gradient(90deg, var(--holo)); box-shadow: inset 0 0 0 1px var(--edge); }
+[data-theme="dark"] .k.dp { box-shadow: none; }
 .k.dgoal { height: 0; border-top: 2px dotted var(--ink); border-radius: 0; background: none; }
-.ctip .k.dp { background: var(--k-deep); }
+.ctip .k.dp { width: 10px; height: 10px; border-radius: 3px; }
 .ctip .k.dgoal { height: 0; border-top: 2px dotted var(--ink); background: none; }
 .ctip .k.sw { width: 10px; height: 10px; border-radius: 3px; }
 .pie-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
@@ -642,7 +648,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .pie svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .slice { fill: none; stroke-width: 15; cursor: default; transition: stroke-width .15s; }
 .slice.hot { stroke-width: 18; }
-.dring { fill: none; stroke: var(--k-deep); stroke-width: 3; pointer-events: none; }
+.dring { fill: none; stroke-width: 3; pointer-events: none; }
 .pie-c { position: absolute; top: 50%; left: 50%; display: grid; justify-items: center; width: 56%; transform: translate(-50%, -50%); text-align: center; font-size: 11.5px; line-height: 1.35; color: var(--muted); pointer-events: none; }
 .pie-c b { font-size: 16px; line-height: 1.15; letter-spacing: -.02em; color: var(--ink); }
 .pie-c span:last-child:not(:nth-child(2)) { margin-top: 2px; font-weight: 700; color: var(--ink); }

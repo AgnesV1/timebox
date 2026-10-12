@@ -817,4 +817,4 @@ export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, repla
 const { setRule } = series;
 
 export const { goals, saveGoal, deleteGoal } = goalStore(core);
-export const { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples } = mealStore(core);
+export const { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples, addDishes, dishToBox } = mealStore(core);

@@ -3,19 +3,21 @@
 //   meal-ing:<id> 常买的东西 / meal-box:<id> 一顿 / meal-week:<这周第一天> 这周：days（日期 → {boxes} / {off}）、
 //   粗排 rough（[{box, n}]）、买了没有 got、手动加的 extra、shopped、skip、note / meal-prefs 目标
 //   meal-sup:<id> 规律要换 / 要补的东西（Restock：价格、每隔多久、下次哪天）；这周的行里还有 notes（采购单上写的备注）
+//   meal-dish:<id> To try 里的一道菜（在外面吃过、想自己做的）：name、note、kind（box 打算做成 Box / once 只试一次）；
+//     从任务那边记的还带着 from（在哪吃的）、date、taskId——只是抄下来的字，任务以后删了改了都不管它
 //   （meal-pack:<id> 是 10-08 那版的 Day pack，现在只在读旧数据时展开成 Box）
 // 这里不存东西：数据在 js/store.js 手里，core 是它递进来的那几样（读、写、撤销）。
 
 export default function (core) {
   const { entries, put, drop, change, memo, newId, today, setting } = core;
 
-  const MEAL_RE = /^meal-(ing|box|pack|week|sup):(.+)$/;
+  const MEAL_RE = /^meal-(ing|box|pack|week|sup|dish):(.+)$/;
   const mealKey = (kind, id) => "meal-" + kind + ":" + id;
   const OLD_UNIT = { g: "g", kg: "g", oz: "g", lb: "g", ml: "ml", L: "ml", "fl oz": "ml", gal: "ml" };
 
   const meals = () => memo("meals", readMeals);
   function readMeals() {
-    const D = { ing: {}, box: {}, pack: {}, week: {}, sup: {}, days: {} };
+    const D = { ing: {}, box: {}, pack: {}, week: {}, sup: {}, dish: {}, days: {} };
     for (const [key, r] of entries("settings")) {
       const m = MEAL_RE.exec(key);
       if (m && r.value && typeof r.value === "object") D[m[1]][m[2]] = { ...r.value, id: m[2] };
@@ -132,11 +134,32 @@ export default function (core) {
       "Imported " + n + (n === 1 ? " grocery" : " groceries") + " · " + b + (b === 1 ? " box" : " boxes") + (s ? " · " + s + " to restock" : ""));
   }
 
+  const shortId = () => newId().replace(/-/g, "").slice(0, 10);
+
+  // To try 里一次加几道（rows = [{ name, note }]，fields = 这几道共用的：kind、from、date、taskId）
+  function addDishes(rows, fields = {}) {
+    const now = Date.now();
+    change(() => rows.forEach((r, k) => putMeal("dish", shortId(), { note: "", kind: "once", ...fields, ...r, order: now + k })),
+      rows.length > 1 ? "Added " + rows.length + " dishes" : "");
+  }
+
+  // 一道菜做成 Box：建一个同名的（备注带过去，食材空着等你加），这道菜从清单里拿掉。返回 Box 的 id
+  function dishToBox(id) {
+    const d = meals().dish[id];
+    if (!d) return "";
+    const box = shortId();
+    change(() => {
+      putMeal("box", box, { name: d.name, slot: "", level: "", parts: [{ ing: "", amt: "" }], note: [d.note, d.from ? "had at " + d.from : ""].filter(Boolean).join(" — ") });
+      drop("settings", mealKey("dish", id));
+    }, "Made a box from " + (d.name || "it"));
+    return box;
+  }
+
   function clearMealExamples() {
     change(() => {
       for (const kind of ["box", "ing", "pack"]) for (const id of Object.keys(meals()[kind])) if (id.startsWith("ex-")) removeMeal(kind, id);
     }, "Examples removed");
   }
 
-  return { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples };
+  return { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples, addDishes, dishToBox };
 }

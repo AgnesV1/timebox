@@ -4,6 +4,8 @@
 //     左边一排架子按类别摆着常买的东西，拖到 Box 上就加进去；每类最前面的「Any meat」= 随便哪种，买的时候再挑
 //   Plan（#meals）：最上面是「下次采购」的单子；然后是这一轮还没看的打折、这周和下周按天放 Box、之后四周四个框粗排
 //     （到了周五，这周就不再显示，从下周看起）
+//     Boxes 页底下一块 To try = 在外面吃过、想自己做的菜（菜名 + 备注），分 For meal prep / Try once 两种：
+//     直接在这里写（粘几行 = 几道），或者在今天页一条做完的 Leisure / Friends 任务底下记；Make a box = 建一个同名的 Box、从这里拿掉
 //   Restock（#meals/restock）：规律要换 / 要补的非食物：价格、每隔多久、下次哪天；最上面按月列接下来三个月要花的；
 //     底下一块 Buy once = 只买一次的（一条裙子）：价钱、可以不填的日子，买了点 Bought
 // 「下次采购」手机上也有：顶栏的 🛒 进 #shop，只列要买的东西（不写价钱和说明），在超市里打勾，单子下面是这次采购的备注（只看）；下面挤着一张「Coming up」。
@@ -263,7 +265,36 @@ function boxesHTML(D, c) {
   };
   return '<header class="msec-head"><h3 class="msec">Boxes <small>one meal each — drag them onto the days in Plan</small></h3><button type="button" class="btn cta" data-act="new-box">' + icon("plus") + " Box</button></header>" +
     '<div class="mboxwrap">' + shelfHTML(D) + '<div class="mgrid">' + boxes.map(card).join("") +
-    '<div class="mnew" data-drop="mbox:new" data-act="new-box" role="button" tabindex="0"><b>+ New box</b><small>or drop a grocery here</small></div></div></div>';
+    '<div class="mnew" data-drop="mbox:new" data-act="new-box" role="button" tabindex="0"><b>+ New box</b><small>or drop a grocery here</small></div></div></div>' + toTryHTML(D, c);
+}
+
+// ---------- To try：在外面吃过、想自己做的菜 ----------
+let dishKind = "box";   // 那一行输入选着的是哪种（记着上次选的）
+
+function toTryHTML(D, c) {
+  const T = M.toTry(D);
+  const row = (d) => '<li class="dish-row"><button type="button" class="dish-name" data-act="edit-dish" data-id="' + esc(d.id) + '" title="Edit">' + esc(d.name || "Untitled") + "</button>" +
+    (d.note ? '<span class="dish-note">' + esc(d.note) + "</span>" : "") +
+    (d.from ? '<span class="dish-from">' + esc(d.from + (d.date ? ", " + fmtShort(d.date) + (d.date.slice(0, 4) === c.today.slice(0, 4) ? "" : " " + d.date.slice(0, 4)) : "")) + "</span>" : "") +
+    '<span class="dish-acts">' + (M.dishKind(d) === "once" ? '<button type="button" class="link" data-act="dish-tried" data-id="' + esc(d.id) + '" title="Made it once: take it off the list">Tried</button>' : "") +
+    '<button type="button" class="link" data-act="dish-box" data-id="' + esc(d.id) + '">Make a box</button>' +
+    '<button type="button" class="icon-btn" data-act="del-dish" data-id="' + esc(d.id) + '" aria-label="Remove ' + esc(d.name || "it") + '">' + icon("close") + "</button></span></li>";
+  const col = ([k, label]) => '<div class="dish-col"><h5 class="dish-h">' + label + (T[k].length ? " <small>" + T[k].length + "</small>" : "") + "</h5>" +
+    (T[k].length ? '<ul class="dish-list">' + T[k].map(row).join("") + "</ul>" : '<p class="msub">' + (k === "box" ? "Dishes you mean to turn into a box." : "Dishes to cook once and see.") + "</p>") + "</div>";
+  return '<section class="dish-try"><h4 class="msub-h">To try <small>dishes you had out, or want to cook</small></h4>' +
+    '<form class="dish-add" autocomplete="off"><input name="name" data-keep="dish-name" placeholder="A dish — or paste a list, one per line" aria-label="Dish">' +
+    '<input name="note" data-keep="dish-note" placeholder="Note" aria-label="Note">' + segHTML("dish-kind", M.DISH_KINDS, dishKind) + '<button class="btn" type="submit">Add</button></form>' +
+    (T.box.length + T.once.length ? '<div class="dish-cols">' + M.DISH_KINDS.map(col).join("") + "</div>" : "") + "</section>";
+}
+
+// 加几道：一行一道；只打了一道、备注另填在旁边那格的，备注跟上
+function addDishes(form, text) {
+  const rows = M.parseDishes(text, Object.values(store.meals().dish));
+  if (!rows.length) { if (String(text).trim()) toast("Already on your list"); return; }
+  if (rows.length === 1 && !rows[0].note) rows[0].note = form.note.value.trim();
+  store.addDishes(rows, { kind: dishKind });
+  form.name.value = ""; form.note.value = "";
+  form.name.focus();
 }
 
 // ---------- Groceries ----------
@@ -365,8 +396,20 @@ function supEditor(D, row) {
 
 // ---------- 编辑框（一改就存；新建的有了名字才存） ----------
 
+// 一道菜：菜名、备注、哪一种；从任务那边记的写着在哪吃的
+function dishEditor(row) {
+  return '<h3 class="sheet-title">' + esc(row.name || "Untitled") + "</h3>" +
+    '<label class="field"><span>Dish</span><input data-f="name" data-k="name" value="' + esc(row.name || "") + '" autocomplete="off"></label>' +
+    '<label class="field"><span>Note</span><textarea data-f="note" data-k="note" rows="3" placeholder="What was in it, what made it good…">' + esc(row.note || "") + "</textarea></label>" +
+    '<div class="field"><span>Kind</span>' + segHTML("dish-set-kind", M.DISH_KINDS, M.dishKind(row)) + "</div>" +
+    (row.from ? '<p class="hint">Had at ' + esc(row.from) + (row.date ? ", " + fmtDue(row.date, store.today()) : "") + ".</p>" : "") +
+    footHTML("dish");
+}
+
+const ROWS = ["ing", "box", "sup", "dish"];   // 弹出框里一改就存的那几种
+
 function rowOf(D) {
-  if (!editing || !["ing", "box", "sup"].includes(editing.kind)) return null;
+  if (!editing || !ROWS.includes(editing.kind)) return null;
   return editing.id ? D[editing.kind][editing.id] || null : editing.draft;
 }
 
@@ -464,7 +507,7 @@ function editorHTML() {
   if (editing.kind === "prefs") return prefsEditor();
   const row = rowOf(D);
   if (!row) return "";
-  return editing.kind === "ing" ? ingEditor(D, row) : editing.kind === "sup" ? supEditor(D, row) : boxEditor(D, row);
+  return editing.kind === "ing" ? ingEditor(D, row) : editing.kind === "sup" ? supEditor(D, row) : editing.kind === "dish" ? dishEditor(row) : boxEditor(D, row);
 }
 
 function openEditor(e) {
@@ -479,7 +522,7 @@ const keyOf = (el) => el?.dataset?.k || (el?.dataset?.act ? "act:" + el.dataset.
 export function refreshMealEditor() {
   const box = modalSheet()?.querySelector(".meal-editor");
   if (!box || !editing || editing.kind === "import") return;   // 导入框里贴着的东西别冲掉
-  if (["ing", "box", "sup"].includes(editing.kind) && !rowOf(store.meals())) { closeModal(); return; }
+  if (ROWS.includes(editing.kind) && !rowOf(store.meals())) { closeModal(); return; }
   const a = document.activeElement;
   const key = a && box.contains(a) ? keyOf(a) : "";
   const keep = key && (a.tagName === "INPUT" || a.tagName === "TEXTAREA") && a.type !== "checkbox" ? { value: a.value, s: a.selectionStart, e: a.selectionEnd } : null;
@@ -590,11 +633,28 @@ export function initMeals(rerender) {
     else if (act === "edit-ing") openEditor({ kind: "ing", id });
     else if (act === "new-sup") openEditor({ kind: "sup", id: "", draft: { name: "", store: "", price: "", n: "", unit: "m", next: "", note: "" } });
     else if (act === "edit-sup") openEditor({ kind: "sup", id });
+    else if (act === "dish-kind") { dishKind = el.dataset.v === "once" ? "once" : "box"; rerender(); }
+    else if (act === "edit-dish") openEditor({ kind: "dish", id });
+    else if (act === "dish-tried" && D.dish[id]) store.deleteMeal("dish", id, "Tried " + (D.dish[id].name || "it"));
+    else if (act === "del-dish" && D.dish[id]) store.deleteMeal("dish", id, "Removed " + (D.dish[id].name || "it"));
+    else if (act === "dish-box" && D.dish[id]) { const box = store.dishToBox(id); if (box) openEditor({ kind: "box", id: box }); }
     else if (act === "new-once") openEditor({ kind: "sup", id: "", draft: { name: "", store: "", price: "", next: "", note: "", once: true, bought: "" } });
     else if (act === "once-done" && D.sup[id]) store.saveMeal("sup", { ...D.sup[id], bought: T }, "Bought " + (D.sup[id].name || "it"));
     else if (act === "once-back" && D.sup[id]) store.saveMeal("sup", { ...D.sup[id], bought: "" }, (D.sup[id].name || "It") + " is back on the list");
     else if (act === "bought-toggle") { showBought = !showBought; rerender(); }
     else if (act === "sup-done" && D.sup[id]) { const next = M.nextAfter(T, D.sup[id]); store.saveMeal("sup", { ...D.sup[id], next }, D.sup[id].name + ": next " + fmtDue(next, T)); }
+  });
+  // To try：回车 / Add = 加；粘进来的是好几行就一行一道（输入框自己会把换行吃掉）
+  on(document, "submit", ".dish-add", (e, form) => {
+    e.preventDefault();
+    if (!form.name.value.trim()) { form.name.focus(); return; }
+    addDishes(form, form.name.value);
+  });
+  on(document, "paste", ".dish-add [name=name]", (e, el) => {
+    const text = e.clipboardData?.getData("text") || "";
+    if (!/\n/.test(text.trim())) return;
+    e.preventDefault();
+    addDishes(el.form, text);
   });
   // 卡片、表格行、日子用键盘也能打开
   on(document, "keydown", ".meals [role=button], .meals tr[data-act]", (e, el) => { if (e.key === "Enter" && e.target === el) el.click(); });
@@ -634,6 +694,7 @@ export function initMeals(rerender) {
       closeModal();
       store.deleteMeal(kind, id, "Deleted " + (row.name || "it"));
     }
+    else if (act === "dish-set-kind") update({ kind: el.dataset.v === "box" ? "box" : "once" });
     else if (act === "box-slot") update({ slot: el.dataset.v });
     else if (act === "box-level") update({ level: el.dataset.v });
     else if (act === "ing-level") update({ level: el.dataset.v });

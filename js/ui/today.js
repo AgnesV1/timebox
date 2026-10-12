@@ -12,6 +12,7 @@ import * as F from "../friends.js";
 import * as I from "../ideas.js";
 import * as GR from "../groups.js";
 import * as reading from "../reading.js";
+import * as Meal from "../meals.js";
 import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
 import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickTarget, segStyle, lineInfo, toast, STATUS } from "./common.js";
@@ -126,6 +127,7 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
     (open && meetable(t) ? taskMeetHTML(t.id) : "") +
     (form ? logFormHTML(c, t, list) : "") +
     (want ? finishHTML(t, want) : "") +
+    (open && !phone && canDish(t) ? dishesHTML(t) : "") +
     (why && open ? '<input class="reason" data-act="reason" data-keep="reason-' + t.id + '" placeholder="Why?" value="' + esc(t.reason || "") + '">' : "") +
     (why && !open && t.reason ? '<p class="why">' + esc(t.reason) + "</p>" : "") +
     "</div></div>";
@@ -170,6 +172,20 @@ function noticesHTML(c) {
     h += '<div class="note warn"><p><b>' + (use.full ? "This device is full." : "Storage on this device runs out in about " + Math.max(1, Math.round(use.daysLeft)) + " days.") + '</b> Archive older tasks to make room.</p><a class="link" href="#settings">Settings → Storage</a></div>';
   }
   return h;
+}
+
+// 做完的 Leisure / Friends 任务（能从灵感池里挑的那几个大类）底下：记这一顿吃了什么（电脑）。一家可以记好几道；
+// 记下的进 Meals → Boxes 页的 To try，带着任务的名字和日子（只是抄过去的字，和灵感池、和这条任务以后怎么变都没关系）
+const dishOpen = new Set();   // 点开了「+ What I had」的任务
+const canDish = (t) => (t.status === "done" || t.status === "partial") && GR.ideasOf(store.groupByName(store.groupOf(t)));
+function dishesHTML(t) {
+  const list = Meal.dishesOf(store.meals(), t.id), id = esc(t.id);
+  if (!list.length && !dishOpen.has(t.id)) return '<button type="button" class="link dish-more" data-act="dish-open">+ What I had</button>';
+  return '<div class="dish-had"><form class="dish-quick" data-task="' + id + '" autocomplete="off"><span>What did you have?</span>' +
+    '<input name="name" data-keep="dishq-name-' + id + '" placeholder="Dish" aria-label="Dish"><input name="note" data-keep="dishq-note-' + id + '" placeholder="Note" aria-label="Note">' +
+    '<button class="btn" type="submit">Add</button></form>' +
+    (list.length ? '<ul class="dish-got">' + list.map((d) => "<li><b>" + esc(d.name) + "</b>" + (d.note ? "<span>" + esc(d.note) + "</span>" : "") +
+      '<button type="button" data-act="dish-x" data-did="' + esc(d.id) + '" aria-label="Remove ' + esc(d.name) + '">×</button></li>').join("") + '</ul><p class="msub">Saved under Meals → Boxes → To try.</p>' : "") + "</div>";
 }
 
 // 加任务框选的那个大类能不能从灵感池里挑（Settings → Projects 的 Ideas 一列；默认 Leisure 和 Friends）
@@ -312,6 +328,8 @@ export function initToday(rerender) {
     else if (act === "time-more") { logOpen.add(id); rerender(); }
     else if (act === "time-log") logFromRow(el.closest(".row"));
     else if (act === "tomorrow") store.toTomorrow(id);
+    else if (act === "dish-open") { dishOpen.add(id); rerender(); requestAnimationFrame(() => setTimeout(() => document.querySelector('.dish-quick[data-task="' + CSS.escape(id) + '"] [name=name]')?.focus(), 0)); }
+    else if (act === "dish-x") { const d = store.meals().dish[el.dataset.did]; if (d) store.deleteMeal("dish", d.id, "Removed " + (d.name || "it")); }
     else if (act === "fin-later") { finishing = null; reading.notYet(id); rerender(); }
     else if (act === "fin-mark" || act === "fin-kind") {
       const t = store.get("tasks", id), w = t && reading.wantOf(t.title), tab = readTab(w), v = el.dataset.v;
@@ -359,6 +377,19 @@ export function initToday(rerender) {
     if (box) box.checked = store.planDeep(el.value);
     addTarget[el.form.dataset.add] = el.value;
     rerender();
+  });
+
+  // 记这一顿吃了什么：回车 / Add = 加一道，接着还能加
+  on(document, "submit", ".dish-quick", (e, form) => {
+    e.preventDefault();
+    const t = store.get("tasks", form.dataset.task);
+    if (!t || !form.name.value.trim()) { form.name.focus(); return; }
+    const rows = Meal.parseDishes(form.name.value, Object.values(store.meals().dish));
+    if (!rows.length) { toast("Already on your To try list"); return; }
+    if (rows.length === 1 && !rows[0].note) rows[0].note = form.note.value.trim();
+    store.addDishes(rows, { kind: "once", from: t.title, date: t.date, taskId: t.id });
+    form.name.value = ""; form.note.value = "";
+    form.name.focus();
   });
 
   // 标题框底下的候选：边打边筛；点一条 = 填进标题框（按下去时不让输入框丢焦点，不然候选先收起来、点不着）

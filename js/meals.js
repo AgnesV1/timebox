@@ -4,6 +4,7 @@
 //   每天直接放几个 Box；每周 High 的 Box 有个限额（分配，不是算数）
 //   东西分类（肉 / 菜 / 碳水 / 常驻 / 零食）；Box 里可以放「随便哪种肉」（Any meat）：买的时候再挑，等级和价钱按这一类估
 //   购物单：这周哪几天要用到某样东西 ÷ 一次买够几天 = 买几次；之前勾了「买了」的会往后顶掉几天（米这种一买吃一个月的不会每周都出现）
+//   To try：在外面吃过、想自己做的菜，分「打算做成 Box 的」和「只试一次的」（见下面 toTry）
 //   Restock：规律要换 / 要补的非食物（维生素、牙刷头、手机）：价格 + 周期 + 下次哪天，按月看接下来要花的钱
 // 数据从 store.meals() 来：{ ing, box, week, days }，days 是 日期 → {boxes} / {off}。这里不碰 store，测试直接喂数据。
 
@@ -289,6 +290,39 @@ export function fillFromRough(D, start, w, from = start) {
     while (day.length < 3 && bySlot[""]?.length) day.push(bySlot[""].shift());
     if (!day.length) break;
     out[date] = { boxes: day };
+  }
+  return out;
+}
+
+// ---------- To try：在外面吃过、想自己做的菜（Boxes 页底下） ----------
+// 一道：{ name, note, kind, from, date, taskId, order }。两种：box = 打算做成备餐的 Box；once = 只试一次（没写就算这种）
+
+export const DISH_KINDS = [["box", "For meal prep"], ["once", "Try once"]];
+export const dishKind = (d) => (d?.kind === "box" ? "box" : "once");
+
+// → { box: [...], once: [...] }，新加的在前
+export function toTry(D) {
+  const all = Object.values(D.dish || {}).sort((x, y) => (Number(y.order) || 0) - (Number(x.order) || 0) || byName(x, y));
+  return { box: all.filter((d) => dishKind(d) === "box"), once: all.filter((d) => dishKind(d) === "once") };
+}
+
+// 某条任务记过的那几道（照记的先后）
+export const dishesOf = (D, taskId) => (taskId ? Object.values(D.dish || {}).filter((d) => d.taskId === taskId).sort((x, y) => (Number(x.order) || 0) - (Number(y.order) || 0)) : []);
+
+// 打进来 / 粘进来的几行 → [{ name, note }]：一行一道，行首的 - • 1. 去掉；「菜名 — 备注」「菜名：备注」拆开；
+// 清单里已经有的（不分大小写）、这次重复的不再加
+export function parseDishes(text, have = []) {
+  const key = (v) => String(v || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const seen = new Set(have.map((d) => key(d.name)));
+  const out = [];
+  for (const raw of String(text || "").split(/\r?\n/)) {
+    const line = raw.replace(/^\s*(?:[-•*·]|\d+[.)、])\s*/, "").trim();
+    if (!line) continue;
+    const m = /^(.+?)(?:\s+[—–-]\s+|\s*[:：]\s*)(.+)$/.exec(line);
+    const name = (m ? m[1] : line).trim(), note = m ? m[2].trim() : "";
+    if (!name || seen.has(key(name))) continue;
+    seen.add(key(name));
+    out.push({ name, note });
   }
   return out;
 }

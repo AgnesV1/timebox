@@ -1,5 +1,7 @@
 // Friends 页（电脑）：People 表（搜索 + 筛选）、Recent（最近的记录）、右边 To do（谁、做什么、哪天）。
 // 每个人的资料有哪些格子是自己定的：右上齿轮 → Fields，一行一个；表格里手动加的列也会出现。
+// 特别的日子：点开一个人，Dates 那块记生日、哪几个节要问候、自己的关键日子；页面右边 Coming up 列接下来的，
+// 到了日子点一下名字 = 在他的记录里记一条。Gift 字段填了东西的人，生日那条带 🎁。
 // 已经记在别的表格里的人：People 那块右上角 Import，整片粘进来。带着表头那一行（Name、各字段的名字）就按表头对列，
 // 没带就按字段的顺序；不算资料的列里「5.17 一句话」是一次记录。
 // 还有「和谁」那一小块（withHTML）：今天页点开的任务行、加任务框、任务编辑框都用它，手机上也有。
@@ -7,7 +9,8 @@
 import * as store from "../store.js";
 import * as F from "../friends.js";
 import { esc, on, icon } from "../dom.js";
-import { fmtShort } from "../dates.js";
+import { fmtShort, MONTHS } from "../dates.js";
+import { toast } from "./common.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
 
 let q = "";                 // 搜索
@@ -17,6 +20,7 @@ let td = "", seen = "";     // 两个现成的筛选：有没有要做的事、�
 let editing = null;         // 弹出来的：{ kind: "friend" | "meet" | "fields", id, draft }
 let doneFor = "";           // To do 里正在记「做完了」的那个人
 let newFor = "";            // 正在当场新建一个人的那一块（key）
+let upSpan = 30;            // Coming up 往后看多少天：30 / 364（一整年少一天，免得今天的生日明年那次也冒出来）
 const drafts = new Map();   // 还没存的「和谁」：加任务框 add:<日期>、新记录 meet:new
 let redraw = () => {};
 
@@ -122,6 +126,18 @@ function todoHTML(t, T) {
     (t.list.length ? '<ul class="ftodo">' + t.list.map(row).join("") + "</ul>" : '<p class="empty">Nothing to do. Write a “Next” on a person and it shows up here.</p>') + "</section>";
 }
 
+// 接下来的日子：同一天同一件事的人排一行，点名字 = 做了（在他的记录里记一条），再点 = 其实没做
+function comingHTML(c) {
+  const up = F.comingUp(store.friends(), store.friendSpecial(), c.today, { ahead: upSpan, back: 7 }, store.occasionDone);
+  const seg = '<span class="seg">' + [[30, "30 days"], [364, "Year"]].map(([v, l]) => '<button type="button" data-act="up-span" data-v="' + v + '"' + (upSpan === v ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
+  const chip = (x) => '<button type="button" class="ochip' + (x.done ? " done" : "") + '" data-act="oc-toggle" data-oc="' + esc(x.id) + '" data-friend="' + esc(x.friend.id) + '" data-note="' + esc(x.label + (x.gift ? " (gift)" : "")) +
+    '" aria-pressed="' + x.done + '" title="' + (x.done ? "Done — click to undo" : "Click when it's done") + '">' + (x.done ? "✓ " : "") + esc(x.friend.name || "Untitled") + (x.gift ? ' <span class="og">🎁 ' + esc(x.gift) + "</span>" : "") + "</button>";
+  const row = (g) => '<li class="' + (g.late ? "late" : "") + '"><div class="oc-head"><b class="num">' + fmtShort(g.date) + "</b><span>" + esc(g.label) + "</span><small>" + F.ago(g.date, c.today) + '</small></div><div class="oc-people">' + g.items.map(chip).join("") + "</div></li>";
+  return '<section class="card"><header class="fr-head"><h3>Coming up</h3>' + (up.due ? '<span class="msub">' + up.due + " soon</span>" : "") + seg + "</header>" +
+    (up.groups.length ? '<ul class="fup">' + up.groups.map(row).join("") + "</ul>"
+      : '<p class="empty">Nothing in the next ' + (upSpan > 31 ? "year" : "30 days") + ". Open a person to add a birthday, greetings or a key date.</p>") + "</section>";
+}
+
 export function friendsHTML(c) {
   const all = store.friends(), last = store.lastContact(), fields = store.friendFields();
   where = where.filter((w) => fields.includes(w.field));
@@ -130,23 +146,46 @@ export function friendsHTML(c) {
     '<button type="button" class="btn cta" data-act="new-friend">' + icon("plus") + " Person</button>" +
     '<button type="button" class="btn" data-act="new-meet">' + icon("plus") + " Catch-up</button>" +
     '<button type="button" class="icon-btn" data-act="fr-fields" title="Fields" aria-label="Fields">' + icon("settings") + "</button></div></header>" +
-    '<div class="fr-grid"><div class="fr-main">' + peopleHTML(all, shown, fields, last, c.today) + recentHTML(c.today) + '</div><aside class="fr-side">' + todoHTML(F.todo(all, c.today), c.today) + "</aside></div></div>";
+    '<div class="fr-grid"><div class="fr-main">' + peopleHTML(all, shown, fields, last, c.today) + recentHTML(c.today) + '</div><aside class="fr-side">' + comingHTML(c) + todoHTML(F.todo(all, c.today), c.today) + "</aside></div></div>";
 }
 
-// 侧栏角标：到今天为止该做的有几个
-export const friendsDue = (today) => F.todo(store.all("friends"), today).due;
+// 侧栏角标：到今天为止该做的事 + 三天之内（含过了没做的）的日子
+export const friendsDue = (today) => F.todo(store.all("friends"), today).due + F.comingUp(store.all("friends"), store.friendSpecial(), today, { ahead: 3, back: 7 }, store.occasionDone).due;
 
 // ---------- 弹出来的三种：一个人、一条记录、字段清单 ----------
+
+// 这个人的特别字段叫什么：字段清单里已经有（不管怎么写的）就用那个，没有就用标准的名字
+const spName = (k) => store.friendSpecial()[k] || F.SPECIAL_NAME[k];
+
+// 一个人的 Dates：生日（年份可以不填）、哪几个节要问候、自己记的关键日子（每年 / 只这一次）
+function datesHTML(f) {
+  const more = f.more || {}, names = store.friendSpecial();
+  const b = F.parseDay(more[spName("birthday")]), greet = F.greetKeys(more[spName("greet")]), list = F.parseDates(more[spName("dates")]);
+  const gift = names.gift ? String(more[names.gift] || "").trim() : "";
+  const opt = (v, l, cur) => '<option value="' + v + '"' + (String(v) === String(cur ?? "") ? " selected" : "") + ">" + l + "</option>";
+  return '<h3 class="sub">Dates</h3><div class="fdates">' +
+    '<div class="fd-row"><span class="fd-l">Birthday</span><span class="fd-bd"><select data-bd="m" aria-label="Birthday month">' + opt("", "Month", b?.m) + MONTHS.map((m, i) => opt(i + 1, m, b?.m)).join("") + "</select>" +
+    '<select data-bd="d" aria-label="Birthday day">' + opt("", "Day", b?.d) + Array.from({ length: 31 }, (_, i) => opt(i + 1, i + 1, b?.d)).join("") + "</select>" +
+    '<input class="num" data-bd="y" inputmode="numeric" maxlength="4" placeholder="year" value="' + (b?.y || "") + '" aria-label="Birth year, optional"></span>' +
+    (gift ? '<span class="fd-gift" title="From the Gift field">🎁 ' + esc(gift) + "</span>" : "") + "</div>" +
+    '<div class="fd-row"><span class="fd-l">Greet on</span><span class="fd-greet">' + F.HOLIDAYS.map((h) => '<label class="fd-chip"><input type="checkbox" data-greet="' + h.key + '"' + (greet.includes(h.key) ? " checked" : "") + "><span>" + esc(h.name) + "</span></label>").join("") + "</span></div>" +
+    '<div class="fd-row top"><span class="fd-l">Key dates</span><div class="fd-keys">' +
+    list.map((x, i) => '<span class="fchip"><b>' + MONTHS[x.m - 1] + " " + x.d + (x.y ? ", " + x.y : "") + "</b> " + esc(x.label) + (x.y ? "" : " <small>every year</small>") + '<button type="button" data-act="kd-x" data-i="' + i + '" aria-label="Remove this date">×</button></span>').join("") +
+    '<form class="kd-add" autocomplete="off"><input type="date" name="date" aria-label="Date"><input name="label" placeholder="What — graduation, moving day…" aria-label="What">' +
+    '<label class="check"><input type="checkbox" name="yearly"> every year</label><button type="submit" class="btn">Add</button></form></div></div></div>';
+}
 
 function friendEditorHTML() {
   const isNew = !editing.id, f = isNew ? editing.draft : store.get("friends", editing.id);
   if (!f) return "";
-  const fields = store.friendFields(), T = store.today();
+  const sp = store.friendSpecial(), T = store.today();
+  const fields = store.friendFields().filter((k) => k !== sp.birthday && k !== sp.greet && k !== sp.dates);   // 这三个在下面的 Dates 里改
   const st = (id) => store.get("tasks", id)?.status || "";
   const hist = isNew ? [] : store.meets().filter((m) => (m.friends || []).includes(f.id));
   let h = '<div class="friend-editor" data-fid="' + esc(f.id || "") + '"><h2 class="sheet-title">' + (isNew ? "New person" : "Person") + "</h2>" +
     '<label class="field"><span>Name</span><input data-pf="name" value="' + esc(f.name || "") + '" autocomplete="off"></label>' +
     (fields.length ? '<div class="fgrid">' + fields.map((k) => '<label class="field"><span>' + esc(k) + '</span><textarea rows="1" data-more="' + esc(k) + '">' + esc(f.more?.[k] || "") + "</textarea></label>").join("") + "</div>" : "") +
+    datesHTML(f) +
     '<div class="field-row"><label class="field"><span>Next — what to do</span><input data-pf="next" value="' + esc(f.next || "") + '" autocomplete="off"></label>' +
     '<label class="field small"><span>By</span><input type="date" data-pf="nextDate" value="' + esc(f.nextDate || "") + '"></label></div>';
   if (isNew) return h + '<div class="sheet-foot"><span></span><button type="button" class="btn cta" data-act="create-friend">Add</button></div></div>';
@@ -251,6 +290,37 @@ export function initFriends(rerender) {
   // 任务带的那条记录：聊了什么、要记住的，边写边存
   on(document, "input", "[data-tmeet] [data-meet]", (e, el) => store.setTaskMeet(el.closest("[data-tmeet]").dataset.tmeet, { [el.dataset.meet]: el.value }, { quiet: true }));
 
+  // ---- 一个人的 Dates：生日、问候、关键日子。存在他的资料里（三个固定名字的字段），新建的先记在草稿里 ----
+  const person = () => (editing?.kind !== "friend" ? null : editing.id ? store.get("friends", editing.id) : editing.draft);
+  const setSpecial = (which, value) => {
+    const f = person();
+    if (!f) return;
+    const more = { ...(f.more || {}), [spName(which)]: value };
+    if (editing.id) store.saveFriend({ id: f.id, more });
+    else editing.draft.more = more;
+    refreshFriendEditor(true);
+  };
+  on(document, "change", ".friend-editor [data-bd]", (e, el) => {
+    const box = el.closest(".fd-bd"), v = (k) => box.querySelector("[data-bd=" + k + "]").value.trim();
+    const m = Number(v("m")), d = Number(v("d")), y = Number(v("y"));
+    if (!m !== !d) return;   // 月和日只选了一个：等另一个
+    if (!m) { setSpecial("birthday", ""); return; }
+    const day = F.parseDay((y > 1900 && y < 2101 ? y + "-" : "") + m + "-" + d);
+    if (!day) { toast("That date doesn't exist"); return; }
+    setSpecial("birthday", F.formatDay(day));
+  });
+  on(document, "change", ".friend-editor [data-greet]", (e, el) => {
+    setSpecial("greet", F.formatGreet([...el.closest(".fd-greet").querySelectorAll("[data-greet]:checked")].map((x) => x.dataset.greet)));
+  });
+  on(document, "submit", ".friend-editor .kd-add", (e, form) => {
+    e.preventDefault();
+    const day = F.parseDay(form.date.value);
+    if (!day) { form.date.focus(); return; }
+    const list = F.parseDates(person()?.more?.[spName("dates")]);
+    list.push({ ...day, y: form.yearly.checked ? 0 : day.y, label: form.label.value.trim().replace(/\s*[;\n]+\s*/g, ", ") });
+    setSpecial("dates", F.formatDates(list));
+  });
+
   // ---- 页面 ----
   on(document, "click", ".friends [data-act], .friend-editor [data-act], .meet-editor [data-act], .import-editor [data-act]", (e, el) => {
     if (el.closest("[data-with]")) return;
@@ -263,6 +333,9 @@ export function initFriends(rerender) {
     else if (act === "fr-import") openEditor({ kind: "import" }, "textarea");
     else if (act === "where-x") { where.splice(Number(el.dataset.i), 1); rerender(); }
     else if (act === "fr-clear") { q = ""; where = []; pending = null; td = ""; seen = ""; rerender(); }
+    else if (act === "up-span") { upSpan = Number(el.dataset.v) || 30; rerender(); }
+    else if (act === "oc-toggle") store.toggleOccasion(el.dataset.oc, el.dataset.friend, el.dataset.note);
+    else if (act === "kd-x") { const list = F.parseDates(person()?.more?.[spName("dates")]); list.splice(Number(el.dataset.i), 1); setSpecial("dates", F.formatDates(list)); }
     else if (act === "todo-done") { doneFor = id; rerender(); afterRender(() => document.querySelector(".fdone input")?.select()); }
     else if (act === "done-cancel") { doneFor = ""; rerender(); }
     else if (act === "create-friend") {

@@ -7,6 +7,7 @@ import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, startOfWeek, WEEKDAYS } from "../dates.js";
 import * as S from "../stats.js";
+import * as F from "../friends.js";
 import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
 import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickTarget, segStyle, lineInfo, toast, STATUS } from "./common.js";
@@ -121,7 +122,7 @@ function overdueHTML(c) {
     '<div class="od-actions"><button type="button" class="btn primary" data-act="spread">Spread them out</button><button type="button" class="btn" data-act="all-today">All to today</button></div></section>';
 }
 
-// 两种提醒（电脑今天页右边）：上周成长 / Relax 的时间太少或太多；这台设备的存储快满了
+// 三种提醒（电脑今天页右边）：上周成长 / Relax 的时间太少或太多；今明两天谁有生日、该问候谁；这台设备的存储快满了
 function noticesHTML(c) {
   let h = "";
   const start = addDays(startOfWeek(c.today, store.prefs().weekStartsOn), -7), end = addDays(start, 6);
@@ -132,6 +133,10 @@ function noticesHTML(c) {
         '<button type="button" class="link" data-act="week-seen" data-week="' + start + '">Got it</button></div>';
     }
   }
+  // 今天、明天的生日 / 问候 / 关键日子（还没做的）
+  const soon = F.comingUp(store.friends(), store.friendSpecial(), c.today, { ahead: 1, back: 0 }, store.occasionDone).groups
+    .flatMap((g) => g.items.filter((x) => !x.done).map((x) => (x.friend.name || "Someone") + " — " + g.label + (g.date === c.today ? "" : " tomorrow") + (x.gift ? " 🎁" : "")));
+  if (soon.length) h += '<div class="note"><p><b>Friends</b> — ' + soon.map(esc).join("; ") + '.</p><a class="link" href="#friends">Open</a></div>';
   const use = store.storage();
   if (use.warn) {
     h += '<div class="note warn"><p><b>' + (use.full ? "This device is full." : "Storage on this device runs out in about " + Math.max(1, Math.round(use.daysLeft)) + " days.") + '</b> Archive older tasks to make room.</p><a class="link" href="#settings">Settings → Storage</a></div>';

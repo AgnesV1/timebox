@@ -1045,6 +1045,17 @@ export function importFriends(rows, added = []) {
   }, "Imported " + rows.length + (rows.length === 1 ? " person" : " people"));
 }
 
+// 特别的日子（生日、过节问候、关键日子，见 js/friends.js）：字段清单里哪个是哪个
+export const friendSpecial = () => F.specialFields(friendFields());
+export const occasionDone = (id) => Boolean(get("meets", id));
+// 到了日子点一下：在这个人的记录里记一条（id 是固定的，一年里这个日子只记一次）；再点一下 = 其实没做，把那条删掉
+export function toggleOccasion(id, friendId, note) {
+  if (get("meets", id)) { change(() => drop("meets", id), "Marked as not done"); return; }
+  const f = get("friends", friendId);
+  if (!f) return;
+  change(() => put("meets", { id, date: today(), friends: [friendId], note: String(note || ""), watch: "", taskId: "" }), "Noted for " + (f.name || "them"));
+}
+
 function moveMeet(fromTask, toTask, date) {
   const m = get("meets", F.meetId(fromTask));
   if (!m) return;

@@ -1214,7 +1214,7 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 /* ---------- Friends 页 ---------- */
 .friends .card { margin-bottom: 10px; padding: 12px 14px; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); }
 .fr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
-@media (max-width: 1100px) { .fr-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .fr-grid { grid-template-columns: 1fr; } .fr-side { order: -1; } }
 .fr-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
 .fr-head h3 { margin: 0; font: 700 14px var(--display); }
 .fr-head .fr-import { margin-left: auto; font-size: 12px; }
@@ -1257,6 +1257,43 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 .fdone input { flex: 1; min-width: 0; padding: 5px 9px; border: var(--b-ctl); font-size: 13px; }
 .fdone .btn { padding: 5px 12px; font-size: 12.5px; }
 .fdone .link { font-size: 12px; }
+/* 一个人的 Dates（生日、问候、关键日子）和页面右边的 Coming up */
+.fdates { display: grid; gap: 8px; margin-bottom: 12px; }
+.fd-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.fd-row.top { align-items: flex-start; }
+.fd-l { flex: 0 0 76px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.fd-row.top .fd-l { padding-top: 6px; }
+.fd-bd { display: inline-flex; gap: 5px; }
+.fd-bd select { padding: 5px 24px 5px 9px; font-size: 13px; }
+.fd-bd input { width: 66px; padding: 5px 8px; border: var(--b-ctl); font-size: 13px; text-align: center; }
+.fd-gift { font-size: 12.5px; color: var(--muted); }
+.fd-greet { display: inline-flex; flex-wrap: wrap; gap: 5px; }
+.fd-chip { cursor: pointer; }
+.fd-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.fd-chip span { display: inline-block; padding: 3px 10px; border: var(--b-ctl); border-radius: 999px; background: var(--bg); font-size: 12px; font-weight: 600; color: var(--muted); }
+.fd-chip input:checked + span { border-color: var(--edge); background: var(--accent); color: var(--accent-ink); }
+.fd-chip input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
+.fd-keys { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.fd-keys .fchip small { color: var(--muted); }
+.kd-add { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.kd-add input[name="label"] { flex: 1 1 150px; min-width: 0; }
+.kd-add input, .kd-add .btn { padding: 5px 10px; font-size: 13px; }
+.kd-add .check { margin: 0; font-size: 12.5px; white-space: nowrap; }
+.fr-head .seg { margin-left: auto; align-self: center; }
+.fr-head .seg button { padding: 2px 9px; font-size: 12px; }
+.fup { margin: 0; padding: 0; list-style: none; }
+.fup li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.fup li:last-child { border-bottom: 0; }
+.oc-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; font-size: 13px; }
+.oc-head b { flex: 0 0 48px; font-size: 12px; }
+.oc-head span { font-weight: 700; }
+.oc-head small { margin-left: auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.fup li.late .oc-head small { color: var(--warn); }
+.oc-people { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 56px; }
+.ochip { padding: 3px 10px; border: var(--b-ctl); border-radius: 999px; background: var(--bg); font-size: 12px; font-weight: 600; text-align: left; }
+.ochip:hover { border-color: var(--edge); }
+.ochip.done { background: var(--surface); color: var(--muted); text-decoration: line-through; }
+.ochip .og { font-weight: 500; color: var(--muted); }
 .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
 .fgrid textarea { min-height: 34px; resize: vertical; }
 @media (max-width: 560px) { .fgrid { grid-template-columns: 1fr; } }

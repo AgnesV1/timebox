@@ -209,3 +209,56 @@ test("friends: importing fills people in by name and never doubles anything", ()
   assert.deepEqual(store.friendFields(), ["Field A", "Field B", "Field C", "Town"]);
   assert.deepEqual(store.friends().find((f) => f.name === "Fay").more, { "Field B": "x", Town: "Lyon" });
 });
+
+test("friends: birthdays, greetings and key dates", () => {
+  assert.deepEqual([F.lunarEve(2026), F.lunarEve(2027), F.lunarEve(2028), F.lunarEve(2030)], ["2026-02-16", "2027-02-05", "2028-01-25", "2030-02-02"]);
+  assert.match(F.lunarEve(2045), /^2045-0[12]-\d\d$/, "beyond the table it is worked out");
+  assert.deepEqual(["3.14", "03-14", "3/14", "1995-03-14", "19950314", "2.30", "13.1", "soon", ""].map((s) => F.formatDay(F.parseDay(s))), ["03-14", "03-14", "03-14", "1995-03-14", "1995-03-14", "", "", "", ""]);
+  const dates = F.parseDates("06-20 graduation; 2027-5-1 moving day\n7.4;nonsense here");
+  assert.deepEqual(dates, [{ y: 0, m: 6, d: 20, label: "graduation" }, { y: 2027, m: 5, d: 1, label: "moving day" }, { y: 0, m: 7, d: 4, label: "" }]);
+  assert.equal(F.formatDates(dates), "06-20 graduation; 2027-05-01 moving day; 07-04");
+  assert.deepEqual(F.greetKeys("christmas, New years eve、Teachers' Day, Easter"), ["teachers", "christmas", "new-year-eve"]);
+  assert.equal(F.formatGreet(["lunar-eve", "christmas"]), "Christmas, Lunar New Year's Eve");
+  assert.deepEqual(F.specialFields(["Field A", "birthday", "GIFT", "Key Dates", "Greetings"]), { birthday: "birthday", greet: "Greetings", dates: "Key Dates", gift: "GIFT" });
+  assert.deepEqual(F.specialFields(["Field A"]), { birthday: "", greet: "", dates: "", gift: "" });
+
+  const names = { birthday: "Birthday", greet: "Greetings", dates: "Key dates", gift: "Gift" };
+  const ana = { id: "a", name: "Ana", more: { Birthday: "1995-10-25", Gift: "tea set", Greetings: "Christmas, Lunar New Year's Eve", "Key dates": "10-20 thesis day; 2026-11-01 moving" } };
+  const bo = { id: "b", name: "Bo", more: { Birthday: "02-29", Greetings: "Christmas" } };
+  const got = (f, from, to) => F.occasions(f, names, from, to).map((o) => o.date + " " + o.label + (o.gift ? " [" + o.gift + "]" : "") + " " + o.id);
+  assert.deepEqual(got(ana, "2026-10-01", "2027-02-28").sort(), [
+    "2026-10-20 thesis day oc:a:d1020-thesisday:2026", "2026-10-25 Birthday [tea set] oc:a:birthday:2026", "2026-11-01 moving oc:a:d1101-moving:2026",
+    "2026-12-25 Christmas oc:a:christmas:2026", "2027-02-05 Lunar New Year's Eve oc:a:lunar-eve:2027"
+  ]);
+  assert.deepEqual(got(bo, "2027-02-01", "2028-03-01"), ["2027-02-28 Birthday oc:b:birthday:2027", "2028-02-29 Birthday oc:b:birthday:2028", "2027-12-25 Christmas oc:b:christmas:2027"], "Feb 29 falls on the 28th in other years");
+  assert.deepEqual(got({ id: "c", name: "Cy", more: {} }, "2026-01-01", "2026-12-31"), []);
+  assert.deepEqual(F.occasions(ana, F.specialFields([]), "2026-01-01", "2026-12-31"), [], "no such fields, nothing to show");
+
+  // 接下来 30 天；过了没做的留 7 天；同一天同一件事的人排在一起
+  const done = new Set(["oc:a:d1020-thesisday:2026"]);
+  const up = F.comingUp([bo, ana, { id: "d", name: "Di", more: { Birthday: "10-25" } }], names, "2026-10-22", { ahead: 30, back: 7 }, (id) => done.has(id));
+  assert.deepEqual(up.groups.map((g) => g.date + " " + g.label + ": " + g.items.map((x) => x.friend.name + (x.done ? "✓" : "")).join(",")), ["2026-10-25 Birthday: Ana,Di", "2026-11-01 moving: Ana"], "a past one that's done is gone");
+  assert.equal(up.due, 2, "the two birthdays are within three days");
+  const late = F.comingUp([ana], names, "2026-10-22", { ahead: 5, back: 7 }, () => false);
+  assert.deepEqual(late.groups.map((g) => g.label + (g.late ? "!" : "")), ["thesis day!", "Birthday"]);
+  const year = F.comingUp([ana, bo], names, "2026-10-22", { ahead: 365, back: 0 }, () => false);
+  assert.deepEqual(year.groups.find((g) => g.label === "Christmas").items.map((x) => x.friend.name), ["Ana", "Bo"]);
+});
+
+test("friends: ticking a day off logs it once, and can be undone", () => {
+  for (const f of store.friends()) store.deleteFriend(f.id);
+  store.setSetting("friend-fields", ["Field A", "gift"]);
+  const T = store.today(), md = T.slice(5);
+  const gil = store.saveFriend({ name: "Gil", more: { gift: "tea", Birthday: md, Greetings: "Christmas" } });
+  assert.deepEqual(store.friendSpecial(), { birthday: "Birthday", greet: "Greetings", dates: "", gift: "gift" }, "the three date fields are found once someone has them; Gift is the user's own");
+  assert.deepEqual(store.friendFields(), ["Field A", "gift", "Birthday", "Greetings"]);
+  const up = () => F.comingUp(store.friends(), store.friendSpecial(), T, { ahead: 3, back: 0 }, store.occasionDone);
+  const [oc] = up().groups[0].items;
+  assert.deepEqual([oc.label, oc.gift, oc.done, up().due], ["Birthday", "tea", false, 1]);
+  store.toggleOccasion(oc.id, gil, "Birthday (gift)");
+  assert.deepEqual([up().groups[0].items[0].done, up().due], [true, 0]);
+  assert.deepEqual(store.meets().filter((m) => m.friends.includes(gil)).map((m) => m.date + " " + m.note), [T + " Birthday (gift)"], "it is in their history");
+  assert.equal(store.lastContact()[gil], T);
+  store.toggleOccasion(oc.id, gil, "Birthday (gift)");
+  assert.deepEqual([up().groups[0].items[0].done, store.meets().length], [false, 0]);
+});

@@ -1,7 +1,8 @@
 // 灵感池的纯计算（Projects 页的 Ideas）：想去哪玩、想吃什么、想参加什么活动。没有时长，大多也没有期限。
 // 一条灵感：{ id, text, kind: "out"（出门：去哪玩、什么活动）| "eat" | ""（还没归类）, date: "YYYY-MM-DD" | ""（少数才有）,
-//            by: true = 最晚这天 / 不是 = 就在这天, note, taskId（挑进了哪条任务）, doneAt（那条任务做完的那天）, order }
-// 挑进某天的任务 = 在池子里划掉；任务做完 = 去过了；任务标了 Later / Drop、或者删了 = 回到池子。只算数，不碰页面和存储。
+//            by: true = 最晚这天 / 不是 = 就在这天, note, taskId（挑进了哪条任务）, order }
+// 挑进某天的任务 = 在池子里划掉；任务标了 Later / Drop、或者删了 = 回到池子；
+// 任务做完 = 去过了，这条就不要了：马上不再显示，过一周删掉（这一周里取消 Done、改成 Drop，它还回得来）。只算数，不碰页面和存储。
 
 import { addDays, fmtShort, weekday, WEEKDAYS } from "./dates.js";
 
@@ -15,19 +16,26 @@ export const sameText = (a, b) => low(a) === low(b);
 const live = (task) => Boolean(task) && task.status !== "later" && task.status !== "drop";
 const fin = (task) => task.status === "done" || task.status === "partial";
 
-// "done" 去过了 / "planned" 排进某天了 / "missed" 有日子、已经过了、没排 / "open" 在池子里
+// "done" 去过了（不再显示）/ "planned" 排进某天了 / "missed" 有日子、已经过了、没排 / "open" 在池子里
 export function stateOf(idea, taskOf, today) {
-  if (idea.doneAt) return "done";
   const t = idea.taskId ? taskOf(idea.taskId) : null;
   if (live(t)) return fin(t) ? "done" : "planned";
   return idea.date && idea.date < today ? "missed" : "open";
 }
 
-// 排在哪天 / 哪天去的；还在池子里的是空
+// 排在哪天；还在池子里的是空
 export function dayOf(idea, taskOf) {
-  if (idea.doneAt) return idea.doneAt;
   const t = idea.taskId ? taskOf(idea.taskId) : null;
   return live(t) ? t.date : "";
+}
+
+// 还算数的：去过的不算（查重、数数用）
+export const left = (ideas, taskOf, today) => ideas.filter((i) => stateOf(i, taskOf, today) !== "done");
+
+// 可以删掉的：挂着的任务做完了，而且那条任务已经一周没再动过（now 是毫秒）
+export const KEEP_DONE_DAYS = 7;
+export function stale(ideas, taskOf, now) {
+  return ideas.filter((i) => { const t = i.taskId ? taskOf(i.taskId) : null; return live(t) && fin(t) && now - (Number(t.updated) || 0) > KEEP_DONE_DAYS * 864e5; });
 }
 
 // 「on Sat Oct 17」/「by Oct 25」；没有日子是空
@@ -37,16 +45,14 @@ export const whenText = (idea) => (idea.date ? (idea.by ? "by " : "on " + WEEKDA
 const byDate = (a, b) => (a.date || "9999").localeCompare(b.date || "9999") || (Number(b.order) || 0) - (Number(a.order) || 0);
 const RANK = { open: 0, missed: 1, planned: 2 };
 
-// 整页的样子 → { groups: [{ kind, title, items: [{ idea, state, day }] }], done: [{ idea, day }], open }
+// 整页的样子 → { groups: [{ kind, title, items: [{ idea, state, day }] }], open }（去过的不在里面）
 //   groups：没归类的（Unsorted）在最前，然后照 KINDS 的顺序，空的不列；组里先是还在池子里的，过了日子的、已经排了的沉到后面
-//   done：去过的，最近的在前        open：还能挑的有几条
+//   open：还能挑的有几条
 export function board(ideas, taskOf, today) {
-  const rows = ideas.map((idea) => ({ idea, state: stateOf(idea, taskOf, today), day: dayOf(idea, taskOf) }));
-  const left = rows.filter((r) => r.state !== "done");
+  const rows = ideas.map((idea) => ({ idea, state: stateOf(idea, taskOf, today), day: dayOf(idea, taskOf) })).filter((r) => r.state !== "done");
   const groups = [["", "Unsorted"], ...KINDS].map(([kind, title]) => ({ kind, title,
-    items: left.filter((r) => kindOf(r.idea) === kind).sort((a, b) => RANK[a.state] - RANK[b.state] || byDate(a.idea, b.idea)) })).filter((g) => g.items.length);
-  const done = rows.filter((r) => r.state === "done").sort((a, b) => String(b.day).localeCompare(String(a.day)) || byDate(a.idea, b.idea));
-  return { groups, done, open: left.filter((r) => r.state !== "planned").length };
+    items: rows.filter((r) => kindOf(r.idea) === kind).sort((a, b) => RANK[a.state] - RANK[b.state] || byDate(a.idea, b.idea)) })).filter((g) => g.items.length);
+  return { groups, open: rows.filter((r) => r.state !== "planned").length };
 }
 
 // 快到日子、还没排的：今天起 days 天以内（过了的不算），近的在前

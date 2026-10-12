@@ -5,7 +5,8 @@ import * as GR from "../js/groups.js";
 
 console.warn = () => {};   // 「Can't save on this device」
 const T = "2026-10-12";
-const idea = (x) => ({ id: x.text, kind: "", date: "", by: false, note: "", taskId: "", doneAt: "", order: 0, ...x });
+const DAY = 864e5;
+const idea = (x) => ({ id: x.text, kind: "", date: "", by: false, note: "", taskId: "", order: 0, ...x });
 const tasks = (list) => (id) => list.find((t) => t.id === id) || null;
 
 test("state: in the pool, planned, done, missed", () => {
@@ -16,7 +17,6 @@ test("state: in the pool, planned, done, missed", () => {
   assert.equal(I.stateOf(idea({ text: "x", taskId: "c" }), of, T), "open", "a dropped task puts it back");
   assert.equal(I.stateOf(idea({ text: "x", taskId: "d" }), of, T), "open", "so does Later");
   assert.equal(I.stateOf(idea({ text: "x", taskId: "gone" }), of, T), "open", "and a deleted task");
-  assert.equal(I.stateOf(idea({ text: "x", taskId: "gone", doneAt: "2025-03-01" }), of, T), "done", "done stays done after the task is archived");
   assert.equal(I.stateOf(idea({ text: "x", date: "2026-10-11" }), of, T), "missed");
   assert.equal(I.stateOf(idea({ text: "x", date: T }), of, T), "open", "today isn't missed yet");
   assert.equal(I.dayOf(idea({ text: "x", taskId: "a" }), of), "2026-10-17");
@@ -29,19 +29,28 @@ test("when: on a day, or by a day", () => {
   assert.equal(I.whenText(idea({ text: "x" })), "");
 });
 
-test("board: unsorted first, then by kind; dated first, planned last; done apart", () => {
+test("board: unsorted first, then by kind; dated first, planned last; done ones aren't listed", () => {
   const of = tasks([{ id: "p", date: "2026-10-18", status: "" }, { id: "z", date: "2026-10-05", status: "done" }]);
-  const b = I.board([
+  const list = [
     idea({ text: "pho", kind: "eat", order: 1 }), idea({ text: "omakase", kind: "eat", order: 2 }), idea({ text: "brunch", kind: "eat", date: "2026-10-20", order: 0 }),
     idea({ text: "museum", kind: "out", taskId: "p" }), idea({ text: "leaves", kind: "out", date: "2026-10-25", by: true }), idea({ text: "old fair", kind: "out", date: "2026-10-01" }),
-    idea({ text: "something", kind: "nope" }), idea({ text: "jazz", kind: "out", taskId: "z" }), idea({ text: "zoo", kind: "out", doneAt: "2026-10-09" })
-  ], of, T);
+    idea({ text: "something", kind: "nope" }), idea({ text: "jazz", kind: "out", taskId: "z" })
+  ];
+  const b = I.board(list, of, T);
   assert.deepEqual(b.groups.map((g) => g.title), ["Unsorted", "Outing", "Eat"]);
   assert.deepEqual(b.groups[2].items.map((r) => r.idea.text), ["brunch", "omakase", "pho"], "dated, then newest");
-  assert.deepEqual(b.groups[1].items.map((r) => r.idea.text + ":" + r.state), ["leaves:open", "old fair:missed", "museum:planned"]);
+  assert.deepEqual(b.groups[1].items.map((r) => r.idea.text + ":" + r.state), ["leaves:open", "old fair:missed", "museum:planned"], "jazz is done: gone from the page");
   assert.equal(b.groups[1].items[2].day, "2026-10-18");
-  assert.deepEqual(b.done.map((r) => r.idea.text + " " + r.day), ["zoo 2026-10-09", "jazz 2026-10-05"]);
   assert.equal(b.open, 6);
+  assert.deepEqual(I.left(list, of, T).map((i) => i.text).includes("jazz"), false);
+});
+
+test("stale: done for a week, ready to delete", () => {
+  const now = Date.parse("2026-10-12T12:00:00Z");
+  const of = tasks([{ id: "old", status: "done", updated: now - 8 * DAY }, { id: "new", status: "done", updated: now - 2 * DAY }, { id: "part", status: "partial", updated: now - 30 * DAY },
+    { id: "open", status: "", updated: now - 30 * DAY }, { id: "drop", status: "drop", updated: now - 30 * DAY }]);
+  const list = [idea({ text: "a", taskId: "old" }), idea({ text: "b", taskId: "new" }), idea({ text: "c", taskId: "part" }), idea({ text: "d", taskId: "open" }), idea({ text: "e", taskId: "drop" }), idea({ text: "f", taskId: "gone" }), idea({ text: "g" })];
+  assert.deepEqual(I.stale(list, of, now).map((i) => i.text), ["a", "c"]);
 });
 
 test("soon: dated, within a week, not planned yet", () => {
@@ -52,9 +61,9 @@ test("soon: dated, within a week, not planned yet", () => {
 });
 
 test("match: what you can pick while adding a task", () => {
-  const of = tasks([{ id: "p", date: "2026-10-14", status: "" }]);
+  const of = tasks([{ id: "p", date: "2026-10-14", status: "" }, { id: "z", date: "2026-10-01", status: "done" }]);
   const list = [idea({ text: "Pho place", order: 1 }), idea({ text: "Photo walk", date: "2026-10-20", order: 2 }), idea({ text: "Phantom show", taskId: "p" }),
-    idea({ text: "Old pho pop-up", date: "2026-10-01" }), idea({ text: "Jazz night", order: 3 }), idea({ text: "Zoo", doneAt: "2026-10-01" })];
+    idea({ text: "Old pho pop-up", date: "2026-10-01" }), idea({ text: "Jazz night", order: 3 }), idea({ text: "Zoo", taskId: "z" })];
   assert.deepEqual(I.match(list, of, T, "PHO").map((i) => i.text), ["Photo walk", "Pho place", "Old pho pop-up"]);
   assert.deepEqual(I.match(list, of, T).map((i) => i.text), ["Photo walk", "Jazz night", "Pho place", "Old pho pop-up"], "nothing typed: all that's left");
   assert.equal(I.match(list, of, T, "", 2).length, 2);
@@ -91,9 +100,10 @@ test("store: picked, done, dropped, deleted, moved, undone", async () => {
   assert.equal(store.ideaOfTask(t).id, a);
 
   store.setStatus(t, "done");
-  assert.equal(store.ideaOf(a).doneAt, today, "done stamps the day");
+  assert.equal(state(a), "done");
+  store.settleIdeas();
+  assert.ok(store.ideaOf(a), "just done: kept for a week in case it's undone");
   store.setStatus(t, "done");   // 再点一次 = 取消
-  assert.equal(store.ideaOf(a).doneAt, "");
   assert.equal(state(a), "planned");
 
   store.setStatus(t, "drop");
@@ -111,8 +121,6 @@ test("store: picked, done, dropped, deleted, moved, undone", async () => {
   store.undo(undo);
   assert.equal(store.ideaOf(a).taskId, moved, "undo brings the link back with the task");
 
-  store.setStatus(moved, "partial");
-  assert.equal(state(a), "done");
   store.unpickIdea(a);
   assert.equal(state(a), "open");
   assert.ok(of(moved), "putting it back leaves the task alone");
@@ -121,19 +129,22 @@ test("store: picked, done, dropped, deleted, moved, undone", async () => {
   assert.equal(store.ideaOf(a), null);
 });
 
-test("store: a status that arrives from the Sheet is settled after the pull", async () => {
-  const store = await import("../js/store.js?ideas-pull");
-  const id = store.saveIdea({ text: "Zoo" });
-  const t = store.addTask({ title: "Zoo", est: 60, date: "2026-10-10" });
+test("store: an idea whose task was done a week ago is deleted", async () => {
+  const store = await import("../js/store.js?ideas-gone");
+  const realNow = Date.now;
+  const id = store.saveIdea({ text: "Zoo" }), other = store.saveIdea({ text: "Aquarium" });
+  const t = store.addTask({ title: "Zoo", est: 60 });
   store.pickIdea(id, t);
-  const row = store.get("tasks", t);
-  store.applyPull({ tables: { tasks: [{ ...row, status: "done", updated: row.updated + 10 }] } }, Date.now());
-  assert.equal(store.ideaOf(id).doneAt, "", "the pull itself doesn't run the hook");
-  store.settleIdeas();
-  assert.equal(store.ideaOf(id).doneAt, "2026-10-10");
-  // 一年以后任务归档了、从设备上拿走：还是去过的
-  store.applyPull({ tables: { settings: store.all("settings") } }, Date.now(), { full: true });
-  assert.equal(store.get("tasks", t), null);
-  store.settleIdeas();
-  assert.equal(I.stateOf(store.ideaOf(id), (x) => store.get("tasks", x), store.today()), "done");
+  store.setStatus(t, "done");
+  try {
+    Date.now = () => realNow() + 6 * DAY;
+    store.settleIdeas();
+    assert.ok(store.ideaOf(id), "six days on: still there");
+    Date.now = () => realNow() + 8 * DAY;
+    store.settleIdeas();
+    assert.equal(store.ideaOf(id), null, "eight days on: gone");
+    assert.equal(store.get("settings", "idea:" + id), null);
+    assert.ok(store.ideaOf(other), "the rest of the pool is untouched");
+    assert.ok(store.get("tasks", t), "and so is the task");
+  } finally { Date.now = realNow; }
 });

@@ -1526,7 +1526,7 @@ select.open { border-color: var(--edge); }
 .idea-row:hover .idea-acts, .idea-row:focus-within .idea-acts { opacity: 1; }
 .idea-acts .link { font-size: 12.5px; }
 .idea-row .idea-kinds .chip { padding: 1px 8px; font-size: 11.5px; color: var(--muted); }
-.idea-row.planned .idea-text, .idea-row.done .idea-text { font-weight: 500; color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.idea-row.planned .idea-text { font-weight: 500; color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .idea-row.missed .idea-text { color: var(--muted); }
 .idea-row.missed .idea-when { color: var(--warn); }
 .idea-row.editing { gap: 8px; padding: 8px 0; }
@@ -1536,7 +1536,6 @@ select.open { border-color: var(--edge); }
 .idea-plan { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 2px 0 6px; font-size: 13px; color: var(--muted); }
 .idea-plan .num { width: 62px; text-align: center; color: var(--ink); }
 .idea-plan .btn { padding: 5px 12px; color: var(--ink); }
-.idea-more { display: inline-block; margin: 2px 0 6px; font-size: 12.5px; }
 [data-theme="dark"] .idea-row.editing .idea-kinds .chip.on { color: var(--accent); }
 .idea-pick { display: none; margin-top: 8px; padding: 7px 9px 5px; border: 1px dashed #CDCDC6; border-radius: 10px; }
 .add:focus-within .idea-pick:not(:empty) { display: block; }

@@ -246,8 +246,6 @@ function put(t, row, { generated = false } = {}) {
   // 任务带着的那条记录（和谁、聊了什么）日期跟着任务走
   const meet = t === "tasks" ? S.data.meets[F.meetId(row.id)] : null;
   if (meet && meet.date !== row.date) put("meets", { ...meet, date: row.date });
-  // 从灵感池里挑来的：做完了，池子那边记下是哪天
-  if (t === "tasks") ideaTaskPut(row);
 }
 
 function drop(t, id) {
@@ -812,7 +810,7 @@ const { moveMeet } = fr;
 
 const idea = ideaStore(core);
 export const { ideas, ideaOf, ideaOfTask, saveIdea, addIdeas, deleteIdea, pickIdea, unpickIdea, settleIdeas } = idea;
-const { ideaTaskPut, ideaTaskDropped, moveIdea } = idea;
+const { ideaTaskDropped, moveIdea } = idea;
 
 const series = seriesStore({ ...core, timer, setTimer: tm.setTimer, moveMeet, moveIdea });
 export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries } = series;

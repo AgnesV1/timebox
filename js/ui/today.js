@@ -412,7 +412,7 @@ export function initToday(rerender) {
     };
     // 手机上开着 Idea：不建任务，记进灵感池
     if (f.get("idea") === "on") {
-      const lines = I.parseLines(String(f.get("title")), store.ideas());
+      const lines = I.parseLines(String(f.get("title")), I.left(store.ideas(), taskOf, store.today()));
       if (lines.length) store.addIdeas(lines);
       toast(lines.length ? "Saved to Ideas" : "Already in your ideas");
       form.querySelector("[name=idea]").checked = false;

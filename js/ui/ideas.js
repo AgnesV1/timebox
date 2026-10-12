@@ -1,6 +1,6 @@
 // 灵感池（Projects 页头的 Plans | Ideas 切到 Ideas，电脑）：想去哪玩、想吃什么、想参加什么活动——没有时长，大多也没有期限。
 // 顶上一格直接加（粘几行 = 几条；选着的类别、日子这几条都带上）。下面按类别分组，没归类的在最上面，每条带类别按钮（Outing / Eat）。
-// 点文字就改；Plan = 放到哪天（建一条任务、挂上）；排了的划掉、写着哪天，Put back 放回池子；去过的收在最底下。
+// 点文字就改；Plan = 放到哪天（建一条任务、挂上）；排了的划掉、写着哪天，Put back 放回池子；任务做完 = 去过了，这条就不再列出来。
 // 在 Leisure / Friends 下加任务时也能挑（见 js/ui/today.js 的 pickHTML）；手机上只能随手记一条。怎么算见 js/ideas.js。
 
 import * as store from "../store.js";
@@ -15,7 +15,6 @@ let dated = false;      // 加的那一格开着日子
 let by = false;
 let edit = "";          // 正在改的那条
 let planning = "";      // 正在挑日子的那条
-let showDone = false;
 
 const afterRender = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));
 const taskOf = (id) => store.get("tasks", id);
@@ -66,24 +65,17 @@ function rowHTML({ idea, state, day }) {
     (planning === idea.id ? planHTML(idea) : "") + "</li>";
 }
 
-const doneRowHTML = ({ idea, day }) => '<li class="idea-row done" data-idea="' + esc(idea.id) + '"><span class="idea-text">' + esc(idea.text) + "</span>" +
-  (day ? '<span class="idea-when">' + esc(fmtShort(day) + (day.slice(0, 4) !== store.today().slice(0, 4) ? " " + day.slice(0, 4) : "")) + "</span>" : "") +
-  (idea.note ? '<span class="idea-note">' + esc(idea.note) + "</span>" : "") +
-  '<span class="idea-acts"><button type="button" class="link" data-act="idea-back">Put back</button></span></li>';
-
 export function ideasHTML(c) {
   const b = I.board(store.ideas(), taskOf, c.today);
   return '<div class="idea-page">' + addHTML() +
-    (b.groups.length || b.done.length ? "" : '<p class="hint idea-intro">Places to go, things to eat, events to catch — no hours, no deadline. When you add a task under ' +
-      esc(homes().map((g) => g.name).join(" or ") || "a project") + ", pick one and it's crossed off here.</p>") +
-    b.groups.map((g) => '<section class="idea-group"><h3 class="idea-h">' + g.title + " <small>" + g.items.length + '</small></h3><ul class="idea-list">' + g.items.map(rowHTML).join("") + "</ul></section>").join("") +
-    (b.done.length ? '<button type="button" class="link idea-more" data-act="idea-done-toggle" aria-expanded="' + showDone + '">Been there (' + b.done.length + ")</button>" +
-      (showDone ? '<ul class="idea-list">' + b.done.map(doneRowHTML).join("") + "</ul>" : "") : "") + "</div>";
+    (b.groups.length ? "" : '<p class="hint idea-intro">Places to go, things to eat, events to catch — no hours, no deadline. When you add a task under ' +
+      esc(homes().map((g) => g.name).join(" or ") || "a project") + ", pick one and it's crossed off here; once that task is done, it's gone.</p>") +
+    b.groups.map((g) => '<section class="idea-group"><h3 class="idea-h">' + g.title + " <small>" + g.items.length + '</small></h3><ul class="idea-list">' + g.items.map(rowHTML).join("") + "</ul></section>").join("") + "</div>";
 }
 
-// 加进去：一行一条；已经有的不重复加
+// 加进去：一行一条；池子里已经有的不重复加（去过的不算，可以再加）
 function addLines(text, form) {
-  const lines = I.parseLines(text, store.ideas());
+  const lines = I.parseLines(text, I.left(store.ideas(), taskOf, store.today()));
   if (!lines.length) { if (String(text).trim()) toast("Already in your ideas"); return; }
   const date = dated ? form.date?.value || "" : "";
   store.addIdeas(lines, { kind, date, by: Boolean(date) && by });
@@ -101,7 +93,6 @@ export function initIdeas(rerender) {
     else if (act === "idea-edit-done") edit = "";
     else if (act === "idea-plan") planning = planning === id ? "" : id;
     else if (act === "idea-plan-x") planning = "";
-    else if (act === "idea-done-toggle") showDone = !showDone;
     else if (!idea) return;
     else if (act === "idea-del") { edit = ""; store.deleteIdea(id); return; }
     else if (act === "idea-sort") { store.saveIdea({ id, kind: v }); return; }

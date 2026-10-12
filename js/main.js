@@ -4,18 +4,16 @@
 import * as store from "./store.js";
 import * as sync from "./sync.js";
 import * as reading from "./reading.js";
-import * as E from "./engine.js";
-import * as R from "./routines.js";
 import * as Meal from "./meals.js";
 import { esc, on, icon } from "./dom.js";
-import { fmtMin } from "./dates.js";
 import { paintPatterns } from "./patterns.js";
 import { initFx, setFx, burst, confetti, refreshFxColors } from "./fx.js";
-import { toast, lineInfo, groupsOf } from "./ui/common.js";
+import { toast, lineInfo } from "./ui/common.js";
 import { initModal, closeModal } from "./ui/modal.js";
+import { initSelect } from "./ui/select.js";
 import { todayHTML, initToday, shownDate } from "./ui/today.js";
 import { calendarHTML, poolHTML, initCalendar, handleDrop, refreshDayModal } from "./ui/calendar.js";
-import { projectsHTML, initProjects, refreshProjectEditor, openProjectEditor } from "./ui/projects.js";
+import { projectsHTML, initProjects, refreshProjectEditor } from "./ui/projects.js";
 import { settingsHTML, initSettings } from "./ui/settings.js";
 import { initEditor, refreshEditor } from "./ui/editor.js";
 import { initDnd } from "./ui/dnd.js";
@@ -56,20 +54,13 @@ function sidebarHTML(c, view) {
   const todayOpen = c.tasks.filter((t) => t.date === c.today && !t.status).length;
   const deals = Meal.toCheck(store.meals(), c.today).length;   // 这一轮还没看的打折
   const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""], ["meals", "Meals", deals || ""], ["reading", "Reading", ""], ["settings", "Settings", ""]];
-  // 项目（group）下面缩进列子项目
-  const sub = (p) => {
-    const reg = E.isRegular(p);
-    const h = reg ? { level: "regular", text: R.describe(R.ruleOf(p), store.prefs().weekStartsOn, p.place) } : E.health(c, p);
-    const need = Math.round(reg ? (E.isAuto(p) ? R.dueOn(R.ruleOf(p), c.today) : 0) : E.needOn(c, p, c.today));
-    return '<button type="button" class="sp h-' + h.level + (p.group ? " nested" : "") + '" data-open-project="' + p.id + '" style="--pc:' + esc(p.color) + '" title="' + esc(h.text) + '"><i></i><span>' + esc(p.name) + "</span>" + (need ? '<b class="num">' + fmtMin(need) + "</b>" : "") + "</button>";
-  };
-  const projects = groupsOf(c.projects.filter(E.isActive)).map((g) => (g.name ? '<p class="sp-group">' + esc(g.name) + "</p>" : "") + g.subs.map(sub).join("")).join("");
   const theme = store.local().theme;
   const st = sync.getStatus();
-  return '<div class="brand"><span class="ball" data-act="ball"></span><h1>苦昼短</h1></div>' +
-    '<nav class="snav">' + nav.map(([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '">' + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>").join("") + "</nav>" +
-    '<section class="sprojects"><div class="sp-head"><a href="#projects">Projects</a><button type="button" class="icon-btn" data-act="new-project-side" aria-label="New project">' + icon("plus") + "</button></div>" +
-    (projects || '<p class="sp-empty">None yet</p>') + "</section>" +
+  // 收起来只剩一列图标（记在这台设备上）：名字放进 title，角标缩成一个点
+  const min = Boolean(store.local().sideMin);
+  return '<div class="brand"><span class="ball" data-act="ball"></span><h1>苦昼短</h1>' +
+    '<button type="button" class="icon-btn side-tog" data-act="side-toggle" aria-expanded="' + !min + '" aria-label="' + (min ? "Show" : "Hide") + ' the sidebar labels" title="' + (min ? "Expand" : "Collapse") + '">' + icon(min ? "right" : "left") + "</button></div>" +
+    '<nav class="snav">' + nav.map(([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '" title="' + t + '">' + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>").join("") + "</nav>" +
     '<footer class="sfoot"><button type="button" class="sync-pill' + (st.bad ? " bad" : "") + '" data-act="sync" title="Sync now">' + icon("sync") + '<span data-sync-status>' + esc(st.text) + "</span></button>" +
     '<button type="button" class="icon-btn" data-act="theme-cycle" title="Theme: ' + theme + '">' + icon(theme === "dark" ? "moon" : theme === "light" ? "sun" : "auto") + "</button></footer>";
 }
@@ -125,6 +116,7 @@ function draw() {
   const view = route();
   document.body.dataset.view = view;
   document.body.classList.toggle("phone", phone);
+  document.body.classList.toggle("side-min", !phone && Boolean(store.local().sideMin));
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
   main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : todayHTML(c, phone);
@@ -162,6 +154,7 @@ function paintSync() {
     // 手机顶栏放不下一句话（会压住日期）：只画一个点，点一下再说是什么
     if (el.classList.contains("psync")) { el.title = text; el.setAttribute("aria-label", text || "Sync"); el.classList.toggle("wait", !st.bad && !/^Synced/.test(text)); }
     else el.textContent = text;
+    el.closest(".sync-pill")?.setAttribute("title", text ? text + " — click to sync" : "Sync now");   // 侧栏收起时只剩图标，状态看这里
     el.closest(".sync-pill, .sync-status, .psync")?.classList.toggle("bad", st.bad);
   });
 }
@@ -201,6 +194,7 @@ applyTheme();
 initFx();
 setFx(store.local().fx !== false);
 initModal();
+initSelect();
 initToday(render);
 initCalendar(render);
 initProjects(render);
@@ -245,8 +239,7 @@ on(document, "click", "[data-act=theme-cycle]", () => {
   store.setLocal({ theme: next });
   applyTheme();
 });
-on(document, "click", "[data-open-project]", (e, el) => openProjectEditor(el.dataset.openProject));
-on(document, "click", "[data-act=new-project-side]", () => openProjectEditor(""));
+on(document, "click", "[data-act=side-toggle]", () => store.setLocal({ sideMin: !store.local().sideMin }));
 
 // 装到主屏后没网也能打开（只在 https 上，也就是 GitHub Pages）
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("./sw.js").catch(() => {});

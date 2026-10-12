@@ -1,0 +1,152 @@
+// 下拉框：页面里还是普通的 <select>（各处的 change 处理都不用改）。电脑上点开时不用系统自带的菜单，
+// 换成自己画的一块：分组小标题、颜色点（option 的 data-color）、当前项打勾、键盘上下 / 回车 / Esc，选项多的顶上带一格搜索。
+// 选中后给原来的 <select> 赋值并发 input / change。手机和触屏还是系统自带的选择器。
+
+import { esc } from "../dom.js";
+
+const fine = matchMedia("(hover: hover) and (pointer: fine)");
+const SEARCH_FROM = 12;   // 选项到这么多就带搜索
+const OPEN_KEYS = [" ", "Enter", "ArrowDown", "ArrowUp"];
+let cur = null;   // 开着的那块：{ el, sel, active, watch, typed, typedAt }
+
+const usable = (sel) => !sel.multiple && !sel.disabled && fine.matches && !document.body.classList.contains("phone");
+const optionsOf = (sel) => [...sel.querySelectorAll("option")];
+
+function listHTML(sel, q = "") {
+  const hit = (o) => !q || o.textContent.toLowerCase().includes(q);
+  const row = (o, nested) => '<div class="mi' + (nested ? " in" : "") + (o.selected ? " on" : "") + (o.disabled ? " off" : "") + '" role="option" aria-selected="' + o.selected + '" data-i="' + optionsOf(sel).indexOf(o) + '">' +
+    (o.dataset.color ? '<i style="--dot:' + esc(o.dataset.color) + '"></i>' : "") + "<span>" + esc(o.textContent) + "</span></div>";
+  let html = "";
+  for (const node of sel.children) {
+    if (node.tagName === "OPTION") { if (hit(node)) html += row(node, false); continue; }
+    if (node.tagName !== "OPTGROUP") continue;
+    const inside = [...node.children].filter(hit);
+    if (inside.length) html += '<div class="mg">' + esc(node.label) + "</div>" + inside.map((o) => row(o, true)).join("");
+  }
+  return html || '<div class="mg">Nothing matches</div>';
+}
+
+const items = () => (cur ? [...cur.el.querySelectorAll(".mi:not(.off)")] : []);
+
+function setActive(el, scroll = true) {
+  if (!cur) return;
+  cur.el.querySelector(".mi.act")?.classList.remove("act");
+  cur.active = el || null;
+  if (!el) return;
+  el.classList.add("act");
+  if (scroll) el.scrollIntoView({ block: "nearest" });
+}
+
+function place() {
+  const r = cur.sel.getBoundingClientRect(), m = cur.el;
+  m.style.minWidth = Math.max(150, r.width) + "px";
+  const w = m.offsetWidth, h = m.offsetHeight;
+  const below = r.bottom + 4 + h <= innerHeight - 8 || r.top < h + 12;
+  m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + "px";
+  m.style.top = Math.max(8, below ? Math.min(r.bottom + 4, innerHeight - h - 8) : r.top - h - 4) + "px";
+}
+
+function open(sel) {
+  close();
+  const el = document.createElement("div");
+  el.className = "menu";
+  el.setAttribute("role", "listbox");
+  const search = optionsOf(sel).length >= SEARCH_FROM;
+  el.innerHTML = (search ? '<input class="ms" type="search" placeholder="Search" aria-label="Search" autocomplete="off" spellcheck="false">' : "") + '<div class="ml">' + listHTML(sel) + "</div>";
+  document.body.appendChild(el);
+  cur = { el, sel, active: null, typed: "", typedAt: 0 };
+  sel.classList.add("open");
+  place();
+  setActive(el.querySelector(".mi.on:not(.off)") || items()[0]);
+  if (search) el.querySelector(".ms").focus({ preventScroll: true });
+  else sel.focus({ preventScroll: true });
+  // 页面重画把这个 <select> 换掉了：这块也收起来
+  cur.watch = new MutationObserver(() => { if (cur && !cur.sel.isConnected) close(); });
+  cur.watch.observe(document.body, { childList: true, subtree: true });
+}
+
+export function close() {
+  if (!cur) return;
+  cur.watch?.disconnect();
+  cur.sel.classList.remove("open");
+  cur.el.remove();
+  cur = null;
+}
+
+function choose(item) {
+  const sel = cur.sel, o = optionsOf(sel)[Number(item.dataset.i)];
+  close();
+  if (!o || o.disabled) return;
+  if (sel.value !== o.value || !o.selected) {
+    sel.value = o.value;
+    sel.dispatchEvent(new Event("input", { bubbles: true }));
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  if (sel.isConnected) sel.focus({ preventScroll: true });
+}
+
+function move(n) {
+  const list = items();
+  if (!list.length) return;
+  const i = list.indexOf(cur.active);
+  setActive(list[Math.max(0, Math.min(list.length - 1, i < 0 ? (n > 0 ? 0 : list.length - 1) : i + n))]);
+}
+
+// 没有搜索框的：直接打字跳到那一项（半秒内连着打算一个词）
+function typeAhead(ch) {
+  const now = Date.now();
+  cur.typed = (now - cur.typedAt < 600 ? cur.typed : "") + ch.toLowerCase();
+  cur.typedAt = now;
+  const hit = items().find((x) => x.textContent.trim().toLowerCase().startsWith(cur.typed));
+  if (hit) setActive(hit);
+}
+
+export function initSelect() {
+  // 点 <select>：拦下系统菜单，开自己的；再点一下收起
+  document.addEventListener("mousedown", (e) => {
+    if (cur && (cur.el.contains(e.target))) return;
+    const sel = e.target.closest?.("select");
+    if (sel && e.button === 0 && usable(sel)) {
+      e.preventDefault();
+      if (cur?.sel === sel) { close(); sel.focus({ preventScroll: true }); }
+      else open(sel);
+      return;
+    }
+    close();
+  }, true);
+
+  document.addEventListener("keydown", (e) => {
+    if (!cur) {
+      const sel = e.target.closest?.("select");
+      if (sel && OPEN_KEYS.includes(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey && usable(sel)) { e.preventDefault(); open(sel); }
+      return;
+    }
+    const typing = e.target.classList?.contains("ms");
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); const sel = cur.sel; close(); sel.focus({ preventScroll: true }); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); move(e.key === "ArrowDown" ? 1 : -1); }
+    else if (e.key === "Home" && !typing) { e.preventDefault(); setActive(items()[0]); }
+    else if (e.key === "End" && !typing) { e.preventDefault(); setActive(items().pop()); }
+    else if (e.key === "Enter" || (e.key === " " && !typing)) { e.preventDefault(); if (cur.active) choose(cur.active); else close(); }
+    else if (e.key === "Tab") close();
+    else if (!typing && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); typeAhead(e.key); }
+  }, true);
+
+  document.addEventListener("input", (e) => {
+    if (!cur || !e.target.classList?.contains("ms")) return;
+    cur.el.querySelector(".ml").innerHTML = listHTML(cur.sel, e.target.value.trim().toLowerCase());
+    setActive(items()[0]);
+    place();
+  });
+  document.addEventListener("mousemove", (e) => {
+    const item = cur && e.target.closest?.(".menu .mi:not(.off)");
+    if (item && item !== cur.active) setActive(item, false);
+  });
+  document.addEventListener("click", (e) => {
+    const item = cur && e.target.closest?.(".menu .mi");
+    if (item) choose(item);
+  });
+  // 页面滚了、窗口变了：位置对不上，收起来（在这块里面滚不算）
+  addEventListener("scroll", (e) => { if (cur && !cur.el.contains(e.target)) close(); }, true);
+  addEventListener("resize", close);
+  addEventListener("hashchange", close);
+}

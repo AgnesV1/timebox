@@ -936,8 +936,10 @@ body.phone .reading { padding: 0 2px 90px; }
 [data-theme="dark"] .sun .trk-e.in { stroke: rgba(0, 0, 0, .6); }
 .sun .sweep { fill: none; stroke: var(--hot); stroke-width: 2.5; stroke-linecap: round; }
 .sun .arc { fill: none; stroke: var(--c, var(--c-None)); stroke-width: 18; opacity: .5; transition: opacity .25s, stroke-width .2s; cursor: pointer; }
-/* 任务的色块压在金属上要跳出来：还是那个项目的色相，调亮、调艳（不认这个写法的浏览器留在上面那行的原色） */
-.sun .arc:not(.fixed) { stroke: oklch(from var(--c, #B4B4BC) calc(l + .1) calc(c * 1.7) h); }
+/* 任务的色块压在金属上要跳出来：--c 已经是项目颜色的霓虹版（js/groups.js 的 neon）；自己另选的颜色没有霓虹版（.boost），
+   就按同一个色相调亮、调艳（不认这个写法的浏览器留在上面那行的原色）。白天描一圈很细的墨边，白色的块也看得见；夜里是原来的光晕 */
+.sun .arc.boost { stroke: oklch(from var(--c, #B4B4BC) calc(l + .12) calc(c * 1.9) h); }
+[data-theme="light"] .sun .arc:not(.fixed) { filter: drop-shadow(0 0 .45px rgba(11, 11, 11, .95)) drop-shadow(0 0 .45px rgba(11, 11, 11, .95)); }
 .sun .arc.lit { opacity: 1; }
 /* 通勤日的固定时段：先盖一层磨砂（页面的底色，半透明）把金属的反光压下去，再压深色的细纹 */
 .sun .frost { fill: none; stroke: var(--page); stroke-width: 18; opacity: .62; pointer-events: none; }

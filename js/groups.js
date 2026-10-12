@@ -11,12 +11,25 @@ const [GREEN, BLUE, ORANGE, PURPLE, IVORY, BROWN, OCHRE, CRIMSON] = PALETTE;
 
 export const DEFAULTS = [
   { name: "Work", color: BLUE, labor: true, grow: "all" },
-  { name: "Fitness", color: ORANGE, labor: false, grow: "all" },
+  { name: "Fitness", color: IVORY, labor: false, grow: "all" },
   { name: "Chores", color: BROWN, labor: true, grow: "" },
   { name: "Build", color: GREEN, labor: true, grow: "all" },
-  { name: "Leisure", color: PURPLE, labor: false, grow: "deep" },
-  { name: "Friends", color: IVORY, labor: true, grow: "", friends: true }
+  { name: "Leisure", color: ORANGE, labor: false, grow: "deep" },
+  { name: "Friends", color: PURPLE, labor: true, grow: "", friends: true }
 ];
+
+// 圆盘上用的霓虹版：色块压在金属上，要比油画色亮得多。八个颜色一个对一个（绿 → 薄荷霓虹、蓝 → 电光蓝、橘 → 霓虹橙、紫 → 霓虹紫、
+// 白 → 纯白、棕 → 琥珀、赭黄 → 霓虹黄、茜红 → 霓虹红）；自己另选的颜色没有对应的，返回空（圆盘那边会把它调亮）
+const NEON = { [GREEN]: "#00E58F", [BLUE]: "#3A6BFF", [ORANGE]: "#FF6A00", [PURPLE]: "#B44CFF", [IVORY]: "#FFFFFF", [BROWN]: "#FFB300", [OCHRE]: "#FFE500", [CRIMSON]: "#FF2D4A" };
+export const neon = (c) => NEON[String(c || "").toUpperCase()] || "";
+
+// 三个大类换过默认颜色（Fitness 橘 → 白、Leisure 紫 → 橘、Friends 白 → 紫）：三个都还是原来那套才换，换过一次就不再满足、不会重复；
+// 自己改过其中任何一个的不动。→ [{ name, color }]（要换的；没有就是空）
+const RECOLOR = [["Fitness", ORANGE, IVORY], ["Leisure", PURPLE, ORANGE], ["Friends", IVORY, PURPLE]];
+export function recolor(list) {
+  const hits = RECOLOR.map(([name, from, to]) => { const g = (list || []).find((x) => match(x.name) === name); return g && String(g.color || "").toUpperCase() === from ? { name: g.name, color: to } : null; });
+  return hits.every(Boolean) ? hits : [];
+}
 
 // 以前那套亮色 → 现在的颜色（没归进大类的计划换一次）
 const OLD_COLORS = { "#B8F000": GREEN, "#C6FF00": GREEN, "#2F5BFF": BLUE, "#FF3EA5": CRIMSON, "#FF7A1A": ORANGE, "#9B5CFF": PURPLE, "#00C2A8": GREEN, "#FFC400": OCHRE, "#FF4D4D": BROWN };

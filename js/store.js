@@ -708,6 +708,12 @@ export function adoptGroups() {
   return { names: [...new Set(moves.map((m) => m.group).filter(Boolean))], undo: () => apply(before, GR.withPlans(GR.DEFAULTS, before.map((b) => ({ group: b.group, color: b.color })))) };
 }
 
+// 三个大类的默认颜色换过（见 groups.js 的 recolor）：还用着原来那套的换成新的，下面的计划跟着换
+export function adoptColors() {
+  if (!groupsSaved()) return;
+  for (const g of GR.recolor(groups())) saveGroup(g.name, { color: g.color });
+}
+
 // 改大类的设置（颜色、labor、grow、friends）。换颜色时，还用着原来那个颜色的计划跟着换
 export function saveGroup(name, patch) {
   if (!groupsSaved()) adoptGroups();

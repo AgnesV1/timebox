@@ -228,7 +228,7 @@ initFriends(render);
 initSun();
 
 store.subscribe((meta) => {
-  if (meta.pulled) { adoptGroups(); store.adoptMarks(); }
+  if (meta.pulled) { adoptGroups(); store.adoptMarks(); store.adoptColors(); }
   if (meta.local) setFx(store.local().fx !== false);
   if (!meta.quiet) render();
   else paintSync();
@@ -268,5 +268,5 @@ if ("serviceWorker" in navigator && location.protocol === "https:") navigator.se
 render();
 // 早上的线要等表格里的数据拉下来再拍；连不上就 6 秒后用本机的
 if (sync.configured()) await Promise.race([syncThenLog(), new Promise((r) => setTimeout(r, 6000))]);
-else { adoptGroups(); store.adoptMarks(); }
+else { adoptGroups(); store.adoptMarks(); store.adoptColors(); }
 store.ensureTodayLog();

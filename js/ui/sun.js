@@ -1,6 +1,7 @@
 // 今天页的「日出」圆盘（手机和电脑都有）：这一天计过时的每一段画在 24 小时的圆盘上——
 // 外圈 6→18（白天）、内圈 18→6（夜里），6 点在左边、顺时针（几何在 js/day.js）。
 // 底盘是镜面铬：白天那圈亮银、夜里那圈深灰，没做事的时间就是这层金属；最左边（6 点 / 18 点，一圈的头和尾）横着切开一道细缝。
+// 任务的色块用项目颜色的霓虹版（groups.js 的 neon），压在金属上才跳得出来；白天再描一圈很细的墨边（白色的块靠它才看得见）。
 // 通勤日的固定时段先盖一层磨砂把反光压下去、再压深色细纹；正在计时的那段画到现在；
 // 「现在」是从圆心伸出去的一根指针（白天电光蓝、夜里青柠），指到当前那一圈的外沿——升起来以后指针从中间那几行字外面起。
 // 平时它是屏幕下方一个半透明的半圆（在计时浮条上面）；往上拖，它跟着手指升起、变大，时间段从 6 点起一段段亮起；
@@ -16,6 +17,7 @@ import { parseTimes } from "../times.js";
 import { esc, on } from "../dom.js";
 import { fmtDay, fmtMin } from "../dates.js";
 import { colorOf } from "./common.js";
+import { neon } from "../groups.js";
 
 const RO = 98, RI = 72;   // 外圈、内圈的半径（viewBox ±120，圈宽 18）；两圈之间的缝里画「日出」那道光
 const reduce = matchMedia("(prefers-reduced-motion: reduce)");
@@ -92,8 +94,8 @@ function sunHTML(c, d) {
   const edges = [RO + 9, RO - 9, RI + 9, RI - 9].map((r, i) => '<circle class="trk-e' + (i % 2 ? " in" : "") + '" r="' + r + '"/>').join("");
   const arcs = pieces.map((x, i) =>
     (x.kind === "fixed" ? '<path class="frost ' + x.ring + '" d="' + arcPath(x.ring === "outer" ? RO : RI, x.a, x.b) + '"/>' : "") +
-    '<path class="arc ' + x.kind + (i === picked ? " on" : "") + '" data-i="' + i + '" data-t="' + x.a + '" d="' + arcPath(x.ring === "outer" ? RO : RI, x.a, x.b) + '"' +
-    (x.color ? ' style="--c:' + esc(x.color) + '"' : "") + "><title>" + esc(x.label + " · " + x.from + "–" + x.to) + "</title></path>").join("");
+    '<path class="arc ' + x.kind + (i === picked ? " on" : "") + (x.color && !neon(x.color) ? " boost" : "") + '" data-i="' + i + '" data-t="' + x.a + '" d="' + arcPath(x.ring === "outer" ? RO : RI, x.a, x.b) + '"' +
+    (x.color ? ' style="--c:' + esc(neon(x.color) || x.color) + '"' : "") + "><title>" + esc(x.label + " · " + x.from + "–" + x.to) + "</title></path>").join("");
   return '<div class="sun" role="button" tabindex="0" aria-label="Your day on a clock — drag up or press Enter">' +
     '<svg viewBox="-120 -120 240 240" aria-hidden="true">' +
     "<defs>" + chrome("day") + chrome("night") +

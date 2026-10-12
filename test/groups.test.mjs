@@ -10,7 +10,7 @@ console.warn = () => {};   // store 在 node 里存不下来，只是提示
 test("old project names find their new home; unknown ones stay as they are", () => {
   assert.deepEqual(["Work 1", "work", "Main - Gym", "Main - Fitness", "Main - English", "Main - French", "Fun", "Chores", "Friends", "Garden", ""].map(GR.match),
     ["Work", "Work", "Fitness", "Fitness", "Build", "Build", "Leisure", "Chores", "Friends", "", ""]);
-  const [green, blue, orange, purple] = GR.PALETTE;
+  const [green, blue, , purple, ivory] = GR.PALETTE;
   const { groups, moves } = GR.adopt([
     { id: "a", name: "Deck", group: "Work 1", color: "#2F5BFF" }, { id: "b", name: "IELTS", group: "Main - English", color: "#FF3EA5" },
     { id: "c", name: "Gym", group: "", color: "#FF7A1A" }, { id: "d", name: "Tomatoes", group: "Garden", color: "#9B5CFF" },
@@ -19,7 +19,7 @@ test("old project names find their new home; unknown ones stay as they are", () 
   ]);
   assert.deepEqual(groups.map((g) => g.name), ["Work", "Fitness", "Chores", "Build", "Leisure", "Friends", "Garden"]);
   assert.deepEqual(moves, [
-    { id: "a", group: "Work", color: blue }, { id: "b", group: "Build", color: green }, { id: "c", group: "Fitness", color: orange },
+    { id: "a", group: "Work", color: blue }, { id: "b", group: "Build", color: green }, { id: "c", group: "Fitness", color: ivory },
     { id: "d", group: "Garden", color: purple }, { id: "e", group: "Garden", color: purple }
   ], "plans keep their own names; a plan with no project is matched by its name; untouched ones aren't listed");
   assert.equal(groups.find((g) => g.name === "Garden").color, purple, "an unknown project keeps going, in the new palette");
@@ -307,4 +307,18 @@ test("projects: what each one is watched for, and its health over the last week"
   assert.deepEqual([S.groupHealth(ctx, groups[2], { lastContact: "2026-09-28" }).level, S.groupHealth(ctx, groups[2], { lastContact: "2026-09-27" }).level], ["ok", "low"], "fourteen days is still fine");
   assert.deepEqual(S.groupHealth(ctx, groups[2]), { kind: "contact", days: null, limit: 14, level: "low" });
   assert.equal(S.groupHealth(ctx, groups[3]), null, "work isn't watched");
+});
+
+test("projects: default colours changed once, and each has a neon twin for the dial", async () => {
+  const GR = await import("../js/groups.js");
+  const [GREEN, BLUE, ORANGE, PURPLE, IVORY] = GR.PALETTE;
+  assert.deepEqual(["Fitness", "Leisure", "Friends"].map((n) => GR.DEFAULTS.find((g) => g.name === n).color), [IVORY, ORANGE, PURPLE]);
+  const old = [{ name: "Work", color: BLUE }, { name: "Gym", color: ORANGE }, { name: "Leisure", color: PURPLE }, { name: "Friends", color: IVORY.toLowerCase() }];
+  assert.deepEqual(GR.recolor(old), [{ name: "Gym", color: IVORY }, { name: "Leisure", color: ORANGE }, { name: "Friends", color: PURPLE }], "the three still on the earlier defaults move together, whatever they were renamed to");
+  assert.deepEqual(GR.recolor(old.map((g) => (g.name === "Leisure" ? { ...g, color: GREEN } : g))), [], "one of them was changed by hand: leave all three");
+  assert.deepEqual(GR.recolor(GR.DEFAULTS), [], "already the new colours");
+  assert.deepEqual(GR.recolor([]), []);
+  assert.equal(new Set(GR.PALETTE.map(GR.neon)).size, 8, "eight different neons");
+  assert.equal(GR.neon(IVORY.toLowerCase()), "#FFFFFF");
+  assert.equal(GR.neon("#123456"), "", "a colour picked by hand has none");
 });

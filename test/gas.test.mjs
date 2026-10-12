@@ -280,7 +280,7 @@ test("reading: every tab is searched, new things go to a Want tab, duplicates ar
   assert.deepEqual(res.added, ["a2"]);
   assert.deepEqual(res.dupes.map((d) => d.id + " " + d.tab), ["a1 Book", "a3 TV", "a4 TV"], "any tab counts; 《》, case and spaces don't matter");
   const want = book.getSheetByName("Want");
-  assert.deepEqual(want.header(), ["Added", "Name", "Type", "Vibe", "Note"]);
+  assert.deepEqual(want.header(), ["Name", "Type", "Vibe", "Note"], "no date column");
   const row = want.objects()[0];
   assert.equal(row.Name, "The Bear");
   assert.equal(row.Type, "TV");
@@ -294,6 +294,66 @@ test("reading: every tab is searched, new things go to a Want tab, duplicates ar
   assert.equal(bear.mark, "😊");
   assert.equal(bear.note, "=chef");
   assert.ok(!again.types.includes("Want"));
+});
+
+test("reading: finished things land on their own tab, and leave Want", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  const url = "https://docs.google.com/spreadsheets/d/1ReadingSheetIdAbcdefghijklmnop/edit";
+  const book = g.spreadsheet("https://docs.google.com/spreadsheets/d/1ReadingSheetIdAbcdefghijklmnop");
+  const tab = (name, rows) => { const sh = book.insertSheet(name); rows.forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v))); return sh; };
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const books = tab("Book", [["Year", "Month", "Name", "这一切真的值得吗"], [2023, "July", "Book one", "🥰", "book", "old note"], [2026, "February", "Book two", "🥰", "English"]]);
+  books.dropdown(1, ["2023", "2024", "2025", "2026"]).dropdown(2, months).dropdown(4, ["🥰", "🎉", "💢"]).dropdown(5, ["book", "English", "image", "EN/book"]);
+  const tv = tab("TV", [[], ["Year", "Month", "Name", "这一切真的值得吗"], [2025, "May", "Severance", "🎉", "", "great"], ["", "", "奥本海默"], ["", "", "Later show", "", "", "kept"]]);
+  const fiction = tab("Fiction", [["Year", "Month", "Name", "这一切真的值得吗"], [2026, 5, "Novel one", "🎉"]]);
+  tab("Game", [["Year", "Month", "Name", "这一切真的值得吗"], [2026, "May", "Game one", "🥰", "played"], [2026, "June", "Game two", "", "completed"], [2026, "June", "Game three", "", "played"]]);
+  // 以前建的 Want 页带着 Added 那一列：照样能用，新加的那一格空着
+  const want = tab("Want", [["Added", "Name", "Type", "Vibe", "Note"], ["2026-10-01", "The Bear", "TV", "😊", "chef"]]);
+  g.post({ secret: "CHANGE_ME", push: { rows: { settings: [{ key: "reading", value: { url }, updated: 1 }] } } });
+  const read = (reading) => g.post({ secret: "CHANGE_ME", reading }).reading;
+  const line = (sh, n) => sh.rows[n - 1].slice(0, 6);
+
+  assert.deepEqual(read({ add: [{ id: "w1", title: "Dune", type: "Book" }] }).added, ["w1"]);
+  assert.deepEqual(line(want, 3), ["", "Dune", "Book", "", "", ""], "no date written any more");
+  assert.deepEqual(read({ list: true }).kinds, { Book: ["book", "English", "image", "EN/book"], Game: ["played", "completed"] }, "the dropdown's options, or what the column already holds");
+
+  const res = read({ list: true, done: [
+    { id: "d1", title: "Book three", tab: "book", year: 2026, month: 10, mark: "🎉", kind: "EN/book", note: "=fun" },
+    { id: "d2", title: "The Bear", tab: "TV", year: 2026, month: 10, mark: "🥰", note: "finale" },
+    { id: "d3", title: "奥本海默", tab: "Book", year: 2026, month: 3, mark: "💢" },
+    { id: "d4", title: "severance", tab: "TV", year: 2026, month: 1 },
+    { id: "d5", title: "Nowhere", tab: "Films", year: 2026, month: 1 },
+    { id: "d6", title: "Book four", tab: "Book", year: 2027, month: 1, mark: "🥰" },
+    { id: "d7", title: "Novel two", tab: "Fiction", year: 2026, month: 7 }
+  ] });
+  assert.deepEqual(res.logged, ["d1", "d2", "d3", "d7"]);
+  assert.deepEqual(res.dupes.map((d) => d.id + " " + d.tab), ["d4 TV"], "already there with a date");
+  assert.deepEqual(res.failed.map((f) => f.id), ["d5", "d6"]);
+  assert.match(res.failed[0].why, /no Films tab/);
+  assert.match(res.failed[1].why, /Book: the Year dropdown has no "2027"/);
+
+  assert.deepEqual(line(books, 4), [2026, "October", "Book three", "🎉", "EN/book", "=fun"], "right under the last dated row; the note stays text");
+  assert.equal(books.getLastRow(), 4, "the one the dropdown refused left nothing behind");
+  assert.deepEqual(line(tv, 3), [2025, "May", "Severance", "🎉", "", "great"]);
+  assert.deepEqual(line(tv, 4), [2026, "October", "The Bear", "🥰", "", "chef\nfinale"], "a row is put in above the undated ones; the Want note comes along");
+  assert.deepEqual(line(tv, 5), [2026, "March", "奥本海默", "💢", "", ""], "an undated row is filled in where it is, whatever tab was picked");
+  assert.deepEqual(line(tv, 6), ["", "", "Later show", "", "", "kept"]);
+  assert.deepEqual(line(fiction, 3), [2026, 7, "Novel two", "", "", ""], "months the way that tab writes them");
+  assert.deepEqual(want.objects().map((r) => r.Name), ["Dune"], "finished = out of Want");
+  const bear = res.rows.find((r) => r.title === "The Bear");
+  assert.deepEqual([bear.tab, bear.want, bear.when, bear.mark], ["TV", false, "2026 Oct", "🥰"]);
+  assert.ok(!("row" in bear) && !("full" in bear));
+
+  // 把 Added 那一列删掉：之后不会再补回来
+  want.deleteColumn(1);
+  assert.deepEqual(read({ add: [{ id: "w2", title: "Arrival", type: "TV", vibe: "👀" }] }).added, ["w2"]);
+  assert.deepEqual(want.header(), ["Name", "Type", "Vibe", "Note"]);
+  assert.deepEqual(want.objects().map((r) => r.Name + " " + r.Type), ["Dune Book", "Arrival TV"]);
+  // 下拉只是提醒（不拒绝）：照写
+  books.dropdown(1, ["2023", "2024", "2025", "2026"], false);
+  assert.deepEqual(read({ done: [{ id: "d8", title: "Book four", tab: "Book", year: 2027, month: 1 }] }).logged, ["d8"]);
+  assert.deepEqual(line(books, 5), [2027, "January", "Book four", "", "", ""]);
 });
 
 test("deep work: the flag goes up, shows as a tick in the Deep column, and comes back", () => {

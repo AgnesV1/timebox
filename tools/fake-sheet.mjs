@@ -66,14 +66,23 @@ Object.assign(g, load(current, g.ss));
 g.sandbox.setup();
 console.log("→ current:", g.logs.join(" | "));
 
-// 一个假的阅读记录表格（一页一种，表头那行写着 Name）：在页面设置里填 https://docs.google.com/spreadsheets/d/FAKE-READING-0000000000000000/edit
+let readingBook = null;
+// GET /reading 看它现在的样子。一个假的阅读记录表格（一页一种，表头那行写着 Name）：在页面设置里填 https://docs.google.com/spreadsheets/d/FAKE-READING-0000000000000000/edit
 if (g.spreadsheet) {
   const book = g.spreadsheet("https://docs.google.com/spreadsheets/d/FAKE-READING-0000000000000000");
-  const tab = (name, rows) => { const sh = book.insertSheet(name); rows.forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v))); };
-  tab("Book", [["", "", "", "年度笔记"], [], ["Year", "Month", "Name", "这一切真的值得吗"], [2024, "March", "《日常生活中的自我呈现》", "🥰", "book"], [2026, "February", "The Last Days Of Socrates", "🥰", "English"]]);
-  tab("Fiction", [["Year", "Month", "Name", "这一切真的值得吗"], [2026, "May", "迷宫馆事件 by绫辻行人", "🎉"], [2026, "September", "《同学少年都不贱》by张爱玲", "🥰"]]);
+  const tab = (name, rows) => { const sh = book.insertSheet(name); rows.forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v))); return sh; };
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], faces = ["🥰", "🎉", "💢"];
+  // 像真的那样带下拉：年份只到今年（记明年的会被拒绝），Book 的小类四种，Game 的两种
+  const years = [0, 1, 2, 3].map((n) => String(new Date().getFullYear() - 3 + n));
+  tab("Book", [["Year", "Month", "Name", "这一切真的值得吗"], [2024, "March", "《日常生活中的自我呈现》", "🥰", "book"], [2026, "February", "The Last Days Of Socrates", "🥰", "English", "论据都蛮棒的"]])
+    .dropdown(1, years).dropdown(2, months).dropdown(4, faces).dropdown(5, ["book", "English", "image", "EN/book"]);
+  tab("PodCast", [["Year", "Month", "Name", "这一切真的值得吗"], [2026, "April", "忽左忽右", "🎉"]]).dropdown(1, years).dropdown(2, months).dropdown(4, faces);
+  tab("Fiction", [["Year", "Month", "Name", "这一切真的值得吗"], [2026, "May", "迷宫馆事件 by绫辻行人", "🎉"], [2026, "September", "《同学少年都不贱》by张爱玲", "🥰"]]).dropdown(1, years).dropdown(2, months).dropdown(4, faces);
   tab("TV", [[], ["Year", "Month", "Name", "这一切真的值得吗"], [2025, "May", "Severance", "🎉", "", "great"], ["", "", "奥本海默"]]);
-  tab("Game", [[], ["Year", "Month", "Name", "这一切真的值得吗"], [2026, "May", "古剑奇谭3", "🥰", "", "天行健"]]);
+  tab("Game", [["Year", "Month", "Name", "这一切真的值得吗"], [2026, "May", "古剑奇谭3", "🥰", "completed", "天行健"]]).dropdown(1, years).dropdown(2, months).dropdown(4, faces).dropdown(5, ["played", "completed"]);
+  tab("etc", [["Year", "Month", "Name", "这一切真的值得吗"], [2026, "June", "something by hand", "🥰"]]);
+  tab("Want", [["Name", "Type", "Vibe", "Note"], ["The Bear", "TV", "😊", "chef"], ["Dune", "Book", "🎉", ""], ["Hades II", "Game", "👀", ""]]);
+  readingBook = book;
 }
 
 // 一个假的季度表格（一页一个季度，页名「2026 Q4」，表头写着 progress / focus）：
@@ -92,6 +101,7 @@ const dump = (ss) => Object.fromEntries(ss.getSheets().map((sh) => [sh.getName()
 http.createServer((req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   if (req.method === "OPTIONS") { res.setHeader("Access-Control-Allow-Headers", "*"); res.end(); return; }
+  if (req.method !== "POST" && req.url.startsWith("/reading")) { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(readingBook ? dump(readingBook) : {})); return; }
   if (req.method !== "POST" && req.url.startsWith("/quarter")) { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(quarterBook ? dump(quarterBook) : {})); return; }
   if (req.method !== "POST" && req.url.startsWith("/dump")) { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(dump(g.ss))); return; }
   if (req.method !== "POST") { res.setHeader("Content-Type", "application/json"); res.end(g.sandbox.doGet().getContent()); return; }

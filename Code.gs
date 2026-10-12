@@ -730,11 +730,14 @@ function migrate_() {
 
 // ================= 阅读：你自己的另一个表格 =================
 // 链接在 Settings 的 reading（{url}），在网页电脑端的设置里填一次（整个表格的链接就行）。
-// 那个表格每一页是一种（Book、PodCast、TV……），各页找到写着 Name 的那一行当表头，下面每一行是一条。
-// 网页加的东西只放进单独一页 Want（没有就建一个），别的页不改不删；查重和搜索看所有页。
+// 那个表格每一页是一种（Book、PodCast、TV……），各页找到写着 Name 的那一行当表头，下面每一行是一条：
+// Year | Month | Name | 评价（emoji）| 小类（Book 页的 book / English…，Game 页的 played / completed）| 备注。
+// 网页加的「想看的」只放进单独一页 Want（没有就建一个）；「看完的」写进它自己那一页，Want 里那行拿掉。
+// 别的格子不改不删；查重和搜索看所有页。
 var READING_TAB = 'Want';
-var READING_HEAD = ['Added', 'Name', 'Type', 'Vibe', 'Note'];
+var READING_HEAD = ['Name', 'Type', 'Vibe', 'Note'];
 var NAME_HEADS = ['name', 'title', '名字', '书名', '名称', '标题'];
+var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function readingBook_() {
   var row = readAll_('settings').filter(function (r) { return r.id === 'reading'; })[0];
@@ -756,23 +759,30 @@ function readingHead_(sh) {
   return null;
 }
 
+// 表头下面的所有行
+function readingBody_(sh, h) {
+  return h && h.last > h.row ? sh.getRange(h.row + 1, 1, h.last - h.row, h.width).getValues() : [];
+}
+
 // 查重用：不分大小写，书名号、引号、空格都不算
 function titleKey_(s) {
   return String(s || '').toLowerCase().replace(/[《》<>「」『』"'“”‘’\s]+/g, '');
 }
 
-// 一页里的每一条：名字、哪一页、什么时候（Year + Month 或 Added）、名字后面那格的 emoji、再后面的几格当备注
-function readingRows_(sh, tz) {
-  var h = readingHead_(sh);
-  if (!h || h.last <= h.row) return [];
+function cellText_(v, tz) {
+  if (Object.prototype.toString.call(v) === '[object Date]') return Utilities.formatDate(v, tz || tz_(), 'yyyy-MM-dd');
+  return typeof v === 'number' && v % 1 === 0 ? String(v) : String(v === null || v === undefined ? '' : v).trim();
+}
+
+// 一页里的每一条：名字、哪一页、什么时候（Year + Month）、名字后面那格的 emoji、再后面的几格当备注。
+// row（第几行）和 full（Want 页没截短的备注）只给这边用，不发给网页
+function readingRows_(sh, tz, h, body) {
+  if (!h) return [];
   var at = function (k) { return h.cols.indexOf(k); };
   var year = at('year'), month = at('month'), added = at('added'), vibe = at('vibe'), type = at('type'), note = at('note');
-  var str = function (v) {
-    if (Object.prototype.toString.call(v) === '[object Date]') return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
-    return typeof v === 'number' && v % 1 === 0 ? String(v) : String(v === null ? '' : v).trim();
-  };
+  var str = function (v) { return cellText_(v, tz); };
   var mine = sh.getName() === READING_TAB;
-  return sh.getRange(h.row + 1, 1, h.last - h.row, h.width).getValues().map(function (r) {
+  return body.map(function (r, n) {
     var title = str(r[h.name]);
     if (!title) return null;
     var when = added >= 0 ? str(r[added]) : [year >= 0 ? str(r[year]) : '', month >= 0 ? str(r[month]).slice(0, 3) : ''].join(' ').trim();
@@ -781,18 +791,49 @@ function readingRows_(sh, tz) {
     var rest = [];
     if (mine) { if (note >= 0 && str(r[note])) rest.push(str(r[note])); }
     else for (var i = h.name + 2; i < r.length; i++) if (str(r[i])) rest.push(str(r[i]));
-    return { title: title, tab: mine && type >= 0 && str(r[type]) ? str(r[type]) : sh.getName(), want: mine, when: when, mark: mark, note: rest.join(' · ').slice(0, 120) };
+    var full = rest.join(' · ');
+    return { title: title, tab: mine && type >= 0 && str(r[type]) ? str(r[type]) : sh.getName(), want: mine, when: when, mark: mark, note: full.slice(0, 120), row: h.row + 1 + n, full: mine ? full : '' };
   }).filter(Boolean);
 }
 
-// Want 页：没有就建，表头缺的补在后面；返回 { sh, col: {added, name, type, vibe, note} }
+// 这一格的下拉：{ list: 选项, strict: 不在选项里的值收不收 }；没有下拉（或不是列表型的）是 null
+function dropdown_(cell) {
+  try {
+    var rule = cell.getDataValidation();
+    if (!rule) return null;
+    var kind = String(rule.getCriteriaType()), args = rule.getCriteriaValues();
+    var vals = kind === 'VALUE_IN_LIST' ? args[0] : kind === 'VALUE_IN_RANGE' ? [].concat.apply([], args[0].getValues()) : null;
+    if (!vals) return null;
+    vals = vals.map(function (v) { return cellText_(v, ''); }).filter(function (v) { return v !== ''; });
+    return vals.length ? { list: vals, strict: !rule.getAllowInvalid() } : null;
+  } catch (err) { return null; }
+}
+
+// 小类那一格（名字后面第二格）能选什么：有下拉就照下拉的选项；没有就看这一列写过什么（短的、就那么几种才算）
+function readingKinds_(sh, h, body) {
+  var col = h.name + 2;
+  if (col >= sh.getMaxColumns()) return [];
+  var drop = dropdown_(sh.getRange(h.row + 1, col + 1));
+  if (drop) return drop.list;
+  var count = {}, names = [];
+  for (var i = 0; i < body.length; i++) {
+    var v = cellText_(body[i][col], '');
+    if (!v) continue;
+    if (v.length > 12) return [];
+    if (!count[v]) { count[v] = 0; names.push(v); }
+    count[v]++;
+  }
+  return names.length > 6 ? [] : names.sort(function (a, b) { return count[b] - count[a]; });
+}
+
+// Want 页：没有就建，表头缺的补在后面；返回 { sh, col: {name, type, vibe, note} }
 function wantTab_(book) {
   var sh = book.getSheetByName(READING_TAB);
   if (!sh) {
     sh = book.insertSheet(READING_TAB);
     sh.getRange(1, 1, 1, READING_HEAD.length).setValues([READING_HEAD]);
     sh.setFrozenRows(1);
-    sh.getRange(2, 2, Math.max(sh.getMaxRows() - 1, 1), 4).setNumberFormat('@');
+    sh.getRange(2, 1, Math.max(sh.getMaxRows() - 1, 1), READING_HEAD.length).setNumberFormat('@');
   }
   var names = head_(sh), col = {};
   READING_HEAD.forEach(function (hd) {
@@ -808,44 +849,141 @@ function wantTab_(book) {
   return { sh: sh, col: col, width: names.length };
 }
 
-// req = { list: true, add: [{id, title, type, vibe, note}] } → { rows, types, added: [id], dupes: [{id, title, tab}] }
+var plainKey_ = function (v) { return String(v).replace(/️/g, '').trim().toLowerCase(); };
+
+// 月份照这一页已有的写法：下拉选项 / 已有的格子里开头三个字母一样的原样用；这一页写的是数字就写数字；都没有就写英文全名
+function monthText_(m, known) {
+  var want = MONTHS[m - 1].slice(0, 3).toLowerCase(), digits = false;
+  for (var i = 0; i < known.length; i++) {
+    var s = cellText_(known[i], '');
+    if (s.slice(0, 3).toLowerCase() === want) return s;
+    if (/^\d{1,2}$/.test(s)) digits = true;
+  }
+  return digits ? m : MONTHS[m - 1];
+}
+
+// 要写进有下拉的格子：照选项里的写法写（大小写、emoji 的变体符不算差别）；选项里没有、下拉又不收别的值 → 说清楚缺什么
+function fit_(sh, row, col, v, what) {
+  var drop = dropdown_(sh.getRange(row, col + 1));
+  if (!drop) return v;
+  for (var i = 0; i < drop.list.length; i++) if (plainKey_(drop.list[i]) === plainKey_(v)) return typeof v === 'number' ? v : drop.list[i];
+  if (drop.strict) throw new Error(sh.getName() + ': the ' + what + ' dropdown has no "' + v + '" — add it in the Sheet');
+  return v;
+}
+
+// 看完的一条写进它那一页。all = 现在所有页里的条目 [{r, sh}]。返回 {} / { dupe: 已经在哪一页 } / { why: 为什么没写 }
+function finish_(book, d, all) {
+  var title = String(d.title).trim(), key = titleKey_(title);
+  var hits = all.filter(function (x) { return titleKey_(x.r.title) === key; });
+  var dated = hits.filter(function (x) { return !x.r.want && x.r.when; })[0];
+  if (dated) return { dupe: dated.r.tab };
+  var open = hits.filter(function (x) { return !x.r.want; })[0];   // 某一页里已经有、还没写日期：就地填
+  var wants = hits.filter(function (x) { return x.r.want; });
+  var tab = String(d.tab || '').trim().toLowerCase();
+  var sh = open ? open.sh : book.getSheets().filter(function (s) { return s.getName() !== READING_TAB && s.getName().trim().toLowerCase() === tab; })[0];
+  if (!sh) return { why: 'There is no ' + (d.tab || '?') + ' tab in your reading Sheet' };
+  var h = readingHead_(sh), yc = h ? h.cols.indexOf('year') : -1, mc = h ? h.cols.indexOf('month') : -1;
+  if (yc < 0 || mc < 0) return { why: sh.getName() + ': no Year / Month / Name headings' };
+  var m = Math.min(12, Math.max(1, Number(d.month) || 1)), year = Number(d.year);
+  if (!(year > 1900)) return { why: 'No year' };
+  var body = readingBody_(sh, h), row = open ? open.r.row : 0, fresh = false;
+  if (!row) {
+    // 最后一条有日期的下面那一行；那一行有东西（比如放在底下、还没看的）就先插一行
+    var last = h.row;
+    body.forEach(function (r, n) { if (cellText_(r[h.name], '') && cellText_(r[yc], '')) last = h.row + 1 + n; });
+    row = last + 1;
+    var taken = row <= h.last && body[row - h.row - 1].some(function (v) { return v !== '' && v !== null; });
+    if (taken || row > sh.getMaxRows()) { sh.insertRowsAfter(row - 1, 1); fresh = true; }
+  }
+  var was = open ? body[row - h.row - 1] : [], wrote = [];
+  var set = function (col, v, what) {
+    while (sh.getMaxColumns() < col + 1) sh.insertColumnAfter(sh.getMaxColumns());
+    var cell = fit_(sh, row, col, v, what);
+    sh.getRange(row, col + 1).setValue(typeof cell === 'number' ? cell : toCell_('text', cell));
+    wrote.push(col);
+  };
+  // Want 页里写过的备注跟着过去，这次写的接在后面
+  var notes = wants.map(function (x) { return x.r.full; }).concat(open ? [cellText_(was[h.name + 3], '')] : []).concat([String(d.note || '').trim()]);
+  var note = notes.filter(function (s, i) { return s && notes.indexOf(s) === i; }).join('\n');
+  try {
+    set(yc, year, 'Year');
+    set(mc, monthText_(m, ((dropdown_(sh.getRange(row, mc + 1)) || {}).list || []).concat(body.map(function (r) { return r[mc]; }))), 'Month');
+    if (d.mark) set(h.name + 1, String(d.mark), 'rating');
+    if (d.kind) set(h.name + 2, String(d.kind), 'kind');
+    if (note) set(h.name + 3, note, 'note');
+    if (!open) set(h.name, title, 'Name');
+    SpreadsheetApp.flush();   // 下拉不收的值最晚在这里报出来
+  } catch (err) {
+    // 写到一半：这一行恢复原样，这条留在网页那边等着
+    try {
+      if (fresh) sh.deleteRow(row);
+      else wrote.forEach(function (col) { sh.getRange(row, col + 1).setValue(was[col] === undefined ? '' : was[col]); });
+    } catch (e) { /* 恢复不了就算了，原因照样报回去 */ }
+    return { why: String(err.message || err) };
+  }
+  // 行号从下往上删，上面的不会挪位置
+  wants.map(function (x) { return x.r.row; }).sort(function (a, b) { return b - a; }).forEach(function (n) { wants[0].sh.deleteRow(n); });
+  return {};
+}
+
+// req = { list: true, add: [{id, title, type, vibe, note}], done: [{id, title, tab, year, month, mark, kind, note}] }
+// → { rows, types, kinds: {页名: [小类…]}, added: [id], logged: [id], dupes: [{id, title, tab}], failed: [{id, title, why}] }
 function reading_(req) {
   var book = readingBook_();
   if (!book) return { error: 'no sheet' };
-  var tz = tz_(), rows = [], types = [];
-  book.getSheets().forEach(function (sh) {
-    if (sh.getName() !== READING_TAB) types.push(sh.getName());
-    rows = rows.concat(readingRows_(sh, tz));
-  });
-  var seen = {};
-  rows.forEach(function (r) { if (!seen[titleKey_(r.title)]) seen[titleKey_(r.title)] = r; });
-  var out = { added: [], dupes: [] };
+  var tz = tz_(), all, types, kinds;
+  var scan = function (withKinds) {
+    all = []; types = []; kinds = {};
+    book.getSheets().forEach(function (sh) {
+      var mine = sh.getName() === READING_TAB, h = readingHead_(sh), body = readingBody_(sh, h);
+      if (!mine) types.push(sh.getName());
+      readingRows_(sh, tz, h, body).forEach(function (r) { all.push({ r: r, sh: sh }); });
+      if (withKinds && h && !mine) { var k = readingKinds_(sh, h, body); if (k.length) kinds[sh.getName()] = k; }
+    });
+  };
   var adds = (req.add || []).filter(function (a) { return a && String(a.title || '').trim(); });
+  var dones = (req.done || []).filter(function (d) { return d && String(d.title || '').trim(); });
+  var writes = adds.length + dones.length > 0;
+  scan(Boolean(req.list) && !writes);
+  var out = { added: [], dupes: [], logged: [], failed: [] }, changed = false;
   if (adds.length) {
-    var w = wantTab_(book), fresh = [], today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    var seen = {}, fresh = [], w = wantTab_(book);
+    all.forEach(function (x) { if (!seen[titleKey_(x.r.title)]) seen[titleKey_(x.r.title)] = x.r; });
     adds.forEach(function (a) {
-      var r = { title: String(a.title).trim(), tab: String(a.type || '').trim(), want: true, when: today, mark: String(a.vibe || '').trim(), note: String(a.note || '').trim() };
-      var hit = seen[titleKey_(r.title)];
-      if (hit) { out.dupes.push({ id: a.id, title: r.title, tab: hit.tab }); return; }
+      var title = String(a.title).trim(), hit = seen[titleKey_(title)];
+      if (hit) { out.dupes.push({ id: a.id, title: title, tab: hit.tab }); return; }
       var line = [];
       for (var i = 0; i < w.width; i++) line.push('');
-      line[w.col.added] = today;
-      line[w.col.name] = toCell_('text', r.title);
-      line[w.col.type] = toCell_('text', r.tab);
-      line[w.col.vibe] = toCell_('text', r.mark);
-      line[w.col.note] = toCell_('text', r.note);
+      line[w.col.name] = toCell_('text', title);
+      line[w.col.type] = toCell_('text', String(a.type || '').trim());
+      line[w.col.vibe] = toCell_('text', String(a.vibe || '').trim());
+      line[w.col.note] = toCell_('text', String(a.note || '').trim());
       fresh.push(line);
-      seen[titleKey_(r.title)] = r;
-      rows.push(r);
+      seen[titleKey_(title)] = { tab: String(a.type || '').trim() };
       out.added.push(a.id);
     });
     if (fresh.length) {
       var start = w.sh.getLastRow() + 1, need = start + fresh.length - 1 - w.sh.getMaxRows();
       if (need > 0) w.sh.insertRowsAfter(w.sh.getMaxRows(), need);
       w.sh.getRange(start, 1, fresh.length, w.width).setValues(fresh);
+      changed = true;
     }
   }
-  if (req.list) { out.rows = rows; out.types = types; }
+  dones.forEach(function (d) {
+    if (changed) scan(false);   // 上一条挪过行：重新读一遍再找
+    var res;
+    try { res = finish_(book, d, all); } catch (err) { res = { why: String(err.message || err) }; }
+    if (res.dupe) out.dupes.push({ id: d.id, title: String(d.title).trim(), tab: res.dupe });
+    else if (res.why) out.failed.push({ id: d.id, title: String(d.title).trim(), why: res.why });
+    else out.logged.push(d.id);
+    changed = true;
+  });
+  if (req.list) {
+    if (writes) scan(true);   // 写过东西：重新读一遍，回去的就是表格现在的样子
+    out.rows = all.map(function (x) { return { title: x.r.title, tab: x.r.tab, want: x.r.want, when: x.r.when, mark: x.r.mark, note: x.r.note }; });
+    out.types = types;
+    out.kinds = kinds;
+  }
   return out;
 }
 

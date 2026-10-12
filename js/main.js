@@ -55,16 +55,20 @@ function applyTheme() {
 function sidebarHTML(c, view) {
   const todayOpen = c.tasks.filter((t) => t.date === c.today && !t.status).length;
   const deals = Meal.toCheck(store.meals(), c.today).length;   // 这一轮还没看的打折
-  const nav = [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""], ["meals", "Meals", deals || ""], ["reading", "Reading", ""], ["friends", "Friends", friendsDue(c.today) || ""], ["settings", "Settings", ""]];
+  // 四段，各管各的事：排时间的那四页 / 备餐 / 阅读 / 人。每段一层自己的淡底色（css 里 .sblock），不写标题
+  const blocks = [["todo", [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", ""], ["stats", "Stats", ""]]],
+    ["meals", [["meals", "Meals", deals || ""]]], ["read", [["reading", "Reading", ""]]], ["friends", [["friends", "Friends", friendsDue(c.today) || ""]]]];
+  const link = ([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '" title="' + t + '">' + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>";
   const theme = store.local().theme;
   const st = sync.getStatus();
   // 收起来只剩一列图标（记在这台设备上）：名字放进 title，角标缩成一个点
   const min = Boolean(store.local().sideMin);
   return '<div class="brand"><span class="ball" data-act="ball"></span><h1>苦昼短</h1>' +
     '<button type="button" class="icon-btn side-tog" data-act="side-toggle" aria-expanded="' + !min + '" aria-label="' + (min ? "Show" : "Hide") + ' the sidebar labels" title="' + (min ? "Expand" : "Collapse") + '">' + icon(min ? "right" : "left") + "</button></div>" +
-    '<nav class="snav">' + nav.map(([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '" title="' + t + '">' + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>").join("") + "</nav>" +
+    '<nav class="snav">' + blocks.map(([b, links]) => '<div class="sblock" data-b="' + b + '">' + links.map(link).join("") + "</div>").join("") + "</nav>" +
+    '<div class="sbot"><nav class="snav">' + link(["settings", "Settings", ""]) + "</nav>" +
     '<footer class="sfoot"><button type="button" class="sync-pill' + (st.bad ? " bad" : "") + '" data-act="sync" title="Sync now">' + icon("sync") + '<span data-sync-status>' + esc(st.text) + "</span></button>" +
-    '<button type="button" class="icon-btn" data-act="theme-cycle" title="Theme: ' + theme + '">' + icon(theme === "dark" ? "moon" : theme === "light" ? "sun" : "auto") + "</button></footer>";
+    '<button type="button" class="icon-btn" data-act="theme-cycle" title="Theme: ' + theme + '">' + icon(theme === "dark" ? "moon" : theme === "light" ? "sun" : "auto") + "</button></footer></div>";
 }
 
 // ---------- 整页重画（正在打字的输入框，值、光标都留住） ----------
@@ -224,7 +228,7 @@ initFriends(render);
 initSun();
 
 store.subscribe((meta) => {
-  if (meta.pulled) adoptGroups();
+  if (meta.pulled) { adoptGroups(); store.adoptMarks(); }
   if (meta.local) setFx(store.local().fx !== false);
   if (!meta.quiet) render();
   else paintSync();
@@ -264,5 +268,5 @@ if ("serviceWorker" in navigator && location.protocol === "https:") navigator.se
 render();
 // 早上的线要等表格里的数据拉下来再拍；连不上就 6 秒后用本机的
 if (sync.configured()) await Promise.race([syncThenLog(), new Promise((r) => setTimeout(r, 6000))]);
-else adoptGroups();
+else { adoptGroups(); store.adoptMarks(); }
 store.ensureTodayLog();

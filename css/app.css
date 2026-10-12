@@ -95,7 +95,20 @@ body.phone #main { max-width: 560px; margin: 0 auto; padding: 0 16px calc(40px +
 .brand { display: flex; align-items: center; gap: 9px; padding: 0 6px 10px; }
 .brand h1 { margin: 0; font: 900 20px/1 var(--cjk); letter-spacing: .06em; }
 [data-theme="dark"] .brand h1 { text-shadow: 0 0 18px rgba(204, 255, 0, .35); }
-.snav { display: grid; gap: 3px; }
+.snav { display: grid; gap: 7px; }
+/* 四段（排时间 / 备餐 / 阅读 / 人）：每段一块很淡的底，两个颜色慢慢过渡；上一段收尾的颜色就是下一段开头的，
+   所以从上到下是连着的一条，又各有各的色调。颜色是大类用的那套油画色，压得很淡。选中的那一项还是青柠 */
+.sblock { display: grid; gap: 3px; padding: 4px; border-radius: 13px;
+  background: linear-gradient(168deg, color-mix(in srgb, var(--w1) var(--wash), var(--bg)), color-mix(in srgb, var(--w2) var(--wash), var(--bg))); }
+#side { --wash: 17%; }
+[data-theme="dark"] #side { --wash: 14%; }
+.sblock[data-b="todo"] { --w1: #3E8E6E; --w2: #D2A52E; }
+.sblock[data-b="meals"] { --w1: #D2A52E; --w2: #E07A2B; }
+.sblock[data-b="read"] { --w1: #E07A2B; --w2: #8B62AE; }
+.sblock[data-b="friends"] { --w1: #8B62AE; --w2: #3F62B5; }
+.sblock a:hover { background: color-mix(in srgb, var(--bg) 65%, transparent); }
+.sbot { margin-top: auto; display: grid; gap: 8px; padding-top: 12px; }
+.sbot .snav { padding: 0 4px; }
 .snav a { display: flex; align-items: center; gap: 9px; padding: 6px 9px; border: 1.5px solid transparent; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13.5px; color: var(--muted); }
 .snav a:hover { background: var(--surface); color: var(--ink); }
 .snav a.on { color: var(--ink); background: var(--accent); border-color: var(--edge); box-shadow: 2px 2px 0 var(--edge); }
@@ -112,9 +125,11 @@ body.side-min .snav a { position: relative; justify-content: center; padding: 7p
 body.side-min .snav a span { display: none; }
 body.side-min .snav a b { position: absolute; top: 1px; right: 1px; min-width: 0; width: 8px; height: 8px; padding: 0; font-size: 0; line-height: 0; box-shadow: 0 0 0 2px var(--bg); }
 body.side-min .sfoot { flex-direction: column; }
+body.side-min .sbot { justify-items: center; }
+body.side-min .sbot .snav { padding: 0; }
 body.side-min .sync-pill { flex: none; padding: 8px; }
 body.side-min .sync-pill span { display: none; }
-.sfoot { margin-top: auto; display: flex; align-items: center; gap: 6px; padding-top: 12px; }
+.sfoot { display: flex; align-items: center; gap: 6px; }
 .sync-pill { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: var(--b-soft); border-radius: 999px; background: var(--bg); font-size: 12px; color: var(--muted); }
 .sync-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sync-pill .ic { width: 15px; height: 15px; }
@@ -814,6 +829,15 @@ body.phone .logtime input, body.phone .add input, body.phone .add select { font-
 .rtype { padding: 1px 6px; border-radius: 999px; background: var(--surface); font-size: 11px; color: var(--muted); }
 .rrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .rlab { width: 40px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.radd.done .rlab { width: 62px; }
+.rwhens { display: grid; gap: 6px; flex: 1; }
+.rpick { display: block; width: 100%; padding: 3px 6px; margin: 0 -6px; border: 0; border-radius: 8px; background: none; text-align: left; }
+.rpick:hover { background: var(--surface); }
+.rdone { color: var(--muted); }
+.rmore { margin-top: 6px; font-size: 12px; }
+.rstuck { margin: 0; font-size: 12.5px; color: var(--warn); }
+.rstuck b { color: var(--ink); }
+[data-rstuck]:empty { display: none; }
 .vibes { display: flex; gap: 6px; }
 .vibe { width: 40px; height: 36px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 19px; line-height: 1; filter: grayscale(.8); opacity: .7; }
 .vibe.on { border: var(--b); filter: none; opacity: 1; background: var(--surface); }
@@ -894,6 +918,12 @@ body[data-view="today"] #main, body.phone.has-dock[data-view="today"] #main { pa
 .rconnect { margin-bottom: 4px; }
 .rconnect input { border: var(--b-ctl); }
 body.phone .rconnect input, body.phone .radd input, body.phone .radd textarea { font-size: 16px; }
+body.phone .radd .chip { min-height: 38px; padding: 0 12px; font-size: 14px; }
+body.phone .radd.done .rrow { align-items: flex-start; }
+body.phone .radd.done .rlab { padding-top: 10px; }
+body.phone .rmonths { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+body.phone .rmonths .chip { padding: 0; }
+body.phone .rpick { padding: 8px 6px; }
 
 /* ---------- 备餐（Meals 页在电脑上；下次采购的单子手机上也有 #shop） ---------- */
 /* 热量只分三档：Low 绿 / Mid 黄 / High 红 */

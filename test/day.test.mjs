@@ -86,3 +86,35 @@ test("reading errors read as advice, not Google's raw message", async () => {
   assert.match(R.readingError("no sheet"), /Settings/);
   assert.equal(R.readingError("something else"), "something else");
 });
+
+test("reading: finished things queue apart from wants; an old script and a refused row are both noticed", async () => {
+  const R = await import("../js/reading.js");
+  R.add({ title: "Dune", type: "Book", vibe: "🎉" });
+  const id = R.log({ title: " Severance ", type: "TV", year: 2026, month: 10, mark: "🥰", note: "" });
+  const rq = R.request();
+  assert.deepEqual(rq.add.map((x) => x.title), ["Dune"], "an old script only ever sees the wants");
+  assert.deepEqual(rq.done, [{ id, title: "Severance", tab: "TV", year: 2026, month: 10, mark: "🥰", kind: "", note: "" }]);
+  assert.equal(R.finished("severance").when, "2026 Oct", "counts as logged while it waits");
+  assert.equal(R.finished("Dune"), undefined);
+  assert.deepEqual(R.wants().map((r) => r.title), ["Dune"]);
+  assert.deepEqual(R.logTypes(), ["Book", "PodCast", "Fiction", "TV", "Blogger", "Game"], "nothing to log on etc");
+
+  R.apply({ added: [rq.add[0].id], dupes: [] }, rq);   // 旧脚本：只回了想看的
+  assert.match(R.state().error, /Update Code\.gs/);
+  assert.deepEqual(R.state().pending.map((x) => x.id), [id]);
+
+  const no = { added: [], dupes: [], logged: [], failed: [{ id, why: "TV: the Year dropdown has no \"2026\"" }] };
+  R.apply(no, R.request());
+  assert.equal(R.state().error, "");
+  assert.deepEqual(R.takeFailed(), [{ title: "Severance", why: no.failed[0].why }]);
+  R.apply(no, R.request());
+  assert.deepEqual(R.takeFailed(), [], "the same reason is only said once");
+  assert.equal(R.state().pending[0].why, no.failed[0].why);
+
+  R.apply({ added: [], dupes: [], logged: [id], failed: [], types: ["Book", "TV", "etc"], kinds: { Book: ["book", "English"] },
+    rows: [{ title: "Severance", tab: "TV", want: false, when: "2026 Oct", mark: "🥰", note: "" }, { title: "Dune", tab: "Book", want: true, when: "", mark: "🎉", note: "" }] }, R.request());
+  assert.equal(R.state().pending.length, 0);
+  assert.deepEqual(R.logTypes(), ["Book", "TV"]);
+  assert.deepEqual([R.kindsOf("Book"), R.kindsOf("TV")], [["book", "English"], []]);
+  assert.equal(R.finished("Severance").tab, "TV");
+});

@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const files = ["js", "js/ui"].flatMap((d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js")).map((f) => path.join(d, f)));
+const files = ["js", "js/ui", "js/store"].filter((d) => fs.existsSync(path.join(root, d))).flatMap((d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js")).map((f) => path.join(d, f)));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "kzd-syntax-"));
 
 test("every page module parses", () => {

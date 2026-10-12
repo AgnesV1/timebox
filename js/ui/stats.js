@@ -1,6 +1,7 @@
-// 统计页（电脑）。最上面：看哪段时间（Day / Week / Month / Season / Year / 自己选两头）、只看哪几个项目 / 计划（可以勾好几个）、只看深度。
+// 统计页（电脑）。最上面：看哪段时间（Week / Month / Season / Year / 自己选两头；每次打开都从 Month 开始）、只看哪几个项目 / 计划（可以勾好几个）、只看深度。
 // 下面两个页签：
-//   Time —— 时间去哪了：花了多久、其中多少是深度、每天的柱子、一天 24 小时的饼图、时间表（项目 × 日子）、几点在干活
+//   Time —— 时间去哪了：花了多久、其中多少是深度、每天的柱子、一天 24 小时的饼图、时间表（项目 × 日子，点开看它下面的计划）、几点在干活、星期几
+// 颜色的规矩：青柠 = 总量（每天的柱子）；项目自己的颜色 = 按项目拆开的图（饼图、时间表、星期几、几点在干活）。
 //   Plan —— 计划执行得怎样：做完多少、守住几天线、估时准不准、各项目、没做完的原因、项目健康
 // 图都是 HTML / SVG 画的，鼠标移上去有读数，数字都另有一份表格 / 图例可以看。「+ Add time」补一段忘了记的时间。
 
@@ -9,12 +10,11 @@ import * as S from "../stats.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtMin, fmtShort, fmtDay, fmtClock, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf } from "../dates.js";
-import { healthPill, groupsOf, projectOptions, pickTarget, badgeOf } from "./common.js";
+import { healthPill, groupsOf, projectOptions, pickTarget } from "./common.js";
 import { hourLabel } from "../day.js";
-import { parseTimes } from "../times.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
 
-let kind = "";        // 档位；上次选的记在这台设备上
+let kind = "month";   // 档位：每次打开都从 Month 开始，换了以后这次用着的时候一直是它
 let tab = "";         // time / plan
 let anchor = "";
 let custom = null;    // 自己选的两头 { from, to }
@@ -25,15 +25,13 @@ let pieMode = "day";  // 饼图：day = 一天 24 小时都算 / logged = 只看
 let adjust = false;   // 饼图底下「Adjust」开着
 const tips = {};   // 图表 id → 每根柱子的读数
 
-const PREV = { day: "the day before", week: "last week", month: "last month", season: "last season", year: "last year", custom: "the stretch before" };
+const PREV = { week: "last week", month: "last month", season: "last season", year: "last year", custom: "the stretch before" };
 const pct = (v) => Math.round(v * 100) + "%";
 const share = (v, total) => (total > 0 ? (v / total < 0.005 ? "<1%" : pct(v / total)) : "—");
 const groupName = (p) => String(p.group || "").trim() || p.name || "";
 
 function remember() {
-  const l = store.local();
-  if (!kind) kind = S.PERIODS[l.statsKind] ? l.statsKind : "season";
-  if (!tab) tab = l.statsTab === "plan" ? "plan" : "time";
+  if (!tab) tab = store.local().statsTab === "plan" ? "plan" : "time";
 }
 
 function rangeOf(c) {
@@ -69,7 +67,6 @@ function niceMax(v) {
 function rangeLabel(r) {
   const y = r.from.slice(0, 4);
   const other = (d) => (d.slice(0, 4) !== String(new Date().getFullYear()) ? ", " + d.slice(0, 4) : "");
-  if (kind === "day") return fmtDay(r.from) + other(r.from);
   if (kind === "month") return MONTHS_LONG[Number(r.from.slice(5, 7)) - 1] + " " + y;
   if (kind === "season") return "Q" + quarterOf(r.from) + " " + y;
   if (kind === "year") return y;
@@ -89,17 +86,15 @@ function tile(label, value, sub, dlt = "") {
   return '<div class="tile"><p class="tl">' + label + '</p><p class="tv">' + value + "</p>" + (sub ? '<p class="ts">' + sub + "</p>" : "") + dlt + "</div>";
 }
 
-// Time 页签：花了多久、其中多少深度、有几天动了（看一天时换成做完几个）
+// Time 页签：花了多久、其中多少深度、有几天动了
 function timeKpis(s, p) {
   const deepSub = s.goal
-    ? (kind === "day" ? "of your " + fmtMin(s.goal) + " goal" : "Goal " + fmtMin(s.goal) + " a day · reached on " + s.goalHit + " of " + s.goalDays + (s.goalDays === 1 ? " day" : " days"))
+    ? "Goal " + fmtMin(s.goal) + " a day · reached on " + s.goalHit + " of " + s.goalDays + (s.goalDays === 1 ? " day" : " days")
     : s.deep ? pct(s.deep / s.spent) + " of the time you logged" : "Mark a task ◆ Deep to see this";
   return '<div class="kpis three">' +
-    tile("Time spent", fmtMin(s.spent), kind === "day" ? fmtMin(s.planned) + " planned" : s.days ? "About " + fmtMin(s.avgSpent) + " a day" : "Nothing yet", delta(s.spent, p.spent, fmtMin)) +
+    tile("Time spent", fmtMin(s.spent), s.days ? "About " + fmtMin(s.avgSpent) + " a day" : "Nothing yet", delta(s.spent, p.spent, fmtMin)) +
     tile("◆ Deep work", fmtMin(s.deep), deepSub, delta(s.deep, p.deep, fmtMin)) +
-    (kind === "day"
-      ? tile("Tasks done", String(s.done), s.counted ? "of " + s.counted + " planned" : "No tasks that day", delta(s.done, p.done, String))
-      : tile("Active days", String(s.active), "of " + s.days + " days", delta(s.active, p.active, String))) +
+    tile("Active days", String(s.active), "of " + s.days + " days", delta(s.active, p.active, String)) +
     "</div>";
 }
 
@@ -152,19 +147,19 @@ function timeTrendHTML(s) {
   const labels = axisLabels(rows, byWeek);
   tips.ttrend = rows.map((r) => ({
     title: byWeek ? "Week of " + fmtShort(r.date) : fmtDay(r.date),
-    rows: [["Logged", fmtMin(r.spent), "dn"], ["Deep", fmtMin(r.deep), "dp"], ...(r.goal ? [["Deep goal", fmtMin(r.goal), "gl"]] : [])]
+    rows: [["Logged", fmtMin(r.spent), "dn"], ["Deep", fmtMin(r.deep), "dp"], ...(r.goal ? [["Deep goal", fmtMin(r.goal), "dgoal"]] : [])]
   }));
   const insight = s.days
     ? "You logged <b>" + fmtMin(s.avgSpent) + "</b> a day on average" + (s.deep ? ", <b>" + fmtMin(s.deep / s.days) + "</b> of it deep." : ".")
     : "This period hasn't started yet.";
   return '<figure class="card chart"><figcaption><div><h3>Time per ' + (byWeek ? "week" : "day") + "</h3><p>" + insight + "</p></div>" +
-    '<div class="legend"><span><i class="k dp"></i>Deep</span><span><i class="k dn"></i>Other</span>' + (s.goal ? '<span><i class="k gl"></i>Deep goal</span>' : "") + "</div></figcaption>" +
+    '<div class="legend"><span><i class="k dp"></i>Deep</span><span><i class="k dn"></i>Logged</span>' + (s.goal ? '<span><i class="k dgoal"></i>Deep goal</span>' : "") + "</div></figcaption>" +
     '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtMin(max * f) : "0") + "</span></i>").join("") +
     '<div class="cols" data-chart="ttrend">' + rows.map((r, i) =>
       '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.ttrend[i].title + ": " + fmtMin(r.spent) + " logged, " + fmtMin(r.deep) + " deep") + '">' +
       (r.spent ? '<i class="dn solo" style="height:' + h(r.spent) + '"></i>' : "") +
       (r.deep ? '<i class="dp' + (r.deep >= r.spent - 0.5 ? " full" : "") + '" style="height:' + h(r.deep) + '"></i>' : "") +
-      (r.goal && !r.future ? '<i class="gl" style="bottom:' + h(r.goal) + '"></i>' : "") +
+      (r.goal && !r.future ? '<i class="dgoal" style="bottom:' + h(r.goal) + '"></i>' : "") +
       (top > 0 && r.spent === top ? '<b class="cap-label num" style="bottom:' + h(r.spent) + '">' + fmtMin(r.spent) + "</b>" : "") + "</div>").join("") + "</div></div>" +
     '<div class="xaxis">' + labels.map((t) => "<span>" + t + "</span>").join("") + "</div>" +
     '<details class="tview"><summary>Show as table</summary><table><thead><tr><th>' + (byWeek ? "Week of" : "Day") + "</th><th>Logged</th><th>Deep</th></tr></thead><tbody>" +
@@ -219,21 +214,30 @@ function projectHTML(s) {
 
 // ---------- 星期几 ----------
 
+// 每根柱子按项目一段段叠起来（整体最多的在最下面），颜色是项目自己的
+const paint = (x) => esc(x.color || "var(--c-None)");
+
 function weekdayHTML(s) {
   const ws = store.prefs().weekStartsOn;
   const order = ws === "sunday" ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0];
   const rows = order.map((wd) => s.byWeekday[wd]);
   const top = Math.max(...rows.map((r) => r.avg));
   const max = niceMax(Math.max(30, top));
-  tips.weekday = rows.map((r) => ({ title: WEEKDAYS[r.wd] + " · " + r.days + " day" + (r.days === 1 ? "" : "s"), rows: [["Average", fmtMin(r.avg), "dn"]] }));
-  return '<figure class="card chart small"><figcaption><div><h3>Weekly rhythm</h3><p>Average time spent on each weekday.</p></div></figcaption>' +
+  const h = (v) => ((v / max) * 100).toFixed(2) + "%";
+  const names = s.byProject.filter((x) => x.spent > 0);
+  tips.weekday = rows.map((r) => ({ title: WEEKDAYS[r.wd] + " · " + r.days + " day" + (r.days === 1 ? "" : "s"),
+    rows: [["average", fmtMin(r.avg), "ln"], ...r.parts.map((x) => [x.name || "No project", fmtMin(x.avg), "sw", x.color || "var(--c-None)"])] }));
+  return '<figure class="card chart small"><figcaption><div><h3>Weekly rhythm</h3><p>Average time on each weekday, by project.</p></div>' +
+    '<div class="legend">' + names.slice(0, 8).map((x) => '<span><i class="k" style="background:' + paint(x) + '"></i>' + esc(x.name || "No project") + "</span>").join("") + "</div></figcaption>" +
     '<div class="plot short">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtMin(max * f) : "0") + "</span></i>").join("") +
     '<div class="cols wide" data-chart="weekday">' + rows.map((r, i) =>
-      '<div class="col" data-i="' + i + '" tabindex="0" aria-label="' + esc(WEEKDAYS[r.wd] + ": " + fmtMin(r.avg) + " on average") + '">' +
-      '<i class="dn solo" style="height:' + ((r.avg / max) * 100).toFixed(2) + '%"></i>' +
-      (top > 0 && r.avg === top ? '<b class="cap-label num" style="bottom:' + ((r.avg / max) * 100).toFixed(2) + '%">' + fmtMin(r.avg) + "</b>" : "") + "</div>").join("") + "</div></div>" +
+      '<div class="col" data-i="' + i + '" tabindex="0" aria-label="' + esc(WEEKDAYS[r.wd] + ": " + fmtMin(r.avg) + " on average" + (r.parts.length ? " — " + r.parts.map((x) => (x.name || "No project") + " " + fmtMin(x.avg)).join(", ") : "")) + '">' +
+      (r.avg ? '<span class="stack" style="height:' + h(r.avg) + '">' + r.parts.map((x) => '<i style="flex-grow:' + x.avg.toFixed(2) + ";background:" + paint(x) + '"></i>').join("") + "</span>" : "") +
+      (top > 0 && r.avg === top ? '<b class="cap-label num" style="bottom:' + h(r.avg) + '">' + fmtMin(r.avg) + "</b>" : "") + "</div>").join("") + "</div></div>" +
     '<div class="xaxis wide">' + rows.map((r) => "<span>" + WEEKDAYS[r.wd] + "</span>").join("") + "</div>" +
-    '<details class="tview"><summary>Show as table</summary><table><tbody>' + rows.map((r) => "<tr><td>" + WEEKDAYS[r.wd] + '</td><td class="num">' + fmtMin(r.avg) + "</td></tr>").join("") + "</tbody></table></details></figure>";
+    '<details class="tview"><summary>Show as table</summary><table><thead><tr><th></th><th>Average</th>' + names.map((x) => "<th>" + esc(x.name || "No project") + "</th>").join("") + "</tr></thead><tbody>" +
+    rows.map((r) => "<tr><td>" + WEEKDAYS[r.wd] + '</td><td class="num">' + fmtMin(r.avg) + "</td>" +
+      names.map((x) => '<td class="num">' + fmtMin(r.parts.find((y) => y.name === x.name)?.avg || 0) + "</td>").join("") + "</tr>").join("") + "</tbody></table></details></figure>";
 }
 
 // ---------- 没做完的原因 ----------
@@ -254,29 +258,40 @@ function reasonsHTML(s) {
 // ---------- 热力图：几点在干活 ----------
 // 横着 24 个小时（从 6:00 起，和今天页的圆盘一样），竖着星期几。只算写了起止钟点的计时段。
 // 底下「Week by week」展开后，每一周一张（最近的在上），通勤日的固定时段画灰；展开时才画，一年也不卡。
+// 颜色 = 这个钟点主要在干什么（S.hourTint）：一个项目占了七成以上就是它的颜色，不然前两名左右渐变、往多的那边偏；深浅 = 多少分钟。
 
 let heatGrid = [];   // 这一页的每天 × 小时，展开每周时要用
+let heatColors = {};   // 这一页每一行（项目 / 计划）的颜色
 let weeksOpen = false;   // 「Week by week」开着：同步重画时别收起来
-const shade = (min) => (min > 0.5 ? "--h:" + Math.min(100, Math.round(18 + (min / 60) * 82)) + "%" : "");
+const heatColor = (name) => esc(heatColors[name] || "var(--c-None)");
+function shade(min, tint) {
+  if (!(min > 0.5)) return "";
+  return "--h:" + Math.min(100, Math.round(18 + (min / 60) * 82)) + "%" +
+    (tint ? ";--c1:" + heatColor(tint.top) + (tint.next === null ? "" : ";--c2:" + heatColor(tint.next) + ";--p:" + Math.round(tint.share * 100) + "%") : "");
+}
 
 function heatRows(chart, rows) {
   tips[chart] = [];
   const head = '<div class="hrow hhead"><span></span>' + Array.from({ length: 24 }, (_, h) => "<i>" + (h % 3 === 0 ? hourLabel(h).slice(0, 2) : "") + "</i>").join("") + "</div>";
   return '<div class="heat" data-chart="' + chart + '">' + head + rows.map((r) =>
     '<div class="hrow"><span>' + esc(r.label) + "</span>" + r.hours.map((min, h) => {
-      const i = tips[chart].push({ title: r.label + " · " + hourLabel(h) + "–" + hourLabel(h + 1), rows: [[r.what, fmtMin(Math.round(min)), "dn"], ...(r.fixed?.[h] ? [["commute", fmtMin(r.fixed[h]), "pl"]] : [])] }) - 1;
-      return '<i class="hc' + (r.fixed?.[h] && min < 0.5 ? " fx" : "") + '" data-i="' + i + '" tabindex="-1" style="' + shade(min) + '"></i>';
+      const tint = S.hourTint(r.parts?.[h]);
+      const i = tips[chart].push({ title: r.label + " · " + hourLabel(h) + "–" + hourLabel(h + 1), rows: [[r.what, fmtMin(Math.round(min)), "ln"],
+        ...(tint ? tint.list.slice(0, 4).map(([n, m]) => [n || "No project", fmtMin(Math.round(m)), "sw", heatColors[n] || "var(--c-None)"]) : []),
+        ...(r.fixed?.[h] ? [["commute", fmtMin(r.fixed[h]), "pl"]] : [])] }) - 1;
+      return '<i class="hc' + (r.fixed?.[h] && min < 0.5 ? " fx" : "") + (tint && tint.next !== null ? " mix" : "") + '" data-i="' + i + '" tabindex="-1" style="' + shade(min, tint) + '"></i>';
     }).join("") + "</div>").join("") + "</div>";
 }
 
-function heatHTML(c, s) {
+function heatHTML(c, s, by) {
   const ws = store.prefs().weekStartsOn;
-  heatGrid = S.hourGrid(c, s.from, s.to);
+  heatGrid = S.hourGrid(c, s.from, s.to, by);
+  heatColors = Object.fromEntries(s.byProject.map((x) => [x.name, x.color]));
   const order = ws === "sunday" ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0];
   const byWd = S.heatByWeekday(heatGrid);
   const timed = heatGrid.reduce((a, x) => a + x.hours.reduce((b, v) => b + v, 0), 0);
-  return '<section class="card heatcard"><h3>When you worked</h3><p class="lede">Average minutes timed in each hour, from 6:00. Only time with a start and end counts.</p>' +
-    (timed ? heatRows("heat", order.map((wd) => ({ label: WEEKDAYS[wd], hours: byWd[wd].hours, what: "average" }))) : '<p class="empty">No timed sessions in this period.</p>') +
+  return '<section class="card heatcard"><h3>When you worked</h3><p class="lede">Average minutes timed in each hour, from 6:00. The colour is what that hour mostly went to — a blend when it was shared. Only time with a start and end counts.</p>' +
+    (timed ? heatRows("heat", order.map((wd) => ({ label: WEEKDAYS[wd], hours: byWd[wd].hours, parts: byWd[wd].parts, what: "average" }))) : '<p class="empty">No timed sessions in this period.</p>') +
     (timed ? '<details class="heat-weeks"' + (weeksOpen ? " open" : "") + '><summary>Week by week</summary><div data-heat-weeks>' + (weeksOpen ? weeksHTML() : "") + "</div></details>" : "") + "</section>";
 }
 
@@ -284,7 +299,7 @@ function heatHTML(c, s) {
 function weeksHTML() {
   return S.heatWeeks(heatGrid, store.prefs().weekStartsOn).map((w, k) =>
     '<div class="hweek"><p>' + fmtShort(w.from) + " – " + fmtShort(addDays(w.from, 6)) + "</p>" +
-    heatRows("heatw" + k, w.days.map((x, j) => ({ label: WEEKDAYS[(weekday(w.from) + j) % 7], hours: x ? x.hours : Array(24).fill(0), fixed: x?.fixed, what: x ? fmtShort(x.date) : "" }))) + "</div>").join("");
+    heatRows("heatw" + k, w.days.map((x, j) => ({ label: WEEKDAYS[(weekday(w.from) + j) % 7], hours: x ? x.hours : Array(24).fill(0), parts: x?.parts, fixed: x?.fixed, what: x ? fmtShort(x.date) : "" }))) + "</div>").join("");
 }
 
 // ---------- 项目 ----------
@@ -335,7 +350,7 @@ function pieHTML(c, s, rest) {
   const parts = pieParts(pie), life = S.lifeOf(c);
   const color = (x) => (x.kind === "life" ? LIFE_COLOR[x.key] : x.kind === "blank" ? "var(--k-blank)" : x.kind === "rest" ? "url(#st-hatch)" : x.kind === "more" ? "var(--k-None)" : esc(x.color || "var(--c-None)"));
   const swatch = (x) => (x.kind === "rest" ? HATCH : color(x));
-  const what = logged ? "of what you logged" : "of the whole " + (kind === "day" ? "day" : "period");
+  const what = logged ? "of what you logged" : "of the whole period";
   tips.pie = parts.map((x) => ({ title: x.name, rows: [[what, fmtMin(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.deep > 0 ? [["deep", fmtMin(x.deep), "dp"]] : [])] }));
   // 每片之间留一条缝（周长的 0.5% ≈ 2px）；pathLength = 100，所以长度直接写百分比
   let at = 0;
@@ -373,30 +388,29 @@ function colLabel(col) {
   return "<span>" + col.from.slice(0, 4) + "</span><b>" + MONTHS[Number(col.from.slice(5, 7)) - 1] + "</b>";
 }
 
+const sheetOpen = new Set();   // 点开了哪几个项目（默认都收着）
+
 function sheetHTML(c, s, by) {
   const sh = S.sheet(c, s.from, s.to, { weekStartsOn: store.prefs().weekStartsOn, by });
   if (!sh.rows.length) return '<section class="card"><h3>Timesheet</h3><p class="empty">Nothing logged in this period.</p></section>';
   const cell = (v, i) => '<td class="num' + (sh.cols[i].future ? " future" : "") + '">' + (v ? fmtClock(v) : "") + "</td>";
-  return '<section class="card"><h3>Timesheet</h3><p class="lede">Hours and minutes logged on each ' + (by === "plan" ? "plan" : "project") + ".</p>" +
+  const line = (r, lead, cls) => "<tr" + (cls ? ' class="' + cls + '"' : "") + "><th>" + lead + "</th>" + r.cells.map(cell).join("") + '<td class="num sum">' + fmtClock(r.total) + "</td></tr>";
+  const dot = (r) => '<span class="pdot" style="background:' + paint(r) + '"></span>';
+  // 能点开的：下面不止一个计划，或者只有一个、但名字和它自己不一样
+  const subsOf = (r) => (r.subs.length > 1 || (r.subs.length === 1 && r.subs[0].name && r.subs[0].name !== r.name) ? r.subs : []);
+  const any = sh.rows.some((r) => subsOf(r).length);
+  return '<section class="card"><h3>Timesheet</h3><p class="lede">Hours and minutes logged on each ' + (by === "plan" ? "plan" : "project") + (any ? ". Open a project to see its plans" : "") + ".</p>" +
     '<div class="table-wrap"><table class="tsheet"><thead><tr><th>' + (by === "plan" ? "Plan" : "Project") + "</th>" + sh.cols.map((x) => "<th" + (x.future ? ' class="future"' : "") + ">" + colLabel(x) + "</th>").join("") + "<th>Total</th></tr></thead><tbody>" +
-    sh.rows.map((r) => '<tr><th><span class="pdot" style="background:' + esc(r.color || "var(--c-None)") + '"></span>' + esc(r.name || "No plan") + "</th>" + r.cells.map(cell).join("") + '<td class="num sum">' + fmtClock(r.total) + "</td></tr>").join("") +
+    sh.rows.map((r) => {
+      const subs = subsOf(r), open = subs.length > 0 && sheetOpen.has(r.name), name = dot(r) + esc(r.name || "No plan");
+      return line(r, subs.length
+        ? '<button type="button" class="tw" data-act="sheet-row" data-name="' + esc(r.name) + '" aria-expanded="' + open + '">' + icon("right") + name + "</button>"
+        : (any ? '<span class="tw-gap"></span>' : "") + name) +
+        (open ? subs.map((x) => line(x, dot(x) + esc(x.name || "General"), "sub")).join("") : "");
+    }).join("") +
     "</tbody><tfoot>" +
-    (sh.deepSum ? "<tr><th>◆ Deep</th>" + sh.deep.map(cell).join("") + '<td class="num sum">' + fmtClock(sh.deepSum) + "</td></tr>" : "") +
-    '<tr class="total"><th>Total</th>' + sh.total.map(cell).join("") + '<td class="num sum">' + fmtClock(sh.sum) + "</td></tr></tfoot></table></div></section>";
-}
-
-// ---------- 看一天：那天做了什么 ----------
-
-function dayListHTML(c, s) {
-  const tasks = c.tasks.filter((t) => t.date === s.from).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
-  if (!tasks.length) return '<section class="card"><h3>That day</h3><p class="empty">Nothing planned or logged.</p></section>';
-  const when = (t) => parseTimes(t.times).filter((x) => x.from && x.to).map((x) => x.from + "–" + x.to).join(", ");
-  return '<section class="card"><h3>That day</h3><div class="table-wrap"><table class="ptable"><thead><tr><th>Task</th><th>Plan</th><th>When</th><th>Time</th></tr></thead><tbody>' +
-    tasks.map((t) => {
-      const p = badgeOf(t);
-      return '<tr><td><span class="pdot" style="background:' + esc(p?.color || "var(--c-None)") + '"></span>' + esc(t.title) + (t.deep ? ' <span class="dp">◆ Deep</span>' : "") + "</td><td>" + esc(p ? p.name : "—") +
-        '</td><td class="num">' + (when(t) || "—") + '</td><td class="num">' + (E.spentMin(t) ? fmtMin(E.spentMin(t)) : "—") + (t.status && t.status !== "done" ? " <small>" + t.status + "</small>" : "") + "</td></tr>";
-    }).join("") + "</tbody></table></div></section>";
+    (sh.deepSum ? "<tr><th>" + (any ? '<span class="tw-gap"></span>' : "") + "◆ Deep</th>" + sh.deep.map(cell).join("") + '<td class="num sum">' + fmtClock(sh.deepSum) + "</td></tr>" : "") +
+    '<tr class="total"><th>' + (any ? '<span class="tw-gap"></span>' : "") + "Total</th>" + sh.total.map(cell).join("") + '<td class="num sum">' + fmtClock(sh.sum) + "</td></tr></tfoot></table></div></section>";
 }
 
 // ---------- 整页 ----------
@@ -430,17 +444,16 @@ export function statsHTML(c) {
   const sc = scope(c);
   const s = S.summarize(sc.c, r.from, r.to, { by: sc.by });
   const prev = S.summarize(sc.c, p.from, p.to, { by: sc.by });
-  const day = kind === "day";
   let body;
   if (tab === "plan") {
-    body = planKpis(s, prev, sc.on) + (day ? "" : trendHTML(s, sc.on)) +
+    body = planKpis(s, prev, sc.on) + trendHTML(s, sc.on) +
       '<div class="stat-grid">' + projectHTML(s) + reasonsHTML(s) + "</div>" + projectsHTML(sc.c, s);
   } else {
     // 筛选之外记下来的时间：饼图里合成「Everything else」一片
     const rest = sc.on ? Math.max(0, S.summarize(c, r.from, r.to).spent - s.spent) : 0;
     body = timeKpis(s, prev) +
-      '<div class="st-two' + (day ? " solo" : "") + '">' + (day ? "" : timeTrendHTML(s)) + pieHTML(sc.c, s, rest) + "</div>" +
-      (day ? dayListHTML(sc.c, s) : sheetHTML(sc.c, s, sc.by) + heatHTML(sc.c, s) + '<div class="stat-grid">' + weekdayHTML(s) + "</div>");
+      '<div class="st-two">' + timeTrendHTML(s) + pieHTML(sc.c, s, rest) + "</div>" +
+      sheetHTML(sc.c, s, sc.by) + heatHTML(sc.c, s, sc.by) + '<div class="stat-grid">' + weekdayHTML(s) + "</div>";
   }
   return '<div class="stats">' + headHTML(c, r) + body + "</div>";
 }
@@ -448,7 +461,7 @@ export function statsHTML(c) {
 // ---------- 补一段时间 ----------
 
 function addTimeHTML(c) {
-  const date = kind === "day" && anchor <= c.today ? anchor : c.today;
+  const date = c.today;
   const projects = c.projects.filter(E.isActive);
   return '<form class="addtime" autocomplete="off"><h2 class="sheet-title">Add time</h2>' +
     '<label class="field"><span>What</span><input name="title" placeholder="What did you do?" required></label>' +
@@ -521,7 +534,6 @@ export function initStats(rerender) {
       // 换成 Custom：先接着现在看的这段
       if (el.dataset.k === "custom" && kind !== "custom") { const r = S.periodRange(kind, anchor || T, store.prefs().weekStartsOn); custom = { from: r.from, to: r.to > T ? T : r.to }; }
       kind = el.dataset.k;
-      store.setLocal({ statsKind: kind });
     } else if (act === "st-tab") { tab = el.dataset.v; store.setLocal({ statsTab: tab }); }
     else if (act === "st-prev" || act === "st-next") {
       const n = act === "st-prev" ? -1 : 1;
@@ -534,6 +546,7 @@ export function initStats(rerender) {
     else if (act === "life-adjust") adjust = !adjust;
     else if (act === "deep-only") deepOnly = !deepOnly;
     else if (act === "pick-clear") picks.clear();
+    else if (act === "sheet-row") { const n = el.dataset.name; if (!sheetOpen.delete(n)) sheetOpen.add(n); }
     else if (act === "add-time") { openModal(addTimeHTML(store.ctx())); modalSheet()?.querySelector("[name=title]")?.focus(); return; }
     if (anchor > T) anchor = T;
     rerender();

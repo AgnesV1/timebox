@@ -1,5 +1,5 @@
 // 统计的计算：只算数，不碰页面。时间单位都是分钟。
-// 看的是一段时间（一天 / 一周 / 一个月 / 一个季度 / 一年 / 自己选的两头）里：花了多少时间、其中多少是深度（Deep）、
+// 看的是一段时间（一周 / 一个月 / 一个季度 / 一年 / 自己选的两头）里：花了多少时间、其中多少是深度（Deep）、
 // 做完了多少、守住了几天安全线、估时准不准、各项目、星期几、没做完的原因；
 // 时间去向（一天 24 小时：睡觉、吃饭洗澡、家务按默认值算，剩下 = 记下来的 + 没记的）、时间表（项目 × 日子）。
 // 只看某个项目 / 只看深度：页面先把 ctx.tasks 筛好再传进来，这里不用管。
@@ -9,10 +9,9 @@ import * as E from "./engine.js";
 import { parseTimes } from "./times.js";
 import { hourMinutes, isCommute, COMMUTE_BLOCKS } from "./day.js";
 
-export const PERIODS = { day: "Day", week: "Week", month: "Month", season: "Season", year: "Year", custom: "Custom" };
+export const PERIODS = { week: "Week", month: "Month", season: "Season", year: "Year", custom: "Custom" };
 
 export function periodRange(kind, anchor, weekStartsOn = "monday") {
-  if (kind === "day") return { from: anchor, to: anchor };
   if (kind === "week") { const from = startOfWeek(anchor, weekStartsOn); return { from, to: addDays(from, 6) }; }
   if (kind === "month") { const from = startOfMonth(anchor); return { from, to: addDays(from, daysInMonth(from) - 1) }; }
   if (kind === "year") { const y = Number(anchor.slice(0, 4)); return { from: isoOf(y, 1, 1), to: isoOf(y, 12, 31) }; }
@@ -31,7 +30,6 @@ export function previousRange(kind, r, weekStartsOn) {
 }
 
 export function shiftAnchor(kind, anchor, n) {
-  if (kind === "day") return addDays(anchor, n);
   if (kind === "week") return addDays(anchor, 7 * n);
   if (kind === "month") return addMonths(anchor, n);
   if (kind === "year") return isoOf(Number(anchor.slice(0, 4)) + n, Number(anchor.slice(5, 7)), 1);
@@ -73,9 +71,10 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
   const inRange = (d) => d >= from && d <= last;
   const tasks = ctx.tasks.filter((t) => t.date && inRange(t.date));
 
-  const spentBy = {}, plannedBy = {}, deepBy = {};
+  const spentBy = {}, plannedBy = {}, deepBy = {}, wdBy = {};   // wdBy：每一行（大类 / 计划）在星期几各花了多少
   for (const t of tasks) {
     spentBy[t.date] = (spentBy[t.date] || 0) + E.spentMin(t);
+    if (E.spentMin(t)) { const n = rowOf(ctx, t, by).name; (wdBy[n] = wdBy[n] || Array(7).fill(0))[weekday(t.date)] += E.spentMin(t); }
     if (t.deep) deepBy[t.date] = (deepBy[t.date] || 0) + E.spentMin(t);
     if (t.status !== "drop" && t.status !== "later") plannedBy[t.date] = (plannedBy[t.date] || 0) + num(t.est);
   }
@@ -113,10 +112,12 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
     };
   }).filter((x) => x.counted || x.spent).sort((a, b) => (!a.name) - (!b.name) || b.spent - a.spent);
 
+  // 星期几：平均每天多久；parts = 按行拆开的那几段（顺序和 byProject 一样，最多的在前），加起来就是 avg
   const byWeekday = Array.from({ length: 7 }, (_, wd) => {
     const ds = days.filter((d) => weekday(d) === wd);
     const total = ds.reduce((a, d) => a + (spentBy[d] || 0), 0);
-    return { wd, avg: ds.length ? total / ds.length : 0, days: ds.length };
+    const parts = ds.length ? byProject.map((x) => ({ name: x.name, color: x.color, avg: (wdBy[x.name]?.[wd] || 0) / ds.length })).filter((x) => x.avg > 0) : [];
+    return { wd, avg: ds.length ? total / ds.length : 0, days: ds.length, parts };
   });
 
   const status = { partial: 0, later: 0, drop: 0 };
@@ -268,6 +269,7 @@ export function clockPie(ctx, s, { trackedOnly = false, rest = 0 } = {}) {
 
 // ---------- 时间表：项目 × 日子 ----------
 // 列：两周以内一天一列，十四周以内一周一列，再长一个月一列。格子 = 那一格里花掉的分钟。
+// 按大类分行时，每行带着 subs：它下面每个计划一行（名字为空的 = 直接挂在大类上的），加起来就是这一行。
 
 export function sheetCols(from, to, weekStartsOn = "monday") {
   const days = range(from, to);
@@ -292,22 +294,28 @@ export function sheet(ctx, from, to, { weekStartsOn = "monday", by = "group" } =
     const min = E.spentMin(t), i = cols.findIndex((c) => t.date >= c.from && t.date <= c.to);
     if (!min || i < 0) continue;
     const { name, color } = rowOf(ctx, t, by);
-    if (!rows.has(name)) rows.set(name, { name, color, cells: zeros(), total: 0, deep: 0 });
+    if (!rows.has(name)) rows.set(name, { name, color, cells: zeros(), total: 0, deep: 0, subs: new Map() });
     const r = rows.get(name);
     r.color = r.color || color;
     r.cells[i] += min; r.total += min; total[i] += min;
     if (t.deep) { r.deep += min; deep[i] += min; }
+    if (by !== "group") continue;
+    const p = t.projectId ? E.projectById(ctx, t.projectId) : null, k = p ? p.id : "";
+    if (!r.subs.has(k)) r.subs.set(k, { name: p ? p.name || "" : "", color: (p && p.color) || color, cells: zeros(), total: 0 });
+    const sub = r.subs.get(k);
+    sub.cells[i] += min; sub.total += min;
   }
-  const add = (a, v) => a + v;
+  const add = (a, v) => a + v, order = (a, b) => (!a.name) - (!b.name) || b.total - a.total;
   return {
     cols, total, deep, sum: total.reduce(add, 0), deepSum: deep.reduce(add, 0),
-    rows: [...rows.values()].sort((a, b) => (!a.name) - (!b.name) || b.total - a.total)
+    rows: [...rows.values()].map((r) => ({ ...r, subs: [...r.subs.values()].sort(order) })).sort(order)
   };
 }
 
 // ---------- 热力图：每天每个钟点计了多少分钟 ----------
 // 只算写了起止钟点的计时段；小时从 6:00 起（和今天页的圆盘一样），h = 0 是 6:00–7:00。
 // 通勤日顺便记下固定时段占了哪几个小时（fixed），画成灰的。
+// parts[h] = 这个钟点里各行（大类 / 计划，见 rowOf）各多少分钟 { 名字: 分钟 }，画颜色用。
 
 const commuteHours = () => {
   const out = {};
@@ -315,28 +323,50 @@ const commuteHours = () => {
   return out;
 };
 
-export function hourGrid(ctx, from, to) {
+export function hourGrid(ctx, from, to, by = "group") {
   const last = to < ctx.today ? to : ctx.today;
   const days = from <= last ? range(from, last) : [];
-  const at = new Map(days.map((d) => [d, Array(24).fill(0)]));
+  const at = new Map(days.map((d) => [d, { hours: Array(24).fill(0), parts: Array.from({ length: 24 }, () => ({})) }]));
   for (const t of ctx.tasks) {
-    const hours = at.get(t.date);
-    if (!hours) continue;
+    const day = at.get(t.date);
+    if (!day) continue;
+    let name = null;
     for (const seg of parseTimes(t.times)) {
       if (!seg.from || !seg.to) continue;
-      for (const [h, m] of Object.entries(hourMinutes(seg.from, seg.to))) hours[h] += m;
+      if (name === null) name = rowOf(ctx, t, by).name;
+      for (const [h, m] of Object.entries(hourMinutes(seg.from, seg.to))) { day.hours[h] += m; day.parts[h][name] = (day.parts[h][name] || 0) + m; }
     }
   }
   const fixed = commuteHours();
-  return days.map((d) => ({ date: d, hours: at.get(d), fixed: isCommute(ctx.commute, d) ? fixed : {} }));
+  return days.map((d) => ({ date: d, ...at.get(d), fixed: isCommute(ctx.commute, d) ? fixed : {} }));
 }
 
-// 星期几 × 钟点的平均分钟（这段时间里每个星期几有几天就除以几）
+// 星期几 × 钟点的平均分钟（这段时间里每个星期几有几天就除以几），parts 跟着平均
 export function heatByWeekday(grid) {
   return Array.from({ length: 7 }, (_, wd) => {
     const ds = grid.filter((x) => weekday(x.date) === wd);
-    return { wd, days: ds.length, hours: Array.from({ length: 24 }, (_, h) => (ds.length ? ds.reduce((a, x) => a + x.hours[h], 0) / ds.length : 0)) };
+    return {
+      wd, days: ds.length,
+      hours: Array.from({ length: 24 }, (_, h) => (ds.length ? ds.reduce((a, x) => a + x.hours[h], 0) / ds.length : 0)),
+      parts: Array.from({ length: 24 }, (_, h) => {
+        const out = {};
+        for (const x of ds) for (const [n, m] of Object.entries(x.parts[h])) out[n] = (out[n] || 0) + m / ds.length;
+        return out;
+      })
+    };
   });
+}
+
+// 一个钟点主要在干什么：parts = { 名字: 分钟 } → { top, next, share, list }。
+// 一个占了七成以上（或者只有一个）：next = null，整格它的颜色；不然 next = 第二名，share = 第一名在这两个里占多少（渐变往哪边偏）。
+// list = [[名字, 分钟]…] 多的在前。什么都没有是 null
+export const TINT_SOLID = 0.7;
+export function hourTint(parts) {
+  const list = Object.entries(parts || {}).filter(([, m]) => m > 0.5).sort((a, b) => b[1] - a[1]);
+  if (!list.length) return null;
+  const total = list.reduce((a, [, m]) => a + m, 0);
+  if (list.length === 1 || list[0][1] / total >= TINT_SOLID) return { top: list[0][0], next: null, share: 1, list };
+  return { top: list[0][0], next: list[1][0], share: list[0][1] / (list[0][1] + list[1][1]), list };
 }
 
 // 按周分组（最近的在前）：[{from, days: [7 天，没有的那天是 null]}]

@@ -51,6 +51,8 @@ test("summary: time, completion, line held, accuracy, projects, reasons", () => 
   assert.equal(s.daily.length, 7);
   assert.equal(s.daily.find((x) => x.date === "2026-10-06").future, true);
   assert.equal(s.byWeekday[4].avg, 85, "Thursday Oct 1");
+  assert.deepEqual(s.byWeekday[4].parts, [{ name: "Main - French", color: "#f0f", avg: 75 }, { name: "", color: "", avg: 10 }], "split by project, biggest first, adding up to the average");
+  assert.deepEqual(s.byWeekday[6].parts, [], "nothing on Saturday");
 });
 
 test("weekly roll-up for the year view", () => {
@@ -60,10 +62,9 @@ test("weekly roll-up for the year view", () => {
   assert.equal(w[0].spent, 20);
 });
 
-test("day and custom periods", () => {
-  assert.deepEqual(S.periodRange("day", TODAY), { from: TODAY, to: TODAY });
-  assert.deepEqual(S.previousRange("day", S.periodRange("day", TODAY)), { from: "2026-10-04", to: "2026-10-04" });
-  assert.equal(S.shiftAnchor("day", "2026-10-01", -1), "2026-09-30");
+test("custom periods; there is no single-day one", () => {
+  assert.deepEqual(Object.keys(S.PERIODS), ["week", "month", "season", "year", "custom"]);
+  assert.deepEqual(S.previousRange("custom", { from: TODAY, to: TODAY }), { from: "2026-10-04", to: "2026-10-04" }, "one day picked by hand still works");
   assert.deepEqual(S.previousRange("custom", { from: "2026-10-01", to: "2026-10-03" }), { from: "2026-09-28", to: "2026-09-30" });
 });
 
@@ -142,6 +143,9 @@ test("timesheet: a column per day, week or month depending on how long the perio
   const ielts = week.rows.find((r) => r.name === "IELTS");
   assert.deepEqual(ielts.cells, [0, 0, 0, 0, 90, 30, 0]);
   assert.equal(ielts.total, 120);
+  assert.deepEqual(ielts.subs.map((x) => x.name + " " + x.total), ["Reading 90", "Listening 30"], "the plans under it, biggest first");
+  assert.deepEqual(ielts.subs[0].cells, [0, 0, 0, 0, 90, 0, 0]);
+  for (const r of week.rows) assert.equal(r.subs.reduce((a, x) => a + x.total, 0), r.total, "sub-rows add up to their row");
   assert.deepEqual(week.total, [0, 0, 0, 0, 90, 50, 0]);
   assert.deepEqual(week.deep, [0, 0, 0, 0, 90, 30, 0]);
   assert.equal(week.sum, 140);
@@ -154,6 +158,7 @@ test("timesheet: a column per day, week or month depending on how long the perio
   assert.equal(year.cols.length, 12);
   assert.equal(year.cols[9].kind, "month");
   assert.equal(year.rows.find((r) => r.name === "Reading").cells[9], 105);
+  assert.ok(year.rows.every((r) => r.subs.length === 0), "rows that are already plans don't open");
 });
 
 test("weekly roll-up carries deep time and the goal", () => {

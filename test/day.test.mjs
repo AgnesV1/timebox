@@ -43,7 +43,8 @@ test("hours: a stretch splits across the hours it touches, counted from 6:00", (
 
 test("heat grid: per day per hour, averages by weekday, weeks newest first, commute hours marked", () => {
   const ctx = { today: "2026-10-07", commute: { days: { "2026-10-06": true } }, tasks: [
-    { date: "2026-10-05", times: "09:00-10:30 90m; 20m" },
+    { date: "2026-10-05", times: "09:00-10:30 90m; 20m", group: "Work" },
+    { date: "2026-10-05", times: "10:30-10:50 20m", group: "Build" },
     { date: "2026-10-06", times: "09:15-09:45 30m" },
     { date: "2026-10-12", times: "09:00-10:00 60m" }   // 明天以后，不算
   ] };
@@ -51,8 +52,9 @@ test("heat grid: per day per hour, averages by weekday, weeks newest first, comm
   assert.equal(grid.length, 10, "up to today");
   const mon = grid.find((x) => x.date === "2026-10-05");
   assert.equal(mon.hours[3], 60);
-  assert.equal(mon.hours[4], 30);
-  assert.equal(mon.hours.reduce((a, v) => a + v, 0), 90, "the untimed 20m isn't on the clock");
+  assert.equal(mon.hours[4], 50);
+  assert.equal(mon.hours.reduce((a, v) => a + v, 0), 110, "the untimed 20m isn't on the clock");
+  assert.deepEqual([mon.parts[3], mon.parts[4], mon.parts[5]], [{ Work: 60 }, { Work: 30, Build: 20 }, {}], "who the minutes of each hour belong to");
   assert.deepEqual(mon.fixed, {});
   const tue = grid.find((x) => x.date === "2026-10-06");
   assert.equal(tue.fixed[2], 60, "08:00–09:00 commute");
@@ -61,6 +63,15 @@ test("heat grid: per day per hour, averages by weekday, weeks newest first, comm
   const byWd = S.heatByWeekday(grid);
   assert.equal(byWd[1].days, 2, "two Mondays in range");
   assert.equal(byWd[1].hours[3], 30, "60 min over two Mondays");
+  assert.deepEqual(byWd[1].parts[4], { Work: 15, Build: 10 });
+  assert.deepEqual(byWd[2].parts[3], { "": 15 }, "no project is a row too");
+  // 一个钟点主要在干什么
+  assert.equal(S.hourTint({}), null);
+  assert.deepEqual(S.hourTint({ Work: 60 }), { top: "Work", next: null, share: 1, list: [["Work", 60]] });
+  assert.equal(S.hourTint({ Work: 42, Build: 18 }).next, null, "70% is clear enough: one colour");
+  const mixed = S.hourTint(mon.parts[4]);
+  assert.deepEqual([mixed.top, mixed.next, mixed.share], ["Work", "Build", 0.6], "otherwise the top two, leaning to the bigger");
+  assert.deepEqual(S.hourTint({ A: 20, "": 25, B: 15 }).list.map((x) => x[0]), ["", "A", "B"]);
   const weeks = S.heatWeeks(grid, "monday");
   assert.deepEqual(weeks.map((w) => w.from), ["2026-10-05", "2026-09-28"]);
   assert.equal(weeks[0].days[0].date, "2026-10-05");

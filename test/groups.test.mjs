@@ -264,14 +264,19 @@ test("friends: ticking a day off logs it once, and can be undone", () => {
 });
 
 test("friends: three marks that light up, and filtering by them", () => {
-  const [hat, mind, hug] = F.MARKS;
-  assert.deepEqual(F.marksOf("x " + hug + hat + " y"), [hat, hug], "always in the same order, whatever else is in the cell");
+  const [hall, mind, spark] = F.MARKS;
+  assert.deepEqual(F.marksOf("x " + spark + hall + " y"), [hall, spark], "always in the same order, whatever else is in the cell");
   assert.deepEqual([F.marksOf(""), F.marksOf(undefined)], [[], []]);
   assert.equal(F.toggleMark("", mind), mind);
-  assert.equal(F.toggleMark(hug + mind, hat), hat + mind + hug);
-  assert.equal(F.toggleMark(hat + mind + hug, mind), hat + hug);
-  assert.equal(F.toggleMark(hat, hat), "");
-  const people = [{ id: "a", name: "Ana", more: { Marks: hat + mind } }, { id: "b", name: "Bo", more: { Marks: mind } }, { id: "c", name: "Cy", more: {} }];
+  assert.equal(F.toggleMark(spark + mind, hall), hall + mind + spark);
+  assert.equal(F.toggleMark(hall + mind + spark, mind), hall + spark);
+  assert.equal(F.toggleMark(hall, hall), "");
+  assert.deepEqual(F.MARKS, ["🏛️", "🧠", "✨"]);
+  assert.deepEqual(F.marksOf("🫂🎩"), [hall, spark], "the two earlier marks still light up as the new ones");
+  assert.deepEqual(F.marksOf("🏛"), [hall], "with or without the variation selector");
+  assert.equal(F.toggleMark("🎩", mind), hall + mind, "and are written back the new way");
+  assert.deepEqual([F.freshMarks("🎩🫂"), F.freshMarks(hall + mind), F.freshMarks(""), F.freshMarks(undefined)], [hall + spark, hall + mind, "", ""]);
+  const people = [{ id: "a", name: "Ana", more: { Marks: hall + mind } }, { id: "b", name: "Bo", more: { Marks: mind } }, { id: "c", name: "Cy", more: {} }];
   const names = (marks) => F.filter(people, { marks, marksField: "Marks" }, {}, "2026-10-12").map((f) => f.name).join("");
-  assert.deepEqual([names([]), names([mind]), names([hat, mind]), names([hug])], ["AnaBoCy", "AnaBo", "Ana", ""], "every lit mark has to be there");
+  assert.deepEqual([names([]), names([mind]), names([hall, mind]), names([spark])], ["AnaBoCy", "AnaBo", "Ana", ""], "every lit mark has to be there");
 });

@@ -135,9 +135,16 @@ const ALIASES = { birthday: ["birthday", "bday", "生日"], greet: ["greetings",
 export const SPECIAL_NAME = { birthday: "Birthday", greet: "Greetings", dates: "Key dates", marks: "Marks" };
 
 // 三个记号：每个人可以点亮其中几个（各代表什么，用的人自己知道）。存在 Marks 字段里，值就是点亮的那几个连在一起
-export const MARKS = ["🎩", "🧠", "🫂"];
-export const marksOf = (text) => MARKS.filter((m) => String(text ?? "").includes(m));
+export const MARKS = ["🏛️", "🧠", "✨"];
+const OLD_MARKS = { "🎩": "🏛️", "🫂": "✨" };   // 以前用的两个：格子里还写着的照样认，下次写回去就是新的
+const bare = (s) => String(s ?? "").replace(/️/g, "");   // 🏛️ 带不带变体符都算
+export const marksOf = (text) => {
+  const t = bare(text);
+  return MARKS.filter((m) => t.includes(bare(m)) || Object.keys(OLD_MARKS).some((old) => OLD_MARKS[old] === m && t.includes(old)));
+};
 export const formatMarks = (list) => MARKS.filter((m) => (list || []).includes(m)).join("");
+// 格子里还写着以前的记号：换成现在的写法；没有就原样
+export const freshMarks = (text) => (Object.keys(OLD_MARKS).some((old) => String(text ?? "").includes(old)) ? formatMarks(marksOf(text)) : String(text ?? ""));
 export const toggleMark = (text, m) => { const have = marksOf(text); return formatMarks(have.includes(m) ? have.filter((x) => x !== m) : [...have, m]); };
 
 // 字段清单里哪个是生日、问候、关键日子、礼物（名字不分大小写、空格）；没有的是空

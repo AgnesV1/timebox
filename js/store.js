@@ -1047,6 +1047,12 @@ export function importFriends(rows, added = []) {
 
 // 特别的日子（生日、过节问候、关键日子，见 js/friends.js）：字段清单里哪个是哪个
 export const friendSpecial = () => F.specialFields(friendFields());
+// 记号换过样子：还写着以前那两个的格子改成现在的（不出声，改过的下次同步写回表格）
+export function adoptMarks() {
+  const field = friendSpecial().marks || F.SPECIAL_NAME.marks;
+  const stale = all("friends").filter((f) => F.freshMarks(f.more?.[field]) !== String(f.more?.[field] ?? ""));
+  if (stale.length) change(() => stale.forEach((f) => put("friends", { ...f, more: { ...f.more, [field]: F.freshMarks(f.more[field]) } })), "", { quiet: true });
+}
 export const occasionDone = (id) => Boolean(get("meets", id));
 // 到了日子点一下：在这个人的记录里记一条（id 是固定的，一年里这个日子只记一次）；再点一下 = 其实没做，把那条删掉
 export function toggleOccasion(id, friendId, note) {

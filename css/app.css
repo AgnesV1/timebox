@@ -92,15 +92,13 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 [data-theme="dark"] #sky { background: radial-gradient(44rem 30rem at 88% 6%, rgba(123, 44, 255, .17), transparent 70%), radial-gradient(38rem 26rem at 4% 92%, rgba(47, 91, 255, .14), transparent 70%); }
 [data-theme="light"] #sky .st, [data-theme="dark"] #sky .cloud, body.phone #sky i { display: none; }
 #sky .cloud { inset: 0 -4rem; will-change: transform; animation: cloud-drift 150s ease-in-out infinite alternate;
-  background-image: radial-gradient(30rem 11rem at 76% 8%, rgba(255, 255, 255, .96), transparent 62%), radial-gradient(34rem 12rem at 78% 12%, rgba(120, 180, 235, .26), transparent 65%),
-    radial-gradient(22rem 8rem at 30% 22%, rgba(255, 255, 255, .92), transparent 62%), radial-gradient(26rem 9rem at 32% 26%, rgba(120, 180, 235, .22), transparent 65%),
-    radial-gradient(24rem 8.5rem at 58% 62%, rgba(255, 255, 255, .9), transparent 62%), radial-gradient(28rem 9.5rem at 60% 66%, rgba(120, 180, 235, .2), transparent 68%),
-    radial-gradient(20rem 7rem at 22% 92%, rgba(255, 255, 255, .88), transparent 62%); }
+  background-image: radial-gradient(30rem 11rem at 76% 8%, rgba(255, 255, 255, .7), transparent 62%), radial-gradient(34rem 12rem at 78% 12%, rgba(120, 180, 235, .14), transparent 65%),
+    radial-gradient(22rem 8rem at 30% 24%, rgba(255, 255, 255, .6), transparent 62%), radial-gradient(26rem 9rem at 32% 28%, rgba(120, 180, 235, .11), transparent 65%); }
 #sky .st { will-change: opacity; animation: star-breathe 7s ease-in-out infinite; }
 #sky.still i { animation: none; }
 [data-theme="light"] body.phone #sky { background: linear-gradient(180deg, #D8ECFF, transparent 16rem); }
 @keyframes cloud-drift { to { transform: translateX(3rem); } }
-@keyframes star-breathe { 0%, 100% { opacity: .95; } 50% { opacity: .1; } }
+@keyframes star-breathe { 0%, 100% { opacity: .7; } 50% { opacity: .08; } }
 
 /* ---------- 整体布局 ---------- */
 .app { display: grid; grid-template-columns: var(--side-w, 196px) minmax(0, 1fr) auto; min-height: 100vh; }

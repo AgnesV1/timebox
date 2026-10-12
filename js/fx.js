@@ -50,7 +50,7 @@ function sky() {
   const star = (x, y, r) => "M" + x + " " + (y - r) + "Q" + x + " " + y + " " + (x + r) + " " + y + "Q" + x + " " + y + " " + x + " " + (y + r) + "Q" + x + " " + y + " " + (x - r) + " " + y + "Q" + x + " " + y + " " + x + " " + (y - r) + "Z";
   el.innerHTML = '<i class="cloud"></i>' + [[300, 340, 5.5], [380, 430, 7], [460, 510, 8.5], [540, 610, 11]].map(([w, h, dur], k) => {
     let d = "";
-    for (let i = 0; i < 7; i++) { const r = Math.round((1.6 + R() * 2.8) * 10) / 10; d += star(Math.round(r + R() * (w - 2 * r)), Math.round(r + R() * (h - 2 * r)), r); }
+    for (let i = 0; i < 5; i++) { const r = Math.round((1.6 + R() * 2.8) * 10) / 10; d += star(Math.round(r + R() * (w - 2 * r)), Math.round(r + R() * (h - 2 * r)), r); }
     const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='" + w + "' height='" + h + "'><path fill='white' d='" + d + "'/></svg>";
     return '<i class="st" style="background-image:url(&quot;data:image/svg+xml,' + encodeURIComponent(svg) + "&quot;);background-size:" + w + "px " + h + "px;animation-duration:" + dur + "s;animation-delay:-" + (k * 1.7).toFixed(1) + 's"></i>';
   }).join("");

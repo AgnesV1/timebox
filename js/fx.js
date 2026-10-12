@@ -1,5 +1,6 @@
 // 点哪里冒一圈细细的涟漪；标 Done 时在按钮上炸一把星星（Partial 一小把），守住安全线时撒礼花。纯装饰，不接收点击。
 // 系统开了「减弱动态效果」或设置里关掉时，全都不放。
+// 还有整站的底图（#sky，样子在 css 里）：白天蓝天白云，夜里碎星芒；关掉动效时停住不动。
 
 let layer = null, live = 0, hue = 0, enabled = true;
 const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -39,7 +40,22 @@ function star(x, y, dist, size, ms, fall, dotChance, palette) {
   ], ms * (0.85 + Math.random() * 0.4));
 }
 
-export function setFx(on) { enabled = on; }
+export function setFx(on) { enabled = on; document.getElementById("sky")?.classList.toggle("still", !on); }
+
+// 底图：一层云 + 四层星芒。每层星芒是一小块 SVG（几颗四角星，位置随机）平铺满屏，四层的大小和呼吸周期都不一样
+function sky() {
+  const el = document.createElement("div"), R = Math.random;
+  el.id = "sky";
+  el.setAttribute("aria-hidden", "true");
+  const star = (x, y, r) => "M" + x + " " + (y - r) + "Q" + x + " " + y + " " + (x + r) + " " + y + "Q" + x + " " + y + " " + x + " " + (y + r) + "Q" + x + " " + y + " " + (x - r) + " " + y + "Q" + x + " " + y + " " + x + " " + (y - r) + "Z";
+  el.innerHTML = '<i class="cloud"></i>' + [[300, 340, 5.5], [380, 430, 7], [460, 510, 8.5], [540, 610, 11]].map(([w, h, dur], k) => {
+    let d = "";
+    for (let i = 0; i < 7; i++) { const r = Math.round((1.6 + R() * 2.8) * 10) / 10; d += star(Math.round(r + R() * (w - 2 * r)), Math.round(r + R() * (h - 2 * r)), r); }
+    const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='" + w + "' height='" + h + "'><path fill='white' d='" + d + "'/></svg>";
+    return '<i class="st" style="background-image:url(&quot;data:image/svg+xml,' + encodeURIComponent(svg) + "&quot;);background-size:" + w + "px " + h + "px;animation-duration:" + dur + "s;animation-delay:-" + (k * 1.7).toFixed(1) + 's"></i>';
+  }).join("");
+  document.body.prepend(el);
+}
 
 export function burst(x, y, n = 20, dist = 120) {
   if (!layer || !enabled || reduce()) return;
@@ -75,6 +91,7 @@ export function cheer(el, status) {
 }
 
 export function initFx() {
+  sky();
   layer = document.createElement("div");
   layer.className = "fx";
   document.body.appendChild(layer);

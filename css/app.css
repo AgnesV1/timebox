@@ -82,6 +82,26 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 [data-theme="dark"] .seg { background: var(--surface); }
 [data-theme="dark"] .seg button.on { box-shadow: var(--glow); }
 
+/* ---------- 整站底图（#sky，js/fx.js 建的）：白天 = 蓝天白云，夜里 = 碎星芒 ----------
+   全是渐变加几小块 SVG 平铺，没有图片。垫在所有东西下面：侧栏、卡片都是不透明的，只在它们之间露出来。
+   云极慢地飘；星芒分四层，每层平铺的大小、呼吸的快慢都不一样，看着就不齐。设置里关了动效（.still）或系统要求减少动态时都停住。
+   手机上任务是直接铺在底色上的，所以只留顶上一点天色，不放云和星 */
+#sky { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+#sky i { position: absolute; inset: 0; }
+[data-theme="light"] #sky { background: linear-gradient(180deg, #BFE2FF, #E6F3FF 62%, #F5FAFF); }
+[data-theme="dark"] #sky { background: radial-gradient(44rem 30rem at 88% 6%, rgba(123, 44, 255, .17), transparent 70%), radial-gradient(38rem 26rem at 4% 92%, rgba(47, 91, 255, .14), transparent 70%); }
+[data-theme="light"] #sky .st, [data-theme="dark"] #sky .cloud, body.phone #sky i { display: none; }
+#sky .cloud { inset: 0 -4rem; will-change: transform; animation: cloud-drift 150s ease-in-out infinite alternate;
+  background-image: radial-gradient(30rem 11rem at 76% 8%, rgba(255, 255, 255, .96), transparent 62%), radial-gradient(34rem 12rem at 78% 12%, rgba(120, 180, 235, .26), transparent 65%),
+    radial-gradient(22rem 8rem at 30% 22%, rgba(255, 255, 255, .92), transparent 62%), radial-gradient(26rem 9rem at 32% 26%, rgba(120, 180, 235, .22), transparent 65%),
+    radial-gradient(24rem 8.5rem at 58% 62%, rgba(255, 255, 255, .9), transparent 62%), radial-gradient(28rem 9.5rem at 60% 66%, rgba(120, 180, 235, .2), transparent 68%),
+    radial-gradient(20rem 7rem at 22% 92%, rgba(255, 255, 255, .88), transparent 62%); }
+#sky .st { will-change: opacity; animation: star-breathe 7s ease-in-out infinite; }
+#sky.still i { animation: none; }
+[data-theme="light"] body.phone #sky { background: linear-gradient(180deg, #D8ECFF, transparent 16rem); }
+@keyframes cloud-drift { to { transform: translateX(3rem); } }
+@keyframes star-breathe { 0%, 100% { opacity: .95; } 50% { opacity: .1; } }
+
 /* ---------- 整体布局 ---------- */
 .app { display: grid; grid-template-columns: var(--side-w, 196px) minmax(0, 1fr) auto; min-height: 100vh; }
 body.side-min { --side-w: 54px; }
@@ -622,30 +642,33 @@ body.phone .settings .page-head { margin-top: 4px; }
 .st-two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); gap: 0 12px; align-items: stretch; }
 .st-two > * { margin-bottom: 10px; }
 @media (max-width: 1100px) { .st-two { grid-template-columns: minmax(0, 1fr); } }
-/* 深度（.tide；别叫 .dp，那是任务名后面「◆ Deep」小字的类，带 margin，会把这一段挤偏）：柱子还是那一根青柠。深度到哪，哪里有一道潮水线：青柠深一点（垫一层淡墨，两个主题一样）、顶上是一条在走的浪、
-   往下二十来像素就淡没了，像浪打在岸上那一小段。两层浪（.wv / .wv.b）波长、快慢、方向都不一样，叠出层次；整道线还会很轻地涨落 */
+/* 深度（.tide；别叫 .dp，那是任务名后面「◆ Deep」小字的类，带 margin，会把这一段挤偏）：柱子还是那一根青柠。
+   深度大概到哪，哪里漫上来一道电光蓝的潮水：顶上的浪边是虚的（不画线，不用知道得那么准），在慢慢走；往下二十来像素就淡没了，
+   像浪打在岸上那一小段。两层浪（.wv / .wv.b）波长、快慢、方向都不一样，叠出层次；整道水还会很轻地涨落。
+   浪边是一小块带模糊的 SVG 当 mask 平铺出来的（路径画得比这一块宽，接缝处才不会淡一截） */
 :root {
-  --wave-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='6' viewBox='0 0 24 6'%3E%3Cpath d='M0 3 Q6 -3 12 3 T24 3 V6 H0Z'/%3E%3C/svg%3E");
-  --wave-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='6' viewBox='0 0 34 6'%3E%3Cpath d='M0 3 Q8.5 -3 17 3 T34 3 V6 H0Z'/%3E%3C/svg%3E");
+  --tide: 47, 91, 255;
+  --wave-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='14' viewBox='0 0 24 14'%3E%3Cfilter id='b' x='-50%25' y='-50%25' width='200%25' height='200%25'%3E%3CfeGaussianBlur stdDeviation='1.7'/%3E%3C/filter%3E%3Cpath filter='url(%23b)' d='M-24 7 Q-18 1 -12 7 T0 7 T12 7 T24 7 T36 7 T48 7 V22 H-24Z'/%3E%3C/svg%3E");
+  --wave-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='14' viewBox='0 0 34 14'%3E%3Cfilter id='b' x='-50%25' y='-50%25' width='200%25' height='200%25'%3E%3CfeGaussianBlur stdDeviation='1.7'/%3E%3C/filter%3E%3Cpath filter='url(%23b)' d='M-34 7 Q-25.5 1 -17 7 T0 7 T17 7 T34 7 T51 7 T68 7 V22 H-34Z'/%3E%3C/svg%3E");
 }
 .col .tide { width: min(100%, 24px); overflow: hidden; border-radius: 0; background: none; }
-.wv { position: absolute; left: 0; right: 0; top: 0; height: 26px; background: linear-gradient(180deg, rgba(11, 11, 11, .26), rgba(11, 11, 11, 0));
-  -webkit-mask: var(--wave-a) 0 0 / 24px 6px repeat-x, linear-gradient(#000, #000) 0 5px / 100% calc(100% - 5px) no-repeat;
-  mask: var(--wave-a) 0 0 / 24px 6px repeat-x, linear-gradient(#000, #000) 0 5px / 100% calc(100% - 5px) no-repeat;
+.wv { position: absolute; left: 0; right: 0; top: 0; height: 32px; background: linear-gradient(180deg, rgba(var(--tide), .68) 6px, rgba(var(--tide), 0));
+  -webkit-mask: var(--wave-a) 0 0 / 24px 14px repeat-x, linear-gradient(#000, #000) 0 13px / 100% calc(100% - 13px) no-repeat;
+  mask: var(--wave-a) 0 0 / 24px 14px repeat-x, linear-gradient(#000, #000) 0 13px / 100% calc(100% - 13px) no-repeat;
   animation: wave-a 5s linear infinite, tide 7s ease-in-out infinite alternate; }
-.wv.b { height: 20px; background: linear-gradient(180deg, rgba(11, 11, 11, .16), rgba(11, 11, 11, 0));
+.wv.b { height: 26px; background: linear-gradient(180deg, rgba(var(--tide), .42) 6px, rgba(var(--tide), 0));
   -webkit-mask-image: var(--wave-b), linear-gradient(#000, #000); mask-image: var(--wave-b), linear-gradient(#000, #000);
-  -webkit-mask-size: 34px 6px, 100% calc(100% - 5px); mask-size: 34px 6px, 100% calc(100% - 5px);
+  -webkit-mask-size: 34px 14px, 100% calc(100% - 13px); mask-size: 34px 14px, 100% calc(100% - 13px);
   animation: wave-b 8s linear infinite, tide 9s ease-in-out infinite alternate; }
-@keyframes wave-a { to { -webkit-mask-position: -24px 0, 0 5px; mask-position: -24px 0, 0 5px; } }
-@keyframes wave-b { to { -webkit-mask-position: 34px 0, 0 5px; mask-position: 34px 0, 0 5px; } }
+@keyframes wave-a { to { -webkit-mask-position: -24px 0, 0 13px; mask-position: -24px 0, 0 13px; } }
+@keyframes wave-b { to { -webkit-mask-position: 34px 0, 0 13px; mask-position: 34px 0, 0 13px; } }
 @keyframes tide { to { transform: translateY(3px); } }
 .col .dgoal { width: min(100%, 24px); height: 0; border-top: 2px dotted var(--ink); border-radius: 0; }
 /* 按项目叠起来的柱子（Weekly rhythm）：一段一个项目，最多的在最下面 */
 .col .stack { position: absolute; bottom: 0; display: flex; flex-direction: column-reverse; gap: 1px; width: min(100%, 30px); border-radius: 4px 4px 0 0; overflow: hidden; }
 .col .stack i { position: static; flex-basis: 0; min-height: 1px; border-radius: 0; }
 [data-theme="light"] .col .stack i, [data-theme="light"] .legend .k[style] { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
-.k.tide { background: linear-gradient(180deg, rgba(11, 11, 11, .32), rgba(11, 11, 11, 0) 80%), var(--accent); box-shadow: inset 0 0 0 1px var(--edge); }
+.k.tide { background: linear-gradient(180deg, rgba(var(--tide), .75), rgba(var(--tide), 0) 85%), var(--accent); box-shadow: inset 0 0 0 1px var(--edge); }
 [data-theme="dark"] .k.tide { box-shadow: none; }
 .k.dgoal { height: 0; border-top: 2px dotted var(--ink); border-radius: 0; background: none; }
 .ctip .k.tide { width: 10px; height: 10px; border-radius: 3px; }

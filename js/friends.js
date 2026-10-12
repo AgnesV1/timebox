@@ -75,25 +75,43 @@ export function parseDated(cell, year) {
   return { date: y + "-" + String(mo).padStart(2, "0") + "-" + String(d).padStart(2, "0"), note: String(note || "").trim() };
 }
 
-// 从表格里复制出来的几行（一格一个 Tab）→ [{ name, values: [按字段顺序的那几格], meets: [{ date, note }] }]。
-// 第一格是名字，后面 fieldCount 格是资料，再后面带日期的每格算一次记录（不带日期的并进最后一个字段，免得丢）。
+// 从表格里复制出来的几行（一格一个 Tab）→ { rows: [{ name, values: { 字段名: 值 }, meets: [{ date, note }] }], fields, added, headed }。
+// 每一列是什么：
+//   第一行是表头（第一格写着 Name）就照表头来——哪一列的表头和哪个字段同名（不分大小写、空格和符号）就进哪个字段，
+//   表头是新名字的算一个新字段（added），表头空着的列不算资料；
+//   没有表头就按位置：名字后面的几格依次对应 fields。
+// 不算资料的列里，带日期的每格算一次记录（「5.17 coffee」）；不带日期的并进 Note（没有就并进最后一个字段），免得丢。
 // 同一个名字出现几行就并成一个人：后面那行填了的格子为准，记录不重复
-export function parseImport(text, fieldCount, year) {
+const plain = (s) => low(s).replace(/[^\p{L}\p{N}]+/gu, "");
+const NAME_HEADS = ["name", "名字", "姓名"];
+
+export function parseImport(text, fields, year) {
+  const lines = String(text || "").split(/\r?\n/).map((l) => l.split("\t").map((c) => c.trim())).filter((c) => c[0]);
+  const known = (fields || []).map(String), added = [];
+  const headed = lines.length > 0 && NAME_HEADS.includes(plain(lines[0][0]));
+  // cols[i] = 名字后面第 i 格进哪个字段（空 = 不算资料）
+  const cols = !headed ? known.slice() : lines[0].slice(1).map((h) => {
+    if (!plain(h)) return "";
+    const hit = [...known, ...added].find((f) => plain(f) === plain(h));
+    if (!hit) added.push(h);
+    return hit || h;
+  });
+  const all = [...known, ...added];
+  const spare = all.find((f) => ["note", "notes", "备注"].includes(plain(f))) || [...cols].reverse().find(Boolean) || "";
   const out = new Map();
-  for (const line of String(text || "").split(/\r?\n/)) {
-    const cells = line.split("\t").map((c) => c.trim()), name = cells[0];
-    if (!name || (!out.size && low(name) === "name")) continue;   // 空行、表头那行不要
-    if (!out.has(low(name))) out.set(low(name), { name, values: Array(fieldCount).fill(""), meets: [] });
+  for (const cells of headed ? lines.slice(1) : lines) {
+    const name = cells[0];
+    if (!out.has(low(name))) out.set(low(name), { name, values: {}, meets: [] });
     const row = out.get(low(name));
-    cells.slice(1, 1 + fieldCount).forEach((v, i) => { if (v) row.values[i] = v; });
-    for (const c of cells.slice(1 + fieldCount)) {
-      if (!c) continue;
+    cells.slice(1).forEach((c, i) => {
+      if (!c) return;
+      if (cols[i]) { row.values[cols[i]] = c; return; }
       const d = parseDated(c, year);
       if (d) { if (!row.meets.some((x) => x.date === d.date && x.note === d.note)) row.meets.push(d); }
-      else if (fieldCount && !row.values[fieldCount - 1].split(" · ").includes(c)) row.values[fieldCount - 1] = [row.values[fieldCount - 1], c].filter(Boolean).join(" · ");
-    }
+      else if (spare && !String(row.values[spare] || "").split(" · ").includes(c)) row.values[spare] = [row.values[spare], c].filter(Boolean).join(" · ");
+    });
   }
-  return [...out.values()];
+  return { rows: [...out.values()], fields: all, added, headed };
 }
 
 // 一行一个的字段清单 → 数组（去掉空行和重复的）

@@ -1,6 +1,7 @@
 // Friends 页（电脑）：People 表（搜索 + 筛选）、Recent（最近的记录）、右边 To do（谁、做什么、哪天）。
 // 每个人的资料有哪些格子是自己定的：右上齿轮 → Fields，一行一个；表格里手动加的列也会出现。
-// 已经记在别的表格里的人：People 那块右上角 Import，整片粘进来（第一格名字，后面按字段顺序，再后面「5.17 一句话」是记录）。
+// 已经记在别的表格里的人：People 那块右上角 Import，整片粘进来。带着表头那一行（Name、各字段的名字）就按表头对列，
+// 没带就按字段的顺序；不算资料的列里「5.17 一句话」是一次记录。
 // 还有「和谁」那一小块（withHTML）：今天页点开的任务行、加任务框、任务编辑框都用它，手机上也有。
 
 import * as store from "../store.js";
@@ -178,17 +179,16 @@ function fieldsEditorHTML() {
     '<div class="sheet-foot"><span class="hint">A field that already has values stays, even if you take its line out.</span><button type="submit" class="btn primary">Save</button></div></form>';
 }
 
-// 整片粘进来：从表格里复制的几行。字段还没定就先去定（不然那几格没地方放）
+// 整片粘进来：从表格里复制的几行
 function importEditorHTML() {
   const fields = store.friendFields();
   return '<form class="import-editor" autocomplete="off"><h2 class="sheet-title">Import people</h2>' +
-    (fields.length
-      ? '<p class="hint">Paste rows copied from a spreadsheet. The first column is the name, then your fields in this order: <b>' + fields.map(esc).join("</b> · <b>") +
-        "</b>. Cells after those written like <b>5.17 coffee</b> become dated notes in that person's history. People already here are matched by name and filled in, never doubled.</p>"
-      : '<p class="hint">Set up your <button type="button" class="link" data-act="fr-fields">fields</button> first, so the columns have somewhere to go.</p>') +
-    '<label class="field"><span>Rows</span><textarea name="rows" rows="9" wrap="off" spellcheck="false"' + (fields.length ? "" : " disabled") + "></textarea></label>" +
+    '<p class="hint">Paste rows copied from a spreadsheet. Best with the heading row on top — <b>Name</b> first, then a heading over each column: columns are matched to your fields by their headings, and a new heading becomes a new field. ' +
+    (fields.length ? "Without headings, the columns after the name are taken in the order of your fields: <b>" + fields.map(esc).join("</b> · <b>") + "</b>. " : "") +
+    "Cells in columns with no heading written like <b>5.17 coffee</b> become dated notes in that person's history. People already here are matched by name and filled in, never doubled.</p>" +
+    '<label class="field"><span>Rows</span><textarea name="rows" rows="9" wrap="off" spellcheck="false"></textarea></label>' +
     '<label class="field small"><span>Year for dates like 5.17</span><input type="number" class="num" name="year" min="2000" max="2100" value="' + store.today().slice(0, 4) + '"></label>' +
-    '<div class="sheet-foot"><span class="hint" data-import-count></span><button type="submit" class="btn primary"' + (fields.length ? "" : " disabled") + ">Import</button></div></form>";
+    '<div class="sheet-foot"><span class="hint" data-import-count></span><button type="submit" class="btn primary">Import</button></div></form>';
 }
 
 const editorHTML = () => (editing.kind === "friend" ? friendEditorHTML() : editing.kind === "meet" ? meetEditorHTML() : editing.kind === "import" ? importEditorHTML() : fieldsEditorHTML());
@@ -353,19 +353,23 @@ export function initFriends(rerender) {
   on(document, "input", ".meet-editor [data-mf]:not([type=date])", (e, el) => saveMeetField(el, true));
   on(document, "change", ".meet-editor [data-mf]", (e, el) => saveMeetField(el, false));
 
-  // ---- 整片粘进来：边粘边数有几个人、几条带日期的；点 Import 才存 ----
-  const importRows = (form) => F.parseImport(form.rows.value, store.friendFields().length, Number(form.year.value) || Number(store.today().slice(0, 4)));
+  // ---- 整片粘进来：边粘边说读成了什么（几个人、几条带日期的、列是怎么对的）；点 Import 才存 ----
+  const readImport = (form) => F.parseImport(form.rows.value, store.friendFields(), Number(form.year.value) || Number(store.today().slice(0, 4)));
+  // 没有表头、也还没有字段，名字后面却有资料：这些格子没地方放
+  const stuck = (x, text) => !x.headed && !x.fields.length && text.split(/\r?\n/).some((l) => l.split("\t").slice(1).some((c) => c.trim() && !F.parseDated(c, 2000)));
   on(document, "input", ".import-editor [name=rows], .import-editor [name=year]", (e, el) => {
-    const rows = importRows(el.form), notes = rows.reduce((a, r) => a + r.meets.length, 0);
-    el.form.querySelector("[data-import-count]").textContent = rows.length
-      ? rows.length + (rows.length === 1 ? " person" : " people") + (notes ? " · " + notes + (notes === 1 ? " dated note" : " dated notes") : "") : "";
+    const x = readImport(el.form), notes = x.rows.reduce((a, r) => a + r.meets.length, 0);
+    el.form.querySelector("[data-import-count]").textContent = !x.rows.length ? ""
+      : stuck(x, el.form.rows.value) ? "Add a heading row (Name, then a name for each column) so the columns have somewhere to go."
+        : x.rows.length + (x.rows.length === 1 ? " person" : " people") + (notes ? " · " + notes + (notes === 1 ? " dated note" : " dated notes") : "") +
+          (x.headed ? " · matched by headings" : "") + (x.added.length ? " · new " + (x.added.length === 1 ? "field" : "fields") + ": " + x.added.join(", ") : "");
   });
   on(document, "submit", ".import-editor", (e, form) => {
     e.preventDefault();
-    const rows = importRows(form);
-    if (!rows.length) { form.rows.focus(); return; }
+    const x = readImport(form);
+    if (!x.rows.length || stuck(x, form.rows.value)) { form.rows.focus(); return; }
     closeModal();
-    store.importFriends(rows);
+    store.importFriends(x.rows, x.added);
   });
 
   // ---- 字段清单 ----

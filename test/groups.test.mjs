@@ -156,8 +156,7 @@ test("friends: rows pasted from a spreadsheet", () => {
   assert.deepEqual(F.parseDated("2024-1-9 call  about the move ", 2026), { date: "2024-01-09", note: "call  about the move" });
   assert.deepEqual(F.parseDated("20260517 picnic", 1999), { date: "2026-05-17", note: "picnic" });
   assert.deepEqual(["13.1 x", "2.30 x", "Mock", "5.17coffee", "", "3 people"].map((c) => F.parseDated(c, 2026)), [null, null, null, null, null, null]);
-  const text = [
-    "Name\tField A\tField B\tField C",
+  const body = [
     "Ana\tDesign\tToronto\t\t5.17 coffee\t6.5 lunch",
     "",
     "Bo",
@@ -165,20 +164,33 @@ test("friends: rows pasted from a spreadsheet", () => {
     "ana\t\tOttawa\tkept\t5.17 coffee\t7.1",
     "\tno name\tignored"
   ].join("\r\n");
-  const rows = F.parseImport(text, 3, 2026);
-  assert.deepEqual(rows, [
-    { name: "Ana", values: ["Design", "Ottawa", "kept"], meets: [{ date: "2026-05-17", note: "coffee" }, { date: "2026-06-05", note: "lunch" }, { date: "2026-07-01", note: "" }] },
-    { name: "Bo", values: ["", "", ""], meets: [] },
-    { name: "Cy", values: ["", "Montreal", "20260517 the picnic · stray note"], meets: [{ date: "2026-05-20", note: "call" }] }
-  ], "header and blank lines skipped; the same name merges; a dated cell inside the fields stays text; an undated extra joins the last field");
+  const want = [
+    { name: "Ana", values: { "Field A": "Design", "Field B": "Ottawa", "Field C": "kept" }, meets: [{ date: "2026-05-17", note: "coffee" }, { date: "2026-06-05", note: "lunch" }, { date: "2026-07-01", note: "" }] },
+    { name: "Bo", values: {}, meets: [] },
+    { name: "Cy", values: { "Field B": "Montreal", "Field C": "20260517 the picnic · stray note" }, meets: [{ date: "2026-05-20", note: "call" }] }
+  ];
+  // 没有表头：按字段的顺序
+  const byPlace = F.parseImport(body, ["Field A", "Field B", "Field C"], 2026);
+  assert.deepEqual(byPlace.rows, want, "blank lines skipped; the same name merges; a dated cell inside the fields stays text; an undated extra joins the last field");
+  assert.deepEqual([byPlace.headed, byPlace.added], [false, []]);
+  // 有表头：照表头对列，字段清单多一个、顺序不一样都不要紧
+  const head = " name \tfield-a\tFIELD B\tField C\t\t\n";
+  const byHead = F.parseImport(head + body, ["Extra", "Field C", "Field B", "Field A"], 2026);
+  assert.deepEqual(byHead.rows, want, "headings win over position, however many fields there are and whatever their order");
+  assert.deepEqual([byHead.headed, byHead.added, byHead.fields], [true, [], ["Extra", "Field C", "Field B", "Field A"]]);
+  // 表头里的新名字 = 新字段；不带日期的多余格子并进 Note
+  const fresh = F.parseImport("Name\tCity\tNote\t\nEd\tParis\tkind\tstray\t5.1 tea", ["Field A"], 2026);
+  assert.deepEqual(fresh.rows, [{ name: "Ed", values: { City: "Paris", Note: "kind · stray" }, meets: [{ date: "2026-05-01", note: "tea" }] }]);
+  assert.deepEqual([fresh.added, fresh.fields], [["City", "Note"], ["Field A", "City", "Note"]]);
+  assert.deepEqual(F.parseImport("", ["Field A"], 2026).rows, []);
 });
 
 test("friends: importing fills people in by name and never doubles anything", () => {
   store.setSetting("friend-fields", ["Field A", "Field B", "Field C"]);
   for (const f of store.friends()) store.deleteFriend(f.id);
   const dee = store.saveFriend({ name: "Dee", more: { "Field A": "old", "Field B": "keep me" }, next: "write back" });
-  const rows = F.parseImport("dee\tnew\t\t\t5.17 coffee\nEd\t\tParis\t\t5.17 coffee\t5.18 walk\nFay", 3, 2026);
-  store.importFriends(rows);
+  const x = F.parseImport("dee\tnew\t\t\t5.17 coffee\nEd\t\tParis\t\t5.17 coffee\t5.18 walk\nFay", store.friendFields(), 2026);
+  store.importFriends(x.rows, x.added);
   const names = () => store.friends().map((f) => f.name);
   assert.deepEqual(names(), ["Dee", "Ed", "Fay"]);
   assert.deepEqual(store.get("friends", dee).more, { "Field A": "new", "Field B": "keep me" }, "filled cells win, empty ones leave what was there");
@@ -187,8 +199,13 @@ test("friends: importing fills people in by name and never doubles anything", ()
   assert.deepEqual(ed.more, { "Field B": "Paris" });
   const log = () => store.meets().map((m) => m.date + " " + m.note + " " + m.friends.map((id) => store.get("friends", id).name).join("+")).sort();
   assert.deepEqual(log(), ["2026-05-17 coffee Dee", "2026-05-17 coffee Ed", "2026-05-18 walk Ed"], "one record per person");
-  store.importFriends(rows);
+  store.importFriends(x.rows, x.added);
   assert.deepEqual(names(), ["Dee", "Ed", "Fay"]);
   assert.equal(log().length, 3, "pasting the same rows again adds nothing");
   assert.equal(store.lastContact()[ed.id], "2026-05-18");
+  // 带表头、表头里有新名字：字段清单接上新的那个
+  const y = F.parseImport("Name\tfield b\tTown\nFay\tx\tLyon", store.friendFields(), 2026);
+  store.importFriends(y.rows, y.added);
+  assert.deepEqual(store.friendFields(), ["Field A", "Field B", "Field C", "Town"]);
+  assert.deepEqual(store.friends().find((f) => f.name === "Fay").more, { "Field B": "x", Town: "Lyon" });
 });

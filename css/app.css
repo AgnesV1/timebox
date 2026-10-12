@@ -622,24 +622,33 @@ body.phone .settings .page-head { margin-top: 4px; }
 .st-two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); gap: 0 12px; align-items: stretch; }
 .st-two > * { margin-bottom: 10px; }
 @media (max-width: 1100px) { .st-two { grid-template-columns: minmax(0, 1fr); } }
-/* 深度：柱子还是那一根青柠，深度那一段上闪着又小又密的星芒（紫罗兰和电光蓝混着，深度越多越密）；不另起颜色，也不画分界线。
-   这两个颜色垫在青柠上，两个主题用同一对 */
-:root { --spk-a: #7B2CFF; --spk-b: #2F5BFF; }
+/* 深度：柱子还是那一根青柠。深度到哪，哪里有一道潮水线：青柠深一点（垫一层淡墨，两个主题一样）、顶上是一条在走的浪、
+   往下二十来像素就淡没了，像浪打在岸上那一小段。两层浪（.wv / .wv.b）波长、快慢、方向都不一样，叠出层次；整道线还会很轻地涨落 */
+:root {
+  --wave-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='6' viewBox='0 0 24 6'%3E%3Cpath d='M0 3 Q6 -3 12 3 T24 3 V6 H0Z'/%3E%3C/svg%3E");
+  --wave-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='6' viewBox='0 0 34 6'%3E%3Cpath d='M0 3 Q8.5 -3 17 3 T34 3 V6 H0Z'/%3E%3C/svg%3E");
+}
 .col .dp { width: min(100%, 24px); overflow: hidden; border-radius: 0; background: none; }
-.spk { position: absolute; width: clamp(4px, 60%, 5px); aspect-ratio: 1; margin: -2.5px 0 0 -2.5px; background: var(--spk-a); clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); animation: twinkle 4s ease-in-out infinite; }
-.spk.b { background: var(--spk-b); }
-@keyframes twinkle { 0%, 100% { transform: scale(.15); opacity: 0; } 35%, 65% { transform: scale(1) rotate(45deg); opacity: 1; } }
+.wv { position: absolute; left: 0; right: 0; top: 0; height: 26px; background: linear-gradient(180deg, rgba(11, 11, 11, .26), rgba(11, 11, 11, 0));
+  -webkit-mask: var(--wave-a) 0 0 / 24px 6px repeat-x, linear-gradient(#000, #000) 0 5px / 100% calc(100% - 5px) no-repeat;
+  mask: var(--wave-a) 0 0 / 24px 6px repeat-x, linear-gradient(#000, #000) 0 5px / 100% calc(100% - 5px) no-repeat;
+  animation: wave-a 5s linear infinite, tide 7s ease-in-out infinite alternate; }
+.wv.b { height: 20px; background: linear-gradient(180deg, rgba(11, 11, 11, .16), rgba(11, 11, 11, 0));
+  -webkit-mask-image: var(--wave-b), linear-gradient(#000, #000); mask-image: var(--wave-b), linear-gradient(#000, #000);
+  -webkit-mask-size: 34px 6px, 100% calc(100% - 5px); mask-size: 34px 6px, 100% calc(100% - 5px);
+  animation: wave-b 8s linear infinite, tide 9s ease-in-out infinite alternate; }
+@keyframes wave-a { to { -webkit-mask-position: -24px 0, 0 5px; mask-position: -24px 0, 0 5px; } }
+@keyframes wave-b { to { -webkit-mask-position: 34px 0, 0 5px; mask-position: 34px 0, 0 5px; } }
+@keyframes tide { to { transform: translateY(3px); } }
 .col .dgoal { width: min(100%, 24px); height: 0; border-top: 2px dotted var(--ink); border-radius: 0; }
 /* 按项目叠起来的柱子（Weekly rhythm）：一段一个项目，最多的在最下面 */
 .col .stack { position: absolute; bottom: 0; display: flex; flex-direction: column-reverse; gap: 1px; width: min(100%, 30px); border-radius: 4px 4px 0 0; overflow: hidden; }
 .col .stack i { position: static; flex-basis: 0; min-height: 1px; border-radius: 0; }
 [data-theme="light"] .col .stack i, [data-theme="light"] .legend .k[style] { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
-.k.dp { position: relative; background: var(--accent); box-shadow: inset 0 0 0 1px var(--edge); }
-.k.dp::after { content: ""; position: absolute; inset: 1px 2px; background: var(--spk-a); clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.k.dp { background: linear-gradient(180deg, rgba(11, 11, 11, .32), rgba(11, 11, 11, 0) 80%), var(--accent); box-shadow: inset 0 0 0 1px var(--edge); }
 [data-theme="dark"] .k.dp { box-shadow: none; }
 .k.dgoal { height: 0; border-top: 2px dotted var(--ink); border-radius: 0; background: none; }
 .ctip .k.dp { width: 10px; height: 10px; border-radius: 3px; }
-.ctip .k.dp::after { inset: 1px; }
 .ctip .k.dgoal { height: 0; border-top: 2px dotted var(--ink); background: none; }
 .ctip .k.sw { width: 10px; height: 10px; border-radius: 3px; }
 .pie-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }

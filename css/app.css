@@ -1595,3 +1595,9 @@ select.open { border-color: var(--edge); }
 .dish-got li button { width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 13px; line-height: 1; }
 .dish-got li button:hover { color: var(--warn); }
 .dish-got + .msub { margin: 5px 0 0; font-size: 11.5px; }
+/* 阅读页：搜到的想看的旁边那两个标优先级的小按钮；表单里 Priority 那一行的字宽一点 */
+.rprios { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: 1px; }
+.rprios .chip { padding: 1px 8px; font-size: 11px; color: var(--muted); }
+.rprios .chip.on { color: var(--accent-ink); }
+[data-theme="dark"] .rprios .chip.on { color: var(--accent); }
+.radd:not(.done) .rlab { width: 52px; }

@@ -1,6 +1,7 @@
 // 阅读入口：你的阅读记录在另一个 Google 表格里（链接存在 Settings 的 reading），一页一种（Book、TV……）。
 // 这里做三件事：往那个表格的 Want 页追加想看的东西；看完的记进它自己那一页（哪一页、年月、评价、小类、备注）；
 // 在本机缓存一份所有页的条目，打字时查重。条目：{title, tab, want, when, mark, note}
+// 想看的可以标多想看（优先级，不是期限）：Soon = 这一两年 / 5 years = 五年内 / 不标。存在 Want 页的 Priority 那一列，表格里也能直接改。
 // 今天页也用它：加任务时能挑 Want 里的；任务标了 Done、名字在 Want 里，就问一句看完没有（wantOf / notYet）。
 // 要发的都先排队（没网也行，下次同步一起发）。缓存和排队都只在这台设备上（localStorage 单独一个 key），不进 Tasks 那些表。
 
@@ -9,6 +10,13 @@ import { readLocal, writeLocal } from "./dom.js";
 const KEY = "kuzhouduan-reading";
 const FRESH = 10 * 60000;   // 列表 10 分钟内拉过就不再拉（打开阅读页时总会拉一次）
 export const VIBES = ["🎉", "😊", "👀"];   // 想看的：爽 / 成长 / 好奇
+export const PRIOS = [["soon", "Soon", "This year or next"], ["five", "5 years", "Sometime in the next five years"]];   // 多想看；不标 = 没有
+export const prioText = (k) => (PRIOS.find(([key]) => key === k) || [])[1] || "";
+// 表格那一格里的字 → 哪一档（宽一点认：手写的 soon / this year / 1y、5y / five years 都行）
+export function prioKey(v) {
+  const s = String(v ?? "").trim().toLowerCase();
+  return !s ? "" : PRIOS.some(([k]) => k === s) ? s : /5|five/.test(s) ? "five" : /soon|1|one|year|now/.test(s) ? "soon" : "";
+}
 export const MARKS = ["🥰", "🎉", "💢"];   // 看完的：成长 / 爽了 / 踩雷（表格里名字后面那一格）
 export const TYPES = ["Book", "PodCast", "Fiction", "TV", "Blogger", "Game", "Article", "etc"];   // 用户定的，和阅读表格的页名对应
 const BY_HAND = ["etc", "article"];   // 看完的不在这里记的：etc 那一页太杂，只在表格里手写；Article 没有自己的页
@@ -40,10 +48,14 @@ export const kindsOf = (tab) => (R.kinds || {})[tab] || [];
 
 export function want(on = true) { wanted = on; }
 
-// 所有条目：排队还没发出去的排在前面（想看的 / 看完的），后面是表格里的
-const everything = () => [...R.pending.map((x) => (x.done
-  ? { title: x.title, tab: x.type, want: false, when: x.year + " " + monthName(x.month), mark: x.mark, note: x.note, queued: true }
-  : { title: x.title, tab: x.type, want: true, mark: x.vibe, note: x.note, queued: true })), ...R.rows];
+// 所有条目：排队还没发出去的排在前面（想看的 / 看完的），后面是表格里的。prio 都换成档位；刚点的优先级还排着队的，先叠上去
+function everything() {
+  const ranks = new Map(R.pending.filter((x) => x.rank).map((x) => [titleKey(x.title), x.prio || ""]));
+  const all = [...R.pending.filter((x) => !x.rank).map((x) => (x.done
+    ? { title: x.title, tab: x.type, want: false, when: x.year + " " + monthName(x.month), mark: x.mark, note: x.note, queued: true }
+    : { title: x.title, tab: x.type, want: true, mark: x.vibe, note: x.note, prio: x.prio || "", queued: true })), ...R.rows.map((r) => ({ ...r, prio: r.want ? prioKey(r.prio) : "" }))];
+  return ranks.size ? all.map((r) => (r.want && ranks.has(titleKey(r.title)) ? { ...r, prio: ranks.get(titleKey(r.title)) } : r)) : all;
+}
 
 // 打字时找已有的：标题包含你打的字（排队还没发出去的也算）
 export function search(q, limit = 8) {
@@ -70,12 +82,27 @@ export function notYet(taskId) {
   save();
   emit();
 }
-// 还没看的：Want 页里的，最新的在前（刚加、还没发出去的最前）
-export const wants = () => { const all = everything().filter((r) => r.want); return [...all.filter((r) => r.queued).reverse(), ...all.filter((r) => !r.queued).reverse()]; };
+// 还没看的：Want 页里的。Soon 的在前，然后 5 years，然后没标的；同一档里最新的在前（刚加、还没发出去的最前）
+const PRIO_RANK = { soon: 0, five: 1 };
+export const wants = () => { const all = everything().filter((r) => r.want); return [...all.filter((r) => r.queued).reverse(), ...all.filter((r) => !r.queued).reverse()].sort((a, b) => (PRIO_RANK[a.prio] ?? 2) - (PRIO_RANK[b.prio] ?? 2)); };
+
+// 给 Want 里的一条标优先级（prio = "soon" / "five" / "" 清掉）：还没发出去的那条直接改；已经在表格里的排一条改动，同一条只留最后一次
+export function setPrio(title, prio) {
+  const k = titleKey(title);
+  if (!k) return;
+  const mine = R.pending.find((x) => !x.done && !x.rank && titleKey(x.title) === k);
+  if (mine) mine.prio = prio || "";
+  else {
+    R.pending = R.pending.filter((x) => !(x.rank && titleKey(x.title) === k));
+    R.pending.push({ id: "k" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), rank: true, title: String(title).trim(), prio: prio || "" });
+  }
+  save();
+  emit();
+}
 
 export function add(entry) {
   const id = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  R.pending.push({ id, title: String(entry.title).trim(), type: String(entry.type || "").trim(), vibe: entry.vibe || "", note: String(entry.note || "").trim() });
+  R.pending.push({ id, title: String(entry.title).trim(), type: String(entry.type || "").trim(), vibe: entry.vibe || "", prio: entry.prio || "", note: String(entry.note || "").trim() });
   save();
   emit();
   return id;
@@ -100,11 +127,12 @@ export function drop(id) {
 
 // 同步时带上：要发的（想看的 / 看完的分开）、要不要列表。没什么要做就不带。
 // 有东西要发的时候清单也一起要回来：表格写完再读，本机这份马上就是新的（在今天页记了看完的，那句「看完了吗」才会收起来）；
-// 上次没写进去、还卡着的那几条不算，免得每次同步都整本读一遍
+// 上次没写进去、还卡着的那几条（why），等着新脚本的那几条（held）不算，免得每次同步都整本读一遍
 export function request() {
-  const list = wanted || R.pending.some((x) => !x.why) || Date.now() - (R.at || 0) > FRESH;
+  const list = wanted || R.pending.some((x) => !x.why && !x.held) || Date.now() - (R.at || 0) > FRESH;
   if (!R.pending.length && !list) return null;
-  return { add: R.pending.filter((x) => !x.done),
+  return { add: R.pending.filter((x) => !x.done && !x.rank).map((x) => ({ ...x, prio: prioText(x.prio) })),
+    rank: R.pending.filter((x) => x.rank).map((x) => ({ id: x.id, title: x.title, prio: prioText(x.prio) })),
     done: R.pending.filter((x) => x.done).map((x) => ({ id: x.id, title: x.title, tab: x.type, year: x.year, month: x.month, mark: x.mark, kind: x.kind, note: x.note })), list };
 }
 
@@ -127,10 +155,23 @@ export function apply(res, sent) {
   if (res.error) {
     R.error = readingError(res.error);
   } else {
-    // 发了看完的、回来却没提这回事：表格里还是旧脚本，那几条先留着
-    R.error = sent.done?.length && !Array.isArray(res.logged) ? "Update Code.gs in your Sheet to log finished things" : "";
-    const done = new Set([...(res.added || []), ...(res.logged || []), ...(res.dupes || []).map((d) => d.id)]);
+    // 表格里还是旧脚本（不认优先级）：刚加进去的那几条带着的优先级改成排队等着；排着的优先级标成 held，换了新脚本再写
+    const old = !Array.isArray(res.ranked);
+    if (old) {
+      for (const id of res.added || []) {
+        const p = R.pending.find((x) => x.id === id);
+        if (p?.prio) R.pending.push({ id: "k" + id, rank: true, title: p.title, prio: p.prio });
+      }
+      for (const x of R.pending) if (x.rank) x.held = true;
+    } else for (const x of R.pending) delete x.held;
+    // 发了看完的、回来却没提这回事：也是旧脚本，那几条先留着
+    R.error = sent.done?.length && !Array.isArray(res.logged) ? "Update Code.gs in your Sheet to log finished things"
+      : old && R.pending.some((x) => x.rank) ? "Update Code.gs in your Sheet to save priorities" : "";
+    const done = new Set([...(res.added || []), ...(res.logged || []), ...(res.ranked || []), ...(res.dupes || []).map((d) => d.id)]);
     R.pending = R.pending.filter((x) => !done.has(x.id));
+    // 要标的那条已经不在 Want 里了（看完了、在表格里删了）：这次改动不要了
+    const gone = new Set((res.failed || []).map((f) => f.id));
+    R.pending = R.pending.filter((x) => !(x.rank && gone.has(x.id)));
     if (res.dupes?.length) lastDupes = res.dupes;
     // 没写进去的留在队列里、记着原因（下次同步再试）；同一个原因只提醒一次
     for (const f of res.failed || []) {

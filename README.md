@@ -115,7 +115,10 @@
 **阅读（电脑和手机都有）**：第一次打开 Reading 页（或电脑 Settings → Reading）贴一次你的阅读记录表格的链接，贴进去就存。表格不用公开，用你自己的 Google 账号打开。
 `Reading` 页（手机右上角的书本图标）右上角两格：
 - **Want**：想看的。填标题、类型（就是那个表格的各页：Book、TV……）、风格（🎉 爽 / 😊 成长 / 👀 好奇）和 Note，
-  点 Add 就加进那个表格的 **Want** 页（没有会自动建，表头 Name / Type / Vibe / Note）。
+  点 Add 就加进那个表格的 **Want** 页（没有会自动建，表头 Name / Type / Vibe / Note / Priority）。
+  **Priority** 是多想看（优先级，不是期限）：`Soon` = 这一两年、`5 years` = 五年内，也可以不标。加的时候能选；
+  打字搜到已经在 Want 里的，旁边两个小按钮点一下就标上、再点取消。写在 Want 页的 Priority 那一列，表格里也能直接改、能排序
+  （以前建的 Want 页没有这一列，第一次用到时自动补在最后）。Finished 那一格标题空着时，先列标了 Soon 的那几条。
 - **Finished**：看完的。点选哪一页、小类（那一页的小类格子有下拉才出现，比如 Book 的 book / English…，Game 的 played / completed）、
   年月、值不值（🥰 成长 / 🎉 爽了 / 💢 踩雷，可以不标），写 Note，点 Log 就写进那一页：落在最后一条有日期的下面，
   月份照那一页已有的写法写。之前在 Want 里的点一下就填进来，记完会从 Want 页拿掉（Want 里写的 Note 跟过去）；

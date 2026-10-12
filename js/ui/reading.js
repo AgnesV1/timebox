@@ -1,8 +1,9 @@
 // 阅读页（电脑和手机都有），两格：
-// Want —— 往阅读表格的 Want 页加一条想看的：标题、类型（就是那个表格的各页）、风格（🎉 爽 / 😊 成长 / 👀 好奇）、Note。
+// Want —— 往阅读表格的 Want 页加一条想看的：标题、类型（就是那个表格的各页）、风格（🎉 爽 / 😊 成长 / 👀 好奇）、
+//   多想看（Priority：Soon 这一两年 / 5 years 五年内 / 不标——是优先级，不是期限）、Note。搜到的已经在 Want 里的，旁边两个小按钮直接标。
 // Finished —— 看完了一个，记进它自己那一页：哪一页、小类（那一页有才出现）、年月、评价（🥰 成长 / 🎉 爽了 / 💢 踩雷，可以不标）、Note；
 //   全是点选。之前放在 Want 里的点一下就填进来，记完表格那边把它从 Want 拿掉。
-// 标题边打边搜所有页里已经有的，免得重复。不显示整个清单，只显示对得上的（Finished 空着时列最近几条想看的）。
+// 标题边打边搜所有页里已经有的，免得重复。不显示整个清单，只显示对得上的（Finished 空着时列出标了 Soon 的那几条，没有标过就列最近几条）。
 
 import * as store from "../store.js";
 import * as sync from "../sync.js";
@@ -13,6 +14,7 @@ import { toast } from "./common.js";
 let query = "";   // 标题框里正在打的字（两格共用）
 let vibe = "";
 let type = "";
+let prio = "";    // Want 那一格选着的优先级
 // Finished 那一格：选的页、小类、评价、年月（0 = 还没动过，用今天的）、想看的是不是全列出来
 let tab = "", kind = "", mark = "", year = 0, month = 0, allWants = false;
 
@@ -20,7 +22,8 @@ const finishing = () => store.local().readMode === "done";
 const thisYear = () => Number(store.today().slice(0, 4));
 const when = () => ({ y: year || thisYear(), m: month || Number(store.today().slice(5, 7)) });
 
-const tags = (r) => (r.tab ? ' <span class="rtype">' + esc(r.tab) + "</span>" : "") + (r.want ? ' <span class="rtype want">Want</span>' : "") +
+const tags = (r, withPrio = true) => (r.tab ? ' <span class="rtype">' + esc(r.tab) + "</span>" : "") + (r.want ? ' <span class="rtype want">Want</span>' : "") +
+  (withPrio && r.want && r.prio ? ' <span class="rtype">' + reading.prioText(r.prio) + "</span>" : "") +
   (r.mark ? " " + esc(r.mark) : "") + (r.when ? ' <span class="rwhen">' + esc(r.when) + "</span>" : "") + (r.queued ? " <em>sending…</em>" : "");
 
 // Finished 里对得上的一条：还没看完的（Want 里的、某页里没写日期的）能点，点了填进表单
@@ -29,11 +32,16 @@ function pickHTML(r) {
   return r.want || !r.when ? '<li><button type="button" class="rpick" data-act="rpick" data-t="' + esc(r.title) + '" data-tab="' + esc(r.tab || "") + '">' + body + "</button></li>" : '<li class="rdone">' + body + "</li>";
 }
 
+// Want 里的一条旁边的两个小按钮：点一下标上，再点一次取消
+const prioChips = (r) => '<span class="rprios">' + reading.PRIOS.map(([k, l, tip]) => '<button type="button" class="chip' + (r.prio === k ? " on" : "") + '" data-act="rset" data-t="' + esc(r.title) + '" data-v="' + k +
+  '" aria-pressed="' + (r.prio === k) + '" title="' + tip + '">' + l + "</button>").join("") + "</span>";
+
 function matchesHTML() {
   if (!reading.titleKey(query)) {
     if (!finishing()) return "";
-    const all = reading.wants(), shown = allWants ? all : all.slice(0, 6);
-    return all.length ? '<p class="rhead">From Want</p><ul>' + shown.map(pickHTML).join("") + "</ul>" +
+    // 标题空着：标了 Soon 的那几条全列出来（这是眼下要看的），别的收在 more 里；一条都没标过就列最近 6 条
+    const all = reading.wants(), soon = all.filter((r) => r.prio === "soon"), shown = allWants ? all : soon.length ? soon : all.slice(0, 6);
+    return all.length ? '<p class="rhead">' + (!allWants && soon.length ? "Soon" : "From Want") + "</p><ul>" + shown.map(pickHTML).join("") + "</ul>" +
       (all.length > shown.length ? '<button type="button" class="link rmore" data-act="rmore">+' + (all.length - shown.length) + " more</button>" : "") : "";
   }
   const hits = reading.search(query);
@@ -41,7 +49,7 @@ function matchesHTML() {
   if (finishing()) return '<p class="rhead">' + (reading.finished(query) ? "Already logged" : "In your list") + "</p><ul>" + hits.map(pickHTML).join("") + "</ul>";
   const same = hits.some((h) => reading.titleKey(h.title) === reading.titleKey(query));
   return '<p class="rhead">' + (same ? "Already in your list" : "Similar") + "</p><ul>" + hits.map((r) =>
-    "<li><b>" + esc(r.title) + "</b>" + tags(r) + (r.note ? "<small>" + esc(r.note) + "</small>" : "") + "</li>").join("") + "</ul>";
+    "<li><b>" + esc(r.title) + "</b>" + tags(r, false) + (r.want ? prioChips(r) : "") + (r.note ? "<small>" + esc(r.note) + "</small>" : "") + "</li>").join("") + "</ul>";
 }
 
 function statusText() {
@@ -63,7 +71,8 @@ const faces = (list, act, cur) => '<div class="vibes">' + list.map((v) =>
 
 function wantFields() {
   return row("Vibe", faces(reading.VIBES, "vibe", vibe)) +
-    row("Type", '<div class="rtypes">' + reading.TYPES.map((t) => chip("rtype", t, t, type === t)).join("") + "</div>");
+    row("Type", '<div class="rtypes">' + reading.TYPES.map((t) => chip("rtype", t, t, type === t)).join("") + "</div>") +
+    row("Priority", '<div class="rtypes">' + reading.PRIOS.map(([k, l, tip]) => '<button type="button" class="chip' + (prio === k ? " on" : "") + '" data-act="rprio" data-v="' + k + '" aria-pressed="' + (prio === k) + '" title="' + tip + '">' + l + "</button>").join("") + "</div>");
 }
 
 function doneFields() {
@@ -120,6 +129,9 @@ export function initReading(rerender) {
     if (act === "rmode") { store.setLocal({ readMode: v === "done" ? "done" : "want" }); return; }   // 存完自己会重画
     if (act === "vibe") vibe = flip(vibe);
     if (act === "rtype") type = flip(type);
+    if (act === "rprio") prio = flip(prio);
+    // 搜到的那条：标上 / 取消，马上发给表格
+    if (act === "rset") { const cur = reading.exists(el.dataset.t); reading.setPrio(el.dataset.t, cur?.prio === v ? "" : v); rerender(); sync.sync(); return; }
     if (act === "rtab") { tab = flip(tab); kind = ""; }
     if (act === "rkind") kind = flip(kind);
     if (act === "rmark") mark = flip(mark);
@@ -150,9 +162,9 @@ export function initReading(rerender) {
     } else {
       const hit = reading.exists(title);
       if (hit) { toast("Already in your list" + (hit.tab ? " (" + hit.tab + ")" : "")); return; }
-      reading.add({ title, type, vibe, note: form.note.value });
+      reading.add({ title, type, vibe, prio, note: form.note.value });
       toast("Added " + title);
-      query = ""; vibe = ""; type = "";
+      query = ""; vibe = ""; type = ""; prio = "";
     }
     form.title.value = ""; form.note.value = "";
     rerender();

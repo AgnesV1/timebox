@@ -280,7 +280,7 @@ test("reading: every tab is searched, new things go to a Want tab, duplicates ar
   assert.deepEqual(res.added, ["a2"]);
   assert.deepEqual(res.dupes.map((d) => d.id + " " + d.tab), ["a1 Book", "a3 TV", "a4 TV"], "any tab counts; 《》, case and spaces don't matter");
   const want = book.getSheetByName("Want");
-  assert.deepEqual(want.header(), ["Name", "Type", "Vibe", "Note"], "no date column");
+  assert.deepEqual(want.header(), ["Name", "Type", "Vibe", "Note", "Priority"], "no date column");
   const row = want.objects()[0];
   assert.equal(row.Name, "The Bear");
   assert.equal(row.Type, "TV");
@@ -294,6 +294,41 @@ test("reading: every tab is searched, new things go to a Want tab, duplicates ar
   assert.equal(bear.mark, "😊");
   assert.equal(bear.note, "=chef");
   assert.ok(!again.types.includes("Want"));
+});
+
+test("reading: a priority on what's in Want — set when adding, changed later, cleared", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  const url = "https://docs.google.com/spreadsheets/d/1ReadingSheetIdAbcdefghijklmnop/edit";
+  const book = g.spreadsheet("https://docs.google.com/spreadsheets/d/1ReadingSheetIdAbcdefghijklmnop");
+  const tab = (name, rows) => { const sh = book.insertSheet(name); rows.forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v))); return sh; };
+  tab("Book", [["Year", "Month", "Name", "这一切真的值得吗"], [2026, "February", "Book two", "🥰"], ["", "", "Undated book"]]);
+  // 以前建的 Want 页没有 Priority 那一列
+  const want = tab("Want", [["Name", "Type", "Vibe", "Note"], ["The Bear", "TV", "😊", "chef"], ["Dune", "Book", "🎉", ""]]);
+  g.post({ secret: "CHANGE_ME", push: { rows: { settings: [{ key: "reading", value: { url }, updated: 1 }] } } });
+  const read = (reading) => g.post({ secret: "CHANGE_ME", reading }).reading;
+  const prios = () => want.objects().map((r) => r.Name + ":" + (r.Priority || ""));
+
+  const first = read({ list: true });
+  assert.deepEqual(first.rows.filter((r) => r.want).map((r) => r.title + ":" + r.prio), ["The Bear:", "Dune:"]);
+  assert.deepEqual(first.ranked, [], "a script that knows about priorities says so");
+  assert.deepEqual(want.header(), ["Name", "Type", "Vibe", "Note"], "just looking doesn't add the column");
+
+  const res = read({ list: true, add: [{ id: "a1", title: "Hades II", type: "Game", vibe: "👀", prio: "Soon" }, { id: "a2", title: "Arrival", type: "TV" }],
+    rank: [{ id: "k1", title: " the bear", prio: "5 years" }, { id: "k2", title: "Hades II", prio: "5 years" }, { id: "k3", title: "Book two", prio: "Soon" }, { id: "k4", title: "Nowhere", prio: "Soon" }] });
+  assert.deepEqual(want.header(), ["Name", "Type", "Vibe", "Note", "Priority"], "the column is added the first time it's needed");
+  assert.deepEqual(res.added, ["a1", "a2"]);
+  assert.deepEqual(res.ranked, ["k1", "k2"], "by name, and something added in the same request can be ranked too");
+  assert.deepEqual(res.failed.map((f) => f.id), ["k3", "k4"], "only what's in Want: not a finished book, not something unknown");
+  assert.deepEqual(prios(), ["The Bear:5 years", "Dune:", "Hades II:5 years", "Arrival:"]);
+  assert.deepEqual(res.rows.filter((r) => r.want).map((r) => r.title + ":" + r.prio), ["The Bear:5 years", "Dune:", "Hades II:5 years", "Arrival:"], "the list that comes back is the Sheet as it is now");
+  assert.equal(res.rows.find((r) => r.title === "Book two").prio, "", "other tabs have none");
+
+  assert.deepEqual(read({ rank: [{ id: "k5", title: "The Bear", prio: "" }, { id: "k6", title: "Dune", prio: "Soon" }] }).ranked, ["k5", "k6"]);
+  assert.deepEqual(prios(), ["The Bear:", "Dune:Soon", "Hades II:5 years", "Arrival:"]);
+  // 看完了：那一行连同它的优先级一起离开 Want
+  assert.deepEqual(read({ done: [{ id: "d1", title: "Dune", tab: "Book", year: 2026, month: 10 }] }).logged, ["d1"]);
+  assert.deepEqual(prios(), ["The Bear:", "Hades II:5 years", "Arrival:"]);
 });
 
 test("reading: finished things land on their own tab, and leave Want", () => {
@@ -348,7 +383,7 @@ test("reading: finished things land on their own tab, and leave Want", () => {
   // 把 Added 那一列删掉：之后不会再补回来
   want.deleteColumn(1);
   assert.deepEqual(read({ add: [{ id: "w2", title: "Arrival", type: "TV", vibe: "👀" }] }).added, ["w2"]);
-  assert.deepEqual(want.header(), ["Name", "Type", "Vibe", "Note"]);
+  assert.deepEqual(want.header(), ["Name", "Type", "Vibe", "Note", "Priority"]);
   assert.deepEqual(want.objects().map((r) => r.Name + " " + r.Type), ["Dune Book", "Arrival TV"]);
   // 下拉只是提醒（不拒绝）：照写
   books.dropdown(1, ["2023", "2024", "2025", "2026"], false);

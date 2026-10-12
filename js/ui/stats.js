@@ -148,18 +148,18 @@ function timeTrendHTML(s) {
   const labels = axisLabels(rows, byWeek);
   tips.ttrend = rows.map((r) => ({
     title: byWeek ? "Week of " + fmtShort(r.date) : fmtDay(r.date),
-    rows: [["Logged", fmtMin(r.spent), "dn"], ["Deep", fmtMin(r.deep), "dp"], ...(r.goal ? [["Deep goal", fmtMin(r.goal), "dgoal"]] : [])]
+    rows: [["Logged", fmtMin(r.spent), "dn"], ["Deep", fmtMin(r.deep), "tide"], ...(r.goal ? [["Deep goal", fmtMin(r.goal), "dgoal"]] : [])]
   }));
   const insight = s.days
     ? "You logged <b>" + fmtMin(s.avgSpent) + "</b> a day on average" + (s.deep ? ", <b>" + fmtMin(s.deep / s.days) + "</b> of it deep." : ".")
     : "This period hasn't started yet.";
   return '<figure class="card chart"><figcaption><div><h3>Time per ' + (byWeek ? "week" : "day") + "</h3><p>" + insight + "</p></div>" +
-    '<div class="legend"><span><i class="k dp"></i>Deep</span><span><i class="k dn"></i>Logged</span>' + (s.goal ? '<span><i class="k dgoal"></i>Deep goal</span>' : "") + "</div></figcaption>" +
+    '<div class="legend"><span><i class="k tide"></i>Deep</span><span><i class="k dn"></i>Logged</span>' + (s.goal ? '<span><i class="k dgoal"></i>Deep goal</span>' : "") + "</div></figcaption>" +
     '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtMin(max * f) : "0") + "</span></i>").join("") +
     '<div class="cols" data-chart="ttrend">' + rows.map((r, i) =>
       '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.ttrend[i].title + ": " + fmtMin(r.spent) + " logged, " + fmtMin(r.deep) + " deep") + '">' +
       (r.spent ? '<i class="dn solo" style="height:' + h(r.spent) + '"></i>' : "") +
-      (r.deep ? '<i class="dp" style="height:' + h(r.deep) + '"><span class="wv" style="animation-delay:-' + ((i * 0.7) % 5).toFixed(1) + "s,-" + ((i * 1.3) % 7).toFixed(1) + 's"></span><span class="wv b" style="animation-delay:-' + ((i * 1.1) % 8).toFixed(1) + "s,-" + ((i * 0.9) % 7).toFixed(1) + 's"></span></i>' : "") +
+      (r.deep ? '<i class="tide" style="height:' + h(r.deep) + '"><span class="wv" style="animation-delay:-' + ((i * 0.7) % 5).toFixed(1) + "s,-" + ((i * 1.3) % 7).toFixed(1) + 's"></span><span class="wv b" style="animation-delay:-' + ((i * 1.1) % 8).toFixed(1) + "s,-" + ((i * 0.9) % 7).toFixed(1) + 's"></span></i>' : "") +
       (r.goal && !r.future ? '<i class="dgoal" style="bottom:' + h(r.goal) + '"></i>' : "") +
       (top > 0 && r.spent === top ? '<b class="cap-label num" style="bottom:' + h(r.spent) + '">' + fmtMin(r.spent) + "</b>" : "") + "</div>").join("") + "</div></div>" +
     '<div class="xaxis">' + labels.map((t) => "<span>" + t + "</span>").join("") + "</div>" +
@@ -352,7 +352,7 @@ function pieHTML(c, s, rest) {
   const color = (x) => (x.kind === "life" ? LIFE_COLOR[x.key] : x.kind === "blank" ? "var(--k-blank)" : x.kind === "rest" ? "url(#st-hatch)" : x.kind === "more" ? "var(--k-None)" : esc(x.color || "var(--c-None)"));
   const swatch = (x) => (x.kind === "rest" ? HATCH : color(x));
   const what = logged ? "of what you logged" : "of the whole period";
-  tips.pie = parts.map((x) => ({ title: x.name, rows: [[what, fmtMin(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.deep > 0 ? [["deep", fmtMin(x.deep), "dp"]] : [])] }));
+  tips.pie = parts.map((x) => ({ title: x.name, rows: [[what, fmtMin(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.deep > 0 ? [["deep", fmtMin(x.deep), "tide"]] : [])] }));
   // 每片之间留一条缝（周长的 0.5% ≈ 2px）；pathLength = 100，所以长度直接写百分比
   let at = 0;
   const arcs = parts.map((x, i) => {

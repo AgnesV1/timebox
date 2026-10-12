@@ -8,7 +8,7 @@ import { esc, on, icon } from "../dom.js";
 import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, WEEKDAYS } from "../dates.js";
 import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
-import { heroHTML, stripHTML, billHTML, colorOf, projectOf, projectOptions, segStyle, lineInfo, toast, STATUS } from "./common.js";
+import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickTarget, segStyle, lineInfo, toast, STATUS } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
 import { animateNext } from "../motion.js";
@@ -60,7 +60,7 @@ const STATUS_WORD = { done: "Done ✓", partial: "Partial", later: "Later", drop
 // 一行任务。只有展开的那行（openId）带四个状态按钮、计时记录、补时间的框和原因；
 // 别的行只有一行字：分钟、名字、计划，右边是记了多久和状态。电脑上鼠标移上去，状态按钮浮在右边
 function rowHTML(c, t, tasks, phone = false, openId = "") {
-  const p = projectOf(t);
+  const p = badgeOf(t);
   const open = t.id === openId;
   const fin = t.status === "done" || t.status === "partial";
   const why = t.status === "partial" || t.status === "later" || t.status === "drop";
@@ -122,7 +122,7 @@ function addHTML(c, d, phone = false) {
     '<div class="add-main"><input name="title" data-keep="add-title-' + d + '" placeholder="' + (phone || d > c.today ? "Add a task" : "Add a task, or log one: Reading 14:00-15:10") + '" enterkeyhint="done">' +
     '<input name="est" class="min num" data-keep="add-est-' + d + '" type="number" inputmode="numeric" value="30" min="5" step="5" aria-label="Minutes">' +
     '<button class="btn cta" type="submit">Add</button></div>' +
-    '<div class="add-more">' + (projects.length ? '<select name="project" data-keep="add-plan-' + d + '" aria-label="Plan">' + projectOptions(projects) + "</select>" : "") +
+    '<div class="add-more"><select name="project" data-keep="add-plan-' + d + '" aria-label="Project or plan">' + projectOptions(projects) + "</select>" +
     '<label class="deep-tog" title="Deep work: focused, one thing at a time"><input type="checkbox" name="deep" data-keep="add-deep-' + d + '"><span>◆ Deep</span></label>' +
     (phone ? "" : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
       '<option value="weekdays">↻ Weekdays</option><option value="weekly">↻ Every ' + WEEKDAYS[weekday(d)] + "</option></select>" +
@@ -289,7 +289,7 @@ export function initToday(rerender) {
     // 「Gym 40」「Gym 40m」：末尾的数字当分钟
     const m = title.match(/^(.*\S)\s+(\d{1,3})\s*(m|min|mins)?$/i);
     if (m && Number(m[2]) >= 5) { title = m[1]; est = Number(m[2]); }
-    const fields = { date: form.dataset.add, title, est, projectId: String(f.get("project") || ""), deep: f.get("deep") === "on" };
+    const fields = { date: form.dataset.add, title, est, ...pickTarget(f.get("project")), deep: f.get("deep") === "on" };
     animateNext();
     const clear = () => {
       const input = document.querySelector('[data-keep="add-title-' + form.dataset.add + '"]');
@@ -302,7 +302,7 @@ export function initToday(rerender) {
     // 「Reading 14:00-15:10」：已经做完的，记成一条 Done（以后的日子不认）
     const log = fields.date <= store.today() ? parseLogLine(String(f.get("title") || "")) : null;
     if (log) {
-      focus = store.addLogged({ date: fields.date, title: log.title, projectId: fields.projectId, deep: fields.deep }, log.from, log.to);
+      focus = store.addLogged({ date: fields.date, title: log.title, projectId: fields.projectId, group: fields.group, deep: fields.deep }, log.from, log.to);
       clear();
       return;
     }

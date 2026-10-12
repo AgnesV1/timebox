@@ -4,25 +4,29 @@
 import { todayIso, addDays, fmtShort } from "./dates.js";
 import * as E from "./engine.js";
 import * as R from "./routines.js";
+import * as GR from "./groups.js";
+import * as F from "./friends.js";
 import { readLocal, writeLocal } from "./dom.js";
 import { parseTimes, formatTimes, sumTimes } from "./times.js";
 
 const KEY = "kuzhouduan-v1";
 const OLD_KEY = "timebox-v1";
 const SCHEMA = 3;   // 和表格的 Code.gs 版本对应（见 sync.js）
-export const TABLES = ["tasks", "projects", "items", "log", "settings"];
+export const TABLES = ["tasks", "projects", "items", "log", "settings", "friends", "meets"];
 const KEYED = { log: "date", settings: "key" };
 
 // 只把这些字段发给表格；项目名这种是表格自己填的
 const FIELDS = {
-  tasks: ["date", "title", "est", "actual", "order", "status", "reason", "optional", "deep", "projectId", "itemId", "times", "desc"],
+  tasks: ["date", "title", "est", "actual", "order", "status", "reason", "optional", "deep", "projectId", "group", "itemId", "times", "desc"],
   projects: ["name", "group", "kind", "place", "status", "deadline", "start", "early", "rule", "color", "order", "calib"],
   items: ["title", "module", "est", "origEst", "order", "projectId"],
   log: ["date", "need", "projects"],
-  settings: ["key", "value"]
+  settings: ["key", "value"],
+  friends: ["name", "more", "next", "nextDate"],
+  meets: ["date", "note", "watch", "friends", "taskId"]
 };
 
-export const PROJECT_COLORS = ["#B8F000", "#2F5BFF", "#FF3EA5", "#FF7A1A", "#9B5CFF", "#00C2A8", "#FFC400", "#FF4D4D"];
+export const PROJECT_COLORS = GR.PALETTE;
 
 function blank() {
   return {
@@ -128,8 +132,10 @@ function upgrade(s) {
   if (s.local) s.local.serverVersion = 0;
 }
 
+let full = false;   // 上一次没存进去（这台设备的存储满了）
 function persist() {
-  if (!writeLocal(KEY, S)) console.warn("Can't save on this device");
+  full = !writeLocal(KEY, S);
+  if (full) console.warn("Can't save on this device");
 }
 
 // ---------- 读 ----------
@@ -168,7 +174,8 @@ export function ctx() {
     level: prefs().level !== false,
     weekStartsOn: prefs().weekStartsOn,
     commute: setting("commute", null),
-    life: setting("life", null)
+    life: setting("life", null),
+    groups: groups()
   };
   return ctxCache;
 }
@@ -211,9 +218,14 @@ function put(t, row, { generated = false } = {}) {
   remember(t, row.id);
   const prev = S.data[t][row.id];
   row.updated = generated && !prev ? 1 : Math.max(Date.now(), (Number(prev?.updated) || 0) + 1);
+  // 任务属于哪个大类写在任务自己身上（表格里一眼能看）：挂了计划就跟计划，没挂就是直接挂的那个
+  if (t === "tasks") row.group = row.projectId && S.data.projects[row.projectId] ? groupFor(row.projectId) : String(row.group || "");
   S.data[t][row.id] = row;
   S.pending[t + ":" + row.id] = row.updated;
   S.deletes = S.deletes.filter((d) => !(d.table === t && d.id === row.id));
+  // 任务带着的那条记录（和谁、聊了什么）日期跟着任务走
+  const meet = t === "tasks" ? S.data.meets[F.meetId(row.id)] : null;
+  if (meet && meet.date !== row.date) put("meets", { ...meet, date: row.date });
 }
 
 function drop(t, id) {
@@ -222,6 +234,7 @@ function drop(t, id) {
   delete S.data[t][id];
   delete S.pending[t + ":" + id];
   S.deletes.push({ table: t, id, at: Date.now() });
+  if (t === "tasks") drop("meets", F.meetId(id));   // 任务删了，它带着的那条记录一起删
 }
 
 export function undo(before) {
@@ -279,10 +292,13 @@ function normalize(t, raw) {
     r.optional = Boolean(r.optional);
     r.deep = Boolean(r.deep);
     r.projectId = r.projectId || "";
+    r.group = r.group || "";
     r.itemId = r.itemId || "";
     r.times = r.times || "";
   }
   if (t === "items") { r.est = Number(r.est) || 0; r.projectId = r.projectId || ""; }
+  if (t === "friends") { r.more = r.more && typeof r.more === "object" ? r.more : {}; r.next = r.next || ""; r.nextDate = r.nextDate || ""; }
+  if (t === "meets") { r.friends = Array.isArray(r.friends) ? r.friends : []; r.taskId = r.taskId || ""; r.note = r.note || ""; r.watch = r.watch || ""; }
   if (t === "projects") {
     r.status = r.status || "active";
     r.kind = r.kind === "regular" ? "regular" : "total";
@@ -359,7 +375,7 @@ export function addTask(fields) {
   change(() => {
     const itemId = fields.projectId && !fields.itemId ? itemFor(fields.projectId, fields.title, fields.est) : fields.itemId || "";
     put("tasks", {
-      id, title: "", est: 30, actual: null, status: "", reason: "", optional: false, deep: planDeep(fields.projectId), projectId: "", times: "", desc: "",
+      id, title: "", est: 30, actual: null, status: "", reason: "", optional: false, deep: planDeep(fields.projectId), projectId: "", group: "", times: "", desc: "",
       ...fields, date, itemId, order: nextOrder(date)
     });
   });
@@ -399,11 +415,11 @@ export function moveMany(ids, date) {
   }), "Moved " + ids.length + " task" + (ids.length > 1 ? "s" : ""));
 }
 
-// 换项目：解开原来的条目，再按名字挂到新项目的条目上
-export function setTaskProject(id, projectId) {
+// 换计划：解开原来的条目，再按名字挂到新计划的条目上。不挂计划时可以直接挂在大类上（group）
+export function setTaskProject(id, projectId, group = "") {
   const t = get("tasks", id);
-  if (!t || t.projectId === projectId) return;
-  change(() => put("tasks", { ...t, projectId, itemId: projectId ? itemFor(projectId, t.title, t.est) : "" }));
+  if (!t || (t.projectId === projectId && (projectId || (t.group || "") === group))) return;
+  change(() => put("tasks", { ...t, projectId, group: projectId ? "" : group, itemId: projectId ? itemFor(projectId, t.title, t.est) : "" }));
 }
 
 export function reorder(ids) {
@@ -439,7 +455,9 @@ export function toTomorrow(id) {
   const date = addDays(t.date < today() ? today() : t.date, 1);
   change(() => {
     if (t.status !== "later") put("tasks", { ...t, status: "later" });
-    put("tasks", { ...t, id: newId(), date, status: "", actual: null, times: "", reason: "", order: nextOrder(date) });
+    const nid = newId();
+    put("tasks", { ...t, id: nid, date, status: "", actual: null, times: "", reason: "", order: nextOrder(date) });
+    moveMeet(id, nid, date);
   }, "Moved to tomorrow");
 }
 
@@ -486,10 +504,12 @@ export function spreadOverdue() {
 // 计划 = projects 表一行。kind：total（总时长 + 截止日）/ regular（规律）；place：auto（自动排到每天）/ pool（进任务池）
 
 const nextPlanOrder = () => all("projects").reduce((m, x) => Math.max(m, Number(x.order) || 0), 0) + 1;
-// 同一个项目（group）里的计划默认用同一个颜色
-const colorFor = (group) => all("projects").find((x) => group && x.group === group)?.color || PROJECT_COLORS[all("projects").length % PROJECT_COLORS.length];
-// 任务挂着的计划属于哪个项目（没有 group 的计划自己就是项目）
+// 同一个大类里的计划默认用大类的颜色
+const colorFor = (group) => groupByName(group)?.color || all("projects").find((x) => group && x.group === group)?.color || PROJECT_COLORS[all("projects").length % PROJECT_COLORS.length];
+// 任务挂着的计划属于哪个大类（没有 group 的计划自己算一个）
 const groupFor = (projectId) => { const p = get("projects", projectId); return p ? p.group || p.name || "" : ""; };
+// 任务属于哪个大类：挂了计划就是计划的；没挂就是直接挂的那个
+export const groupOf = (t) => (t.projectId && get("projects", t.projectId) ? groupFor(t.projectId) : String(t.group || ""));
 // 计划的「默认深度」（rule.deep）：从它来的任务一开始就标成 Deep
 export const planDeep = (projectId) => Boolean(projectId && get("projects", projectId)?.rule?.deep);
 
@@ -503,6 +523,7 @@ export function saveProject(p) {
   row.color = fields.color || prev?.color || colorFor(row.group);
   if (row.kind === "regular") { const { id: _i, title: _t, ...rule } = R.ruleOf(row); row.rule = rule; }
   change(() => {
+    if (row.group && groupsSaved() && !groupByName(row.group)) putGroups([...groups(), { name: row.group, color: row.color, labor: false, grow: "" }]);
     put("projects", row);
     if (!prev && row.kind === "total" && Number(total) > 0) put("items", { id: newId(), projectId: id, module: "", title: row.name, est: Math.round(Number(total)), origEst: null, order: 1 });
   });
@@ -526,7 +547,8 @@ export function setPlanDeep(id, on) {
 export function deleteProject(id) {
   change(() => {
     all("items").filter((i) => i.projectId === id).forEach((i) => drop("items", i.id));
-    all("tasks").filter((t) => t.projectId === id).forEach((t) => (E.isAutoTask(t) && !started(t) ? dropTask(t.id) : put("tasks", { ...t, projectId: "", itemId: "" })));
+    const group = groupFor(id);   // 留下来的任务还算在原来那个大类里
+    all("tasks").filter((t) => t.projectId === id).forEach((t) => (E.isAutoTask(t) && !started(t) ? dropTask(t.id) : put("tasks", { ...t, projectId: "", itemId: "", group })));
     drop("projects", id);
   }, "Deleted plan");
 }
@@ -658,13 +680,70 @@ export function placeRegular(pid, date) {
   return addTask({ date, title: p.name, est: Number(p.rule?.min) || 30, projectId: pid, optional: Boolean(p.rule?.optional), deep: Boolean(p.rule?.deep) });
 }
 
-// ---------- 项目 / 子项目 ----------
-// 子项目就是 projects 表里的一行；它的 group 就是上一层的「项目」名字
+// ---------- 大类（界面上的 Project）和它下面的计划 ----------
+// 大类清单在 Settings 的 groups 里（见 js/groups.js）；计划的 group、直接挂在大类上的任务的 group 存的都是大类的名字
 
+const groupsSaved = () => Array.isArray(setting("groups", null));
+function putGroups(list) { put("settings", { id: "groups", key: "groups", value: list }); }
+
+// 还没存过（刚更新、还没从表格拉到数据）就先用默认的六个，加上计划里出现过的名字
+export function groups() {
+  const saved = setting("groups", null);
+  return Array.isArray(saved) ? saved : GR.withPlans(GR.DEFAULTS, all("projects"));
+}
+export const groupByName = (name) => (name ? GR.byName(groups(), name) : null);
+
+// 第一次：把现有的计划归进六个大类、换成新颜色。返回 { names, undo }（没什么可归的返回 null）；
+// undo = 计划的大类和颜色改回去（清单留着：默认的六个加上原来的名字）
+export function adoptGroups() {
+  if (groupsSaved()) return null;
+  const { groups: list, moves } = GR.adopt(all("projects"));
+  const before = moves.map((m) => { const p = get("projects", m.id); return { id: m.id, group: p.group || "", color: p.color || "" }; });
+  const apply = (rows, value) => change(() => {
+    putGroups(value);
+    for (const m of rows) { const p = get("projects", m.id); if (p) put("projects", { ...p, group: m.group, color: m.color }); }
+  });
+  apply(moves, list);
+  if (!moves.length) return null;
+  return { names: [...new Set(moves.map((m) => m.group).filter(Boolean))], undo: () => apply(before, GR.withPlans(GR.DEFAULTS, before.map((b) => ({ group: b.group, color: b.color })))) };
+}
+
+// 改大类的设置（颜色、labor、grow、friends）。换颜色时，还用着原来那个颜色的计划跟着换
+export function saveGroup(name, patch) {
+  if (!groupsSaved()) adoptGroups();
+  const list = groups(), cur = GR.byName(list, name);
+  if (!cur) return;
+  change(() => {
+    putGroups(list.map((g) => (g.name === name ? { ...g, ...patch, name } : g)));
+    if (patch.color && patch.color !== cur.color) all("projects").filter((p) => (p.group || "") === name && p.color === cur.color).forEach((p) => put("projects", { ...p, color: patch.color }));
+  });
+}
+
+export function addGroup(name) {
+  if (!groupsSaved()) adoptGroups();
+  const n = String(name || "").trim(), list = groups();
+  if (!n || GR.byName(list, n)) return;
+  change(() => putGroups([...list, { name: n, color: PROJECT_COLORS[list.length % PROJECT_COLORS.length], labor: false, grow: "" }]));
+}
+
+// 空的大类（下面没有计划）才能拿掉；直接挂在它上面的任务留着名字
+export function removeGroup(name) {
+  if (!groupsSaved()) adoptGroups();
+  if (all("projects").some((p) => (p.group || "") === name)) return;
+  change(() => putGroups(groups().filter((g) => g.name !== name)), "Removed " + name);
+}
+
+// 改名；改成一个已经有的名字 = 并进去（计划、直接挂着的任务都跟过去）
 export function renameGroup(from, to) {
   const name = String(to || "").trim();
   if (!name || name === from) return;
-  change(() => all("projects").filter((p) => (p.group || "") === from).forEach((p) => put("projects", { ...p, group: name })), "Renamed project");
+  if (!groupsSaved()) adoptGroups();
+  const list = groups(), merge = Boolean(GR.byName(list, name));
+  change(() => {
+    putGroups(merge ? list.filter((g) => g.name !== from) : list.map((g) => (g.name === from ? { ...g, name } : g)));
+    all("projects").filter((p) => (p.group || "") === from).forEach((p) => put("projects", { ...p, group: name }));
+    all("tasks").filter((t) => !t.projectId && (t.group || "") === from).forEach((t) => put("tasks", { ...t, group: name }));
+  }, merge ? "Moved " + from + " into " + name : "Renamed project");
 }
 
 // ---------- 规律计划（重复） ----------
@@ -681,8 +760,8 @@ function setRule(p, patch) {
   put("projects", { ...(get("projects", p.id) || p), rule: { ...rule, ...patch } });
 }
 
-function newRegular(name, projectId, rule) {
-  const group = groupFor(projectId);
+function newRegular(name, projectId, rule, direct = "") {
+  const group = groupFor(projectId) || direct;
   return { id: newId(), name, group, kind: "regular", place: "auto", status: "active", deadline: "", start: "", early: 0, calib: null,
     rule: { days: [0, 0, 0, 0, 0, 0, 0], skip: [], ...rule }, color: get("projects", projectId)?.color || colorFor(group), order: nextPlanOrder() };
 }
@@ -692,7 +771,7 @@ const repeatLabel = (end) => (end ? "Repeats until " + fmtShort(end) : "Repeats 
 // 加任务时直接设重复：days 是一周七天的分钟数，end 是最后一天（空 = 一直）。返回第一次的 ID（那天要做的话）
 export function addRepeating(fields, days, end) {
   const start = fields.date || today();
-  const p = newRegular(fields.title, fields.projectId, { days, start, end: R.clampEnd(start, end), optional: Boolean(fields.optional), deep: Boolean(fields.deep) });
+  const p = newRegular(fields.title, fields.projectId, { days, start, end: R.clampEnd(start, end), optional: Boolean(fields.optional), deep: Boolean(fields.deep) }, fields.group);
   let first = "";
   change(() => {
     put("projects", p);
@@ -710,12 +789,13 @@ export function addRepeating(fields, days, end) {
 export function repeatTask(id, days, end) {
   const t = get("tasks", id);
   if (!t) return id;
-  const p = newRegular(t.title, t.projectId, { days, start: t.date, end: R.clampEnd(t.date, end), optional: Boolean(t.optional), deep: Boolean(t.deep) });
+  const p = newRegular(t.title, t.projectId, { days, start: t.date, end: R.clampEnd(t.date, end), optional: Boolean(t.optional), deep: Boolean(t.deep) }, t.group);
   const nid = R.routineTaskId(p.id, t.date);
   change(() => {
     put("projects", p);
     put("tasks", { ...t, id: nid, projectId: p.id, itemId: "" });
     if (timer()?.taskId === id) setTimer({ ...timer(), taskId: nid });
+    moveMeet(id, nid, t.date);
     drop("tasks", id);
   }, repeatLabel(p.rule.end));
   return nid;
@@ -881,6 +961,99 @@ export function deleteTime(id) {
   list.splice(n, 1);
   change(() => writeTimes(taskId, list), "Deleted time");
 }
+
+// ---------- Friends：人、每次的记录（见 js/friends.js） ----------
+// friends 表：{ name, more: { 字段名: 值 }, next, nextDate }；字段是自己定的（Settings 的 friend-fields，一行一个）。
+// meets 表：{ date, friends: [id], note, watch, taskId }。任务带出来的那条 id = mt:<任务 id>：任务改日期它跟着改，任务删了一起删。
+
+const byLowName = (a, b) => String(a.name || "").toLowerCase().localeCompare(String(b.name || "").toLowerCase());
+export const friends = () => all("friends").sort(byLowName);
+export const meets = () => all("meets").sort((a, b) => String(b.date).localeCompare(String(a.date)) || (Number(b.updated) || 0) - (Number(a.updated) || 0));
+export const meetOfTask = (taskId) => get("meets", F.meetId(taskId));
+
+// 字段清单：设置里排好的在前，再加表格里手动加出来的列
+export function friendFields() {
+  const out = (setting("friend-fields", []) || []).filter(Boolean).map(String);
+  for (const f of all("friends")) for (const k of Object.keys(f.more || {})) if (!out.includes(k)) out.push(k);
+  return out;
+}
+
+// 上次联系：{ 人的 id: 日期 }
+export const lastContact = () => F.lastContact(all("meets"), today(), (taskId) => get("tasks", taskId)?.status || "");
+
+export function saveFriend(row, label, opts) {
+  const id = row.id || newId();
+  change(() => put("friends", { name: "", more: {}, next: "", nextDate: "", ...(get("friends", id) || {}), ...row, id }), label, opts);
+  return id;
+}
+
+// 删一个人：他的记录一起删（几个人一起的那条只把他拿掉）
+export function deleteFriend(id) {
+  change(() => {
+    for (const m of all("meets")) {
+      if (!(m.friends || []).includes(id)) continue;
+      const left = m.friends.filter((x) => x !== id);
+      if (left.length) put("meets", { ...m, friends: left });
+      else drop("meets", m.id);
+    }
+    drop("friends", id);
+  }, "Deleted");
+}
+
+export function saveMeet(row, label, opts) {
+  const id = row.id || newId();
+  change(() => put("meets", { date: today(), friends: [], note: "", watch: "", taskId: "", ...(get("meets", id) || {}), ...row, id }), label, opts);
+  return id;
+}
+
+export function deleteMeet(id) {
+  change(() => drop("meets", id), "Deleted");
+}
+
+// 任务带的那条记录：和谁（friends）、聊了什么（note）、要记住的（watch）。三样都空了就不留
+export function setTaskMeet(taskId, patch, opts) {
+  const t = get("tasks", taskId);
+  if (!t) return;
+  const id = F.meetId(taskId), cur = get("meets", id);
+  const next = { date: t.date, friends: [], note: "", watch: "", ...(cur || {}), ...patch, id, taskId, date: t.date };
+  const empty = !next.friends.length && !String(next.note).trim() && !String(next.watch).trim();
+  if (empty && !cur) return;
+  change(() => (empty ? drop("meets", id) : put("meets", next)), "", opts);
+}
+
+function moveMeet(fromTask, toTask, date) {
+  const m = get("meets", F.meetId(fromTask));
+  if (!m) return;
+  put("meets", { ...m, id: F.meetId(toTask), taskId: toTask, date });
+  drop("meets", m.id);
+}
+
+// 该做的事做完了：在这个人的记录里记一条（今天 + 写的那句），再把这件事清掉
+export function doneNext(friendId, note) {
+  const f = get("friends", friendId);
+  if (!f) return;
+  change(() => {
+    put("meets", { id: newId(), date: today(), friends: [friendId], note: String(note || "").trim(), watch: "", taskId: "" });
+    put("friends", { ...f, next: "", nextDate: "" });
+  }, "Logged with " + (f.name || "them"));
+}
+
+// ---------- 这台设备的存储 ----------
+// 整份数据是 localStorage 里的一段文字，上限大约 5MB。算一算用了多少、按最近 7 天的量还能撑多久（十分钟内不重算）。
+const LIMIT = 5e6;
+let usage = null;
+export function storage() {
+  if (usage && Date.now() - usage.at < 6e5 && usage.full === full) return usage;
+  const tasks = all("tasks"), T = today(), from = addDays(T, -6);
+  const used = JSON.stringify(S).length, taskChars = JSON.stringify(S.data.tasks).length;
+  const each = tasks.length ? taskChars / tasks.length : 420;
+  const recent = tasks.filter((t) => t.date >= from && t.date <= T).length;
+  const perDay = (recent / 7) * each;
+  const daysLeft = perDay > 0 ? Math.max(0, (LIMIT - used) / perDay) : Infinity;
+  usage = { at: Date.now(), tasks: tasks.length, used, limit: LIMIT, recent, daysLeft, full, warn: full || used / LIMIT > 0.9 || daysLeft < 14 };
+  return usage;
+}
+export const forgetStorage = () => { usage = null; };
 
 // ---------- 目标（Projects 页最上面的目标板，见 js/goals.js） ----------
 // 存在 Settings 页里，一条目标一行：goal:<id> = { text, tag, span, due, done, order }

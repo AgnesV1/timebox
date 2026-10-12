@@ -1,12 +1,15 @@
 // 和 Google Sheet（Apps Script）同步：先推本机的改动，再拉表格里比上次新的。
 // 改完 2.5 秒推一次（连着点几下只发一次）；页面切走时用 sendBeacon 补发；回到页面、联网时再同步。
 // 表格里的 Code.gs 和页面要是同一版（VERSION）：不知道表格是哪版时先问一句，旧版就先不推，改动都留在本机。
+// 同步完顺手做的：季度表里这几天的两格（设了链接才发，值变了才发）；每天让表格清一次过期的删除记录。
 
 import * as store from "./store.js";
 import * as reading from "./reading.js";
+import * as S from "./stats.js";
 import { debounce } from "./dom.js";
 
-export const VERSION = 4;
+export const VERSION = 5;
+const KEEP_DELETED_DAYS = 14;   // 表格里的删除记录只留这么久：更久没同步的设备整表重拉一次
 
 let busy = false, again = false;
 let status = { text: "", bad: false };
@@ -44,8 +47,11 @@ async function post(url, body) {
 }
 
 const current = () => Number(store.local().serverVersion) >= VERSION;
+// 太久没同步：这段时间里别处删掉的东西，表格已经不记得了，只能整表对一遍
+const stale = () => store.cursor() > 0 && Date.now() - store.cursor() > (KEEP_DELETED_DAYS - 1) * 864e5;
 
-export async function sync({ full = false } = {}) {
+// archive = { before }：顺便把这天以前的任务搬进表格的 Archive 页（见 Code.gs 的 archive_）
+export async function sync({ full = false, archive = null } = {}) {
   const { url, secret } = store.local();
   if (!url) {
     set(store.hasPending() ? "Saved on this device" : "Local only");
@@ -63,14 +69,19 @@ export async function sync({ full = false } = {}) {
       if (!(Number(hello.version) >= VERSION)) throw new Error(ERRORS["old sheet"]);
       store.setLocal({ serverVersion: Number(hello.version) });
     }
-    full = full || store.needsFull();
+    full = full || store.needsFull() || stale();
     const out = store.outgoing();
     // 阅读表格：设了链接才带（要追加的、要不要列表）
     const rq = store.setting("reading")?.url ? reading.request() : null;
-    const data = await post(url, { secret, pull: true, since: full ? 0 : store.cursor(), push: { rows: out.rows, deletes: out.deletes }, ...(rq ? { reading: rq } : {}) });
+    const day = store.today(), tidy = store.local().tidied !== day;
+    const data = await post(url, { secret, pull: true, since: full ? 0 : store.cursor(), push: { rows: out.rows, deletes: out.deletes },
+      ...(rq ? { reading: rq } : {}), ...(tidy ? { tidy: true } : {}), ...(archive ? { archive } : {}) });
     store.pushed(out, data.tables || store.TABLES);
     store.applyPull(data.pull, data.now, { full });
     if (rq) reading.apply(data.reading, rq);
+    if (tidy) store.setLocal({ tidied: day });
+    if (archive) { store.forgetStorage(); store.setLocal({ archived: data.archive?.moved ?? 0 }); }
+    await quarter(url, secret);
     set("Synced " + hhmm());
     ok = true;
   } catch (e) {
@@ -80,6 +91,36 @@ export async function sync({ full = false } = {}) {
   busy = false;
   if (again) { again = false; queue(); }
   return ok;
+}
+
+let tried = { key: "", at: 0 };
+// 季度表：把最近两周里和上次发的不一样的那几天发过去（数据刚拉过，是最新的）。出了问题只记一句，不影响同步
+async function quarter(url, secret) {
+  const q = store.setting("quarter");
+  if (!q?.url) return;
+  const sent = store.local().quarterSent || {};
+  const mark = (r) => r.progress + "|" + r.focus;
+  const all = S.quarterRows(store.ctx(), q.from || store.today());
+  const rows = all.filter((r) => sent[r.date] !== mark(r));
+  if (!rows.length) return;
+  // 上次发的就是这几行、没填进去（比如那个季度的页签还没建）：十分钟内不重发
+  const key = JSON.stringify(rows);
+  if (key === tried.key && Date.now() - tried.at < 6e5) return;
+  tried = { key, at: Date.now() };
+  let note = "", done = [];
+  try {
+    const res = (await post(url, { secret, quarter: { rows } })).quarter || {};
+    if (res.error) note = res.error === "no sheet" ? "Can't open that Sheet" : String(res.error);
+    else {
+      done = res.done || [];
+      const miss = (res.missing || [])[0];
+      note = miss ? miss.why : done.length ? "Filled through " + done.slice().sort().pop() : "";
+    }
+  } catch (e) { note = e.message || "Couldn't reach the quarter sheet"; }
+  // 只记着还在这两周里的日子
+  const keep = Object.fromEntries(all.map((r) => [r.date, sent[r.date]]).filter(([, v]) => v !== undefined));
+  for (const r of rows) if (done.includes(r.date)) keep[r.date] = mark(r);
+  if (JSON.stringify(keep) !== JSON.stringify(sent) || (note && note !== store.local().quarterNote)) store.setLocal({ quarterSent: keep, ...(note ? { quarterNote: note } : {}) });
 }
 
 export const queue = debounce(() => sync(), 2500);

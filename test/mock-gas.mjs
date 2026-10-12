@@ -22,6 +22,7 @@ class Range {
     return this;
   }
   setValue(v) { this.sh.put(this.r, this.c, v); return this; }
+  getValue() { return this.sh.cell(this.r, this.c); }
   setNumberFormat(f) { for (let j = 0; j < this.nc; j++) this.sh.fmt[this.c + j] = f; return this; }
   setDataValidation() { return this; }
   clearDataValidations() { return this; }
@@ -50,6 +51,7 @@ class Sheet {
   deleteColumn(c) { this.rows.forEach((r) => r.splice(c - 1, 1)); this.cols--; }
   shiftFmt(from, n) { const f = {}; Object.entries(this.fmt).forEach(([k, v]) => { k = Number(k); f[k >= from ? k + n : k] = v; }); this.fmt = f; }
   deleteRow(r) { this.rows.splice(r - 1, 1); this.rows.push(Array(this.cols).fill("")); }
+  deleteRows(r, n) { for (let k = 0; k < n; k++) this.deleteRow(r); }
   insertRowsAfter(r, n) { this.rows.splice(r, 0, ...Array.from({ length: n }, () => Array(this.cols).fill(""))); }
   moveColumns(range, dest) {
     const c = range.c;
@@ -69,7 +71,8 @@ class Sheet {
 }
 
 class Spreadsheet {
-  constructor() { this.sheets = []; }
+  constructor(name = "Untitled") { this.sheets = []; this.name = name; }
+  getName() { return this.name; }
   getSheetByName(n) { return this.sheets.find((s) => s.name === n) || null; }
   insertSheet(n) { const s = new Sheet(this, n); this.sheets.push(s); return s; }
   getSheets() { return this.sheets; }
@@ -94,7 +97,7 @@ export function load(codePath, ss = new Spreadsheet()) {
   };
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(codePath, "utf8"), sandbox);
-  const post = (body) => JSON.parse(sandbox.doPost({ postData: { contents: JSON.stringify({ version: 4, ...body }) } }).getContent());
+  const post = (body) => JSON.parse(sandbox.doPost({ postData: { contents: JSON.stringify({ version: 5, ...body }) } }).getContent());
   // 测试用：再开一个表格（比如阅读记录），网页里填它的链接
   const spreadsheet = (url) => (others[url] = others[url] || new Spreadsheet());
   return { ss, sandbox, logs, post, spreadsheet };

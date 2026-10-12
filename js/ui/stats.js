@@ -1,4 +1,4 @@
-// 统计页（电脑）。最上面：看哪段时间（Day / Week / Month / Season / Year / 自己选两头）、只看哪个项目 / 计划、只看深度。
+// 统计页（电脑）。最上面：看哪段时间（Day / Week / Month / Season / Year / 自己选两头）、只看哪几个项目 / 计划（可以勾好几个）、只看深度。
 // 下面两个页签：
 //   Time —— 时间去哪了：花了多久、其中多少是深度、每天的柱子、一天 24 小时的饼图、时间表（项目 × 日子）、几点在干活
 //   Plan —— 计划执行得怎样：做完多少、守住几天线、估时准不准、各项目、没做完的原因、项目健康
@@ -9,7 +9,7 @@ import * as S from "../stats.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtMin, fmtShort, fmtDay, fmtClock, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf } from "../dates.js";
-import { healthPill, groupsOf, projectOptions } from "./common.js";
+import { healthPill, groupsOf, projectOptions, pickTarget, badgeOf } from "./common.js";
 import { hourLabel } from "../day.js";
 import { parseTimes } from "../times.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
@@ -18,7 +18,8 @@ let kind = "";        // 档位；上次选的记在这台设备上
 let tab = "";         // time / plan
 let anchor = "";
 let custom = null;    // 自己选的两头 { from, to }
-let pick = "";        // 只看："" 全部 / "g:<项目>" / "p:<计划 id>" / "none" 没挂计划的
+const picks = new Set();   // 只看哪几个：g:<大类> / p:<计划 id> / none（哪都没挂的）；一个都不勾 = 全部，按大类分
+let pickOpen = false;      // 勾选的那块开着：重画时别收起来
 let deepOnly = false;
 let pieMode = "day";  // 饼图：day = 一天 24 小时都算 / logged = 只看记下来的
 let adjust = false;   // 饼图底下「Adjust」开着
@@ -41,16 +42,22 @@ function rangeOf(c) {
   return { ...custom };
 }
 
-// 只看某个项目 / 计划 / 没挂计划的 / 深度：把任务（和计划）先筛好，后面的计算照旧
+// 只看勾了的那几个 / 只看深度：把任务（和计划）先筛好，后面的计算照旧。
+// 分行：一个都没勾 = 按大类；只勾了一个大类 = 按它里面的计划拆开；别的情况 = 勾了的每个一行
 function scope(c) {
-  if (pick && pick !== "none" && !c.projects.some((p) => pick === "p:" + p.id || pick === "g:" + groupName(p))) pick = "";   // 选的那个已经没了
-  if (!pick && !deepOnly) return { c, by: "group", on: false };
-  const plans = new Set(c.projects.filter((p) => (pick.startsWith("p:") ? p.id === pick.slice(2) : pick.startsWith("g:") && groupName(p) === pick.slice(2))).map((p) => p.id));
-  const known = new Set(c.projects.map((p) => p.id));
-  const inPick = (t) => !pick || (pick === "none" ? !known.has(t.projectId) : plans.has(t.projectId));
+  const names = new Set([...c.groups.map((g) => g.name), ...c.projects.map(groupName)]);
+  for (const k of [...picks]) if (k !== "none" && !(k.startsWith("p:") ? c.projects.some((p) => p.id === k.slice(2)) : names.has(k.slice(2)))) picks.delete(k);   // 勾的那个已经没了
+  if (!picks.size && !deepOnly) return { c, by: "group", on: false };
+  const keyOf = (t) => {
+    const p = t.projectId ? E.projectById(c, t.projectId) : null, g = S.rowOf(c, t, "group").name;
+    return p && picks.has("p:" + p.id) ? "p" : g && picks.has("g:" + g) ? "g" : !p && !g && picks.has("none") ? "n" : "";
+  };
+  const only = picks.size === 1 ? [...picks][0] : "";
+  const by = !picks.size ? "group" : only.startsWith("g:") ? "plan"
+    : (t) => { const k = keyOf(t); return k === "p" ? S.rowOf(c, t, "plan") : k === "g" ? S.rowOf(c, t, "group") : { name: "", color: "" }; };
   return {
-    c: { ...c, tasks: c.tasks.filter((t) => inPick(t) && (!deepOnly || t.deep)), projects: pick ? c.projects.filter((p) => plans.has(p.id)) : c.projects },
-    by: pick && pick !== "none" ? "plan" : "group", on: true
+    c: { ...c, tasks: c.tasks.filter((t) => (!picks.size || keyOf(t)) && (!deepOnly || t.deep)), projects: picks.size ? c.projects.filter((p) => picks.has("p:" + p.id) || picks.has("g:" + groupName(p))) : c.projects },
+    by, on: true
   };
 }
 
@@ -386,7 +393,7 @@ function dayListHTML(c, s) {
   const when = (t) => parseTimes(t.times).filter((x) => x.from && x.to).map((x) => x.from + "–" + x.to).join(", ");
   return '<section class="card"><h3>That day</h3><div class="table-wrap"><table class="ptable"><thead><tr><th>Task</th><th>Plan</th><th>When</th><th>Time</th></tr></thead><tbody>' +
     tasks.map((t) => {
-      const p = t.projectId ? E.projectById(c, t.projectId) : null;
+      const p = badgeOf(t);
       return '<tr><td><span class="pdot" style="background:' + esc(p?.color || "var(--c-None)") + '"></span>' + esc(t.title) + (t.deep ? ' <span class="dp">◆ Deep</span>' : "") + "</td><td>" + esc(p ? p.name : "—") +
         '</td><td class="num">' + (when(t) || "—") + '</td><td class="num">' + (E.spentMin(t) ? fmtMin(E.spentMin(t)) : "—") + (t.status && t.status !== "done" ? " <small>" + t.status + "</small>" : "") + "</td></tr>";
     }).join("") + "</tbody></table></div></section>";
@@ -395,12 +402,15 @@ function dayListHTML(c, s) {
 // ---------- 整页 ----------
 
 function headHTML(c, r) {
-  const filter = '<select data-st="pick" aria-label="Show which project"><option value="">All projects</option>' +
-    groupsOf(c.projects).map((g) => {
-      const opt = (v, label) => '<option value="' + esc(v) + '"' + (pick === v ? " selected" : "") + ">" + esc(label) + "</option>";
-      if (!g.name) return g.subs.map((p) => opt("p:" + p.id, p.name)).join("");
-      return '<optgroup label="' + esc(g.name) + '">' + (g.subs.length > 1 ? opt("g:" + g.name, "All of " + g.name) : "") + g.subs.map((p) => opt("p:" + p.id, p.name)).join("") + "</optgroup>";
-    }).join("") + '<option value="none"' + (pick === "none" ? " selected" : "") + ">No plan</option></select>";
+  // 只看哪几个：大类一个勾，下面缩进是它的计划，最后是哪都没挂的
+  const box = (v, label, color, cls) => '<label class="mi ' + cls + '"><input type="checkbox" data-pick="' + esc(v) + '"' + (picks.has(v) ? " checked" : "") + ">" +
+    (color ? '<i style="--dot:' + esc(color) + '"></i>' : "") + "<span>" + esc(label) + "</span></label>";
+  const chosen = [...picks].map((k) => (k === "none" ? "No project" : k.startsWith("g:") ? k.slice(2) : c.projects.find((p) => p.id === k.slice(2))?.name || ""));
+  const filter = '<details class="st-pick"' + (pickOpen ? " open" : "") + '><summary class="' + (picks.size ? "on" : "") + '">' + esc(chosen.length ? chosen.slice(0, 2).join(", ") + (chosen.length > 2 ? " +" + (chosen.length - 2) : "") : "All projects") + "</summary>" +
+    '<div class="menu st-pick-panel"><div class="ml">' + groupsOf(c.projects, { all: true }).map((g) =>
+      (g.name ? box("g:" + g.name, g.name, c.groups.find((x) => x.name === g.name)?.color || g.subs[0]?.color, "top") : "") + g.subs.map((p) => box("p:" + p.id, p.name, p.color, g.name ? "in" : "")).join("")).join("") +
+    box("none", "No project", "", "top") + "</div>" +
+    '<footer><span class="msub">' + (picks.size ? picks.size + " picked" : "Nothing picked = everything, by project") + '</span><button type="button" class="link" data-act="pick-clear"' + (picks.size ? "" : " disabled") + ">Clear</button></footer></div></details>";
   return '<header class="page-head"><div><h2>' + rangeLabel(r) + "</h2></div>" +
     '<div class="tools"><span class="seg">' + Object.entries(S.PERIODS).map(([k, t]) => '<button type="button" data-act="period" data-k="' + k + '"' + (k === kind ? ' class="on"' : "") + ">" + t + "</button>").join("") + "</span>" +
     (kind === "custom" ? '<span class="st-range"><input type="date" data-st="from" value="' + r.from + '" max="' + r.to + '" aria-label="From">–<input type="date" data-st="to" value="' + r.to + '" min="' + r.from + '" aria-label="To"></span>' : "") +
@@ -442,7 +452,7 @@ function addTimeHTML(c) {
   const projects = c.projects.filter(E.isActive);
   return '<form class="addtime" autocomplete="off"><h2 class="sheet-title">Add time</h2>' +
     '<label class="field"><span>What</span><input name="title" placeholder="What did you do?" required></label>' +
-    (projects.length ? '<label class="field"><span>Plan</span><select name="project">' + projectOptions(projects) + "</select></label>" : "") +
+    '<label class="field"><span>Project or plan</span><select name="project">' + projectOptions(projects) + "</select></label>" +
     '<div class="field-row three"><label class="field"><span>Date</span><input type="date" name="date" value="' + date + '" max="' + c.today + '" required></label>' +
     '<label class="field"><span>Start</span><input type="time" name="from" required></label>' +
     '<label class="field"><span>Stop</span><input type="time" name="to" value="' + (date === c.today ? store.clockNow() : "") + '" required></label></div>' +
@@ -523,18 +533,29 @@ export function initStats(rerender) {
     } else if (act === "pie-mode") pieMode = el.dataset.v;
     else if (act === "life-adjust") adjust = !adjust;
     else if (act === "deep-only") deepOnly = !deepOnly;
+    else if (act === "pick-clear") picks.clear();
     else if (act === "add-time") { openModal(addTimeHTML(store.ctx())); modalSheet()?.querySelector("[name=title]")?.focus(); return; }
     if (anchor > T) anchor = T;
     rerender();
   });
   on(document, "change", ".stats [data-st]", (e, el) => {
     const f = el.dataset.st;
-    if (f === "pick") pick = el.value;
-    else if (el.value) {
+    if (el.value) {
       custom = { ...custom, [f]: el.value };
       if (custom.from > custom.to) custom = { from: el.value, to: el.value };
     }
     rerender();
+  });
+  // 只看哪几个：勾一下就重算；那一块开着就一直开着，点到外面才收
+  on(document, "change", ".stats [data-pick]", (e, el) => {
+    if (el.checked) picks.add(el.dataset.pick); else picks.delete(el.dataset.pick);
+    rerender();
+  });
+  document.addEventListener("toggle", (e) => { if (e.target.matches?.(".st-pick")) pickOpen = e.target.open; }, true);
+  document.addEventListener("click", (e) => {
+    if (!pickOpen || e.target.closest?.(".st-pick")) return;
+    pickOpen = false;
+    document.querySelector(".st-pick")?.removeAttribute("open");
   });
   // 饼图底下的默认值：填的是小时，存成分钟（空着的深度目标 = 不设）
   on(document, "change", ".stats [data-life]", (e, el) => {
@@ -549,7 +570,7 @@ export function initStats(rerender) {
     e.preventDefault();
     const title = form.title.value.trim();
     if (!title || !form.from.value || !form.to.value) return;
-    const id = store.addLogged({ date: form.date.value || store.today(), title, projectId: form.project?.value || "", deep: form.deep.checked }, form.from.value, form.to.value);
+    const id = store.addLogged({ date: form.date.value || store.today(), title, ...pickTarget(form.project?.value), deep: form.deep.checked }, form.from.value, form.to.value);
     if (!id) { form.to.focus(); return; }
     closeModal();
   });

@@ -10,38 +10,54 @@ export const STATUS = [["done", "Done"], ["partial", "Partial"], ["later", "Late
 
 export const projectOf = (t) => (t.projectId ? store.get("projects", t.projectId) : null);
 
-// 两层：上一层「项目」= 计划的 group，下面是计划（projects 表里的行）。
-// 按出现顺序分好组：[{ name, subs }]，没有项目的那些放最后（name 为空）
-export function groupsOf(projects) {
+// 两层：上一层「项目」= 大类（计划的 group），下面是计划（projects 表里的行）。
+// 分好组：[{ name, subs }]，先按大类清单的顺序，再是清单里没有的名字，没有大类的那些放最后（name 为空）。
+// all = 清单里的大类哪怕下面没有计划也列出来（Projects 页用）
+export function groupsOf(projects, { all = false } = {}) {
   const map = new Map();
+  for (const g of store.groups()) map.set(g.name, []);
   for (const p of projects) {
     const g = String(p.group || "").trim();
     if (!map.has(g)) map.set(g, []);
     map.get(g).push(p);
   }
-  const out = [...map.entries()].filter(([g]) => g).map(([name, subs]) => ({ name, subs }));
-  if (map.has("")) out.push({ name: "", subs: map.get("") });
+  const listed = new Set(store.groups().map((g) => g.name));
+  const out = [...map.entries()].filter(([g, subs]) => g && (subs.length || (all && listed.has(g)))).map(([name, subs]) => ({ name, subs }));
+  if (map.get("")?.length) out.push({ name: "", subs: map.get("") });
   return out;
 }
 
-// 下拉框：按项目分组列计划
-export function projectOptions(projects, selected = "", none = "No plan") {
-  const opt = (p) => '<option value="' + p.id + '"' + (p.id === selected ? " selected" : "") + ">" + esc(p.name) + "</option>";
-  return (none === null ? "" : '<option value="">' + none + "</option>") + groupsOf(projects).map((g) =>
-    g.name ? '<optgroup label="' + esc(g.name) + '">' + g.subs.map(opt).join("") + "</optgroup>" : g.subs.map(opt).join("")).join("");
+// 下拉框：每个大类一组，组里第一项是大类自己（直接挂在大类上，值 g:<名字>），下面是它的计划（值 = 计划 id）。
+// direct = false 时只列计划（任务池里加条目要落在某个计划上）
+export function projectOptions(projects, selected = "", none = "No project", direct = true) {
+  const opt = (p) => '<option value="' + p.id + '"' + (p.id === selected ? " selected" : "") + ' data-color="' + esc(p.color || "") + '">' + esc(p.name) + "</option>";
+  const self = (g) => { const v = "g:" + g.name, x = store.groupByName(g.name); return x && direct ? '<option value="' + esc(v) + '"' + (v === selected ? " selected" : "") + ' data-self data-color="' + esc(x.color || "") + '">' + esc(g.name) + "</option>" : ""; };
+  return (none === null ? "" : '<option value="">' + none + "</option>") + groupsOf(projects, { all: direct }).map((g) =>
+    g.name ? '<optgroup label="' + esc(g.name) + '">' + self(g) + g.subs.map(opt).join("") + "</optgroup>" : g.subs.map(opt).join("")).join("");
 }
+
+// 下拉选中的值 → 任务挂在哪：计划，或者直接挂在大类上
+export const pickTarget = (v) => (String(v || "").startsWith("g:") ? { projectId: "", group: String(v).slice(2) } : { projectId: String(v || ""), group: "" });
+// 任务现在挂在哪（下拉的值）
+export const targetOf = (t) => t.projectId || (t.group ? "g:" + t.group : "");
 
 // 「Main - French · Module #4」
 export const fullName = (p) => (p.group ? p.group + " · " : "") + p.name;
 
-// 任务的颜色：计划的颜色，没挂计划是灰
+// 任务的颜色：计划的颜色；直接挂在大类上的用大类的；都没有是灰
 export function colorOf(t) {
-  return projectOf(t)?.color || "var(--c-None)";
+  return projectOf(t)?.color || store.groupByName(t.group)?.color || "var(--c-None)";
+}
+
+// 任务旁边那个小标签：计划的名字，直接挂在大类上的是大类的名字
+export function badgeOf(t) {
+  const p = projectOf(t);
+  return p ? { name: p.name || "", color: p.color || "" } : t.group ? { name: t.group, color: store.groupByName(t.group)?.color || "" } : null;
 }
 
 export function zebraOf(t) {
-  const p = projectOf(t);
-  return p?.color ? zebraFor(p.color) : "var(--zebra-None)";
+  const c = projectOf(t)?.color || store.groupByName(t.group)?.color;
+  return c ? zebraFor(c) : "var(--zebra-None)";
 }
 
 // 做完 = 纯色；部分完成 = 豹纹；还没做 = 斑马纹；Later 只剩描边；Drop 淡掉

@@ -174,9 +174,16 @@ function celebrate(c, view) {
 
 // ---------- 同步时机 ----------
 
+// 第一次用上大类：现有的计划按名字归进六个大类（要先拿到表格里最新的；没连表格就直接归）
+function adoptGroups() {
+  const done = store.adoptGroups();
+  if (done) toast("Projects sorted into " + done.names.join(", "), done.undo);
+}
+
 // 同步完：拍今天的安全线快照
 async function syncThenLog() {
-  await sync.sync();
+  const ok = await sync.sync();
+  if (ok || !sync.configured()) adoptGroups();
   store.ensureTodayLog();
 }
 
@@ -250,4 +257,5 @@ if ("serviceWorker" in navigator && location.protocol === "https:") navigator.se
 render();
 // 早上的线要等表格里的数据拉下来再拍；连不上就 6 秒后用本机的
 if (sync.configured()) await Promise.race([syncThenLog(), new Promise((r) => setTimeout(r, 6000))]);
+else adoptGroups();
 store.ensureTodayLog();

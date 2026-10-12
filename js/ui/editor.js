@@ -6,7 +6,7 @@ import * as E from "../engine.js";
 import * as R from "../routines.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtMin, fmtShort, weekday, WEEKDAYS } from "../dates.js";
-import { projectOptions } from "./common.js";
+import { projectOptions, pickTarget, targetOf } from "./common.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
 
 let editing = "";
@@ -86,7 +86,7 @@ function editorHTML(t) {
     '<label class="field"><span>Task</span><input data-f="title" value="' + esc(t.title) + '"></label>' +
     '<div class="field-row"><label class="field"><span>Date</span><input type="date" data-f="date" value="' + esc(t.date) + '"></label>' +
     '<label class="field"><span>Minutes</span><input type="number" class="num" min="0" step="5" data-f="est" value="' + esc(t.est) + '"></label></div>' +
-    (rule ? "" : '<label class="field"><span>Plan</span><select data-f="projectId">' + projectOptions(projects, t.projectId) + "</select></label>") +
+    (rule ? "" : '<label class="field"><span>Project or plan</span><select data-f="projectId">' + projectOptions(projects, targetOf(t)) + "</select></label>") +
     (item ? '<p class="hint">Part of <b>' + esc(item.title) + "</b> · " + fmtMin(st.progress) + " of " + fmtMin(st.est) + " done</p>" : "") +
     '<label class="check"><input type="checkbox" data-f="optional"' + (t.optional ? " checked" : "") + "> Optional — nice to do, not a must</label>" +
     '<label class="check"><input type="checkbox" data-f="deep"' + (t.deep ? " checked" : "") + "> ◆ Deep work — focused, one thing at a time</label>" +
@@ -135,7 +135,7 @@ export function initEditor() {
     if (f === "title" && !String(v).trim()) return;
     if (f === "date" && !v) return;
     if (scope !== "this" && SERIES_FIELDS.includes(f) && ruleFor(editing)) return store.editSeries(editing, { [f]: v }, scope);
-    if (f === "projectId") return store.setTaskProject(editing, el.value);
+    if (f === "projectId") { const to = pickTarget(el.value); return store.setTaskProject(editing, to.projectId, to.group); }
     store.updateTask(editing, { [f]: v }, null, { quiet: f === "desc" || f === "title" });
   };
   on(document, "input", ".task-editor [data-f=desc], .task-editor [data-f=title]", (e, el) => save(el));

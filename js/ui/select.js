@@ -1,5 +1,5 @@
 // 下拉框：页面里还是普通的 <select>（各处的 change 处理都不用改）。电脑上点开时不用系统自带的菜单，
-// 换成自己画的一块：分组小标题、颜色点（option 的 data-color）、当前项打勾、键盘上下 / 回车 / Esc，选项多的顶上带一格搜索。
+// 换成自己画的一块：分组小标题（组里第一项带 data-self 的，组名自己也能选）、颜色点（option 的 data-color）、当前项打勾、键盘上下 / 回车 / Esc，选项多的顶上带一格搜索。
 // 选中后给原来的 <select> 赋值并发 input / change。手机和触屏还是系统自带的选择器。
 
 import { esc } from "../dom.js";
@@ -14,14 +14,18 @@ const optionsOf = (sel) => [...sel.querySelectorAll("option")];
 
 function listHTML(sel, q = "") {
   const hit = (o) => !q || o.textContent.toLowerCase().includes(q);
-  const row = (o, nested) => '<div class="mi' + (nested ? " in" : "") + (o.selected ? " on" : "") + (o.disabled ? " off" : "") + '" role="option" aria-selected="' + o.selected + '" data-i="' + optionsOf(sel).indexOf(o) + '">' +
+  const all = optionsOf(sel);
+  const row = (o, nested, top = false) => '<div class="mi' + (nested ? " in" : "") + (top ? " top" : "") + (o.selected ? " on" : "") + (o.disabled ? " off" : "") + '" role="option" aria-selected="' + o.selected + '" data-i="' + all.indexOf(o) + '">' +
     (o.dataset.color ? '<i style="--dot:' + esc(o.dataset.color) + '"></i>' : "") + "<span>" + esc(o.textContent) + "</span></div>";
   let html = "";
   for (const node of sel.children) {
     if (node.tagName === "OPTION") { if (hit(node)) html += row(node, false); continue; }
     if (node.tagName !== "OPTGROUP") continue;
-    const inside = [...node.children].filter(hit);
-    if (inside.length) html += '<div class="mg">' + esc(node.label) + "</div>" + inside.map((o) => row(o, true)).join("");
+    // 组里第一项带 data-self：这一组的名字自己也能选（大类），就不另画小标题了
+    const kids = [...node.children], self = kids[0]?.dataset.self !== undefined ? kids[0] : null;
+    const inside = kids.filter((o) => o !== self && hit(o));
+    if (self && (hit(self) || inside.length)) html += row(self, false, true) + inside.map((o) => row(o, true)).join("");
+    else if (inside.length) html += '<div class="mg">' + esc(node.label) + "</div>" + inside.map((o) => row(o, true)).join("");
   }
   return html || '<div class="mg">Nothing matches</div>';
 }

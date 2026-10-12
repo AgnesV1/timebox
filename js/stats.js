@@ -41,11 +41,17 @@ export function shiftAnchor(kind, anchor, n) {
 const num = (v) => Number(v) || 0;
 const key = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
-// 一个任务算在哪一行：by = "group" 按项目（计划的 group；没有 group 的计划自己算一个），"plan" 按计划；没挂计划的名字是空
-function rowOf(ctx, t, by) {
+const groupColor = (ctx, name) => (ctx.groups || []).find((g) => g.name === name)?.color || "";
+
+// 一个任务算在哪一行：by = "group" 按大类（计划的 group；没有 group 的计划自己算一个），"plan" 按计划，
+// 也可以传一个函数自己定（任务 → { name, color }）。直接挂在大类上的任务两种都算在大类那一行；哪都没挂的名字是空
+export function rowOf(ctx, t, by) {
+  if (typeof by === "function") return by(t);
   const p = t.projectId ? E.projectById(ctx, t.projectId) : null;
-  if (!p) return { name: "", color: "" };
-  return { name: (by === "plan" ? "" : String(p.group || "").trim()) || p.name || "", color: p.color || "" };
+  if (!p) { const name = String(t.group || "").trim(); return { name, color: name ? groupColor(ctx, name) : "" }; }
+  if (by === "plan") return { name: p.name || "", color: p.color || "" };
+  const name = String(p.group || "").trim() || p.name || "";
+  return { name, color: groupColor(ctx, name) || p.color || "" };
 }
 
 // 默认的「不用记的时间」：睡觉、吃饭做饭洗碗洗澡（每天，分钟）、家务（每个周末一共）；deepGoal = 每天想做多少深度（0 = 不设）
@@ -91,15 +97,14 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
   const accuracy = timed.length ? timed.reduce((a, t) => a + num(t.actual), 0) / timed.reduce((a, t) => a + num(t.est), 0) : null;
   const caps = days.map((d) => E.capacityFor(ctx.capacity, d)).filter((v) => v > 0);
 
-  // 按项目（或者按计划，见 rowOf）；没挂计划的放最后
-  const projectOf = (t) => (t.projectId ? E.projectById(ctx, t.projectId) : null);
+  // 按大类（或者按计划，见 rowOf）；哪都没挂的放最后
   const nameOf = (t) => rowOf(ctx, t, by).name;
   const byProject = [...new Set(tasks.map(nameOf))].map((name) => {
     const ts = tasks.filter((t) => nameOf(t) === name);
     const tm = ts.filter((t) => t.status === "done" && num(t.actual) > 0 && num(t.est) > 0);
     return {
       name,
-      color: ts.map((t) => projectOf(t)?.color).find(Boolean) || "",
+      color: ts.map((t) => rowOf(ctx, t, by).color).find(Boolean) || "",
       spent: ts.reduce((a, t) => a + E.spentMin(t), 0),
       deep: ts.reduce((a, t) => a + (t.deep ? E.spentMin(t) : 0), 0),
       done: ts.filter((t) => t.status === "done").length,
@@ -165,6 +170,76 @@ export function projectRows(ctx, from, last) {
       health: E.health(ctx, p)
     };
   }).filter((r) => r.planned || r.spent);
+}
+
+// ---------- 占比：各大类各占多少，大类里面各计划各占多少（Projects 页用） ----------
+// → { total, groups: [{ name, color, min, parts: [{ name, color, min }] }] }；parts 里名字为空的 = 直接挂在大类上的
+export function shares(ctx, from, to) {
+  const last = to < ctx.today ? to : ctx.today;
+  const groups = new Map();
+  let total = 0;
+  for (const t of ctx.tasks) {
+    if (!t.date || t.date < from || t.date > last) continue;
+    const min = E.spentMin(t);
+    if (!min) continue;
+    const g = rowOf(ctx, t, "group"), p = t.projectId ? E.projectById(ctx, t.projectId) : null;
+    if (!groups.has(g.name)) groups.set(g.name, { name: g.name, color: g.color, min: 0, parts: new Map() });
+    const row = groups.get(g.name), key = p ? p.id : "";
+    if (!row.parts.has(key)) row.parts.set(key, { name: p ? p.name || "" : "", color: (p && p.color) || g.color, min: 0 });
+    row.min += min; total += min;
+    row.parts.get(key).min += min;
+  }
+  const big = (a, b) => b.min - a.min;
+  return { total, groups: [...groups.values()].map((g) => ({ ...g, parts: [...g.parts.values()].sort(big) })).sort((a, b) => (!a.name) - (!b.name) || big(a, b)) };
+}
+
+// ---------- 每周：成长 / Relax 够不够、是不是太多 ----------
+// 大类的 grow = "all"：全部时间算成长；"deep"：标了 ◆ Deep 的算成长（比如深度阅读），没标的算 Relax。
+// 四个门槛（分钟，0 = 不提醒）：成长太少 / 太多、Relax 太少 / 太多。
+export const WEEKLY = { growMin: 2400, growMax: 4800, relaxMin: 300, relaxMax: 1200 };
+
+export function weekCheck(ctx, from, to, limits = {}) {
+  const L = { ...WEEKLY, ...(limits || {}) };
+  let growth = 0, relax = 0;
+  for (const t of ctx.tasks) {
+    if (!t.date || t.date < from || t.date > to) continue;
+    const min = E.spentMin(t);
+    if (!min) continue;
+    const name = rowOf(ctx, t, "group").name, g = (ctx.groups || []).find((x) => x.name === name);
+    if (!g) continue;
+    if (g.grow === "all" || (g.grow === "deep" && t.deep)) growth += min;
+    else if (g.grow === "deep") relax += min;
+  }
+  const warn = [];
+  const check = (what, v, lo, hi) => {
+    if (num(lo) > 0 && v < num(lo)) warn.push({ what, dir: "low", min: v, limit: num(lo) });
+    else if (num(hi) > 0 && v > num(hi)) warn.push({ what, dir: "high", min: v, limit: num(hi) });
+  };
+  check("growth", growth, L.growMin, L.growMax);
+  check("relax", relax, L.relaxMin, L.relaxMax);
+  return { from, to, growth, relax, warn };
+}
+
+// ---------- 季度表的两格 ----------
+// progress = 当天 labor 大类里实际花的分钟 ÷ 6，取整（6 小时 → 60，6.5 小时 → 65）；
+// focus = 当天 ◆ Deep 的分钟四舍五入到整小时，再 ÷ 10（1 小时 → 0.1，1.5 小时 → 0.2）。any = 这天有没有记下东西
+export function quarterRow(ctx, date) {
+  let labor = 0, deep = 0, any = false;
+  for (const t of E.tasksOn(ctx, date)) {
+    const min = E.spentMin(t);
+    if (!min) continue;
+    any = true;
+    if (t.deep) deep += min;
+    const name = rowOf(ctx, t, "group").name;
+    if ((ctx.groups || []).find((x) => x.name === name)?.labor) labor += min;
+  }
+  return { date, progress: Math.round(labor / 6), focus: Math.round(deep / 60) / 10, any };
+}
+
+// 要填的那几天：最近两周、不早于 from（开始自动填的那天）、到今天为止。今天还什么都没记就先不填；过去的日子没记就是 0
+export function quarterRows(ctx, from, days = 14) {
+  const start = [addDays(ctx.today, -(days - 1)), from || ctx.today].sort()[1];
+  return range(start, ctx.today).map((d) => quarterRow(ctx, d)).filter((r) => r.any || r.date < ctx.today).map(({ date, progress, focus }) => ({ date, progress, focus }));
 }
 
 // ---------- 时间去向：一天 24 小时都去哪了 ----------

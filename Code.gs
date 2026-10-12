@@ -6,12 +6,12 @@ var SECRET = 'CHANGE_ME';
 // 每张表：页名、主键、[字段, 表头, 类型, 标记]。列按表头文字找，可以挪位置、中间插自己的列。
 // 类型 text / num / date / bool / json / status / pstatus / clock（钟点 09:10，存成文字）。
 // 标记 calc = 脚本自己算，App 不写；hide = setup 时把这列藏起来（右键可取消隐藏）。
-var VERSION = 4;   // 页面和脚本对版本：页面不是这个版本就不收它的数据，免得新旧格式混在一起
+var VERSION = 5;   // 页面和脚本对版本：页面不是这个版本就不收它的数据，免得新旧格式混在一起
 var T = {
-  // 计时记录在 Times 一格里：「09:10-09:40 30m; 20m」
+  // 计时记录在 Times 一格里：「09:10-09:40 30m; 20m」。Project = 挂在哪个计划上（脚本填名字）；Group = 属于哪个大类（可以不挂计划、直接挂在大类上）
   tasks: { sheet: 'Tasks', key: 'id', main: 'title', cols: [
     ['date', 'Date', 'date'], ['title', 'Task', 'text'], ['est', 'Est min', 'num'], ['actual', 'Actual min', 'num'],
-    ['status', 'Status', 'status'], ['reason', 'Reason', 'text'], ['project', 'Project', 'text', 'calc'],
+    ['status', 'Status', 'status'], ['reason', 'Reason', 'text'], ['project', 'Project', 'text', 'calc'], ['group', 'Group', 'text'],
     ['optional', 'Optional', 'bool'], ['deep', 'Deep', 'bool'], ['times', 'Times', 'text'], ['order', 'Order', 'num', 'hide'],
     ['id', 'ID', 'text', 'hide'], ['projectId', 'Project ID', 'text', 'hide'], ['itemId', 'Item ID', 'text', 'hide'],
     ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide'],
@@ -32,13 +32,23 @@ var T = {
     ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
   // capacity（含每天单独改的 overrides）/ prefs / timer / reading 都是 JSON
   settings: { sheet: 'Settings', key: 'key', cols: [
-    ['key', 'Key', 'text'], ['value', 'Value', 'json'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] }
+    ['key', 'Key', 'text'], ['value', 'Value', 'json'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
+  // 一行一个人。more = 这页里别的列都算他的资料：表头写什么，网页里那一格就叫什么（自己加列、改表头都行）
+  friends: { sheet: 'Friends', key: 'id', main: 'name', more: true, cols: [
+    ['name', 'Name', 'text'], ['next', 'Next', 'text'], ['nextDate', 'By', 'date'], ['last', 'Last', 'date', 'calc'],
+    ['id', 'ID', 'text', 'hide'], ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] },
+  // 每次的记录：哪天、和谁（With 是脚本按 Friend IDs 填的名字）、聊了什么、要记住的
+  meets: { sheet: 'Catch-ups', key: 'id', main: 'note', cols: [
+    ['date', 'Date', 'date'], ['who', 'With', 'text', 'calc'], ['note', 'Notes', 'text'], ['watch', 'Remember', 'text'],
+    ['friends', 'Friend IDs', 'json', 'hide'], ['taskId', 'Task ID', 'text', 'hide'], ['id', 'ID', 'text', 'hide'],
+    ['updated', 'Updated', 'num', 'hide'], ['synced', 'Synced', 'num', 'calc hide']] }
 };
 // 不再用的列：setup 最后删掉
 var DROP = { tasks: ['审核', 'Review', 'Category', 'Done order'], projects: ['Planned min', 'Spent min', 'Progress'] };
 // 平时不用看的页：藏起来（右键页签 → 显示）
 var HIDE = ['Log', 'Settings', 'Deleted', 'Notes'];
-var KEEP_DELETED_DAYS = 90;
+var KEEP_DELETED_DAYS = 14;   // 删除记录只是给还没同步的设备看的；更久没同步的设备会自己整表重拉
+var ARCHIVE = 'Archive';
 var DELETED = 'Deleted';
 var DELETED_HEADER = ['Table', 'ID', 'Deleted at', 'Synced'];
 var STATUS_OUT = { done: 'Done', partial: 'Partial', later: 'Later', drop: 'Drop' };
@@ -51,7 +61,7 @@ var RENAME = {
   '拟定顺序': 'Order', '分类': 'Category', '是否完成': 'Status', '实际次序（自动）': 'Done order',
   '任务描述': 'Description', '可用时长（分钟）': 'Available min'
 };
-var COLORS = ['#C6FF00', '#2F5BFF', '#FF3EA5', '#FF7A1A', '#9B5CFF', '#00C2A8', '#FFC400', '#FF4D4D'];
+var COLORS = ['#3E8E6E', '#3F62B5', '#E07A2B', '#8B62AE', '#EFE6D2', '#9A5A36', '#D2A52E', '#B5413F'];
 
 // ================= 第一次用，以及每次更新代码后：选 setup 点「运行」 =================
 // 老表（Tasks 里还没有 ID 列）会先整页备份成「Backup …」，再原地升级：补列、补 ID、
@@ -76,7 +86,9 @@ function setup() {
   dropColumns_();
   dropGroups_(ss);
   pruneDeleted_();
+  friendCols_();
   recount_();
+  recountFriends_();
   hideSheets_(ss);
   Logger.log(old ? 'Migrated the old sheet. Backups: ' + backupNames_(ss).join(', ') : 'Setup done.');
 }
@@ -302,7 +314,7 @@ function dropGroups_(ss) {
   if (sh) ss.deleteSheet(sh);
 }
 
-// 删除记录只留最近 90 天（按记下来的时间 Synced 算；太久没打开的设备，在设置里点 Reload everything 就好）
+// 删除记录只留最近两周（按记下来的时间 Synced 算；更久没同步的设备，页面会自己整表重拉一次）
 function pruneDeleted_() {
   var sh = deletedSheet_(), data = body_(sh, DELETED_HEADER);
   var cut = Date.now() - KEEP_DELETED_DAYS * 864e5;
@@ -414,6 +426,7 @@ function readAll_(name, fix) {
     }
     var o = {};
     t.cols.forEach(function (c) { if (col[c[0]] >= 0) o[c[0]] = fromCell_(c[2], row[col[c[0]]], tz); });
+    if (t.more) o.more = moreOf_(t, names, row, tz);
     o.id = key;
     out.push(o);
   }
@@ -421,11 +434,55 @@ function readAll_(name, fix) {
   return out;
 }
 
+// ---- 自己加的列（T 里写了 more 的页）：表头不在上面那张清单里的，都读成 more = { 表头: 值 } ----
+
+function known_(t) {
+  var k = {};
+  t.cols.forEach(function (c) { k[c[1]] = true; });
+  return k;
+}
+
+function moreOf_(t, names, row, tz) {
+  var known = known_(t), out = {};
+  names.forEach(function (h, i) {
+    if (!h || known[h]) return;
+    var v = row[i];
+    if (v !== '' && v !== null && v !== undefined) out[h] = day_(v, tz);
+  });
+  return out;
+}
+
+// 缺的列补上（插在 Next 前面，没有 Next 就接在最后），整列设成纯文本
+function moreCols_(name, headers) {
+  var t = T[name], sh = sheetOf_(name), names = head_(sh), known = known_(t);
+  (headers || []).forEach(function (h) {
+    h = String(h === null || h === undefined ? '' : h).trim();
+    if (!h || known[h] || names.indexOf(h) >= 0) return;
+    var at = names.indexOf('Next');
+    if (at >= 0) { sh.insertColumnBefore(at + 1); names.splice(at, 0, h); }
+    else { if (sh.getMaxColumns() < names.length + 1) sh.insertColumnAfter(sh.getMaxColumns()); at = names.length; names.push(h); }
+    sh.getRange(1, at + 1).setValue(h);
+    sh.getRange(2, at + 1, Math.max(sh.getMaxRows() - 1, 1), 1).setNumberFormat('@');
+  });
+}
+
+// Settings 的 friend-fields（网页 Friends 页里排好的那几个名字）→ Friends 页的列
+function friendCols_() {
+  var row = readAll_('settings').filter(function (r) { return r.id === 'friend-fields'; })[0];
+  if (row && Array.isArray(row.value)) moreCols_('friends', row.value);
+}
+
 // 按主键写入：表里那行更新得更晚就不覆盖（Log 例外：两边的份额合并）；
 // 删过的行，除非这次的改动比删除还晚（比如撤销），不再写回来——自动生成的任务删了不会「复活」
 function upsert_(name, rows, now, dead) {
   if (!rows || !rows.length) return 0;
   var t = T[name], sh = sheetOf_(name), tz = tz_();
+  if (t.more) {
+    var extra = [];
+    rows.forEach(function (r) { if (r.more && typeof r.more === 'object') Object.keys(r.more).forEach(function (h) { if (extra.indexOf(h) < 0) extra.push(h); }); });
+    moreCols_(name, extra);
+  }
+  if (name === 'projects') PLAN_NAMES = null;
   var names = head_(sh), col = cols_(t, names), width = names.length;
   var last = sh.getLastRow();
   var data = last > 1 ? sh.getRange(2, 1, last - 1, width).getValues() : [];
@@ -452,6 +509,11 @@ function upsert_(name, rows, now, dead) {
       if (r[c[0]] === undefined && !(fresh && (c[2] === 'kind' || c[2] === 'place'))) return;   // 新行的 Kind / Place 填上默认
       row[col[c[0]]] = toCell_(c[2], r[c[0]]);
     });
+    if (t.more && r.more && typeof r.more === 'object') {
+      Object.keys(r.more).forEach(function (h) { var i = names.indexOf(h); if (i >= 0 && !known_(t)[h]) row[i] = toCell_('text', r.more[h]); });
+    }
+    // 任务 / 条目写进来时顺手把计划的名字填上（不用每次同步整页重填）
+    if ((name === 'tasks' || name === 'items') && col.project >= 0 && col.projectId >= 0) row[col.project] = planNames_()[String(row[col.projectId] || '')] || '';
     if (col[t.key] >= 0) row[col[t.key]] = key;
     if (col.synced >= 0) row[col.synced] = now;
     if (pending) appended[i - data.length] = row;
@@ -540,15 +602,26 @@ function pull_(since) {
 
 // ================= 名字列：Tasks / Items 里显示属于哪个计划 =================
 
+var PLAN_NAMES = null;   // 这一次请求里用的：计划 ID → 名字（Projects 一有改动就作废）
+function planNames_() {
+  if (!PLAN_NAMES) {
+    PLAN_NAMES = {};
+    readAll_('projects').forEach(function (p) { PLAN_NAMES[p.id] = p.name; });
+  }
+  return PLAN_NAMES;
+}
+
 function plan_(t) {
   if (t.status === 'done') return Number(t.est) || 0;
   return t.status === 'partial' ? Math.min(Number(t.actual) || 0, Number(t.est) || 0) : 0;
 }
 
 function recount_() {
-  var name = {};
-  readAll_('projects').forEach(function (p) { name[p.id] = p.name; });
+  var name = {}, group = {};
+  readAll_('projects').forEach(function (p) { name[p.id] = p.name; group[p.id] = p.group || p.name || ''; });
   writeCol_('tasks', 'project', function (r) { return name[r.projectId] || ''; });
+  // 挂了计划的任务，大类跟着计划走（计划改了大类、大类改了名，这里补上）；直接挂在大类上的不动
+  writeCol_('tasks', 'group', function (r) { return r.projectId && group[r.projectId] !== undefined ? group[r.projectId] : r.group; });
   writeCol_('items', 'project', function (r) { return name[r.projectId] || ''; });
   return { ok: true, projects: Object.keys(name).length };
 }
@@ -570,9 +643,22 @@ function writeCol_(name, field, f) {
   sh.getRange(2, c + 1, values.length, 1).setValues(values);
 }
 
+// Friends / Catch-ups 里脚本自己填的两列：With = 这次有谁（名字），Last = 这个人最近一次是哪天（到今天为止）
+function recountFriends_() {
+  var name = {}, last = {}, today = Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd');
+  readAll_('friends').forEach(function (f) { name[f.id] = f.name; });
+  readAll_('meets').forEach(function (m) {
+    if (!m.date || m.date > today) return;
+    (m.friends || []).forEach(function (id) { if (!last[id] || m.date > last[id]) last[id] = m.date; });
+  });
+  writeCol_('meets', 'who', function (r) { return (r.friends || []).map(function (id) { return name[id] || ''; }).filter(String).join(', '); });
+  writeCol_('friends', 'last', function (r) { return last[r.id] || ''; });
+}
+
 // 在编辑器里选 recount 点运行：立刻把名字列重填一次
 function recount() {
   var r = recount_();
+  recountFriends_();
   Logger.log(JSON.stringify(r));
   return r;
 }
@@ -763,9 +849,131 @@ function reading_(req) {
   return out;
 }
 
+// ================= 季度表：你自己的另一个表格 =================
+// 链接在 Settings 的 quarter（{url, from}），在网页电脑端的设置里填一次。那个表格每个季度一页，页名「2026 Q4」。
+// 网页把每天的两个数算好发来（progress、focus）；这里只管找到那一天那一行，写这两格，别的格子一概不碰。
+var QUARTER_COLS = ['progress', 'focus'];
+
+function quarterBook_() {
+  var row = readAll_('settings').filter(function (r) { return r.id === 'quarter'; })[0];
+  var url = row && row.value && String(row.value.url || '').trim();
+  if (!url) return null;
+  var id = (/\/d\/([a-zA-Z0-9_-]{20,})/.exec(url) || [])[1];
+  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.openByUrl(url);
+}
+
+// 页名不分大小写、不管空格（2026 Q4 / 2026Q4 / 2026 q4）；没有这一页、但整个表格就叫这个名字，就用第一页
+function quarterTab_(book, name) {
+  var flat = function (v) { return String(v || '').replace(/\s+/g, '').toLowerCase(); };
+  var sheets = book.getSheets();
+  for (var i = 0; i < sheets.length; i++) if (flat(sheets[i].getName()) === flat(name)) return sheets[i];
+  return flat(book.getName()) === flat(name) ? sheets[0] : null;
+}
+
+// req = { rows: [{date, progress, focus}] } → { done: [date], missing: [{date, why}] }
+function quarter_(req) {
+  var book = quarterBook_();
+  if (!book) return { error: 'no sheet' };
+  var tz = book.getSpreadsheetTimeZone(), out = { done: [], missing: [] }, byTab = {};
+  (req.rows || []).forEach(function (r) {
+    var m = /^(\d{4})-(\d{2})-\d{2}$/.exec(String(r && r.date || ''));
+    if (!m) return;
+    var tab = m[1] + ' Q' + (Math.floor((Number(m[2]) - 1) / 3) + 1);
+    (byTab[tab] = byTab[tab] || []).push(r);
+  });
+  Object.keys(byTab).forEach(function (tab) {
+    var miss = function (why) { byTab[tab].forEach(function (r) { out.missing.push({ date: r.date, why: why }); }); };
+    var sh = quarterTab_(book, tab);
+    if (!sh) return miss('No tab named ' + tab);
+    var last = sh.getLastRow(), width = sh.getLastColumn();
+    if (last < 2 || width < 1) return miss('The ' + tab + ' tab is empty');
+    // 前 5 行里找表头：同一行里写着 progress 和 focus
+    var top = sh.getRange(1, 1, Math.min(5, last), width).getValues(), head = 0, col = {};
+    for (var r = 0; r < top.length && !head; r++) {
+      var low = top[r].map(function (v) { return String(v === null ? '' : v).trim().toLowerCase(); });
+      if (QUARTER_COLS.every(function (k) { return low.indexOf(k) >= 0; })) { head = r + 1; QUARTER_COLS.forEach(function (k) { col[k] = low.indexOf(k) + 1; }); }
+    }
+    if (!head) return miss('No progress / focus columns on ' + tab);
+    if (last <= head) return miss('No dates on ' + tab);
+    // 前 3 列里找日期：哪一行是哪一天
+    var at = {};
+    sh.getRange(head + 1, 1, last - head, Math.min(3, width)).getValues().forEach(function (row, i) {
+      for (var c = 0; c < row.length; c++) {
+        var d = day_(row[c], tz);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) { at[d] = head + 1 + i; break; }
+      }
+    });
+    byTab[tab].forEach(function (r) {
+      var row = at[r.date];
+      if (!row) { out.missing.push({ date: r.date, why: 'No row for ' + r.date + ' on ' + tab }); return; }
+      QUARTER_COLS.forEach(function (k) {
+        var v = Number(r[k]);
+        if (r[k] === null || r[k] === undefined || isNaN(v)) return;
+        var cell = sh.getRange(row, col[k]);
+        if (cell.getValue() !== v) cell.setValue(v);
+      });
+      out.done.push(r.date);
+    });
+  });
+  return out;
+}
+
+// ================= 归档：很久以前的任务搬到 Archive 页 =================
+// 网页设置里点 Archive 才会跑。before 这天以前的任务整行抄到 Archive 页（没有就建，表头和 Tasks 一样），
+// 再从 Tasks 删掉、记进 Deleted（各台设备下次同步跟着清掉）。还挂在进行中的整块计划的条目上的不动，不然计划进度会少算。
+function archive_(before, now) {
+  before = String(before || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(before)) return { moved: 0 };
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = sheetOf_('tasks'), tz = tz_();
+  var names = head_(sh), col = cols_(T.tasks, names), data = body_(sh, names);
+  var live = {};
+  readAll_('projects').forEach(function (p) { if (p.kind !== 'regular' && p.status === 'active') live[p.id] = true; });
+  var moved = [], gone = [], log = [];
+  data.forEach(function (row, i) {
+    var id = String(row[col.id] || '').trim(), d = day_(row[col.date], tz);
+    if (!id || !d || d >= before) return;
+    if (String(row[col.itemId] || '').trim() && live[String(row[col.projectId] || '').trim()]) return;
+    moved.push(row); gone.push(i + 2); log.push(['tasks', id, now, now]);
+  });
+  if (!moved.length) return { moved: 0 };
+  var ar = ss.getSheetByName(ARCHIVE);
+  if (!ar) {
+    ar = ss.insertSheet(ARCHIVE);
+    ar.getRange(1, 1, 1, names.length).setValues([names]);
+    ar.setFrozenRows(1);
+  }
+  // 按表头对齐（Tasks 后来多了列，Archive 也补上），文字原样留着
+  var an = head_(ar);
+  names.forEach(function (h) {
+    if (!h || an.indexOf(h) >= 0) return;
+    if (ar.getMaxColumns() < an.length + 1) ar.insertColumnAfter(ar.getMaxColumns());
+    ar.getRange(1, an.length + 1).setValue(h);
+    an.push(h);
+  });
+  var lines = moved.map(function (row) {
+    return an.map(function (h) {
+      var i = names.indexOf(h), v = i >= 0 ? row[i] : '';
+      return typeof v === 'string' && v.charAt(0) === '=' ? "'" + v : v;
+    });
+  });
+  var start = ar.getLastRow() + 1, need = start + lines.length - 1 - ar.getMaxRows();
+  if (need > 0) ar.insertRowsAfter(ar.getMaxRows(), need);
+  ar.getRange(start, 1, lines.length, an.length).setValues(lines);
+  // 从下往上删，挨着的几行一次删掉
+  for (var k = gone.length - 1; k >= 0; k--) {
+    var end = gone[k], first = end;
+    while (k > 0 && gone[k - 1] === first - 1) { first--; k--; }
+    sh.deleteRows(first, end - first + 1);
+  }
+  var del = deletedSheet_();
+  del.getRange(del.getLastRow() + 1, 1, log.length, 4).setValues(log);
+  return { moved: moved.length };
+}
+
 // ================= 网页接口 =================
 // App 只发 POST：{ secret, version, push: { rows: { tasks: [...] }, deletes: [{table, id, at}] }, pull: true, since }
 // 返回 { ok, now, pull: { tables, deleted } }。所有请求排队执行，所以 since 不会漏掉数据。
+// 还可以带：tidy（清过期的删除记录）、quarter（季度表的两格）、archive（{before}，旧任务搬进 Archive 页）、reading（阅读表格）
 
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
@@ -786,11 +994,23 @@ function doPost(e) {
   try { lock.waitLock(25000); } catch (err) { return json_({ error: 'busy' }); }
   try {
     var now = Date.now(), touched = 0, out = { ok: true };
-    var push = body.push || {}, rows = push.rows || {}, dead = deadMap_();
+    PLAN_NAMES = null;
+    var push = body.push || {}, rows = push.rows || {}, dels = push.deletes || [], dead = deadMap_();
     Object.keys(rows).forEach(function (name) { if (T[name]) touched += upsert_(name, rows[name], now, dead); });
-    touched += remove_(push.deletes, now);
-    if (touched) {
-      try { recount_(); } catch (err) { out.recount = String(err); }   // 名字列出问题不能影响同步，但要能看见
+    touched += remove_(dels, now);
+    // 脚本自己填的列：哪张表这次被动到了才重填（任务 / 条目的计划名在写入时已经顺手填了）
+    var hit = function (name) { return (rows[name] && rows[name].length) || dels.some(function (d) { return d.table === name; }); };
+    try {
+      if ((rows.settings || []).some(function (r) { return (r.key || r.id) === 'friend-fields'; })) friendCols_();
+      if (hit('projects')) recount_();
+      if (hit('friends') || hit('meets')) recountFriends_();
+    } catch (err) { out.recount = String(err); }   // 名字列出问题不能影响同步，但要能看见
+    if (body.tidy) pruneDeleted_();
+    if (body.archive) {
+      try { out.archive = archive_(body.archive.before, now); } catch (err) { out.archive = { error: String(err.message || err) }; }
+    }
+    if (body.quarter) {
+      try { out.quarter = quarter_(body.quarter); } catch (err) { out.quarter = { error: String(err.message || err) }; }   // 季度表出问题不影响同步
     }
     if (body.reading) {
       try { out.reading = reading_(body.reading); } catch (err) { out.reading = { error: String(err.message || err) }; }   // 阅读表格出问题不影响同步

@@ -161,3 +161,55 @@ test("weekly roll-up carries deep time and the goal", () => {
   assert.equal(w[0].deep, 70);
   assert.equal(w[0].goal, 120);
 });
+
+// ---------- 大类：直接挂在大类上的任务、占比、每周、季度表 ----------
+
+const GROUPS = [
+  { name: "Work", color: "#00f", labor: true, grow: "all" }, { name: "Fitness", color: "#f80", labor: false, grow: "all" },
+  { name: "Chores", color: "#840", labor: true, grow: "" }, { name: "Leisure", color: "#80f", labor: false, grow: "deep" }
+];
+const gctx = (tasks) => ctx({
+  today: "2026-10-12", groups: GROUPS,
+  projects: [{ id: "deck", name: "Deck", group: "Work", color: "#00f" }, { id: "gym", name: "Gym", group: "Fitness", color: "#f80" }, { id: "solo", name: "Solo plan", group: "", color: "#999" }],
+  tasks
+});
+const done = (id, date, min, extra = {}) => ({ id, date, est: min, actual: min, status: "done", ...extra });
+
+test("a task can sit right on a project, with or without a plan", () => {
+  const c = gctx([done("a", "2026-10-06", 60, { projectId: "deck" }), done("b", "2026-10-06", 30, { group: "Work" }), done("c", "2026-10-07", 20, { group: "Chores" }), done("d", "2026-10-07", 15, { projectId: "solo" }), done("e", "2026-10-07", 10)]);
+  const rows = (by) => Object.fromEntries(S.summarize(c, "2026-10-05", "2026-10-11", { by }).byProject.map((x) => [x.name, x.spent]));
+  assert.deepEqual(rows("group"), { Work: 90, Chores: 20, "Solo plan": 15, "": 10 });
+  assert.deepEqual(rows("plan"), { Deck: 60, Work: 30, Chores: 20, "Solo plan": 15, "": 10 }, "by plan, a task without a plan stays on its project's row");
+  assert.deepEqual(rows((t) => ({ name: t.id < "c" ? "first" : "rest", color: "" })), { first: 90, rest: 45 }, "rows can be decided by a function");
+  assert.equal(S.rowOf(c, c.tasks[2], "group").color, "#840", "the project's colour when there's no plan");
+  const sh = S.shares(c, "2026-10-05", "2026-10-11");
+  assert.equal(sh.total, 135);
+  assert.deepEqual(sh.groups.map((g) => [g.name, g.min, g.parts.map((x) => x.name + ":" + x.min).join(",")]), [["Work", 90, "Deck:60,:30"], ["Chores", 20, ":20"], ["Solo plan", 15, "Solo plan:15"], ["", 10, ":10"]]);
+});
+
+test("weekly check: growth and relax, too little or too much", () => {
+  const c = gctx([
+    done("w", "2026-10-05", 1800, { projectId: "deck" }), done("g", "2026-10-06", 300, { projectId: "gym" }),
+    done("r", "2026-10-07", 200, { group: "Leisure", deep: true }), done("l", "2026-10-08", 240, { group: "Leisure" }),
+    done("c", "2026-10-08", 500, { group: "Chores" }), done("x", "2026-10-12", 999, { group: "Work" })
+  ]);
+  const w = S.weekCheck(c, "2026-10-05", "2026-10-11");
+  assert.equal(w.growth, 2300, "work + fitness + deep leisure; chores and the next week don't count");
+  assert.equal(w.relax, 240, "leisure that isn't deep");
+  assert.deepEqual(w.warn, [{ what: "growth", dir: "low", min: 2300, limit: 2400 }, { what: "relax", dir: "low", min: 240, limit: 300 }]);
+  assert.deepEqual(S.weekCheck(c, "2026-10-05", "2026-10-11", { growMin: 0, growMax: 2000, relaxMin: 0, relaxMax: 200 }).warn.map((x) => x.what + ":" + x.dir), ["growth:high", "relax:high"]);
+  assert.deepEqual(S.weekCheck(c, "2026-10-05", "2026-10-11", { growMin: 2300, relaxMin: 240 }).warn, []);
+});
+
+test("quarter sheet: progress is labour hours x 10, focus is deep hours / 10", () => {
+  const c = gctx([
+    done("a", "2026-10-10", 360, { projectId: "deck" }), done("b", "2026-10-10", 30, { group: "Chores", deep: true }), done("c", "2026-10-10", 120, { projectId: "gym", deep: true }),
+    done("d", "2026-10-11", 84, { group: "Work" }), done("e", "2026-10-11", 29, { group: "Leisure", deep: true }),
+    { id: "f", date: "2026-10-12", est: 30, status: "" }
+  ]);
+  assert.deepEqual(S.quarterRow(c, "2026-10-10"), { date: "2026-10-10", progress: 65, focus: 0.3, any: true }, "6.5 h of work + chores; 2.5 h deep rounds to 3");
+  assert.deepEqual(S.quarterRow(c, "2026-10-11"), { date: "2026-10-11", progress: 14, focus: 0, any: true });
+  assert.deepEqual(S.quarterRows(c, "2026-10-09"), [{ date: "2026-10-09", progress: 0, focus: 0 }, { date: "2026-10-10", progress: 65, focus: 0.3 }, { date: "2026-10-11", progress: 14, focus: 0 }],
+    "from the start day; a past day with nothing is 0; today waits until something is logged");
+  assert.equal(S.quarterRows(c, "2026-01-01").length, 13, "at most the last two weeks");
+});

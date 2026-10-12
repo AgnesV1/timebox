@@ -138,15 +138,15 @@ function axisLabels(rows, byWeek) {
 // 三个多月以上一天一根太挤，按周合起来
 const trendRows = (s) => { const byWeek = s.daily.length > 92; return { byWeek, rows: byWeek ? S.weekly(s.daily, store.prefs().weekStartsOn) : s.daily }; };
 
-// 深度那一段上的星芒：几颗、在哪、闪得多快都按日子定死（重画时不会乱跳）。竖着一颗一格地排，不会挤成一堆
+// 深度那一段上的星芒：几颗、在哪、什么颜色（紫罗兰 / 电光蓝各一半）、闪得多快都按日子定死（重画时不会乱跳）。竖着一颗一格地排，不会挤成一堆
 function sparks(seed, count) {
   let h = 2166136261;
   for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   const rnd = () => { h += 0x6D2B79F5; let t = Math.imul(h ^ (h >>> 15), 1 | h); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  const n = Math.max(1, Math.min(7, Math.round(count)));
+  const n = Math.max(2, Math.min(14, Math.round(count)));
   let out = "";
   for (let i = 0; i < n; i++) {
-    out += '<span class="spk" style="left:' + Math.round(22 + rnd() * 56) + "%;top:" + Math.round(((i + 0.2 + rnd() * 0.6) / n) * 100) + "%;animation-duration:" + (1.6 + rnd() * 1.4).toFixed(2) + "s;animation-delay:-" + (rnd() * 3).toFixed(2) + 's"></span>';
+    out += '<span class="spk' + (rnd() < 0.5 ? " b" : "") + '" style="left:' + Math.round(16 + rnd() * 68) + "%;top:" + Math.round(((i + 0.2 + rnd() * 0.6) / n) * 100) + "%;animation-duration:" + (3.4 + rnd() * 2.6).toFixed(2) + "s;animation-delay:-" + (rnd() * 6).toFixed(2) + 's"></span>';
   }
   return out;
 }
@@ -171,7 +171,7 @@ function timeTrendHTML(s) {
     '<div class="cols" data-chart="ttrend">' + rows.map((r, i) =>
       '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.ttrend[i].title + ": " + fmtMin(r.spent) + " logged, " + fmtMin(r.deep) + " deep") + '">' +
       (r.spent ? '<i class="dn solo" style="height:' + h(r.spent) + '"></i>' : "") +
-      (r.deep ? '<i class="dp" style="height:' + h(r.deep) + '">' + sparks(r.date, (Math.min(1, r.deep / max) * 190) / (rows.length > 40 ? 40 : 18)) + "</i>" : "") +
+      (r.deep ? '<i class="dp" style="height:' + h(r.deep) + '">' + sparks(r.date, (Math.min(1, r.deep / max) * 190) / (rows.length > 40 ? 16 : 6)) + "</i>" : "") +
       (r.goal && !r.future ? '<i class="dgoal" style="bottom:' + h(r.goal) + '"></i>' : "") +
       (top > 0 && r.spent === top ? '<b class="cap-label num" style="bottom:' + h(r.spent) + '">' + fmtMin(r.spent) + "</b>" : "") + "</div>").join("") + "</div></div>" +
     '<div class="xaxis">' + labels.map((t) => "<span>" + t + "</span>").join("") + "</div>" +

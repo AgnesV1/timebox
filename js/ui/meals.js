@@ -4,7 +4,8 @@
 //     左边一排架子按类别摆着常买的东西，拖到 Box 上就加进去；每类最前面的「Any meat」= 随便哪种，买的时候再挑
 //   Plan（#meals）：最上面是「下次采购」的单子；然后是这一轮还没看的打折、这周和下周按天放 Box、之后四周四个框粗排
 //     （到了周五，这周就不再显示，从下周看起）
-//   Restock（#meals/restock）：规律要换 / 要补的非食物：价格、每隔多久、下次哪天；最上面按月列接下来三个月要花的
+//   Restock（#meals/restock）：规律要换 / 要补的非食物：价格、每隔多久、下次哪天；最上面按月列接下来三个月要花的；
+//     底下一块 Buy once = 只买一次的（一条裙子）：价钱、可以不填的日子，买了点 Bought
 // 「下次采购」手机上也有：顶栏的 🛒 进 #shop，只列要买的东西（不写价钱和说明），在超市里打勾，单子下面是这次采购的备注（只看）；下面挤着一张「Coming up」。
 
 import * as store from "../store.js";
@@ -307,33 +308,59 @@ function comingHTML(D, c) {
     (C.overdue.length || months.length ? "" : '<p class="msub">Nothing due in the next three months.</p>') + "</section>";
 }
 
+let showBought = false;   // 只买一次的里面，买过的那几样列不列出来
+
 function restockHTML(D, c) {
-  const list = Object.values(D.sup).sort((a, b) => (!a.next - !b.next) || String(a.next || "").localeCompare(String(b.next || "")) || M.byName(a, b));
+  const R = M.restock(D);
   const dash = '<span class="msub">—</span>';
+  const name = (s) => "<td><b>" + esc(s.name || "Untitled") + "</b>" + (s.note ? " <small>" + esc(s.note) + "</small>" : "") + "</td><td>" + (s.store ? esc(s.store) : dash) + '</td><td class="r num">' + (Number(s.price) ? money(s.price) : dash) + "</td>";
+  const due = (s) => (s.next ? '<span class="num">' + fmtDue(s.next, c.today) + '</span> <span class="dstate ' + (s.next < c.today ? "d-check" : "d-checked") + '">' + dueText(s.next, c.today) + "</span>" : dash);
+  const tr = (s, cls = "") => '<tr data-act="edit-sup" data-id="' + esc(s.id) + '" tabindex="0"' + (cls ? ' class="' + cls + '"' : "") + ">";
   const tools = '<div class="msec-head"><p class="msub">Things you replace or restock on a cycle — vitamins, brush heads, a phone. What it costs, how often, and when it\'s next due.</p>' +
     '<span class="tools"><button type="button" class="btn cta" data-act="new-sup">' + icon("plus") + " Item</button></span></div>";
-  if (!list.length) return tools + '<p class="empty">Nothing here yet. Add what you replace on a schedule: the next three months of spending show up here, and on your phone under the shopping list.</p>';
-  const row = (s) => '<tr data-act="edit-sup" data-id="' + esc(s.id) + '" tabindex="0"><td><b>' + esc(s.name || "Untitled") + "</b>" + (s.note ? " <small>" + esc(s.note) + "</small>" : "") + "</td>" +
-    "<td>" + (s.store ? esc(s.store) : dash) + '</td><td class="r num">' + (Number(s.price) ? money(s.price) : dash) + "</td><td>" + (M.cycleText(s) || dash) + "</td>" +
-    "<td>" + (s.next ? '<span class="num">' + fmtDue(s.next, c.today) + '</span> <span class="dstate ' + (s.next < c.today ? "d-check" : "d-checked") + '">' + dueText(s.next, c.today) + "</span>" : dash) + "</td>" +
+  const row = (s) => tr(s) + name(s) + "<td>" + (M.cycleText(s) || dash) + "</td><td>" + due(s) + "</td>" +
     '<td class="r">' + (M.nextAfter(c.today, s) ? '<button type="button" class="chip" data-act="sup-done" data-id="' + esc(s.id) + '" title="Replaced or restocked today: move the next date one cycle on">Replaced</button>' : "") + "</td></tr>";
-  return tools + comingHTML(D, c) + '<table class="mtable"><thead><tr><th>Item</th><th>Where</th><th class="r">Price</th><th>How often</th><th>Next</th><th></th></tr></thead><tbody>' + list.map(row).join("") + "</tbody></table>";
+  const regular = R.regular.length
+    ? '<table class="mtable"><thead><tr><th>Item</th><th>Where</th><th class="r">Price</th><th>How often</th><th>Next</th><th></th></tr></thead><tbody>' + R.regular.map(row).join("") + "</tbody></table>"
+    : '<p class="empty">Nothing here yet. Add what you replace on a schedule: the next three months of spending show up here, and on your phone under the shopping list.</p>';
+  // 只买一次的（一条裙子、一盏灯）：价钱，有打算哪天之前买就填日子（填了算进 Coming up 那个月）；买了点 Bought，收到底下
+  const sum = R.once.reduce((a, s) => a + (Number(s.price) || 0), 0);
+  const onceRow = (s) => tr(s) + name(s) + "<td>" + due(s) + "</td>" +
+    '<td class="r"><button type="button" class="chip" data-act="once-done" data-id="' + esc(s.id) + '" title="Bought it">Bought</button></td></tr>';
+  const boughtRow = (s) => tr(s, "bought") + name(s) + '<td><span class="msub">bought ' + esc(fmtDue(s.bought, c.today)) + "</span></td>" +
+    '<td class="r"><button type="button" class="chip" data-act="once-back" data-id="' + esc(s.id) + '" title="Not bought after all">Put back</button></td></tr>';
+  const once = '<div class="msec-head monce"><div><h4 class="msub-h">Buy once</h4><p class="msub">Things you mean to buy one time — a dress, a lamp. A price, and a date if there is one.' +
+    (R.once.length ? " <b>" + R.once.length + " to buy" + (sum ? " · " + money0(sum) : "") + "</b>" : "") + "</p></div>" +
+    '<span class="tools"><button type="button" class="btn" data-act="new-once">' + icon("plus") + " Item</button></span></div>" +
+    (R.once.length || (showBought && R.bought.length) ? '<table class="mtable"><thead><tr><th>Item</th><th>Where</th><th class="r">Price</th><th>By</th><th></th></tr></thead><tbody>' +
+      R.once.map(onceRow).join("") + (showBought ? R.bought.map(boughtRow).join("") : "") + "</tbody></table>" : "") +
+    (R.bought.length ? '<button type="button" class="link mbought" data-act="bought-toggle" aria-expanded="' + showBought + '">Bought (' + R.bought.length + ")</button>" : "");
+  return tools + comingHTML(D, c) + regular + once;
 }
 
 function supEditor(D, row) {
   const T = store.today(), then = row.next ? M.nextAfter(row.next, row) : "";
   const stores = [...new Set([...M.STORES, "Amazon", ...Object.values(D.sup).map((s) => String(s.store || "").trim()).filter(Boolean)])];
-  return '<h3 class="sheet-title">' + (editing.id ? esc(row.name || "Untitled") : "New item") + "</h3>" +
-    '<div class="field-row"><label class="field"><span>Name</span><input data-f="name" data-k="name" value="' + esc(row.name || "") + '" placeholder="Vitamin D" autocomplete="off"></label>' +
+  const head = '<h3 class="sheet-title">' + (editing.id ? esc(row.name || "Untitled") : row.once ? "Buy once" : "New item") + "</h3>" +
+    '<div class="field-row"><label class="field"><span>Name</span><input data-f="name" data-k="name" value="' + esc(row.name || "") + '" placeholder="' + (row.once ? "A dress" : "Vitamin D") + '" autocomplete="off"></label>' +
     '<label class="field"><span>Where</span><input data-f="store" data-k="store" list="sup-stores" value="' + esc(row.store || "") + '" placeholder="Amazon" autocomplete="off"></label></div>' +
-    '<datalist id="sup-stores">' + stores.map((s) => '<option value="' + esc(s) + '">').join("") + "</datalist>" +
-    '<div class="field-row three"><label class="field"><span>Price ($)</span><input data-f="price" data-k="price" class="num" type="number" step="0.01" min="0" value="' + esc(row.price || "") + '" placeholder="0.00"></label>' +
+    '<datalist id="sup-stores">' + stores.map((s) => '<option value="' + esc(s) + '">').join("") + "</datalist>";
+  const price = '<label class="field"><span>Price ($)</span><input data-f="price" data-k="price" class="num" type="number" step="0.01" min="0" value="' + esc(row.price || "") + '" placeholder="0.00"></label>';
+  const note = '<label class="field"><span>Note</span><input data-f="note" data-k="note" value="' + esc(row.note || "") + '" placeholder="Brand, size…" autocomplete="off"></label>';
+  // 只买一次的：没有周期；日子可以不填（填了就算进 Coming up 的那个月）；买过的能改是哪天买的
+  if (row.once) {
+    return head + '<div class="field-row">' + price + '<label class="field"><span>By (optional)</span><input data-f="next" data-k="next" type="date" value="' + esc(row.next || "") + '"></label></div>' +
+      (row.bought ? '<label class="field"><span>Bought on</span><input data-f="bought" data-k="bought" type="date" value="' + esc(row.bought) + '"></label>'
+        : '<p class="hint">' + (row.next ? "Counted under Coming up for that month." : "Give it a date and it's counted under Coming up for that month.") + "</p>") +
+      note + footHTML("item");
+  }
+  return head +
+    '<div class="field-row three">' + price +
     '<label class="field"><span>Every</span><input data-f="n" data-k="n" class="num" type="number" step="1" min="1" value="' + esc(row.n || "") + '" placeholder="3"></label>' +
     '<label class="field"><span>&nbsp;</span><select data-f="unit" data-k="unit" aria-label="Unit">' + M.CYCLES.map(([k, l]) => '<option value="' + k + '"' + sel((row.unit || "m") === k) + ">" + l + "s</option>").join("") + "</select></label></div>" +
     '<label class="field"><span>Next due</span><input data-f="next" data-k="next" type="date" value="' + esc(row.next || "") + '"></label>' +
     '<p class="hint">' + (then ? "After that: " + fmtDue(then, T) + " (" + M.cycleText(row) + ")." : "Fill in how often and the next date: it then shows up under Coming up.") + "</p>" +
-    '<label class="field"><span>Note</span><input data-f="note" data-k="note" value="' + esc(row.note || "") + '" placeholder="Brand, size…" autocomplete="off"></label>' +
-    footHTML("item");
+    note + footHTML("item");
 }
 
 // ---------- 编辑框（一改就存；新建的有了名字才存） ----------
@@ -563,6 +590,10 @@ export function initMeals(rerender) {
     else if (act === "edit-ing") openEditor({ kind: "ing", id });
     else if (act === "new-sup") openEditor({ kind: "sup", id: "", draft: { name: "", store: "", price: "", n: "", unit: "m", next: "", note: "" } });
     else if (act === "edit-sup") openEditor({ kind: "sup", id });
+    else if (act === "new-once") openEditor({ kind: "sup", id: "", draft: { name: "", store: "", price: "", next: "", note: "", once: true, bought: "" } });
+    else if (act === "once-done" && D.sup[id]) store.saveMeal("sup", { ...D.sup[id], bought: T }, "Bought " + (D.sup[id].name || "it"));
+    else if (act === "once-back" && D.sup[id]) store.saveMeal("sup", { ...D.sup[id], bought: "" }, (D.sup[id].name || "It") + " is back on the list");
+    else if (act === "bought-toggle") { showBought = !showBought; rerender(); }
     else if (act === "sup-done" && D.sup[id]) { const next = M.nextAfter(T, D.sup[id]); store.saveMeal("sup", { ...D.sup[id], next }, D.sup[id].name + ": next " + fmtDue(next, T)); }
   });
   // 卡片、表格行、日子用键盘也能打开

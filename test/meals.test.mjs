@@ -242,6 +242,27 @@ test("restock: the date one cycle on, and what's coming in the next three months
   assert.deepEqual(C.months.map((m) => m.total), [20, 20, 20]);
 });
 
+test("restock: things you buy once sit apart, count once, and drop out when bought", () => {
+  const D = { sup: {
+    vit: { id: "vit", name: "Vitamin D", price: 20, n: 30, unit: "d", next: "2026-10-20" },
+    dress: { id: "dress", name: "Dress", price: 120, once: true, next: "2026-11-15", n: 3, unit: "m" },   // 留着的周期不算数
+    lamp: { id: "lamp", name: "Lamp", price: 60, once: true, next: "" },
+    coat: { id: "coat", name: "Coat", price: 300, once: true, next: "2026-09-30" },
+    boots: { id: "boots", name: "Boots", price: 180, once: true, next: "2026-10-25", bought: "2026-10-05" },
+    bag: { id: "bag", name: "Bag", price: 90, once: true, next: "", bought: "2026-10-07" }
+  } };
+  const R = M.restock(D);
+  assert.deepEqual(R.regular.map((s) => s.id), ["vit"]);
+  assert.deepEqual(R.once.map((s) => s.id), ["coat", "dress", "lamp"], "dated first, then by name");
+  assert.deepEqual(R.bought.map((s) => s.id), ["bag", "boots"], "latest first");
+  assert.equal(M.nextAfter("2026-11-15", D.sup.dress), "", "no next time");
+  assert.equal(M.cycleText(D.sup.dress), "");
+  const C = M.coming(D, TODAY);
+  assert.deepEqual(C.overdue.map((x) => x.sup.id), ["coat"]);
+  assert.deepEqual(C.months.map((m) => m.items.map((x) => x.sup.id)), [["vit"], ["dress", "vit"], ["vit"]]);
+  assert.deepEqual(C.months.map((m) => m.total), [20, 140, 20]);
+});
+
 test("import also takes things to restock, matched by name", () => {
   const D = { ing: {}, box: {}, sup: { a: { id: "a", name: "Vitamin D", price: 20, n: 30, unit: "d", next: "2026-10-20" } } };
   const out = M.importRows(D, { sup: [{ name: "vitamin d", store: "Costco" }, { name: "Shampoo" }, { name: " " }] }, () => "new");

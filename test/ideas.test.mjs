@@ -33,13 +33,13 @@ test("board: unsorted first, then by kind; dated first, planned last; done apart
   const of = tasks([{ id: "p", date: "2026-10-18", status: "" }, { id: "z", date: "2026-10-05", status: "done" }]);
   const b = I.board([
     idea({ text: "pho", kind: "eat", order: 1 }), idea({ text: "omakase", kind: "eat", order: 2 }), idea({ text: "brunch", kind: "eat", date: "2026-10-20", order: 0 }),
-    idea({ text: "museum", kind: "go", taskId: "p" }), idea({ text: "leaves", kind: "go", date: "2026-10-25", by: true }), idea({ text: "old fair", kind: "go", date: "2026-10-01" }),
-    idea({ text: "something", kind: "nope" }), idea({ text: "jazz", kind: "event", taskId: "z" }), idea({ text: "zoo", kind: "go", doneAt: "2026-10-09" })
+    idea({ text: "museum", kind: "out", taskId: "p" }), idea({ text: "leaves", kind: "out", date: "2026-10-25", by: true }), idea({ text: "old fair", kind: "out", date: "2026-10-01" }),
+    idea({ text: "something", kind: "nope" }), idea({ text: "jazz", kind: "out", taskId: "z" }), idea({ text: "zoo", kind: "out", doneAt: "2026-10-09" })
   ], of, T);
-  assert.deepEqual(b.groups.map((g) => g.title), ["Unsorted", "Eat", "Go"]);
-  assert.deepEqual(b.groups[1].items.map((r) => r.idea.text), ["brunch", "omakase", "pho"], "dated, then newest");
-  assert.deepEqual(b.groups[2].items.map((r) => r.idea.text + ":" + r.state), ["leaves:open", "old fair:missed", "museum:planned"]);
-  assert.equal(b.groups[2].items[2].day, "2026-10-18");
+  assert.deepEqual(b.groups.map((g) => g.title), ["Unsorted", "Outing", "Eat"]);
+  assert.deepEqual(b.groups[2].items.map((r) => r.idea.text), ["brunch", "omakase", "pho"], "dated, then newest");
+  assert.deepEqual(b.groups[1].items.map((r) => r.idea.text + ":" + r.state), ["leaves:open", "old fair:missed", "museum:planned"]);
+  assert.equal(b.groups[1].items[2].day, "2026-10-18");
   assert.deepEqual(b.done.map((r) => r.idea.text + " " + r.day), ["zoo 2026-10-09", "jazz 2026-10-05"]);
   assert.equal(b.open, 6);
 });
@@ -80,9 +80,9 @@ test("store: picked, done, dropped, deleted, moved, undone", async () => {
   const today = store.today(), of = (id) => store.get("tasks", id), state = (id) => I.stateOf(store.ideaOf(id), of, today);
   let undo = null;
   store.onUndo((label, before) => { undo = before; });
-  const a = store.saveIdea({ text: "Jazz night", kind: "event" });
+  const a = store.saveIdea({ text: "Jazz night", kind: "out" });
   store.addIdeas(["Pho place", "ROM"], { kind: "eat" });
-  assert.deepEqual(store.ideas().map((i) => i.text + ":" + i.kind), ["Jazz night:event", "Pho place:eat", "ROM:eat"]);
+  assert.deepEqual(store.ideas().map((i) => i.text + ":" + i.kind), ["Jazz night:out", "Pho place:eat", "ROM:eat"]);
   assert.ok(store.get("settings", "idea:" + a), "one Settings row each");
 
   const t = store.addTask({ title: "Jazz night", est: 90, group: "Leisure" });

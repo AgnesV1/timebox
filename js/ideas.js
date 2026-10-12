@@ -1,11 +1,11 @@
 // 灵感池的纯计算（Projects 页的 Ideas）：想去哪玩、想吃什么、想参加什么活动。没有时长，大多也没有期限。
-// 一条灵感：{ id, text, kind: "event" | "eat" | "go" | ""（还没归类）, date: "YYYY-MM-DD" | ""（少数才有）,
+// 一条灵感：{ id, text, kind: "out"（出门：去哪玩、什么活动）| "eat" | ""（还没归类）, date: "YYYY-MM-DD" | ""（少数才有）,
 //            by: true = 最晚这天 / 不是 = 就在这天, note, taskId（挑进了哪条任务）, doneAt（那条任务做完的那天）, order }
 // 挑进某天的任务 = 在池子里划掉；任务做完 = 去过了；任务标了 Later / Drop、或者删了 = 回到池子。只算数，不碰页面和存储。
 
 import { addDays, fmtShort, weekday, WEEKDAYS } from "./dates.js";
 
-export const KINDS = [["event", "Event"], ["eat", "Eat"], ["go", "Go"]];
+export const KINDS = [["out", "Outing"], ["eat", "Eat"]];
 const KEYS = KINDS.map(([k]) => k);
 export const kindOf = (idea) => (KEYS.includes(idea?.kind) ? idea.kind : "");
 const low = (s) => String(s ?? "").trim().toLowerCase();

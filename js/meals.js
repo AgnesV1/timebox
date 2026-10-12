@@ -295,9 +295,10 @@ export function fillFromRough(D, start, w, from = start) {
 
 // ---------- 规律要换 / 要补的东西（Restock） ----------
 // 一样：{ name, store, price, n, unit, next }：每 n 个 unit（天 / 周 / 月 / 年）一次，next = 下次预计哪天
+// 也有只买一次的（once: true，比如一条裙子）：没有周期，next = 打算哪天之前买（可以不填），买了记 bought = 哪天
 
 export const CYCLES = [["d", "day"], ["w", "week"], ["m", "month"], ["y", "year"]];
-const cycleN = (s) => Math.max(0, Math.round(Number(s?.n) || 0));
+const cycleN = (s) => (s?.once ? 0 : Math.max(0, Math.round(Number(s?.n) || 0)));
 export function cycleText(s) {
   const n = cycleN(s), unit = (CYCLES.find(([k]) => k === s?.unit) || CYCLES[2])[1];
   return n ? "every " + (n === 1 ? unit : n + " " + unit + "s") : "";
@@ -316,7 +317,16 @@ export function nextAfter(date, s) {
   return s.unit === "d" ? addDays(date, n) : s.unit === "w" ? addDays(date, 7 * n) : plusMonths(date, s.unit === "y" ? 12 * n : n);
 }
 
-// 接下来几个月（这个月算第一个）要花钱的：过期的单列（当成今天换，再往后推）；周期短的一样会出现好几次
+// Restock 页的两块：规律的；只买一次的——还没买的、买了的（最近买的在前）。前两样有日子的在前
+export function restock(D) {
+  const all = Object.values(D.sup || {}), once = all.filter((s) => s.once);
+  const byNext = (a, b) => (!a.next - !b.next) || String(a.next || "").localeCompare(String(b.next || "")) || byName(a, b);
+  return { regular: all.filter((s) => !s.once).sort(byNext), once: once.filter((s) => !s.bought).sort(byNext),
+    bought: once.filter((s) => s.bought).sort((a, b) => String(b.bought).localeCompare(String(a.bought)) || byName(a, b)) };
+}
+
+// 接下来几个月（这个月算第一个）要花钱的：过期的单列（当成今天换，再往后推）；周期短的一样会出现好几次。
+// 只买一次的：填了日子、还没买的算进那个月（过了日子就在过期里），只出现一次
 export function coming(D, today, months = 3) {
   const first = startOfMonth(today), end = addDays(addMonths(first, months), -1);
   const out = { overdue: [], months: [] };
@@ -326,7 +336,7 @@ export function coming(D, today, months = 3) {
   }
   for (const sup of Object.values(D.sup || {})) {
     let date = sup.next;
-    if (!date) continue;
+    if (!date || (sup.once && sup.bought)) continue;
     if (date < today) { out.overdue.push({ sup, date }); date = nextAfter(today, sup); }
     for (let k = 0; date && date <= end && k < 36; k++, date = nextAfter(date, sup)) {
       const m = out.months.find((x) => x.key === date.slice(0, 7));

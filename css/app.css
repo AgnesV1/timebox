@@ -1554,3 +1554,9 @@ select.open { border-color: var(--edge); }
 .rfin > span { margin-right: 2px; font-weight: 700; color: var(--muted); }
 .rfin .vibe { width: 34px; height: 28px; font-size: 16px; }
 .rfin .link { margin-left: 4px; font-size: 12.5px; }
+/* Restock 页底下的 Buy once（只买一次的）：区头、买过的行、底下那句 Bought (n) */
+.monce { margin-top: 22px; align-items: flex-end; }
+.monce .msub-h { margin: 0 0 4px; padding-top: 0; border-top: 0; }
+.monce .msub b { font-weight: 600; color: var(--ink); white-space: nowrap; }
+.mtable tr.bought td b { font-weight: 500; color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.mbought { display: inline-block; margin-top: 8px; font-size: 12.5px; }

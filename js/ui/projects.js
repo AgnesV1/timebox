@@ -1,4 +1,4 @@
-// 项目页：按「项目」分区（项目 = 计划的 group），每区汇总进度和今天要做多少；
+// 项目页：最上面是目标板（js/ui/goals.js）；下面按「项目」分区（项目 = 计划的 group），每区汇总进度和今天要做多少；
 // 区里每个计划一张卡。计划两种（Kind）× 两种放法（Place），建的时候自由选：
 //   Total（总时长 + 截止日）：健康度、进度、今天要做多少、时间轴、模块进度、估时校准建议
 //   Regular（规律）：怎么重复、这周做了几次
@@ -12,6 +12,7 @@ import { esc, on, icon } from "../dom.js";
 import { addDays, diffDays, fmtShort, fmtMin, WEEKDAYS } from "../dates.js";
 import { healthPill, groupsOf } from "./common.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
+import { goalsHTML } from "./goals.js";
 
 const GROUPS = ["Work 1", "Work 2", "Main - English", "Main - French", "Main - Fitness", "Fun"];
 let editing = "";
@@ -102,6 +103,7 @@ export function projectsHTML(c) {
   const groups = groupsOf(open);
   return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div>' +
     '<div class="tools"><button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +
+    goalsHTML(c) +
     (groups.length ? groups.map((g) => '<section class="pgroup" data-group="' + esc(g.name) + '">' + groupHead(c, g.name, g.subs) +
       '<div class="pgrid">' + g.subs.map((p) => cardHTML(c, p)).join("") + "</div></section>").join("")
       : '<div class="empty big"><p>No plans yet.</p><p>A project is a big goal — French, Work 1, Fitness. Under it go plans: a <b>Total</b> (so many hours by a deadline) or a <b>Regular</b> one (every Monday, three times a week). Each can be placed on your days automatically, or wait in the pool for you to drag.</p><button type="button" class="btn cta" data-act="new-project">Make the first one</button></div>') +

@@ -14,6 +14,7 @@ import { initSelect } from "./ui/select.js";
 import { todayHTML, initToday, shownDate } from "./ui/today.js";
 import { calendarHTML, poolHTML, initCalendar, handleDrop, refreshDayModal } from "./ui/calendar.js";
 import { projectsHTML, initProjects, refreshProjectEditor } from "./ui/projects.js";
+import { initGoals } from "./ui/goals.js";
 import { settingsHTML, initSettings } from "./ui/settings.js";
 import { initEditor, refreshEditor } from "./ui/editor.js";
 import { initDnd } from "./ui/dnd.js";
@@ -104,6 +105,7 @@ function frame() {
   html.dataset.vt = kind;
   if (!rows) nameParts(main, false);
   const vt = document.startViewTransition(() => { draw(); if (!rows) nameParts(main, false); });
+  vt.ready.catch(() => {});   // 页面在后台时过渡会被取消，不算错
   vt.finished.finally(() => {
     if (html.dataset.vt === kind) delete html.dataset.vt;
     if (!rows) nameParts(main, true);
@@ -198,6 +200,7 @@ initSelect();
 initToday(render);
 initCalendar(render);
 initProjects(render);
+initGoals(render);
 initSettings(applyTheme);
 initEditor();
 initDnd((payload, target) => (target.startsWith("m") ? mealDrop(payload, target) : handleDrop(payload, target)));

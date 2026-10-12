@@ -1120,6 +1120,45 @@ body.phone .lname input { width: 20px; height: 20px; }
 body.phone .lnote { padding-left: 44px; }
 body.phone .mcoming { margin-top: 10px; padding: 10px 12px; }
 
+/* ---------- 目标板（Projects 页最上面） ---------- */
+.goals { margin-bottom: 16px; padding: 10px 12px 12px; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); }
+.goals > header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.goals.folded > header { margin-bottom: 0; }
+.goals > header h3 { margin: 0; font: 700 14px var(--display); }
+.goals .gtools { display: inline-flex; gap: 12px; margin-left: auto; }
+.goals .gtools .link { font-size: 12px; }
+.goals .hint { margin: 8px 2px 0; }
+.ggrid { display: grid; gap: 8px; }
+.ggrid.near { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.ggrid.far { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-top: 8px; }
+.gcol { min-width: 0; padding: 7px 8px 5px; border: var(--b-ctl); border-radius: 10px; }
+.gcol h4 { display: flex; align-items: baseline; gap: 6px; margin: 0 0 3px; font: 700 12px var(--display); }
+.gcol h4 small { font: 600 11px var(--num); color: var(--muted); }
+.gcol ul { margin: 0; padding: 0; list-style: none; }
+.gl { display: flex; flex-wrap: wrap; align-items: center; gap: 1px 5px; min-height: 24px; padding: 1px 0; font-size: 12.5px; line-height: 1.3; }
+.gl input[type="checkbox"] { flex-shrink: 0; width: 13px; height: 13px; margin: 0; padding: 0; accent-color: var(--ink); }
+[data-theme="dark"] .gl input[type="checkbox"] { accent-color: var(--accent); }
+.gt { flex: 1 1 70px; min-width: 0; padding: 2px 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; overflow-wrap: anywhere; cursor: text; }
+.gt-in { flex: 1 1 100%; min-width: 0; padding: 2px 6px; border: var(--b-ctl); border-radius: 6px; font-size: 12.5px; }
+.gl.done .gt { color: var(--muted); text-decoration: line-through; }
+.gl.ahead .gt { color: var(--muted); }
+.gmeta { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.goals .gtag { field-sizing: content; max-width: 92px; padding: 0 7px 0 9px; border: 0; border-radius: 999px; background: var(--surface); box-shadow: inset 3px 0 0 var(--pc); font-size: 10.5px; font-weight: 600; line-height: 18px; }
+.goals .gtag.none { padding-left: 7px; box-shadow: none; color: var(--muted); opacity: 0; }
+.gl:hover .gtag.none, .goals .gtag.none:focus, .goals .gtag.none.open { opacity: 1; }
+.gdue { padding: 0 1px; border: 0; background: none; font: 600 11px var(--num); color: var(--muted); white-space: nowrap; }
+.gdue:hover { color: var(--ink); text-decoration: underline; }
+.gl.late .gdue { color: var(--warn); }
+.gx { width: 14px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; opacity: 0; }
+.gl:hover .gx, .gx:focus-visible { opacity: 1; }
+.gx:hover { color: var(--warn); }
+.gwhen { display: inline-flex; gap: 3px; }
+.goals .gwhen select { padding: 1px 17px 1px 6px; border-radius: 6px; background-position: right 4px center; background-size: 9px; font: 600 11px var(--num); }
+.gadd input { width: 100%; margin-top: 2px; padding: 3px 6px; border: 1px dashed transparent; border-radius: 6px; background: transparent; font-size: 12px; }
+.gadd input::placeholder { color: var(--muted); opacity: .7; }
+.gadd input:hover, .gadd input:focus { border-color: #CDCDC6; }
+[data-theme="dark"] .gadd input:hover, [data-theme="dark"] .gadd input:focus { border-color: var(--edge); box-shadow: none; }
+
 /* ---------- 下拉框 ---------- */
 /* 合上的样子：系统的小箭头换成自己的；点开的那块见 js/ui/select.js（手机上还是系统自带的选择器） */
 select:not([multiple]) { -webkit-appearance: none; appearance: none; padding-right: 26px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%238A8A92' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 4.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; background-size: 11px; text-overflow: ellipsis; cursor: pointer; }
@@ -1141,3 +1180,4 @@ select.open { border-color: var(--edge); }
 .menu .mi.on { font-weight: 700; }
 .menu .mi.on::after { content: "✓"; margin-left: auto; padding-left: 14px; font-size: 12px; }
 .menu .mi.off { opacity: .45; }
+.goals .gtag { padding-right: 7px; background-image: none; }

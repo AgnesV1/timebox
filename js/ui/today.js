@@ -176,13 +176,13 @@ function noticesHTML(c) {
 const poolFor = (target) => { const g = store.groupByName(store.groupOf(pickTarget(target))); return GR.ideasOf(g) ? g : null; };
 const taskOf = (id) => store.get("tasks", id);
 
-// 标题框底下的候选（电脑）：池子里还没排的灵感，打了字就只留对得上的；不是和人有关的大类再加一小段想看的（Reading 的 Want）。
+// 标题框底下的候选（电脑）：池子里还没排的灵感，打了字就只留对得上的；再加一小段想看的（Reading 的 Want）——只看「多久没联系」的那种大类（Friends）不加。
 // 点一条 = 名字填进标题框；灵感那条在任务建好后挂上去
 function pickHTML(d, query) {
   const g = poolFor(addTarget[d] || "");
   if (!g) return "";
   const ideas = I.match(store.ideas(), taskOf, store.today(), query);
-  const wants = g.friends || !store.setting("reading")?.url ? [] : (reading.titleKey(query) ? reading.search(query, 20).filter((r) => r.want) : reading.wants()).slice(0, 4);
+  const wants = GR.trackOf(g) === "contact" || !store.setting("reading")?.url ? [] : (reading.titleKey(query) ? reading.search(query, 20).filter((r) => r.want) : reading.wants()).slice(0, 4);
   const item = (act, id, text, small, on) => '<li><button type="button" data-act="' + act + '" data-id="' + esc(id) + '" data-t="' + esc(text) + '"' + (on ? ' class="on"' : "") + ">" +
     esc(text) + (small ? "<small>" + esc(small) + "</small>" : "") + "</button></li>";
   return (ideas.length ? "<p>Ideas</p><ul>" + ideas.map((i) => item("idea-pick", i.id, i.text, i.date && i.date < store.today() ? "was " + fmtShort(i.date) : I.whenText(i), ideaDraft[d] === i.id && I.sameText(i.text, query))).join("") + "</ul>" : "") +

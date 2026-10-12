@@ -286,6 +286,7 @@ test("projects: what each one is watched for, and its health over the last week"
   const S = await import("../js/stats.js");
   assert.deepEqual(["Work", "Chores", "Build", "Fitness", "Leisure", "Friends"].map((name) => GR.trackOf(GR.DEFAULTS.find((g) => g.name === name))), ["", "", "progress", "min", "range", "contact"]);
   assert.equal(GR.trackOf({ name: "Gym" }), "min", "a name that reads like one of them");
+  assert.equal(GR.trackOf({ ...GR.DEFAULTS.find((g) => g.name === "Leisure"), friends: true }), "range", "Leisure that can pick people is still watched for Relax");
   assert.equal(GR.trackOf({ name: "Side gig" }), "progress", "unknown ones keep showing progress");
   assert.equal(GR.trackOf({ name: "Work", track: "progress" }), "progress", "a saved choice wins");
   assert.equal(GR.trackOf({ name: "Build", track: "" }), "");

@@ -3,6 +3,7 @@
 // 手机上：看今天前后各 5 天的任务、给任务标结果、计时、加任务；右上角齿轮进去只有白天黑夜和连表格。计划都在电脑上做。
 
 import * as store from "../store.js";
+import * as sync from "../sync.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, startOfWeek, WEEKDAYS } from "../dates.js";
@@ -67,6 +68,24 @@ function openOf(c, d, tasks) {
 
 const STATUS_WORD = { done: "Done ✓", partial: "Partial", later: "Later", drop: "Drop" };
 
+// 任务标了 Done，名字又在阅读的 Want 里（或者在某一页里还没写日期）：问一句看完没有（电脑）。
+// 点记号 = 记进它那一页、月份用任务那天的；那一页有小类（Book、Game）就接着在同一行点一下小类。Not yet = 这条任务不再问
+let finishing = null;   // 点了记号、还要挑小类的那条：{ taskId, mark }
+const readTab = (want) => reading.logTypes().find((x) => x.toLowerCase() === String(want?.tab || "").toLowerCase()) || "";
+const askFinished = (t) => (t.status === "done" && store.setting("reading")?.url && !reading.askedNotYet(t.id) ? reading.wantOf(t.title) : undefined);
+function finishHTML(t, want) {
+  const tab = readTab(want), later = '<button type="button" class="link" data-act="fin-later">Not yet</button>';
+  // 没写是哪一类、或者那一类只在表格里手写的：去 Reading 页记
+  if (!tab) return '<p class="rfin"><span>Finished it?</span><a class="link" href="#reading">Log it on Reading</a>' + later + "</p>";
+  const kinds = reading.kindsOf(tab);
+  if (finishing?.taskId === t.id && kinds.length) {
+    return '<p class="rfin"><span>' + esc(tab) + " — which kind?</span>" + kinds.map((k) => '<button type="button" class="chip" data-act="fin-kind" data-v="' + esc(k) + '">' + esc(k) + "</button>").join("") +
+      '<button type="button" class="link" data-act="fin-kind" data-v="">Skip</button></p>';
+  }
+  return '<p class="rfin"><span>Finished it?</span>' + reading.MARKS.map((m) => '<button type="button" class="vibe" data-act="fin-mark" data-v="' + m + '">' + m + "</button>").join("") +
+    '<button type="button" class="chip" data-act="fin-mark" data-v="" title="Finished, no rating">✓</button>' + later + "</p>";
+}
+
 // 一行任务。只有展开的那行（openId）带四个状态按钮、计时记录、补时间的框和原因；
 // 别的行只有一行字：分钟、名字、计划，右边是记了多久和状态。电脑上鼠标移上去，状态按钮浮在右边
 function rowHTML(c, t, tasks, phone = false, openId = "") {
@@ -83,6 +102,7 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
   const picked = timeable(t, c.today) && pickedId(c) === t.id;
   const run = store.timer();
   const running = run?.taskId === t.id;
+  const want = open && !phone ? askFinished(t) : undefined;
   const chips = '<div class="chips' + (open ? "" : " hov") + '">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
     (open && t.status === "later" && !movedOn && !phone ? '<button type="button" class="chip ghost" data-act="tomorrow">→ Tomorrow</button>' : "") + "</div>";
   const total = store.timeTotal(t.id);
@@ -105,6 +125,7 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
     (open || !phone ? chips : "") +
     (open && meetable(t) ? taskMeetHTML(t.id) : "") +
     (form ? logFormHTML(c, t, list) : "") +
+    (want ? finishHTML(t, want) : "") +
     (why && open ? '<input class="reason" data-act="reason" data-keep="reason-' + t.id + '" placeholder="Why?" value="' + esc(t.reason || "") + '">' : "") +
     (why && !open && t.reason ? '<p class="why">' + esc(t.reason) + "</p>" : "") +
     "</div></div>";
@@ -291,6 +312,17 @@ export function initToday(rerender) {
     else if (act === "time-more") { logOpen.add(id); rerender(); }
     else if (act === "time-log") logFromRow(el.closest(".row"));
     else if (act === "tomorrow") store.toTomorrow(id);
+    else if (act === "fin-later") { finishing = null; reading.notYet(id); rerender(); }
+    else if (act === "fin-mark" || act === "fin-kind") {
+      const t = store.get("tasks", id), w = t && reading.wantOf(t.title), tab = readTab(w), v = el.dataset.v;
+      if (!tab) return;
+      if (act === "fin-mark" && reading.kindsOf(tab).length) { finishing = { taskId: id, mark: v }; rerender(); return; }
+      reading.log({ title: w.title, type: tab, year: Number(t.date.slice(0, 4)), month: Number(t.date.slice(5, 7)), mark: act === "fin-kind" ? finishing?.mark || "" : v, kind: act === "fin-kind" ? v : "", note: "" });
+      finishing = null;
+      toast("Logged " + w.title + " in " + tab);
+      rerender();
+      sync.sync();
+    }
     else if (act === "od-toggle") { overdueOpen = !overdueOpen; rerender(); }
     else if (act === "week-seen") store.setLocal({ weekSeen: el.dataset.week });
     else if (act === "open-ideas") { store.setLocal({ projMode: "ideas" }); location.hash = "projects"; }

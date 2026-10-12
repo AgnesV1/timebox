@@ -1549,3 +1549,8 @@ select.open { border-color: var(--edge); }
 [data-theme="dark"] .idea-pick { border-color: var(--edge); }
 [data-theme="dark"] .idea-pick button { background: var(--surface); }
 [data-theme="dark"] .idea-pick button.on { border-color: var(--accent); background: rgba(204, 255, 0, .12); color: var(--accent); }
+/* 任务做完了、名字在阅读的 Want 里：那一行底下问一句看完没有 */
+.rfin { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 0; font-size: 12.5px; }
+.rfin > span { margin-right: 2px; font-weight: 700; color: var(--muted); }
+.rfin .vibe { width: 34px; height: 28px; font-size: 16px; }
+.rfin .link { margin-left: 4px; font-size: 12.5px; }

@@ -1,6 +1,7 @@
 // 阅读入口：你的阅读记录在另一个 Google 表格里（链接存在 Settings 的 reading），一页一种（Book、TV……）。
 // 这里做三件事：往那个表格的 Want 页追加想看的东西；看完的记进它自己那一页（哪一页、年月、评价、小类、备注）；
 // 在本机缓存一份所有页的条目，打字时查重。条目：{title, tab, want, when, mark, note}
+// 今天页也用它：加任务时能挑 Want 里的；任务标了 Done、名字在 Want 里，就问一句看完没有（wantOf / notYet）。
 // 要发的都先排队（没网也行，下次同步一起发）。缓存和排队都只在这台设备上（localStorage 单独一个 key），不进 Tasks 那些表。
 
 import { readLocal, writeLocal } from "./dom.js";
@@ -14,7 +15,7 @@ const BY_HAND = ["etc", "article"];   // 看完的不在这里记的：etc 那�
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export const monthName = (m) => MON[m - 1] || "";
 
-let R = { rows: [], types: [], kinds: {}, at: 0, pending: [], error: "" };
+let R = { rows: [], types: [], kinds: {}, at: 0, pending: [], error: "", later: {} };
 Object.assign(R, readLocal(KEY, {}) || {});
 let wanted = false;   // 阅读页开着：同步时顺便拉列表
 let lastDupes = [];
@@ -58,6 +59,17 @@ export function search(q, limit = 8) {
 export const exists = (title) => search(title, 1).find((r) => titleKey(r.title) === titleKey(title));
 // 已经记过看完的那一条：在自己那一页、带着日期（或者排着队还没发）
 export const finished = (title) => { const k = titleKey(title); return k ? everything().find((r) => !r.want && r.when && titleKey(r.title) === k) : undefined; };
+// 还没看完的那一条（同名）：Want 里的，或者某页里还没写日期的；已经记过看完的、根本没有的都是 undefined
+export const wantOf = (title) => { const k = titleKey(title); return k && !finished(title) ? everything().find((r) => (r.want || !r.when) && titleKey(r.title) === k) : undefined; };
+// 问过「看完了吗」、答了还没：这条任务不再问（一本书要读很多次）。记 30 天
+const ASK_AGAIN = 30 * 864e5;
+export const askedNotYet = (taskId) => Boolean((R.later || {})[taskId]);
+export function notYet(taskId) {
+  const now = Date.now();
+  R.later = { ...Object.fromEntries(Object.entries(R.later || {}).filter(([, at]) => now - at < ASK_AGAIN)), [taskId]: now };
+  save();
+  emit();
+}
 // 还没看的：Want 页里的，最新的在前（刚加、还没发出去的最前）
 export const wants = () => { const all = everything().filter((r) => r.want); return [...all.filter((r) => r.queued).reverse(), ...all.filter((r) => !r.queued).reverse()]; };
 
@@ -86,9 +98,11 @@ export function drop(id) {
   emit();
 }
 
-// 同步时带上：要发的（想看的 / 看完的分开）、要不要列表。没什么要做就不带
+// 同步时带上：要发的（想看的 / 看完的分开）、要不要列表。没什么要做就不带。
+// 有东西要发的时候清单也一起要回来：表格写完再读，本机这份马上就是新的（在今天页记了看完的，那句「看完了吗」才会收起来）；
+// 上次没写进去、还卡着的那几条不算，免得每次同步都整本读一遍
 export function request() {
-  const list = wanted || Date.now() - (R.at || 0) > FRESH;
+  const list = wanted || R.pending.some((x) => !x.why) || Date.now() - (R.at || 0) > FRESH;
   if (!R.pending.length && !list) return null;
   return { add: R.pending.filter((x) => !x.done),
     done: R.pending.filter((x) => x.done).map((x) => ({ id: x.id, title: x.title, tab: x.type, year: x.year, month: x.month, mark: x.mark, kind: x.kind, note: x.note })), list };

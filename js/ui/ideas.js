@@ -77,7 +77,7 @@ export function ideasHTML(c) {
     (b.groups.length || b.done.length ? "" : '<p class="hint idea-intro">Places to go, things to eat, events to catch — no hours, no deadline. When you add a task under ' +
       esc(homes().map((g) => g.name).join(" or ") || "a project") + ", pick one and it's crossed off here.</p>") +
     b.groups.map((g) => '<section class="idea-group"><h3 class="idea-h">' + g.title + " <small>" + g.items.length + '</small></h3><ul class="idea-list">' + g.items.map(rowHTML).join("") + "</ul></section>").join("") +
-    (b.done.length ? '<button type="button" class="link idea-more" data-act="idea-done-toggle">' + (showDone ? "Hide" : "Been there") + " (" + b.done.length + ")</button>" +
+    (b.done.length ? '<button type="button" class="link idea-more" data-act="idea-done-toggle" aria-expanded="' + showDone + '">Been there (' + b.done.length + ")</button>" +
       (showDone ? '<ul class="idea-list">' + b.done.map(doneRowHTML).join("") + "</ul>" : "") : "") + "</div>";
 }
 

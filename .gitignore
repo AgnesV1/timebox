@@ -9,5 +9,8 @@
 *.tmp
 *.swp
 
+# Private notes and lists kept next to the code (never published)
+design/
+
 # Data exported from the app's "导出本地 JSON" button (personal data)
 timebox-backup*.json

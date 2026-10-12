@@ -149,3 +149,46 @@ test("storage: warns two weeks before this device fills up", () => {
   assert.ok(now.tasks >= 0 && now.used > 0 && now.limit === 5e6);
   assert.equal(now.warn, now.full);
 });
+
+test("friends: rows pasted from a spreadsheet", () => {
+  assert.deepEqual(F.parseDated("5.17 coffee", 2026), { date: "2026-05-17", note: "coffee" });
+  assert.deepEqual(F.parseDated("6/5", 2025), { date: "2025-06-05", note: "" });
+  assert.deepEqual(F.parseDated("2024-1-9 call  about the move ", 2026), { date: "2024-01-09", note: "call  about the move" });
+  assert.deepEqual(F.parseDated("20260517 picnic", 1999), { date: "2026-05-17", note: "picnic" });
+  assert.deepEqual(["13.1 x", "2.30 x", "Mock", "5.17coffee", "", "3 people"].map((c) => F.parseDated(c, 2026)), [null, null, null, null, null, null]);
+  const text = [
+    "Name\tField A\tField B\tField C",
+    "Ana\tDesign\tToronto\t\t5.17 coffee\t6.5 lunch",
+    "",
+    "Bo",
+    "Cy\t\tMontreal\t20260517 the picnic\tstray note\t5.20 call",
+    "ana\t\tOttawa\tkept\t5.17 coffee\t7.1",
+    "\tno name\tignored"
+  ].join("\r\n");
+  const rows = F.parseImport(text, 3, 2026);
+  assert.deepEqual(rows, [
+    { name: "Ana", values: ["Design", "Ottawa", "kept"], meets: [{ date: "2026-05-17", note: "coffee" }, { date: "2026-06-05", note: "lunch" }, { date: "2026-07-01", note: "" }] },
+    { name: "Bo", values: ["", "", ""], meets: [] },
+    { name: "Cy", values: ["", "Montreal", "20260517 the picnic · stray note"], meets: [{ date: "2026-05-20", note: "call" }] }
+  ], "header and blank lines skipped; the same name merges; a dated cell inside the fields stays text; an undated extra joins the last field");
+});
+
+test("friends: importing fills people in by name and never doubles anything", () => {
+  store.setSetting("friend-fields", ["Field A", "Field B", "Field C"]);
+  for (const f of store.friends()) store.deleteFriend(f.id);
+  const dee = store.saveFriend({ name: "Dee", more: { "Field A": "old", "Field B": "keep me" }, next: "write back" });
+  const rows = F.parseImport("dee\tnew\t\t\t5.17 coffee\nEd\t\tParis\t\t5.17 coffee\t5.18 walk\nFay", 3, 2026);
+  store.importFriends(rows);
+  const names = () => store.friends().map((f) => f.name);
+  assert.deepEqual(names(), ["Dee", "Ed", "Fay"]);
+  assert.deepEqual(store.get("friends", dee).more, { "Field A": "new", "Field B": "keep me" }, "filled cells win, empty ones leave what was there");
+  assert.equal(store.get("friends", dee).next, "write back");
+  const ed = store.friends().find((f) => f.name === "Ed");
+  assert.deepEqual(ed.more, { "Field B": "Paris" });
+  const log = () => store.meets().map((m) => m.date + " " + m.note + " " + m.friends.map((id) => store.get("friends", id).name).join("+")).sort();
+  assert.deepEqual(log(), ["2026-05-17 coffee Dee", "2026-05-17 coffee Ed", "2026-05-18 walk Ed"], "one record per person");
+  store.importFriends(rows);
+  assert.deepEqual(names(), ["Dee", "Ed", "Fay"]);
+  assert.equal(log().length, 3, "pasting the same rows again adds nothing");
+  assert.equal(store.lastContact()[ed.id], "2026-05-18");
+});

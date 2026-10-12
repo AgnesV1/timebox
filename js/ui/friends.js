@@ -1,5 +1,6 @@
 // Friends 页（电脑）：People 表（搜索 + 筛选）、Recent（最近的记录）、右边 To do（谁、做什么、哪天）。
 // 每个人的资料有哪些格子是自己定的：右上齿轮 → Fields，一行一个；表格里手动加的列也会出现。
+// 已经记在别的表格里的人：People 那块右上角 Import，整片粘进来（第一格名字，后面按字段顺序，再后面「5.17 一句话」是记录）。
 // 还有「和谁」那一小块（withHTML）：今天页点开的任务行、加任务框、任务编辑框都用它，手机上也有。
 
 import * as store from "../store.js";
@@ -93,7 +94,7 @@ function peopleHTML(all, shown, fields, last, T) {
       shown.map((f) => '<tr data-act="edit-friend" data-id="' + esc(f.id) + '" tabindex="0"><td><b>' + esc(f.name || "Untitled") + "</b></td>" +
         cols.map((k) => "<td>" + esc(f.more?.[k] || "") + "</td>").join("") + '<td class="num">' + esc(F.ago(last[f.id], T)) + "</td><td>" + next(f) + "</td></tr>").join("") + "</tbody></table></div>"
     : '<p class="empty">' + (all.length ? "Nobody matches." : "Nobody here yet. Add a person, or pick “New person…” on a task.") + "</p>";
-  return '<section class="card"><header class="fr-head"><h3>People</h3><span class="msub">' + (shown.length === all.length ? all.length : shown.length + " of " + all.length) + "</span></header>" +
+  return '<section class="card"><header class="fr-head"><h3>People</h3><span class="msub">' + (shown.length === all.length ? all.length : shown.length + " of " + all.length) + '</span><button type="button" class="link fr-import" data-act="fr-import">Import</button></header>' +
     filterBarHTML(all, fields) + table +
     (fields.length ? "" : '<p class="hint">What do you want to note about each person? <button type="button" class="link" data-act="fr-fields">Set up the fields</button> — one per line, in your own words.</p>') + "</section>";
 }
@@ -177,13 +178,26 @@ function fieldsEditorHTML() {
     '<div class="sheet-foot"><span class="hint">A field that already has values stays, even if you take its line out.</span><button type="submit" class="btn primary">Save</button></div></form>';
 }
 
-const editorHTML = () => (editing.kind === "friend" ? friendEditorHTML() : editing.kind === "meet" ? meetEditorHTML() : fieldsEditorHTML());
+// 整片粘进来：从表格里复制的几行。字段还没定就先去定（不然那几格没地方放）
+function importEditorHTML() {
+  const fields = store.friendFields();
+  return '<form class="import-editor" autocomplete="off"><h2 class="sheet-title">Import people</h2>' +
+    (fields.length
+      ? '<p class="hint">Paste rows copied from a spreadsheet. The first column is the name, then your fields in this order: <b>' + fields.map(esc).join("</b> · <b>") +
+        "</b>. Cells after those written like <b>5.17 coffee</b> become dated notes in that person's history. People already here are matched by name and filled in, never doubled.</p>"
+      : '<p class="hint">Set up your <button type="button" class="link" data-act="fr-fields">fields</button> first, so the columns have somewhere to go.</p>') +
+    '<label class="field"><span>Rows</span><textarea name="rows" rows="9" wrap="off" spellcheck="false"' + (fields.length ? "" : " disabled") + "></textarea></label>" +
+    '<label class="field small"><span>Year for dates like 5.17</span><input type="number" class="num" name="year" min="2000" max="2100" value="' + store.today().slice(0, 4) + '"></label>' +
+    '<div class="sheet-foot"><span class="hint" data-import-count></span><button type="submit" class="btn primary"' + (fields.length ? "" : " disabled") + ">Import</button></div></form>";
+}
+
+const editorHTML = () => (editing.kind === "friend" ? friendEditorHTML() : editing.kind === "meet" ? meetEditorHTML() : editing.kind === "import" ? importEditorHTML() : fieldsEditorHTML());
 
 function openEditor(next, focus = "") {
   editing = next;
   const html = editorHTML();
   if (!html) { editing = null; return; }
-  const sheet = openModal(html, { wide: next.kind === "friend", close: () => { editing = null; drafts.delete("meet:new"); } });
+  const sheet = openModal(html, { wide: next.kind === "friend" || next.kind === "import", close: () => { editing = null; drafts.delete("meet:new"); } });
   if (focus) sheet.querySelector(focus)?.focus();
 }
 
@@ -238,7 +252,7 @@ export function initFriends(rerender) {
   on(document, "input", "[data-tmeet] [data-meet]", (e, el) => store.setTaskMeet(el.closest("[data-tmeet]").dataset.tmeet, { [el.dataset.meet]: el.value }, { quiet: true }));
 
   // ---- 页面 ----
-  on(document, "click", ".friends [data-act], .friend-editor [data-act], .meet-editor [data-act]", (e, el) => {
+  on(document, "click", ".friends [data-act], .friend-editor [data-act], .meet-editor [data-act], .import-editor [data-act]", (e, el) => {
     if (el.closest("[data-with]")) return;
     const act = el.dataset.act, id = el.dataset.id || el.closest("[data-id]")?.dataset.id || "";
     if (act === "new-friend") openEditor({ kind: "friend", id: "", draft: { name: "", more: {}, next: "", nextDate: "" } }, "[data-pf=name]");
@@ -246,6 +260,7 @@ export function initFriends(rerender) {
     else if (act === "new-meet") { drafts.set("meet:new", []); openEditor({ kind: "meet", id: "", draft: { date: store.today(), note: "", watch: "" } }); }
     else if (act === "edit-meet") openEditor({ kind: "meet", id });
     else if (act === "fr-fields") openEditor({ kind: "fields" }, "textarea");
+    else if (act === "fr-import") openEditor({ kind: "import" }, "textarea");
     else if (act === "where-x") { where.splice(Number(el.dataset.i), 1); rerender(); }
     else if (act === "fr-clear") { q = ""; where = []; pending = null; td = ""; seen = ""; rerender(); }
     else if (act === "todo-done") { doneFor = id; rerender(); afterRender(() => document.querySelector(".fdone input")?.select()); }
@@ -337,6 +352,21 @@ export function initFriends(rerender) {
   };
   on(document, "input", ".meet-editor [data-mf]:not([type=date])", (e, el) => saveMeetField(el, true));
   on(document, "change", ".meet-editor [data-mf]", (e, el) => saveMeetField(el, false));
+
+  // ---- 整片粘进来：边粘边数有几个人、几条带日期的；点 Import 才存 ----
+  const importRows = (form) => F.parseImport(form.rows.value, store.friendFields().length, Number(form.year.value) || Number(store.today().slice(0, 4)));
+  on(document, "input", ".import-editor [name=rows], .import-editor [name=year]", (e, el) => {
+    const rows = importRows(el.form), notes = rows.reduce((a, r) => a + r.meets.length, 0);
+    el.form.querySelector("[data-import-count]").textContent = rows.length
+      ? rows.length + (rows.length === 1 ? " person" : " people") + (notes ? " · " + notes + (notes === 1 ? " dated note" : " dated notes") : "") : "";
+  });
+  on(document, "submit", ".import-editor", (e, form) => {
+    e.preventDefault();
+    const rows = importRows(form);
+    if (!rows.length) { form.rows.focus(); return; }
+    closeModal();
+    store.importFriends(rows);
+  });
 
   // ---- 字段清单 ----
   on(document, "submit", ".fields-editor", (e, form) => {

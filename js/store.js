@@ -1021,6 +1021,27 @@ export function setTaskMeet(taskId, patch, opts) {
   change(() => (empty ? drop("meets", id) : put("meets", next)), "", opts);
 }
 
+// 整片粘进来的（js/friends.js 的 parseImport）：按名字对上已有的人、把填了的格子补上（不清空原来的），没有的新建；
+// 带日期的那几句记进各自的记录里，一模一样的不重复记——同一片再粘一次什么都不会多
+export function importFriends(rows) {
+  const fields = friendFields(), key = (s) => String(s || "").trim().toLowerCase();
+  change(() => {
+    const ids = new Map(all("friends").map((f) => [key(f.name), f.id]));
+    for (const r of rows) {
+      if (!key(r.name)) continue;
+      let id = ids.get(key(r.name));
+      const cur = id ? get("friends", id) : null, more = { ...(cur?.more || {}) };
+      (r.values || []).forEach((v, i) => { if (v && fields[i]) more[fields[i]] = v; });
+      if (!cur) { id = newId(); ids.set(key(r.name), id); put("friends", { id, name: r.name, more, next: "", nextDate: "" }); }
+      else if (JSON.stringify(more) !== JSON.stringify(cur.more || {})) put("friends", { ...cur, more });
+      for (const m of r.meets || []) {
+        const dup = all("meets").some((x) => x.date === m.date && (x.note || "") === m.note && (x.friends || []).length === 1 && x.friends[0] === id);
+        if (!dup) put("meets", { id: newId(), date: m.date, friends: [id], note: m.note, watch: "", taskId: "" });
+      }
+    }
+  }, "Imported " + rows.length + (rows.length === 1 ? " person" : " people"));
+}
+
 function moveMeet(fromTask, toTask, date) {
   const m = get("meets", F.meetId(fromTask));
   if (!m) return;

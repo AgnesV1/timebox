@@ -83,20 +83,26 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 [data-theme="dark"] .seg button.on { box-shadow: var(--glow); }
 
 /* ---------- 整站底图（#sky，js/fx.js 建的）：白天 = 蓝天白云，夜里 = 碎星芒 ----------
-   全是渐变加几小块 SVG 平铺，没有图片。垫在所有东西下面：侧栏、卡片都是不透明的，只在它们之间露出来。
+   全是渐变加几小块 SVG 平铺，没有图片。云有七朵，云影一朵带粉、一朵带蓝。垫在所有东西下面：侧栏、卡片都是不透明的，只在它们之间露出来。
    云极慢地飘；星芒分四层，每层平铺的大小、呼吸的快慢都不一样，看着就不齐。设置里关了动效（.still）或系统要求减少动态时都停住。
    手机上任务是直接铺在底色上的，所以只留顶上一点天色，不放云和星 */
 #sky { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 #sky i { position: absolute; inset: 0; }
-[data-theme="light"] #sky { background: linear-gradient(180deg, #BFE2FF, #E6F3FF 62%, #F5FAFF); }
+/* 白天是「酸性霞光」：天只有很淡的蓝，左上漫一团玫红、右边一团电光蓝，地平线泛青柠——白昼酸自己的三个颜色 */
+[data-theme="light"] #sky { background: radial-gradient(46rem 28rem at 6% 0%, rgba(255, 62, 165, .2), transparent 72%), radial-gradient(48rem 30rem at 100% 32%, rgba(47, 91, 255, .15), transparent 72%), linear-gradient(180deg, #E9F3FF, #FAFCFF 52%, #EEFFB8); }
 [data-theme="dark"] #sky { background: radial-gradient(44rem 30rem at 88% 6%, rgba(123, 44, 255, .17), transparent 70%), radial-gradient(38rem 26rem at 4% 92%, rgba(47, 91, 255, .14), transparent 70%); }
 [data-theme="light"] #sky .st, [data-theme="dark"] #sky .cloud, body.phone #sky i { display: none; }
 #sky .cloud { inset: 0 -4rem; will-change: transform; animation: cloud-drift 150s ease-in-out infinite alternate;
-  background-image: radial-gradient(30rem 11rem at 76% 8%, rgba(255, 255, 255, .7), transparent 62%), radial-gradient(34rem 12rem at 78% 12%, rgba(120, 180, 235, .14), transparent 65%),
-    radial-gradient(22rem 8rem at 30% 24%, rgba(255, 255, 255, .6), transparent 62%), radial-gradient(26rem 9rem at 32% 28%, rgba(120, 180, 235, .11), transparent 65%); }
+  background-image: radial-gradient(30rem 11rem at 76% 8%, rgba(255, 255, 255, .96), transparent 62%), radial-gradient(34rem 12rem at 78% 12%, rgba(255, 62, 165, .12), transparent 66%),
+    radial-gradient(22rem 8rem at 30% 6%, rgba(255, 255, 255, .94), transparent 62%), radial-gradient(26rem 9rem at 32% 10%, rgba(47, 91, 255, .1), transparent 66%),
+    radial-gradient(26rem 9rem at 52% 34%, rgba(255, 255, 255, .94), transparent 62%), radial-gradient(30rem 10rem at 54% 38%, rgba(255, 62, 165, .1), transparent 66%),
+    radial-gradient(22rem 8rem at 92% 54%, rgba(255, 255, 255, .92), transparent 62%), radial-gradient(26rem 9rem at 94% 58%, rgba(47, 91, 255, .09), transparent 66%),
+    radial-gradient(24rem 8.5rem at 14% 60%, rgba(255, 255, 255, .92), transparent 62%), radial-gradient(28rem 9.5rem at 16% 64%, rgba(255, 62, 165, .09), transparent 66%),
+    radial-gradient(26rem 9rem at 62% 80%, rgba(255, 255, 255, .92), transparent 62%), radial-gradient(30rem 10rem at 64% 84%, rgba(47, 91, 255, .08), transparent 66%),
+    radial-gradient(22rem 7.5rem at 34% 96%, rgba(255, 255, 255, .9), transparent 62%); }
 #sky .st { will-change: opacity; animation: star-breathe 7s ease-in-out infinite; }
 #sky.still i { animation: none; }
-[data-theme="light"] body.phone #sky { background: linear-gradient(180deg, #D8ECFF, transparent 16rem); }
+[data-theme="light"] body.phone #sky { background: radial-gradient(22rem 12rem at 0% 0%, rgba(255, 62, 165, .12), transparent 72%), linear-gradient(180deg, #E9F3FF, transparent 16rem); }
 @keyframes cloud-drift { to { transform: translateX(3rem); } }
 @keyframes star-breathe { 0%, 100% { opacity: .7; } 50% { opacity: .08; } }
 

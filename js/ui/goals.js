@@ -6,7 +6,6 @@ import * as store from "../store.js";
 import * as G from "../goals.js";
 import { esc, on } from "../dom.js";
 import { MONTHS } from "../dates.js";
-import { groupsOf } from "./common.js";
 
 let edit = null;        // 正在改的那条：{ id, field: "text" | "when" }
 let showDone = false;   // 做完了、已经过期的也列出来
@@ -17,14 +16,14 @@ const low = (s) => String(s || "").trim().toLowerCase();
 // 标签的颜色：和哪个项目同名就用它的颜色
 function tagColors(c) {
   const out = {};
-  for (const g of groupsOf(c.projects)) if (g.name && g.subs[0]?.color) out[low(g.name)] = g.subs[0].color;
+  for (const g of c.groups) if (g.name && g.color) out[low(g.name)] = g.color;
   return out;
 }
 
 // 下拉里的标签：各个项目的名字在前，再加用过的
 function tagList(c, goals) {
   const seen = new Map();
-  for (const name of [...groupsOf(c.projects).map((g) => g.name), ...goals.map((g) => g.tag)]) if (low(name) && !seen.has(low(name))) seen.set(low(name), String(name).trim());
+  for (const name of [...c.groups.map((g) => g.name), ...goals.map((g) => g.tag)]) if (low(name) && !seen.has(low(name))) seen.set(low(name), String(name).trim());
   return [...seen.values()];
 }
 

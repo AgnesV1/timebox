@@ -1,5 +1,7 @@
 // 数据层：本机存一份（localStorage），所有改动都从这里走，记下哪些行还没推到表格。
 // 每行都有 updated（改动时间），两台设备改了同一行，以后改的为准。
+// 数据和读写都在这个文件里；几块各管一摊的（重复、计时、Friends、目标、备餐）写在 js/store/ 下面，
+// 最底下把它们接回来——对外还是 store.xxx，名字不变。
 
 import { todayIso, addDays, fmtShort } from "./dates.js";
 import * as E from "./engine.js";
@@ -7,7 +9,12 @@ import * as R from "./routines.js";
 import * as GR from "./groups.js";
 import * as F from "./friends.js";
 import { readLocal, writeLocal } from "./dom.js";
-import { parseTimes, formatTimes, sumTimes } from "./times.js";
+import { formatTimes, sumTimes } from "./times.js";
+import seriesStore from "./store/series.js";
+import timerStore from "./store/timer.js";
+import friendStore from "./store/friends.js";
+import goalStore from "./store/goals.js";
+import mealStore from "./store/meals.js";
 
 const KEY = "kuzhouduan-v1";
 const OLD_KEY = "timebox-v1";
@@ -42,6 +49,17 @@ function blank() {
 
 let S = load();
 let ctxCache = null;
+let rev = 0;   // 数据每动一下加一（put / drop / 从表格拉回来）
+const memos = new Map();
+// 同一份数据里算过一次的不再算：Settings 里一条一行的那几样（目标、备餐）每次重画都要整页读一遍。
+// 拿到的东西是共用的，只读；要改先抄一份
+function memo(key, fn) {
+  const hit = memos.get(key);
+  if (hit && hit.rev === rev) return hit.value;
+  const value = fn();
+  memos.set(key, { rev, value });
+  return value;
+}
 let tx = null;
 const listeners = new Set();
 const undoListeners = new Set();
@@ -216,6 +234,7 @@ function remember(t, id) {
 // generated = 重复任务自动生成的那一次：改动时间记成 1，哪台设备上真改过它都比这个新，不会被盖掉
 function put(t, row, { generated = false } = {}) {
   remember(t, row.id);
+  rev++;
   const prev = S.data[t][row.id];
   row.updated = generated && !prev ? 1 : Math.max(Date.now(), (Number(prev?.updated) || 0) + 1);
   // 任务属于哪个大类写在任务自己身上（表格里一眼能看）：挂了计划就跟计划，没挂就是直接挂的那个
@@ -231,6 +250,7 @@ function put(t, row, { generated = false } = {}) {
 function drop(t, id) {
   if (!S.data[t][id]) return;
   remember(t, id);
+  rev++;
   delete S.data[t][id];
   delete S.pending[t + ":" + id];
   S.deletes.push({ table: t, id, at: Date.now() });
@@ -309,6 +329,7 @@ function normalize(t, raw) {
 
 export function applyPull(pull, now, { full = false } = {}) {
   if (!pull) return;
+  rev++;
   for (const d of pull.deleted || []) {
     const r = S.data[d.table]?.[d.id];
     if (!r) continue;
@@ -752,339 +773,6 @@ export function renameGroup(from, to) {
   }, merge ? "Moved " + from + " into " + name : "Renamed project");
 }
 
-// ---------- 规律计划（重复） ----------
-// 规则在计划的 rule 里（见 routines.js）。只有今天的那一次是 Tasks 里的任务（ID 以 rt: 开头），以后的只是预览。
-// 加任务框的「重复」、任务编辑框里的「Repeat」都是新建一个 Regular + Auto 的计划。
-
-export const routines = () => all("projects").filter(E.isRegular).sort(byOrder);
-export const routineOf = (taskId) => { const x = R.parseRoutineTaskId(taskId); const p = x ? get("projects", x.rid) : null; return p && E.isRegular(p) ? p : null; };
-export const seriesTasks = (rid) => all("tasks").filter((x) => x.id.startsWith("rt:" + rid + ":")).sort((a, b) => a.date.localeCompare(b.date));
-const origDate = (id) => R.parseRoutineTaskId(id)?.date || "";
-
-function setRule(p, patch) {
-  const { id: _i, title: _t, ...rule } = R.ruleOf(get("projects", p.id) || p);
-  put("projects", { ...(get("projects", p.id) || p), rule: { ...rule, ...patch } });
-}
-
-function newRegular(name, projectId, rule, direct = "") {
-  const group = groupFor(projectId) || direct;
-  return { id: newId(), name, group, kind: "regular", place: "auto", status: "active", deadline: "", start: "", early: 0, calib: null,
-    rule: { days: [0, 0, 0, 0, 0, 0, 0], skip: [], ...rule }, color: get("projects", projectId)?.color || colorFor(group), order: nextPlanOrder() };
-}
-
-const repeatLabel = (end) => (end ? "Repeats until " + fmtShort(end) : "Repeats from now on");
-
-// 加任务时直接设重复：days 是一周七天的分钟数，end 是最后一天（空 = 一直）。返回第一次的 ID（那天要做的话）
-export function addRepeating(fields, days, end) {
-  const start = fields.date || today();
-  const p = newRegular(fields.title, fields.projectId, { days, start, end: R.clampEnd(start, end), optional: Boolean(fields.optional), deep: Boolean(fields.deep) }, fields.group);
-  let first = "";
-  change(() => {
-    put("projects", p);
-    const est = R.dueOn(R.ruleOf(p), start);
-    if (est) {
-      first = R.routineTaskId(p.id, start);
-      put("tasks", { id: first, date: start, title: p.name, est, actual: null, status: "", reason: "", optional: Boolean(fields.optional), deep: Boolean(fields.deep),
-        projectId: p.id, itemId: "", times: "", desc: "", order: nextOrder(start) });
-    }
-  }, repeatLabel(p.rule.end));
-  return first;
-}
-
-// 已有的普通任务改成重复的：它自己变成第一次（换成 rt: 的 ID，计时记录跟着走）。返回它的新 ID
-export function repeatTask(id, days, end) {
-  const t = get("tasks", id);
-  if (!t) return id;
-  const p = newRegular(t.title, t.projectId, { days, start: t.date, end: R.clampEnd(t.date, end), optional: Boolean(t.optional), deep: Boolean(t.deep) }, t.group);
-  const nid = R.routineTaskId(p.id, t.date);
-  change(() => {
-    put("projects", p);
-    put("tasks", { ...t, id: nid, projectId: p.id, itemId: "" });
-    if (timer()?.taskId === id) setTimer({ ...timer(), taskId: nid });
-    moveMeet(id, nid, t.date);
-    drop("tasks", id);
-  }, repeatLabel(p.rule.end));
-  return nid;
-}
-
-// 改重复（从这一次起）：规则换成新的；已经落成、还没开始的那几次跟着变（新规则里没有的删掉）
-export function replanSeries(id, days, end) {
-  const t = get("tasks", id), p = routineOf(id);
-  if (!t || !p) return;
-  change(() => {
-    setRule(p, { days, end: R.clampEnd(origDate(id), end) });
-    const next = R.ruleOf(get("projects", p.id));
-    for (const x of seriesTasks(p.id)) {
-      if (origDate(x.id) < origDate(id) || started(x)) continue;
-      const m = R.dueOn(next, origDate(x.id));
-      if (x.id !== id && !m) dropTask(x.id);
-      else if (m) put("tasks", { ...x, est: m });
-    }
-  }, "Repeat updated");
-}
-
-const SERIES_FIELDS = ["title", "est", "optional", "deep"];
-
-// 改名字、分钟、可选、深度：只改这一次 / 这次和以后 / 全部（做过的不动，除了这一次自己）
-export function editSeries(id, patch, scope) {
-  const t = get("tasks", id), p = routineOf(id);
-  if (!t || !p || scope === "this") return updateTask(id, patch, null, { quiet: patch.title !== undefined });
-  const fields = Object.fromEntries(Object.entries(patch).filter(([k]) => SERIES_FIELDS.includes(k)));
-  change(() => {
-    for (const x of seriesTasks(p.id)) {
-      if (x.id !== id && (started(x) || (scope === "following" && origDate(x.id) < origDate(id)))) continue;
-      put("tasks", { ...x, ...fields });
-    }
-    const plan = get("projects", p.id);
-    const rule = { ...(plan.rule || {}) };
-    if ("optional" in fields) rule.optional = Boolean(fields.optional);
-    if ("deep" in fields) rule.deep = Boolean(fields.deep);
-    if ("est" in fields) rule.days = (rule.days || []).map((v) => (Number(v) > 0 ? Number(fields.est) || 0 : 0));
-    put("projects", { ...plan, ...("title" in fields ? { name: fields.title } : {}), rule });
-  }, null, { quiet: patch.title !== undefined });
-}
-
-// 删的时候会删掉哪几个已经落成的：only = 只这一次；following / earlier / all 只删还没开始的（这一次也一样）
-export function seriesScope(id, scope) {
-  const t = get("tasks", id), x = R.parseRoutineTaskId(id);
-  if (!t) return [];
-  if (scope === "this" || !x) return [t];
-  return seriesTasks(x.rid).filter((s) => !started(s) &&
-    (scope === "all" || (scope === "following" ? origDate(s.id) >= x.date : origDate(s.id) <= x.date)));
-}
-
-// following = 从这次起不再重复；earlier = 这次和以前的不要了（从下一次开始）；all = 整个计划不要了
-// （做过的还在的话计划留着、标成 Dropped，统计里还认得出名字）
-export function deleteSeries(id, scope) {
-  const t = get("tasks", id), p = routineOf(id);
-  if (!t || !p || scope === "this") return deleteTask(id);
-  const od = origDate(id), gone = seriesScope(id, scope);
-  change(() => {
-    gone.forEach((x) => dropTask(x.id));
-    if (scope === "following") setRule(p, { end: addDays(od, -1) });
-    else if (scope === "earlier") setRule(p, { start: addDays(od, 1) });
-    const r = R.ruleOf(get("projects", p.id));
-    if (scope !== "all" && !(r.start && r.end && r.end < r.start)) return;
-    // 一次都不剩了：做过的还在就留着计划（标 Dropped），不然整个删掉
-    if (all("tasks").some((x) => x.projectId === p.id)) put("projects", { ...get("projects", p.id), status: "dropped" });
-    else drop("projects", p.id);
-  }, scope === "all" ? "Deleted repeat" : "Stopped repeating");
-}
-
-// ---------- 计时 ----------
-// 正在跑的计时器存在 Settings 的 timer 里（{taskId, start}），所以手机上开始、电脑上也能停。
-// 每段时间记在任务自己的 times 里（js/times.js 的写法）：「09:10-09:40 30m; 20m」。
-// 任务的实际分钟 = 这些加起来。每段的 id = 「任务 id#第几段」。
-
-export const timer = () => setting("timer", null);
-export function timeOf(taskId) {
-  const t = get("tasks", taskId);
-  return t ? parseTimes(t.times).map((x, i) => ({ ...x, id: taskId + "#" + i, taskId, date: t.date })) : [];
-}
-export const hasTime = (taskId) => timeOf(taskId).length > 0;
-export const timeTotal = (taskId) => sumTimes(timeOf(taskId));
-
-const pad2 = (n) => String(n).padStart(2, "0");
-export const clockOf = (ms) => { const d = new Date(ms); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); };
-export const clockNow = () => clockOf(Date.now());
-const toMin = (hm) => { const [h, m] = String(hm).split(":").map(Number); return (h || 0) * 60 + (m || 0); };
-const fromMin = (v) => { const x = ((v % 1440) + 1440) % 1440; return pad2(Math.floor(x / 60)) + ":" + pad2(x % 60); };
-// 一天从 dayStartsAt 算起：凌晨 1 点排在晚上 11 点后面；没有钟点的排最后
-function clockKey(hm) { return hm ? (toMin(hm) - toMin(prefs().dayStartsAt) + 1440) % 1440 : 9999; }
-
-function setTimer(value) { put("settings", { id: "timer", key: "timer", value }); }
-
-function writeTimes(taskId, list) {
-  const t = get("tasks", taskId);
-  if (!t) return;
-  const sorted = list.slice().sort((a, b) => clockKey(a.from || a.to) - clockKey(b.from || b.to));
-  put("tasks", { ...t, times: formatTimes(sorted), actual: sumTimes(sorted) || null });
-}
-
-function addTime(taskId, min, to, from) {
-  const t = get("tasks", taskId);
-  if (!t) return;
-  writeTimes(taskId, [...parseTimes(t.times), { from: to ? from ?? fromMin(toMin(to) - min) : "", to: to || "", min }]);
-}
-
-// 开始：已经有一个在跑就先停下记好（和 Toggl 一样一次只跑一个）
-export function startTimer(taskId) {
-  if (!get("tasks", taskId) || timer()?.taskId === taskId) return;
-  let logged = null;
-  change(() => {
-    logged = stopRunning();
-    setTimer({ taskId, start: Date.now() });
-  });
-  return logged;
-}
-
-function stopRunning() {
-  const r = timer();
-  if (!r) return null;
-  setTimer(null);
-  const now = Date.now();
-  const min = Math.round((now - Number(r.start)) / 60000);
-  if (min < 1 || !get("tasks", r.taskId)) return { taskId: r.taskId, min: 0 };
-  addTime(r.taskId, min, clockOf(now), clockOf(Number(r.start)));
-  return { taskId: r.taskId, min };
-}
-
-// 停下：返回记了多少分钟（不到 1 分钟不记）
-export function stopTimer() {
-  let logged = null;
-  change(() => { logged = stopRunning(); });
-  return logged;
-}
-
-export function discardTimer() {
-  if (!timer()) return;
-  change(() => setTimer(null), "Timer discarded");
-}
-
-// 手动补一段：用了多少分钟、几点结束（不填结束时间也行，只记分钟）
-export function logTime(taskId, min, to) {
-  min = Math.round(Number(min) || 0);
-  if (min < 1 || !get("tasks", taskId)) return;
-  change(() => addTime(taskId, min, to || ""), "Logged " + min + " min");
-}
-
-// 补记一段已经做完的：哪天、几点到几点（过了零点也算）。存成那天一条 Done 的任务，带这一段时间。返回任务 id
-export function addLogged(fields, from, to) {
-  const min = (((toMin(to) - toMin(from)) % 1440) + 1440) % 1440;
-  if (min < 1) return "";
-  let id = "";
-  change(() => {
-    id = addTask({ ...fields, est: min, actual: min, status: "done", times: formatTimes([{ from: fromMin(toMin(from)), to: fromMin(toMin(to)), min }]) });
-  }, "Logged " + min + " min");
-  return id;
-}
-
-export function deleteTime(id) {
-  const i = String(id).lastIndexOf("#");
-  const taskId = String(id).slice(0, i), n = Number(String(id).slice(i + 1));
-  const list = parseTimes(get("tasks", taskId)?.times);
-  if (!list[n]) return;
-  list.splice(n, 1);
-  change(() => writeTimes(taskId, list), "Deleted time");
-}
-
-// ---------- Friends：人、每次的记录（见 js/friends.js） ----------
-// friends 表：{ name, more: { 字段名: 值 }, next, nextDate }；字段是自己定的（Settings 的 friend-fields，一行一个）。
-// meets 表：{ date, friends: [id], note, watch, taskId }。任务带出来的那条 id = mt:<任务 id>：任务改日期它跟着改，任务删了一起删。
-
-const byLowName = (a, b) => String(a.name || "").toLowerCase().localeCompare(String(b.name || "").toLowerCase());
-export const friends = () => all("friends").sort(byLowName);
-export const meets = () => all("meets").sort((a, b) => String(b.date).localeCompare(String(a.date)) || (Number(b.updated) || 0) - (Number(a.updated) || 0));
-export const meetOfTask = (taskId) => get("meets", F.meetId(taskId));
-
-// 字段清单：设置里排好的在前，再加表格里手动加出来的列
-export function friendFields() {
-  const out = (setting("friend-fields", []) || []).filter(Boolean).map(String);
-  for (const f of all("friends")) for (const k of Object.keys(f.more || {})) if (!out.includes(k)) out.push(k);
-  return out;
-}
-
-// 上次联系：{ 人的 id: 日期 }
-export const lastContact = () => F.lastContact(all("meets"), today(), (taskId) => get("tasks", taskId)?.status || "");
-
-export function saveFriend(row, label, opts) {
-  const id = row.id || newId();
-  change(() => put("friends", { name: "", more: {}, next: "", nextDate: "", ...(get("friends", id) || {}), ...row, id }), label, opts);
-  return id;
-}
-
-// 删一个人：他的记录一起删（几个人一起的那条只把他拿掉）
-export function deleteFriend(id) {
-  change(() => {
-    for (const m of all("meets")) {
-      if (!(m.friends || []).includes(id)) continue;
-      const left = m.friends.filter((x) => x !== id);
-      if (left.length) put("meets", { ...m, friends: left });
-      else drop("meets", m.id);
-    }
-    drop("friends", id);
-  }, "Deleted");
-}
-
-export function saveMeet(row, label, opts) {
-  const id = row.id || newId();
-  change(() => put("meets", { date: today(), friends: [], note: "", watch: "", taskId: "", ...(get("meets", id) || {}), ...row, id }), label, opts);
-  return id;
-}
-
-export function deleteMeet(id) {
-  change(() => drop("meets", id), "Deleted");
-}
-
-// 任务带的那条记录：和谁（friends）、聊了什么（note）、要记住的（watch）。三样都空了就不留
-export function setTaskMeet(taskId, patch, opts) {
-  const t = get("tasks", taskId);
-  if (!t) return;
-  const id = F.meetId(taskId), cur = get("meets", id);
-  const next = { date: t.date, friends: [], note: "", watch: "", ...(cur || {}), ...patch, id, taskId, date: t.date };
-  const empty = !next.friends.length && !String(next.note).trim() && !String(next.watch).trim();
-  if (empty && !cur) return;
-  change(() => (empty ? drop("meets", id) : put("meets", next)), "", opts);
-}
-
-// 整片粘进来的（js/friends.js 的 parseImport）：按名字对上已有的人、把填了的格子补上（不清空原来的），没有的新建；
-// 带日期的那几句记进各自的记录里，一模一样的不重复记——同一片再粘一次什么都不会多。
-// added = 表头里新出现的字段名：接在字段清单后面
-export function importFriends(rows, added = []) {
-  const key = (s) => String(s || "").trim().toLowerCase();
-  change(() => {
-    const extra = added.filter((f) => f && !friendFields().includes(f));
-    if (extra.length) put("settings", { id: "friend-fields", key: "friend-fields", value: [...friendFields(), ...extra] });
-    const ids = new Map(all("friends").map((f) => [key(f.name), f.id]));
-    for (const r of rows) {
-      if (!key(r.name)) continue;
-      let id = ids.get(key(r.name));
-      const cur = id ? get("friends", id) : null, more = { ...(cur?.more || {}) };
-      for (const [field, v] of Object.entries(r.values || {})) if (field && v) more[field] = v;
-      if (!cur) { id = newId(); ids.set(key(r.name), id); put("friends", { id, name: r.name, more, next: "", nextDate: "" }); }
-      else if (JSON.stringify(more) !== JSON.stringify(cur.more || {})) put("friends", { ...cur, more });
-      for (const m of r.meets || []) {
-        const dup = all("meets").some((x) => x.date === m.date && (x.note || "") === m.note && (x.friends || []).length === 1 && x.friends[0] === id);
-        if (!dup) put("meets", { id: newId(), date: m.date, friends: [id], note: m.note, watch: "", taskId: "" });
-      }
-    }
-  }, "Imported " + rows.length + (rows.length === 1 ? " person" : " people"));
-}
-
-// 特别的日子（生日、过节问候、关键日子，见 js/friends.js）：字段清单里哪个是哪个
-export const friendSpecial = () => F.specialFields(friendFields());
-// 记号换过样子：还写着以前那两个的格子改成现在的（不出声，改过的下次同步写回表格）
-export function adoptMarks() {
-  const field = friendSpecial().marks || F.SPECIAL_NAME.marks;
-  const stale = all("friends").filter((f) => F.freshMarks(f.more?.[field]) !== String(f.more?.[field] ?? ""));
-  if (stale.length) change(() => stale.forEach((f) => put("friends", { ...f, more: { ...f.more, [field]: F.freshMarks(f.more[field]) } })), "", { quiet: true });
-}
-export const occasionDone = (id) => Boolean(get("meets", id));
-// 到了日子点一下：在这个人的记录里记一条（id 是固定的，一年里这个日子只记一次）；再点一下 = 其实没做，把那条删掉
-export function toggleOccasion(id, friendId, note) {
-  if (get("meets", id)) { change(() => drop("meets", id), "Marked as not done"); return; }
-  const f = get("friends", friendId);
-  if (!f) return;
-  change(() => put("meets", { id, date: today(), friends: [friendId], note: String(note || ""), watch: "", taskId: "" }), "Noted for " + (f.name || "them"));
-}
-
-function moveMeet(fromTask, toTask, date) {
-  const m = get("meets", F.meetId(fromTask));
-  if (!m) return;
-  put("meets", { ...m, id: F.meetId(toTask), taskId: toTask, date });
-  drop("meets", m.id);
-}
-
-// 该做的事做完了：在这个人的记录里记一条（今天 + 写的那句），再把这件事清掉
-export function doneNext(friendId, note) {
-  const f = get("friends", friendId);
-  if (!f) return;
-  change(() => {
-    put("meets", { id: newId(), date: today(), friends: [friendId], note: String(note || "").trim(), watch: "", taskId: "" });
-    put("friends", { ...f, next: "", nextDate: "" });
-  }, "Logged with " + (f.name || "them"));
-}
-
 // ---------- 这台设备的存储 ----------
 // 整份数据是 localStorage 里的一段文字，上限大约 5MB。算一算用了多少、按最近 7 天的量还能撑多久（十分钟内不重算）。
 const LIMIT = 5e6;
@@ -1105,162 +793,22 @@ export function storage() {
 }
 export const forgetStorage = () => { usage = null; };
 
-// ---------- 目标（Projects 页最上面的目标板，见 js/goals.js） ----------
-// 存在 Settings 页里，一条目标一行：goal:<id> = { text, tag, span, due, done, order }
+// ---------- 分出去的几块（js/store/）：各拿到下面这几样读写，接回来的名字和原来一样 ----------
+// 上面的函数也会用到它们（删任务要问是不是重复的那一次、标状态要看计了多久）：都是调用时才用，这时已经接好了。
 
-const GOAL_RE = /^goal:(.+)$/;
+const core = { all, get, entries: (t) => Object.entries(S.data[t]), put, drop, change, memo, newId, today, setting, prefs, byOrder,
+  groupFor, colorFor, nextPlanOrder, nextOrder, started, dropTask, addTask, updateTask, deleteTask };
 
-export function goals() {
-  const out = [];
-  for (const [key, r] of Object.entries(S.data.settings)) {
-    const m = GOAL_RE.exec(key);
-    if (m && r.value && typeof r.value === "object") out.push({ ...r.value, id: m[1] });
-  }
-  return out.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
-}
+const tm = timerStore(core);
+export const { timer, timeOf, hasTime, timeTotal, clockOf, clockNow, startTimer, stopTimer, discardTimer, logTime, addLogged, deleteTime } = tm;
 
-export function saveGoal(row, label, opts) {
-  const id = row.id || newId().replace(/-/g, "").slice(0, 10);
-  const { id: _id, ...value } = row;
-  if (!value.order) value.order = Date.now();
-  change(() => put("settings", { id: "goal:" + id, key: "goal:" + id, value }), label, opts);
-  return id;
-}
+const fr = friendStore(core);
+export const { friends, meets, meetOfTask, friendFields, lastContact, saveFriend, deleteFriend, saveMeet, deleteMeet, setTaskMeet, importFriends, friendSpecial, adoptMarks, occasionDone, toggleOccasion, doneNext } = fr;
+const { moveMeet } = fr;
 
-export function deleteGoal(id) {
-  change(() => drop("settings", "goal:" + id), "Goal deleted");
-}
+const series = seriesStore({ ...core, timer, setTimer: tm.setTimer, moveMeet });
+export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries } = series;
+const { setRule } = series;
 
-// ---------- 备餐（Meals 页；手机上只有「下次采购」那张单子） ----------
-// 都存在 Settings 页里，一样东西一行（不用改 Code.gs，一格也不会太长）：
-//   meal-ing:<id> 常买的东西 / meal-box:<id> 一顿 / meal-week:<这周第一天> 这周：days（日期 → {boxes} / {off}）、
-//   粗排 rough（[{box, n}]）、买了没有 got、手动加的 extra、shopped、skip、note / meal-prefs 目标
-//   meal-sup:<id> 规律要换 / 要补的东西（Restock：价格、每隔多久、下次哪天）；这周的行里还有 notes（采购单上写的备注）
-//   （meal-pack:<id> 是 10-08 那版的 Day pack，现在只在读旧数据时展开成 Box）
-const MEAL_RE = /^meal-(ing|box|pack|week|sup):(.+)$/;
-const mealKey = (kind, id) => "meal-" + kind + ":" + id;
-const OLD_UNIT = { g: "g", kg: "g", oz: "g", lb: "g", ml: "ml", L: "ml", "fl oz": "ml", gal: "ml" };
-
-export function meals() {
-  const D = { ing: {}, box: {}, pack: {}, week: {}, sup: {}, days: {} };
-  for (const [key, r] of Object.entries(S.data.settings)) {
-    const m = MEAL_RE.exec(key);
-    if (m && r.value && typeof r.value === "object") D[m[1]][m[2]] = { ...r.value, id: m[2] };
-  }
-  // 旧格式读的时候换成新的：用量的数字 → 文字；某天 {pack} → 那个 pack 里的 Box；粗排 {pack, n} → 每个 Box × n
-  for (const b of Object.values(D.box)) {
-    b.parts = (b.parts || []).map((p) => (p.amt !== undefined || p.qty === undefined ? p
-      : { ing: p.ing, amt: p.qty === "" || p.qty === null ? "" : p.qty + (OLD_UNIT[D.ing[p.ing]?.packUnit] ? " " + OLD_UNIT[D.ing[p.ing].packUnit] : "") }));
-  }
-  const unpack = (id) => (D.pack[id]?.boxes || []).filter((b) => D.box[b]);
-  for (const w of Object.values(D.week)) {
-    const days = {};
-    for (const [d, e] of Object.entries(w.days || {})) days[d] = e?.pack ? { boxes: unpack(e.pack) } : e;
-    w.days = days;
-    const rough = [];
-    for (const r of w.rough || []) {
-      for (const box of r.pack ? unpack(r.pack) : [r.box]) {
-        const hit = rough.find((x) => x.box === box);
-        if (hit) hit.n += Number(r.n) || 0;
-        else rough.push({ box, n: Number(r.n) || 0 });
-      }
-    }
-    w.rough = rough;
-  }
-  // 每天吃什么存在那周的行里；改过「一周从周几开始」也照样找得到
-  for (const w of Object.values(D.week)) Object.assign(D.days, w.days);
-  return D;
-}
-
-// high = 每周 High 的 Box 最多几个；budget = 每周预算（0 = 不比）；shopDay = 星期几去买
-export const mealPrefs = () => ({ high: 3, budget: 0, shopDay: 0, ...(setting("meal-prefs", {}) || {}) });
-
-function putMeal(kind, id, row) {
-  const { id: _id, ...value } = row;
-  put("settings", { id: mealKey(kind, id), key: mealKey(kind, id), value });
-}
-
-export function saveMeal(kind, row, label, opts) {
-  const id = row.id || newId().replace(/-/g, "").slice(0, 10);
-  change(() => putMeal(kind, id, row), label, opts);
-  return id;
-}
-
-// 删一样东西，用到它的地方一起改（一次撤销全回来）：食材 → 从各个 Box 里拿掉；Box → 从每天和粗排里拿掉
-function removeMeal(kind, id) {
-  const D = meals();
-  if (kind === "ing") {
-    for (const b of Object.values(D.box)) if (b.parts.some((p) => p.ing === id)) putMeal("box", b.id, { ...b, parts: b.parts.filter((p) => p.ing !== id) });
-  }
-  if (kind === "box") {
-    for (const w of Object.values(D.week)) {
-      let touched = false;
-      const days = {};
-      for (const [d, e] of Object.entries(w.days)) {
-        if (!e?.boxes?.includes(id)) { days[d] = e; continue; }
-        touched = true;
-        const left = e.boxes.filter((x) => x !== id);
-        if (left.length) days[d] = { ...e, boxes: left };
-      }
-      const rough = w.rough.filter((r) => r.box !== id);
-      if (touched || rough.length !== w.rough.length) putMeal("week", w.id, { ...w, days, rough });
-    }
-  }
-  drop("settings", mealKey(kind, id));
-}
-
-export function deleteMeal(kind, id, label) {
-  change(() => removeMeal(kind, id), label);
-}
-
-export function saveWeek(start, patch, label, opts) {
-  change(() => {
-    const cur = meals().week[start] || {};
-    putMeal("week", start, { ...cur, ...(typeof patch === "function" ? patch(cur) : patch) });
-  }, label, opts);
-}
-
-// 某天吃什么（entry = null 就清空）。别的周的行里要是也有这天（改过一周从周几开始），一起清掉
-export function setMealDay(start, date, entry, label) {
-  change(() => {
-    const D = meals();
-    for (const w of Object.values(D.week)) {
-      if (w.id === start || !w.days?.[date]) continue;
-      const days = { ...w.days };
-      delete days[date];
-      putMeal("week", w.id, { ...w, days });
-    }
-    const cur = D.week[start] || {};
-    const days = { ...(cur.days || {}) };
-    if (entry) days[date] = entry;
-    else delete days[date];
-    putMeal("week", start, { ...cur, days });
-  }, label);
-}
-
-// 这一轮看过了：sale = {price, until} 在打折；null = 没打折。
-// 两周以上一轮的，这次打折当新一轮的开始，下次照这个往后推
-export function checkDeal(id, sale) {
-  const ing = meals().ing[id];
-  if (!ing) return;
-  const T = today();
-  const next = { ...ing, checked: T, sale: sale ? { price: Number(sale.price) || 0, from: T, until: sale.until || T } : null };
-  if (sale && (Number(ing.every) || 0) >= 2) next.from = T;
-  change(() => putMeal("ing", id, next), (sale ? "On sale: " : "Checked: ") + ing.name);
-}
-
-export function addMealExamples(rows) {
-  change(() => { for (const kind of ["ing", "box", "pack", "week"]) for (const r of rows[kind] || []) putMeal(kind, r.id, r); }, "Examples added — remove them under Groceries");
-}
-
-export function importMeals(rows) {
-  const n = (rows.ing || []).length, b = (rows.box || []).length, s = (rows.sup || []).length;
-  change(() => { for (const kind of ["ing", "box", "sup"]) for (const r of rows[kind] || []) putMeal(kind, r.id, r); },
-    "Imported " + n + (n === 1 ? " grocery" : " groceries") + " · " + b + (b === 1 ? " box" : " boxes") + (s ? " · " + s + " to restock" : ""));
-}
-
-export function clearMealExamples() {
-  change(() => {
-    for (const kind of ["box", "ing", "pack"]) for (const id of Object.keys(meals()[kind])) if (id.startsWith("ex-")) removeMeal(kind, id);
-  }, "Examples removed");
-}
+export const { goals, saveGoal, deleteGoal } = goalStore(core);
+export const { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples } = mealStore(core);

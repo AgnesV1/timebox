@@ -3,7 +3,7 @@
 // 底盘是灰的，没做事的时间就是这层灰；最左边（6 点 / 18 点，一圈的头和尾）横着切开一道细缝（两个主题都有）。
 // 夜里底盘是镜面铬（白天那圈亮银、夜里那圈深灰），任务是发光的整块，颜色用项目颜色的霓虹版（groups.js 的 neon）。
 // 白天整个是丝网印的画法：两圈平涂的灰，底下各垫一版错开一点的粉和青蓝（套印没对准露出来的边，.reg），整盘压一层颗粒（.sun-grain）；
-// 任务是平涂的霓虹色块、垫一版藏青、压一片网点（print()），整块的那条弧只留着接手指、标选中。
+// 任务是平涂的霓虹色块、底下垫一版错开的藏青（print()），整块的那条弧只留着接手指、标选中。
 // 每天晚上 11 点到早上 8 点是休息，通勤日再加来回路上的两段：这些不可用的时段先盖一层磨砂把反光压下去、再压深色细纹；
 // 正在计时的那段画到现在；升起来以后整个圆盘外面有一圈和金属同色的柔光（css 里 .sun 的 box-shadow，压在阴影上面）；
 // 「现在」是从圆心伸出去的一根指针（白天电光蓝、夜里青柠），指到当前那一圈的外沿——升起来以后指针从中间那几行字外面起。
@@ -45,12 +45,10 @@ function arcPath(r, a, b) {
   return "M" + f1(x1) + " " + f1(y1) + "A" + r + " " + r + " 0 " + (span > 180 ? 1 : 0) + " 1 " + f1(x2) + " " + f1(y2);
 }
 
-// 白天的一块：丝网印——平涂的色块（ink），底下错开一点垫一版藏青（sh，像套印没对准露出来的那一版），后半段再压一片网点（dots）。
-// 颜色在 css 里从 --c 给；网点的图案在 <defs> 里（#sun-dots）
+// 白天的一块：丝网印——平涂的色块（ink），底下错开一点垫一版藏青（sh，像套印没对准露出来的那一版）。颜色在 css 里从 --c 给
 function print(x, color, boost) {
-  const R0 = x.ring === "outer" ? RO : RI, d = arcPath(R0, x.a, x.b);
-  return '<g class="print' + (boost ? " boost" : "") + '" style="--c0:' + esc(color) + '"><path class="sh" transform="translate(1.6 1.6)" d="' + d + '"/><path class="ink" d="' + d + '"/>' +
-    '<path class="dots" stroke="url(#sun-dots)" d="' + arcPath(R0, x.a + (x.b - x.a) * 0.45, x.b) + '"/></g>';
+  const d = arcPath(x.ring === "outer" ? RO : RI, x.a, x.b);
+  return '<g class="print' + (boost ? " boost" : "") + '" style="--c0:' + esc(color) + '"><path class="sh" transform="translate(1.6 1.6)" d="' + d + '"/><path class="ink" d="' + d + '"/></g>';
 }
 
 // 这一天要画的：通勤固定时段（灰）、计过时的段（计划颜色）、正在跑的那段（到现在）
@@ -112,8 +110,6 @@ function sunHTML(c, d) {
   return '<div class="sun" role="button" tabindex="0" aria-label="Your day on a clock — drag up or press Enter">' +
     '<svg viewBox="-120 -120 240 240" aria-hidden="true">' +
     "<defs>" + chrome("day") + chrome("night") +
-    // 白天色块上压的网点（藏青的小圆点，斜着排）
-    '<pattern id="sun-dots" width="4.6" height="4.6" patternUnits="userSpaceOnUse" patternTransform="rotate(28)"><circle cx="2.3" cy="2.3" r="1.05" fill="#171C55"/></pattern>' +
     '<mask id="sun-cut" maskUnits="userSpaceOnUse" x="-120" y="-120" width="240" height="240"><rect x="-120" y="-120" width="240" height="240" fill="#fff"/><rect x="-120" y="-1.7" width="120" height="3.4" fill="#000"/></mask></defs>' +
     // 白天垫在两圈底下、各错开一点的两版（粉往右下、青蓝往左上）；夜里不画
     '<g mask="url(#sun-cut)"><g class="reg">' + [RO, RI].map((r) => '<circle class="p" r="' + r + '" transform="translate(2.6 1.9)"/><circle class="c" r="' + r + '" transform="translate(-2.2 -1.5)"/>').join("") + "</g>" +

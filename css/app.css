@@ -941,7 +941,7 @@ body.phone .reading { padding: 0 2px 90px; }
 .sun .arc.boost { stroke: oklch(from var(--c, #B4B4BC) calc(l + .12) calc(c * 1.9) h); }
 /* 白天整个是丝网印的画法（夜里不变：镜面铬 + 发光的整块）：
    两圈平涂的灰（盖掉铬的渐变），底下各垫一版错开一点的粉和青蓝（.reg，套印没对准露出来的边）；
-   任务的色块（.print，js/ui/sun.js 的 print()）= 平涂的霓虹色 + 错开垫着的一版藏青 + 后半段一片网点；整块的那条弧透明着，只接手指，选中时垫一圈墨色；
+   任务的色块（.print，js/ui/sun.js 的 print()）= 平涂的霓虹色 + 错开垫着的一版藏青；整块的那条弧透明着，只接手指，选中时垫一圈墨色；
    最上面压两层颗粒（.sun-grain：深的一层正片叠底、白的一层滤色），是平铺的噪点图，用 mask 切成两圈的形状 */
 [data-theme="light"] .sun .trk.day { stroke: #D6D7DC; }
 [data-theme="light"] .sun .trk.night { stroke: #8B8E9B; }
@@ -956,7 +956,6 @@ body.phone .reading { padding: 0 2px 90px; }
 .sun .print path { fill: none; stroke-width: 18; }
 .sun .print .sh { stroke: #171C55; }
 .sun .print .ink { stroke: var(--c); }
-.sun .print .dots { opacity: .3; }
 [data-theme="light"] .sun .arc.lit + .print { opacity: 1; }
 [data-theme="light"] .sun .arc.live.lit + .print { animation: breathe 1.6s ease-in-out infinite; }
 .sun-grain { display: none; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; mix-blend-mode: multiply; opacity: .75;

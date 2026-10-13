@@ -773,19 +773,28 @@ body.phone .settings .page-head { margin-top: 4px; }
 ::view-transition-group(*) { animation-duration: .3s; animation-timing-function: var(--ease); }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .2s; }
 /* 白天夜里互换（html[data-vt="theme"]）：整页当一张图慢慢淡过去，底边泛一阵霞光（#dusk），迪斯科球变一会儿太阳 / 月亮（#orb，盖在球上）。
-   这两样只在过渡里出现一下就拿掉（js/motion.js）；动的都放在 ::before 上，元素本身不带效果，这样它们在过渡里照自己的节奏走，不跟着整页淡 */
+   这两样只在过渡里出现一下就拿掉（js/motion.js）；会动的（明暗、大小）都放在 ::before 上，元素本身不动，这样它们在过渡里照自己的节奏走，不跟着整页淡 */
 html[data-vt="theme"]::view-transition-old(root), html[data-vt="theme"]::view-transition-new(root) { animation-duration: 1.3s; animation-timing-function: ease; }
 html[data-vt="theme"] #dock, html[data-vt="theme"] #main .hero .meter .fill { view-transition-name: none; }
 ::view-transition-new(dusk), ::view-transition-new(orb) { animation: none; }
 #dusk { position: fixed; inset: auto 0 0; z-index: 44; height: 75vh; pointer-events: none; view-transition-name: dusk; }
-#dusk::before { content: ""; position: absolute; inset: 0; opacity: 0; background: radial-gradient(65% 100% at 50% 100%, rgba(255, 170, 0, .75), rgba(255, 62, 165, .5) 45%, transparent 76%); animation: dusk 1.5s ease both; }
+#dusk::before { content: ""; position: absolute; inset: 0; opacity: 0; animation: dusk 1.6s ease both; }
+/* 朝霞（进白天）是黄 → 橙 → 粉，晚霞（进夜里）是玫红 → 紫 → 蓝 */
+#dusk[data-k="dawn"]::before { background: radial-gradient(65% 100% at 50% 100%, rgba(255, 226, 89, .8), rgba(255, 150, 60, .55) 40%, rgba(255, 105, 150, .3) 62%, transparent 80%); }
+#dusk[data-k="dusk"]::before { background: radial-gradient(65% 100% at 50% 100%, rgba(255, 62, 165, .72), rgba(140, 60, 255, .5) 44%, rgba(47, 91, 255, .26) 64%, transparent 80%); }
 @keyframes dusk { 35% { opacity: 1; } 100% { opacity: 0; } }
+/* 太阳：黄 → 橙 → 粉 → 紫的渐变圆，下半截镂三道横纹；月亮：冰蓝的满月，几块淡淡的明暗，一圈蓝的光晕。原地淡入、停一会儿、淡出，不转不挪 */
 #orb { position: fixed; z-index: 45; width: 28px; height: 28px; margin: -14px 0 0 -14px; pointer-events: none; view-transition-name: orb; }
-#orb::before { content: ""; position: absolute; inset: 0; opacity: 0; background: center / contain no-repeat; animation: orb 2.3s ease both; }
-#orb[data-k="sun"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-14 -14 28 28'%3E%3Cg stroke='%230B0B0B' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M0-9.6V-12.6M0 9.6V12.6M-9.6 0H-12.6M9.6 0H12.6M6.8-6.8L8.9-8.9M-6.8 6.8L-8.9 8.9M6.8 6.8L8.9 8.9M-6.8-6.8L-8.9-8.9'/%3E%3Ccircle r='6' fill='%230B0B0B' transform='translate(1.2 1.2)'/%3E%3Ccircle r='6' fill='%23FFD400'/%3E%3C/g%3E%3C/svg%3E"); }
-#orb[data-k="moon"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-14 -14 28 28'%3E%3Cpath d='M3-10A10.5 10.5 0 1 0 10 5A8 8 0 1 1 3-10Z' fill='%23F4FFC2'/%3E%3C/svg%3E"); filter: drop-shadow(0 0 5px rgba(204, 255, 0, .7)) drop-shadow(0 0 10px rgba(255, 43, 214, .45)); }
-@keyframes orb { 0% { opacity: 0; transform: scale(.5) rotate(-60deg); } 18%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; transform: scale(.5) rotate(40deg); } }
-.ball { transition: opacity .3s; }
+#orb::before { content: ""; position: absolute; inset: 0; border-radius: 50%; opacity: 0; animation: orb 2.6s ease both; }
+#orb[data-k="sun"] { filter: drop-shadow(0 0 4px rgba(255, 120, 90, .6)); }
+#orb[data-k="sun"]::before { background: linear-gradient(180deg, #FFD84A, #FF9F3D 34%, #FF4F8B 68%, #C24BD6);
+  -webkit-mask: linear-gradient(#000 0 56%, transparent 56% 60%, #000 60% 70%, transparent 70% 75.5%, #000 75.5% 84%, transparent 84% 91%, #000 91%);
+  mask: linear-gradient(#000 0 56%, transparent 56% 60%, #000 60% 70%, transparent 70% 75.5%, #000 75.5% 84%, transparent 84% 91%, #000 91%); }
+#orb[data-k="moon"] { filter: drop-shadow(0 0 4px rgba(120, 225, 255, .9)) drop-shadow(0 0 11px rgba(70, 130, 255, .6)); }
+#orb[data-k="moon"]::before { background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, .55) 0 9%, transparent 22%), radial-gradient(circle at 66% 40%, rgba(30, 110, 220, .28) 0 12%, transparent 24%),
+  radial-gradient(circle at 40% 70%, rgba(30, 110, 220, .22) 0 14%, transparent 28%), radial-gradient(circle at 38% 34%, #F4FFFF, #BFF4FF 38%, #62CEFF 72%, #3393EA); }
+@keyframes orb { 0% { opacity: 0; transform: scale(.86); } 24%, 76% { opacity: 1; transform: none; } 100% { opacity: 0; transform: scale(.94); } }
+.ball { transition: opacity .55s ease; }
 html[data-orb] .ball { opacity: 0; }
 #dock { view-transition-name: dock; }
 #main .hero .meter .fill { view-transition-name: meter; }

@@ -133,7 +133,7 @@ function frame() {
   const vt = document.startViewTransition(() => {
     draw();
     if (!rows) nameParts(main, false);
-    if (kind === "theme") { dusk(); orb(html.dataset.theme === "dark"); }
+    if (kind === "theme") { const dark = html.dataset.theme === "dark"; dusk(dark); orb(dark); }
   });
   vt.ready.catch(() => {});   // 页面在后台时过渡会被取消，不算错
   vt.finished.finally(() => {

@@ -16,7 +16,7 @@ export function takeTransition() {
 }
 
 // 白天夜里互换的那一下（kind "theme"，整页慢慢淡过去），另外放两样，样子都在 css 里：
-// 底边泛一阵霞光（#dusk，朝霞 / 晚霞两种颜色）；迪斯科球原地淡成一会儿太阳（进白天）/ 月亮（进夜里）再淡回来——#orb 盖在球上，
+// 底边泛一阵霞光（#dusk，朝霞 / 晚霞两种颜色）；迪斯科球原地淡成一会儿太阳（进白天）/ 月亮（进夜里）再淡回来（淡入时往上升一小下）——#orb 盖在球上，
 // html[data-orb] 让球先隐着（这中间页面重画换了新的球，也照样隐着）。屏幕上没有球就只有霞光
 const once = (id) => {
   document.getElementById(id)?.remove();

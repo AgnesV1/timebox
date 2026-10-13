@@ -15,6 +15,38 @@ export function takeTransition() {
   return document.startViewTransition && !reduce.matches ? k : "";
 }
 
+// 白天夜里互换的那一下（kind "theme"，整页慢慢淡过去），另外放两样，样子都在 css 里：
+// 底边泛一阵霞光（#dusk）；迪斯科球原地变一会儿太阳（进白天）/ 月亮（进夜里）再变回来——#orb 盖在球上，
+// html[data-orb] 让球先隐着（这中间页面重画换了新的球，也照样隐着）。屏幕上没有球就只有霞光
+const once = (id) => {
+  document.getElementById(id)?.remove();
+  const el = document.createElement("i");
+  el.id = id;
+  el.setAttribute("aria-hidden", "true");
+  return el;
+};
+
+export function dusk() {
+  const el = once("dusk");
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1700);
+}
+
+export function orb(dark) {
+  const html = document.documentElement, el = once("orb");
+  const ball = [...document.querySelectorAll(".ball")].find((b) => b.offsetWidth);
+  if (!ball) { delete html.dataset.orb; return; }
+  const r = ball.getBoundingClientRect();
+  el.dataset.k = dark ? "moon" : "sun";
+  el.style.left = r.left + r.width / 2 + "px";
+  el.style.top = r.top + r.height / 2 + "px";
+  html.dataset.orb = "1";
+  document.body.appendChild(el);
+  // 太阳 / 月亮开始淡的时候球就回来；自己播完再拿掉（中途又换了一次的，由新的那个管）
+  setTimeout(() => { if (el.isConnected) delete html.dataset.orb; }, 1850);
+  setTimeout(() => el.remove(), 2400);
+}
+
 // 过渡里每一行单独挪动：给行起名字（安全线进度条、浮条的名字写在 CSS 里）；换页、翻天时整块动，先把名字摘掉
 export function nameParts(root, on) {
   root.querySelectorAll(".row[data-id]").forEach((r) => { r.style.viewTransitionName = on ? "r-" + r.dataset.id.replace(/[^\w-]/g, "_") : ""; });

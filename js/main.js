@@ -25,7 +25,7 @@ import { readingHTML, initReading } from "./ui/reading.js";
 import { mealsHTML, shopHTML, initMeals, refreshMealEditor, mealDrop } from "./ui/meals.js";
 import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/friends.js";
 import { renderSun, initSun } from "./ui/sun.js";
-import { animateNext, takeTransition, nameParts } from "./motion.js";
+import { animateNext, takeTransition, nameParts, dusk, orb } from "./motion.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
@@ -42,13 +42,25 @@ function route() {
   return v;
 }
 
+// 白天夜里真的互换的那一下带一段过场（js/motion.js 的 dusk / orb）：先记着要换成什么，等下一次重画在过渡里一起换（draw 开头）。
+// 刚打开、设置里关了动效、页面在后台：直接换
+let themePaint = null, booted = false;
 function applyTheme() {
   const t = store.local().theme;
   const dark = t === "dark" || (t === "auto" && darkMQ.matches);
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0C0C13" : "#FFFFFF");
-  paintPatterns();
-  refreshFxColors();
+  const html = document.documentElement;
+  const paint = () => {
+    html.dataset.theme = dark ? "dark" : "light";
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0C0C13" : "#FFFFFF");
+    paintPatterns();
+    refreshFxColors();
+  };
+  const turning = (html.dataset.theme === "dark") !== dark;
+  if (booted && turning && store.local().fx !== false && document.visibilityState === "visible") {
+    themePaint = paint;
+    animateNext("theme");
+    render();
+  } else { themePaint = null; paint(); }
 }
 
 // ---------- 侧栏（电脑） ----------
@@ -110,7 +122,11 @@ function frame() {
   const html = document.documentElement, rows = kind === "on";
   html.dataset.vt = kind;
   if (!rows) nameParts(main, false);
-  const vt = document.startViewTransition(() => { draw(); if (!rows) nameParts(main, false); });
+  const vt = document.startViewTransition(() => {
+    draw();
+    if (!rows) nameParts(main, false);
+    if (kind === "theme") { dusk(); orb(html.dataset.theme === "dark"); }
+  });
   vt.ready.catch(() => {});   // 页面在后台时过渡会被取消，不算错
   vt.finished.finally(() => {
     if (html.dataset.vt === kind) delete html.dataset.vt;
@@ -119,6 +135,7 @@ function frame() {
 }
 
 function draw() {
+  if (themePaint) { themePaint(); themePaint = null; }
   const c = store.ctx();
   const phone = phoneMQ.matches;
   const view = route();
@@ -210,6 +227,7 @@ function tickDay() {
 // ---------- 启动 ----------
 
 applyTheme();
+booted = true;
 initFx();
 setFx(store.local().fx !== false);
 initModal();

@@ -416,6 +416,14 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
 .pi .g { width: 7px; height: 12px; flex-shrink: 0; opacity: .5; background: radial-gradient(circle, var(--muted) 1.1px, transparent 1.4px) 0 0/3.5px 4px; }
 .pi span { flex: 1; min-width: 0; }
 .pi b { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+/* 任务池里的 Ideas：有日子、还没排的灵感，只列字（不是能拖的色块）；鼠标停着的那行才露出 +（放到那天） */
+.idea-due ul { margin: 0; padding: 0; list-style: none; }
+.idea-due li { display: flex; align-items: baseline; gap: 7px; padding: 4px 2px 4px 18px; font-size: 13px; line-height: 1.35; }
+.idea-due-t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.idea-due em { flex-shrink: 0; font: 500 11.5px var(--num); font-style: normal; color: var(--muted); white-space: nowrap; }
+.idea-due button { flex-shrink: 0; align-self: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 6px; background: var(--surface); font: 700 14px/18px var(--body); color: var(--ink); opacity: 0; }
+.idea-due li:hover button, .idea-due button:focus-visible { opacity: 1; }
+.idea-due button:hover { background: var(--accent); color: var(--accent-ink); }
 .pool-hint { margin-top: 18px; font-size: 12px; color: var(--muted); }
 .forecast { margin-top: 22px; }
 .forecast h4 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }

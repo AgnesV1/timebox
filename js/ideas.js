@@ -55,11 +55,20 @@ export function board(ideas, taskOf, today) {
   return { groups, open: rows.filter((r) => r.state !== "planned").length };
 }
 
-// 快到日子、还没排的：今天起 days 天以内（过了的不算），近的在前
+// 有日子、还没过（今天也算）、还没排的，近的在前（日历的任务池里列的就是这些；过了日子的不列，不催）
+export function upcoming(ideas, taskOf, today) {
+  return ideas.filter((i) => i.date && i.date >= today && stateOf(i, taskOf, today) === "open").sort(byDate);
+}
+
+// 快到日子、还没排的：今天起 days 天以内，近的在前
 export function soon(ideas, taskOf, today, days = 7) {
   const until = addDays(today, days);
-  return ideas.filter((i) => i.date && i.date >= today && i.date <= until && stateOf(i, taskOf, today) === "open").sort(byDate);
+  return upcoming(ideas, taskOf, today).filter((i) => i.date <= until);
 }
+
+// 放到某天时默认占多久（分钟）：出门算大半天，吃一顿算半天，还没归类的先按一小时
+const EST = { out: 360, eat: 180, "": 60 };
+export const defaultEst = (idea) => EST[kindOf(idea)];
 
 // 加任务时能挑的：还在池子里的；打了字就只要对得上的。有日子的在前，过了日子的在最后
 export function match(ideas, taskOf, today, query = "", limit = 6) {

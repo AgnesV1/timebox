@@ -7,7 +7,7 @@ import * as store from "../store.js";
 import * as I from "../ideas.js";
 import * as GR from "../groups.js";
 import { esc, on } from "../dom.js";
-import { fmtShort, weekday, WEEKDAYS } from "../dates.js";
+import { fmtShort, fmtMin, weekday, WEEKDAYS } from "../dates.js";
 import { toast } from "./common.js";
 
 let kind = "";          // 加的那一格选着的类别
@@ -22,8 +22,17 @@ const dayText = (d) => WEEKDAYS[weekday(d)] + " " + fmtShort(d);
 const chip = (act, v, label, cur) => '<button type="button" class="chip' + (cur ? " on" : "") + '" data-act="' + act + '" data-v="' + v + '" aria-pressed="' + cur + '">' + label + "</button>";
 const kindChips = (act, cur) => '<span class="idea-kinds">' + I.KINDS.map(([k, l]) => chip(act, k, l, cur === k)).join("") + "</span>";
 const bySeg = (act, cur) => '<span class="seg">' + [["on", "On"], ["by", "By"]].map(([v, l]) => '<button type="button" data-act="' + act + '" data-v="' + v + '"' + ((v === "by") === Boolean(cur) ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
-// 能挑灵感的大类：Plan 的时候放进哪个
+// 能挑灵感的大类：Plan 的时候放进哪个；没另外选就是 Leisure（没有这个名字的话，第一个）
 const homes = () => store.groups().filter(GR.ideasOf);
+const home = () => { const list = homes(); return (list.find((g) => g.name === "Leisure") || list[0])?.name || ""; };
+
+// 放到某天：建一条任务、挂上，算一次改动（提示条上能撤销）。Ideas 页的 Plan、日历任务池里的 Add 都走这里
+function planIdea(idea, { date, group = home(), est = I.defaultEst(idea) }) {
+  store.change(() => {
+    const task = store.addTask({ date, title: idea.text, est: Math.max(5, Number(est) || I.defaultEst(idea)), group });
+    store.pickIdea(idea.id, task);
+  }, "On " + dayText(date));
+}
 
 function addHTML() {
   return '<form class="idea-add" autocomplete="off">' +
@@ -33,13 +42,13 @@ function addHTML() {
     '<button class="btn cta" type="submit">Add</button></form>';
 }
 
-// 放到哪天：日子（它自己有日子、还没过就用那天）、哪个大类、多少分钟
+// 放到哪天：日子（它自己有日子、还没过就用那天）、哪个大类（先选着 Leisure）、多少分钟（按类别：出门 6 小时、吃 3 小时）
 function planHTML(idea) {
-  const T = store.today(), list = homes();
+  const T = store.today(), list = homes(), cur = home();
   return '<form class="idea-plan"><input type="date" name="date" value="' + (idea.date && idea.date >= T ? idea.date : T) + '" aria-label="Day">' +
-    (list.length > 1 ? '<select name="group" aria-label="Project">' + list.map((g) => '<option value="' + esc(g.name) + '">' + esc(g.name) + "</option>").join("") + "</select>"
-      : '<input type="hidden" name="group" value="' + esc(list[0]?.name || "") + '">') +
-    '<label><input class="num" type="number" name="est" value="60" min="5" step="5" aria-label="Minutes"> min</label>' +
+    (list.length > 1 ? '<select name="group" aria-label="Project">' + list.map((g) => '<option value="' + esc(g.name) + '"' + (g.name === cur ? " selected" : "") + ">" + esc(g.name) + "</option>").join("") + "</select>"
+      : '<input type="hidden" name="group" value="' + esc(cur) + '">') +
+    '<label><input class="num" type="number" name="est" value="' + I.defaultEst(idea) + '" min="5" step="5" aria-label="Minutes"> min</label>' +
     '<button class="btn" type="submit">Add to that day</button><button type="button" class="link" data-act="idea-plan-x">Cancel</button></form>';
 }
 
@@ -63,6 +72,16 @@ function rowHTML({ idea, state, day }) {
     (I.kindOf(idea) || state === "planned" ? "" : kindChips("idea-sort", "")) +
     '<span class="idea-acts">' + (state === "planned" ? '<button type="button" class="link" data-act="idea-back">Put back</button>' : '<button type="button" class="link" data-act="idea-plan">Plan</button>') + "</span>" +
     (planning === idea.id ? planHTML(idea) : "") + "</li>";
+}
+
+// 日历任务池里的一小节：有日子、还没排的灵感，只把字列出来——不生成任务，也不算进要排的时长。
+// 鼠标停着的那行露出一个 + = 放到它自己的那天（by 的放在最后那天，之后照常在日历上拖），Leisure，时长按类别
+export function ideasPoolHTML(c) {
+  const list = I.upcoming(store.ideas(), taskOf, c.today), g = store.groupByName(home());
+  if (!list.length) return "";
+  return '<section class="pg idea-due"><div class="pg-head" style="--pc:' + esc(g?.color || "var(--c-None)") + '"><i></i><span>Ideas</span></div><ul>' + list.map((i) =>
+    '<li data-idea="' + esc(i.id) + '"><span class="idea-due-t">' + esc(i.text) + "</span><em>" + esc(I.whenText(i)) + "</em>" +
+    '<button type="button" data-act="idea-to-day" title="' + esc("Add to " + dayText(i.date) + " · " + home() + " · " + fmtMin(I.defaultEst(i))) + '" aria-label="' + esc("Add to " + dayText(i.date)) + '">+</button></li>').join("") + "</ul></section>";
 }
 
 export function ideasHTML(c) {
@@ -131,9 +150,11 @@ export function initIdeas(rerender) {
     e.preventDefault();
     const idea = store.ideaOf(form.closest("[data-idea]").dataset.idea), date = form.date.value;
     if (!idea || !date) return;
-    const task = store.addTask({ date, title: idea.text, est: Math.max(5, Number(form.est.value) || 60), group: form.group.value });
-    store.pickIdea(idea.id, task);
     planning = "";
-    toast("On " + dayText(date));
+    planIdea(idea, { date, group: form.group.value, est: form.est.value });
+  });
+  on(document, "click", ".idea-due [data-act=idea-to-day]", (e, el) => {
+    const idea = store.ideaOf(el.closest("[data-idea]").dataset.idea);
+    if (idea?.date) planIdea(idea, { date: idea.date });
   });
 }

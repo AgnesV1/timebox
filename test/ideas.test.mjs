@@ -60,6 +60,20 @@ test("soon: dated, within a week, not planned yet", () => {
   assert.deepEqual(I.soon(list, of, T).map((i) => i.text), ["today", "sat"]);
 });
 
+test("upcoming: every dated idea still ahead, nearest first — past ones are left out", () => {
+  const of = tasks([{ id: "a", date: "2026-10-20", status: "" }]);
+  const list = [idea({ text: "far", date: "2027-03-01" }), idea({ text: "past", date: "2026-10-01" }), idea({ text: "today", date: T }), idea({ text: "by", date: "2026-11-02", by: true }),
+    idea({ text: "planned", date: "2026-10-20", taskId: "a" }), idea({ text: "undated" })];
+  assert.deepEqual(I.upcoming(list, of, T).map((i) => i.text), ["today", "by", "far"]);
+});
+
+test("how long an idea takes by default when it's put on a day", () => {
+  assert.equal(I.defaultEst(idea({ text: "x", kind: "out" })), 360);
+  assert.equal(I.defaultEst(idea({ text: "x", kind: "eat" })), 180);
+  assert.equal(I.defaultEst(idea({ text: "x" })), 60);
+  assert.equal(I.defaultEst(idea({ text: "x", kind: "something else" })), 60);
+});
+
 test("match: what you can pick while adding a task", () => {
   const of = tasks([{ id: "p", date: "2026-10-14", status: "" }, { id: "z", date: "2026-10-01", status: "done" }]);
   const list = [idea({ text: "Pho place", order: 1 }), idea({ text: "Photo walk", date: "2026-10-20", order: 2 }), idea({ text: "Phantom show", taskId: "p" }),

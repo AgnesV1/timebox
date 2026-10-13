@@ -1325,6 +1325,10 @@ body.phone .mcoming { margin-top: 10px; padding: 10px 12px; }
 .goals .gtag { field-sizing: content; max-width: 92px; padding: 0 7px 0 9px; border: 0; border-radius: 999px; background: var(--surface); box-shadow: inset 3px 0 0 var(--pc); font-size: 10.5px; font-weight: 600; line-height: 18px; }
 .goals .gtag.none { padding-left: 7px; box-shadow: none; color: var(--muted); opacity: 0; }
 .gl:hover .gtag.none, .goals .gtag.none:focus, .goals .gtag.none.open { opacity: 1; }
+/* 项目的标签压成一个色点（名字在 title 里，点它照旧弹出下拉）；还没标签的是一个悬停才出现的空心点。自己写的标签（没有颜色）照旧是字 */
+.goals .gtag.dot, .goals .gtag.none { field-sizing: fixed; flex-shrink: 0; width: 12px; height: 12px; min-height: 0; padding: 0; border-radius: 50%; font-size: 0; line-height: 0; color: transparent; cursor: pointer; }
+.goals .gtag.dot { background: var(--pc); box-shadow: 0 0 0 1.5px var(--edge); }
+.goals .gtag.none { background: transparent; box-shadow: inset 0 0 0 1.5px var(--muted); }
 .gdue { padding: 0 1px; border: 0; background: none; font: 600 11px var(--num); color: var(--muted); white-space: nowrap; }
 .gdue:hover { color: var(--ink); text-decoration: underline; }
 .gl.late .gdue { color: var(--warn); }

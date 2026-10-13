@@ -1,5 +1,5 @@
 // 目标板（Projects 页最上面，电脑）：这个月 / 这个季度 / 下个季度 / 今年，下面一排是今年之后的五年。
-// 每条一行：勾、文字、标签、哪个月。点文字改字（「文字 #标签」一起改），点月份改年月（做完了的改的是实际做完的年月），
+// 每条一行：勾、文字、标签（项目的标签是一个色点）、哪个月。点文字改字（「文字 #标签」一起改），点月份改年月（做完了的改的是实际做完的年月），
 // 每栏底下一格直接加。栏目跟着今天走，过期没做完的自己滚到当前那栏，见 js/goals.js。
 
 import * as store from "../store.js";
@@ -43,7 +43,9 @@ function rowHTML(x, T, tags, colors) {
     ? '<input class="gt-in" data-g="text" data-keep="goal-' + id + '" value="' + esc(g.text + (tag ? " #" + tag : "")) + '" aria-label="Goal">'
     : '<button type="button" class="gt" data-act="g-text" title="' + esc(g.text) + '">' + esc(g.text) + "</button>";
   const opts = tags.some((t) => low(t) === low(tag)) || !tag ? tags : [...tags, tag];
-  const tagSel = '<select class="gtag' + (tag ? "" : " none") + '" data-g="tag" aria-label="Tag" style="--pc:' + esc(colors[low(tag)] || "var(--c-None)") + '"><option value="">' + (tag ? "No tag" : "+ tag") + "</option>" +
+  // 标签和某个项目同名：只画一个色点（那个项目的颜色），名字放在 title 里——栏很窄，字要留给目标本身；自己写的标签没有颜色，照旧显示字
+  const hue = colors[low(tag)];
+  const tagSel = '<select class="gtag' + (tag ? (hue ? " dot" : "") : " none") + '" data-g="tag" aria-label="' + esc(tag ? "Tag: " + tag : "Tag") + '" title="' + esc(tag || "Add a tag") + '" style="--pc:' + esc(hue || "var(--c-None)") + '"><option value="">' + (tag ? "No tag" : "+ tag") + "</option>" +
     opts.map((t) => '<option value="' + esc(t) + '"' + (low(t) === low(tag) ? " selected" : "") + (colors[low(t)] ? ' data-color="' + esc(colors[low(t)]) + '"' : "") + ">" + esc(t) + "</option>").join("") + "</select>";
   const when = field === "when" ? whenEditHTML(g, T)
     : '<button type="button" class="gdue" data-act="g-when" title="' + (x.done ? "Finished — click to change" : x.late ? "Was due — click to change" : "Due — click to change") + '">' + (x.done ? "✓ " : "") + esc(x.when) + "</button>";

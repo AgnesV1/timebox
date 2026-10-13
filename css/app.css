@@ -687,6 +687,24 @@ body.phone .settings .page-head { margin-top: 4px; }
 .pie svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .slice { fill: none; stroke-width: 15; cursor: default; transition: stroke-width .15s; }
 .slice.hot { stroke-width: 18; }
+/* 项目那几片和圆盘上的色块一个画法：--c 是项目颜色的霓虹版（没有霓虹版的调亮）；白天底下垫一版错开的藏青（.slice-sh），夜里发光 */
+.slice.ink { stroke: var(--c); }
+.slice.ink.boost { stroke: oklch(from var(--c) calc(l + .12) calc(c * 1.9) h); }
+.slice-sh { display: none; fill: none; stroke: #171C55; stroke-width: 15; pointer-events: none; }
+[data-theme="light"] .slice-sh { display: inline; }
+[data-theme="dark"] .slice.ink { filter: drop-shadow(0 0 2.2px var(--c)); }
+.pie[data-act] { cursor: zoom-in; }
+.pie-head .pie-zoom { flex-shrink: 0; margin: -4px -4px 0 0; }
+.pie-head .pie-zoom .ic { width: 17px; height: 17px; }
+/* 放大：铺满整个窗口（卡片还在 .stats 里，鼠标读数、两个切换、Adjust 照常用）。Esc、右上角、再点一下饼图都收回去 */
+.stats .piecard.pie-full { position: fixed; inset: 0; z-index: 43; display: flex; flex-direction: column; margin: 0; padding: 22px clamp(18px, 4vw, 56px) 28px; border: 0; border-radius: 0; box-shadow: none; overflow: auto; overscroll-behavior: contain; }
+.piecard.pie-full .pie[data-act] { cursor: zoom-out; }
+.piecard.pie-full .pie-wrap { flex: 1; grid-template-columns: minmax(0, min(70vh, 46vw)) minmax(0, 440px); justify-content: center; gap: clamp(20px, 5vw, 72px); }
+.piecard.pie-full .pie-c { font-size: 15px; }
+.piecard.pie-full .pie-c b { font-size: clamp(24px, 4vh, 38px); }
+.piecard.pie-full .pie-legend { gap: 10px; font-size: 15px; }
+.piecard.pie-full .pie-legend li { grid-template-columns: 14px minmax(0, 1fr) auto 50px; gap: 10px; }
+.piecard.pie-full .pie-legend i { width: 14px; height: 14px; border-radius: 4px; }
 .dring { fill: none; stroke: var(--ink); stroke-width: 3; pointer-events: none; }
 .pie-c { position: absolute; top: 50%; left: 50%; display: grid; justify-items: center; width: 56%; transform: translate(-50%, -50%); text-align: center; font-size: 11.5px; line-height: 1.35; color: var(--muted); pointer-events: none; }
 .pie-c b { font-size: 16px; line-height: 1.15; letter-spacing: -.02em; color: var(--ink); }
@@ -1536,6 +1554,7 @@ select.open { border-color: var(--edge); }
 [data-theme="light"] .bar, [data-theme="light"] .pj::before, [data-theme="light"] .pdot { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .22); }
 [data-theme="light"] .ev { box-shadow: inset 3px 0 0 var(--c), inset 4px 0 0 rgba(0, 0, 0, .08); }
 [data-theme="light"] .pie .slice { filter: drop-shadow(0 0 .35px rgba(0, 0, 0, .55)); }
+[data-theme="light"] .pie-legend i { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .22); }
 
 /* ---------- 灵感池（Projects 页的 Ideas）；加任务框底下的候选（.idea-pick）。这一段的类名都以 idea- 开头 ---------- */
 .idea-page { max-width: 760px; }

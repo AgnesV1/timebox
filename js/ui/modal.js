@@ -23,6 +23,10 @@ export function closeModal() {
   fn?.();
 }
 
+// 焦点正在弹层里的某个日期框上：这时候把它所在的编辑框整块重画，分段输入（月 / 日 / 年）会跳回第一段、没填完的还会被清掉。
+// 各个编辑框重画前先问这一句，是就先不画；它失去焦点后 main.js 补画一次
+export const fillingDate = () => { const a = document.activeElement; return a?.type === "date" && Boolean(a.closest("#modal")); };
+
 export function modalSheet() {
   const box = document.getElementById("modal");
   return box.hidden ? null : box.querySelector(".sheet");

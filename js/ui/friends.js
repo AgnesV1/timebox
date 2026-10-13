@@ -12,7 +12,7 @@ import * as F from "../friends.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtShort, MONTHS } from "../dates.js";
 import { toast } from "./common.js";
-import { openModal, closeModal, modalSheet } from "./modal.js";
+import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
 
 let q = "";                 // 搜索
 let where = [];             // 筛选条件 [{ field, value }]
@@ -254,6 +254,7 @@ export function refreshFriendEditor(force = false) {
   if (!editing || !box) return;
   const html = editorHTML();
   if (!html) return closeModal();
+  if (fillingDate()) return;
   const a = document.activeElement;
   if (!force && sheet.contains(a) && a.matches("input:not([type=date]):not([type=checkbox]), textarea")) return;
   const scroll = sheet.scrollTop;

@@ -5,7 +5,7 @@ import * as store from "./store.js";
 import * as sync from "./sync.js";
 import * as reading from "./reading.js";
 import * as Meal from "./meals.js";
-import { esc, on, icon } from "./dom.js";
+import { esc, on, icon, initDateTyping } from "./dom.js";
 import { paintPatterns } from "./patterns.js";
 import { initFx, setFx, burst, confetti, refreshFxColors } from "./fx.js";
 import { toast, lineInfo } from "./ui/common.js";
@@ -86,18 +86,25 @@ function sidebarHTML(c, view) {
 
 // ---------- 整页重画（正在打字的输入框，值、光标都留住） ----------
 
+// 重画前后留住正在填的东西（带 data-keep 的输入框）：页面、任务池，还有弹层——日历里点开某一天的那块也是整块重画的。
+// 记的时候带上它在哪一块里（main / pool / modal），同一个名字在两块里各算各的
+const KEEP_IN = ["main", "pool", "modal"];
+const keepRoot = (el) => el?.closest?.(KEEP_IN.map((id) => "#" + id).join(","))?.id || "";
 function captureKeep() {
   const keep = {};
-  document.querySelectorAll("#main [data-keep], #pool [data-keep]").forEach((el) => {
-    keep[el.dataset.keep] = { value: el.value, checked: el.checked, start: el.selectionStart, end: el.selectionEnd };
-  });
+  for (const id of KEEP_IN) {
+    document.querySelectorAll("#" + id + " [data-keep]").forEach((el) => {
+      keep[id + "|" + el.dataset.keep] = { value: el.value, checked: el.checked, start: el.selectionStart, end: el.selectionEnd };
+    });
+  }
   const a = document.activeElement;
-  return { keep, active: a?.dataset?.keep && a.closest("#main, #pool") ? a.dataset.keep : "" };
+  return { keep, active: a?.dataset?.keep && keepRoot(a) ? keepRoot(a) + "|" + a.dataset.keep : "" };
 }
 
 function restoreKeep({ keep, active }) {
   for (const [k, v] of Object.entries(keep)) {
-    const el = document.querySelector('#main [data-keep="' + k + '"], #pool [data-keep="' + k + '"]');
+    const cut = k.indexOf("|");
+    const el = document.querySelector("#" + k.slice(0, cut) + ' [data-keep="' + k.slice(cut + 1) + '"]');
     if (!el) continue;
     if (el.type === "checkbox") { el.checked = Boolean(v.checked); continue; }
     if (el.value !== v.value) el.value = v.value;
@@ -162,13 +169,13 @@ function draw() {
   renderSun(c, view === "today" && (!phone || store.local().url) ? shownDate() : "");
   underSun();
   tick();
-  restoreKeep(kept);
   paintSync();
   refreshEditor();
   refreshDayModal();
   refreshProjectEditor();
   refreshMealEditor();
   refreshFriendEditor();
+  restoreKeep(kept);   // 弹层也画完了再放回去
   celebrate(c, view);
 }
 
@@ -228,6 +235,7 @@ function tickDay() {
 
 applyTheme();
 booted = true;
+initDateTyping();
 initFx();
 setFx(store.local().fx !== false);
 initModal();
@@ -259,6 +267,8 @@ reading.subscribe(() => { if (route() === "reading") render(); });
 sync.onStatus(paintSync);
 
 addEventListener("hashchange", () => { closeModal(); animateNext("page"); render(); scrollTo(0, 0); });
+// 弹层里的日期框填完、离开了：填的时候没重画的编辑框（js/ui/modal.js 的 fillingDate）这时补画一次
+on(document, "focusout", "#modal input[type=date]", () => setTimeout(render, 0));
 phoneMQ.addEventListener("change", render);
 darkMQ.addEventListener("change", () => { if (store.local().theme === "auto") { applyTheme(); render(); } });
 document.addEventListener("visibilitychange", () => {

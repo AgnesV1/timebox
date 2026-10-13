@@ -15,7 +15,7 @@ import * as M from "../meals.js";
 import { esc, on, icon } from "../dom.js";
 import { addDays, diffDays, fmtDay, fmtShort, startOfWeek, weekday, WEEKDAYS } from "../dates.js";
 import { toast } from "./common.js";
-import { openModal, closeModal, modalSheet } from "./modal.js";
+import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
 
 let editing = null;   // 编辑框：{ kind: ing / box / day / prefs, id, draft, date }
 let saleFor = "";     // 打折卡片里正在填打折价的那样
@@ -523,6 +523,7 @@ export function refreshMealEditor() {
   const box = modalSheet()?.querySelector(".meal-editor");
   if (!box || !editing || editing.kind === "import") return;   // 导入框里贴着的东西别冲掉
   if (ROWS.includes(editing.kind) && !rowOf(store.meals())) { closeModal(); return; }
+  if (fillingDate()) return;
   const a = document.activeElement;
   const key = a && box.contains(a) ? keyOf(a) : "";
   const keep = key && (a.tagName === "INPUT" || a.tagName === "TEXTAREA") && a.type !== "checkbox" ? { value: a.value, s: a.selectionStart, e: a.selectionEnd } : null;
@@ -719,6 +720,7 @@ export function initMeals(rerender) {
     const f = el.dataset.f, row = rowOf(store.meals());
     if (!row) return;
     let v = el.type === "checkbox" ? el.checked : el.value;
+    if (el.type === "date" && v && v < "1000") return;   // 年份还没打完（0002-…）
     if (f === "price") v = Math.max(0, Number(v) || 0);
     if (f === "lasts" || f === "n") v = Math.max(0, Math.round(Number(v) || 0)) || "";
     if (f === "name" || f === "store") v = String(v).trim();

@@ -19,7 +19,7 @@ import * as GR from "../groups.js";
 import { esc, on, icon } from "../dom.js";
 import { addDays, diffDays, fmtShort, fmtMin, WEEKDAYS } from "../dates.js";
 import { healthPill, groupsOf } from "./common.js";
-import { openModal, closeModal, modalSheet } from "./modal.js";
+import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
 import { goalsHTML } from "./goals.js";
 import { ideasHTML } from "./ideas.js";
 
@@ -318,6 +318,7 @@ export function refreshProjectEditor(force = false) {
   if (!editing || !sheet?.querySelector(".project-editor")) return;
   const p = store.get("projects", editing);
   if (!p) return closeModal();
+  if (fillingDate()) return;
   const a = document.activeElement;
   if (!force && sheet.contains(a) && a.matches("input:not([type]),input[type=text],input[type=number],textarea")) return;
   const scroll = sheet.scrollTop;

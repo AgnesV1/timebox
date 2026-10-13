@@ -64,8 +64,16 @@ function open(sel) {
   setActive(el.querySelector(".mi.on:not(.off)") || items()[0]);
   if (search) el.querySelector(".ms").focus({ preventScroll: true });
   else sel.focus({ preventScroll: true });
-  // 页面重画把这个 <select> 换掉了：这块也收起来
-  cur.watch = new MutationObserver(() => { if (cur && !cur.sel.isConnected) close(); });
+  // 页面重画把这个 <select> 换掉了：带 data-keep 的（重画前后是同一格、选项也没变）接到新的那个上，这块留着；别的收起来
+  cur.watch = new MutationObserver(() => {
+    if (!cur || cur.sel.isConnected) return;
+    const k = cur.sel.dataset.keep;
+    const next = k ? [...document.querySelectorAll("select[data-keep]")].find((x) => x.dataset.keep === k && usable(x)) : null;
+    if (!next || optionsOf(next).length !== optionsOf(cur.sel).length) { close(); return; }
+    cur.sel = next;
+    next.classList.add("open");
+    place();
+  });
   cur.watch.observe(document.body, { childList: true, subtree: true });
 }
 
@@ -77,9 +85,16 @@ export function close() {
   cur = null;
 }
 
+// 收起来、焦点还给 <select>：先还焦点再收。有的 <select> 只在它那个表单里有焦点（或这块开着）时才显示（加任务那一排），
+// 带搜索框的时候焦点在这块里：先收的话，那一排跟着藏起来，焦点就还不回去了
+function closeTo(sel) {
+  sel.focus({ preventScroll: true });
+  close();
+}
+
 function choose(item) {
   const sel = cur.sel, o = optionsOf(sel)[Number(item.dataset.i)];
-  close();
+  closeTo(sel);
   if (!o || o.disabled) return;
   if (sel.value !== o.value || !o.selected) {
     sel.value = o.value;
@@ -112,7 +127,7 @@ export function initSelect() {
     const sel = e.target.closest?.("select");
     if (sel && e.button === 0 && usable(sel)) {
       e.preventDefault();
-      if (cur?.sel === sel) { close(); sel.focus({ preventScroll: true }); }
+      if (cur?.sel === sel) closeTo(sel);
       else open(sel);
       return;
     }
@@ -126,7 +141,7 @@ export function initSelect() {
       return;
     }
     const typing = e.target.classList?.contains("ms");
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); const sel = cur.sel; close(); sel.focus({ preventScroll: true }); }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeTo(cur.sel); }
     else if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); move(e.key === "ArrowDown" ? 1 : -1); }
     else if (e.key === "Home" && !typing) { e.preventDefault(); setActive(items()[0]); }
     else if (e.key === "End" && !typing) { e.preventDefault(); setActive(items().pop()); }

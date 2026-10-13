@@ -144,9 +144,7 @@ function forecastHTML(c) {
 export function refreshDayModal() {
   const view = document.querySelector("#modal .dayview");
   if (!openDay || !view) return;
-  const keep = document.activeElement?.dataset?.keep;
-  view.outerHTML = dayModalHTML(store.ctx(), openDay);
-  if (keep) document.querySelector('#modal [data-keep="' + keep + '"]')?.focus();
+  view.outerHTML = dayModalHTML(store.ctx(), openDay);   // 正在填的那几格、焦点，由 main.js 的 restoreKeep 放回去
 }
 
 export function initCalendar(rerender) {

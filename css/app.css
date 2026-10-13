@@ -331,7 +331,8 @@ body.side-min .sync-pill span { display: none; }
 .add-main .min { width: 64px; text-align: center; border: var(--b-ctl); }
 .add-main .btn { padding: 0 14px; }
 .add-more { display: none; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
-.add:focus-within .add-more, .add:has(select.open) .add-more { display: flex; }
+/* 这一排平时收着：表单里有焦点、下拉开着时出来；已经打了名字或选了 Project 的，焦点走开也留着（不然刚选完就收起来，重画后焦点也还不回去） */
+.add:focus-within .add-more, .add:has(select.open) .add-more, .add:has(input[name="title"]:not(:placeholder-shown)) .add-more, .add:has(select[name="project"] option:checked:not([value=""])) .add-more { display: flex; }
 .add-more select { padding: 7px 10px; font-size: 13px; border: var(--b-ctl); }
 
 .pfoot { display: flex; align-items: center; gap: 10px; margin-top: 22px; }

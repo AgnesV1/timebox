@@ -20,6 +20,33 @@ export function on(root, type, sel, fn, opts) {
   }, opts);
 }
 
+// 日期框用键盘填的时候，每填完一段（月 / 日 / 年）跳到下一段，浏览器就发一次 change；各处收到就存、就重画，
+// 正在填的那格被换掉，焦点跳回第一段，后面的数字就填错了地方。所以这一格只要动过键盘，它的 change 就先扣下，
+// 等填完了（离开这格 / 回车 / Esc）再补发一次；没碰键盘、从弹出的日历里点的照常马上发。
+export function initDateTyping() {
+  let typed = null, held = null;   // typed：这次聚焦以来用键盘动过的那格；held：扣着一次 change 还没发的那格
+  const isDate = (el) => el?.tagName === "INPUT" && el.type === "date";
+  const flush = () => {
+    const el = held;
+    held = typed = null;
+    if (el?.isConnected) el.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  addEventListener("keydown", (e) => {
+    if (!isDate(e.target)) return;
+    if (e.key !== "Enter" && e.key !== "Escape") typed = e.target;
+    else if (held === e.target) flush();
+  }, true);
+  addEventListener("change", (e) => {
+    if (!isDate(e.target) || !e.isTrusted || e.target !== typed) return;
+    e.stopImmediatePropagation();
+    held = e.target;
+  }, true);
+  addEventListener("focusout", (e) => {
+    if (held === e.target) flush();
+    else if (typed === e.target) typed = null;
+  }, true);
+}
+
 export function icon(name) {
   const p = ICONS[name] || "";
   return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + p + "</svg>";

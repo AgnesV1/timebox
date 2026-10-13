@@ -1,7 +1,8 @@
 // 灵感池（Projects 页头的 Plans | Ideas 切到 Ideas，电脑）：想去哪玩、想吃什么、想参加什么活动——没有时长，大多也没有期限。
 // 顶上一格直接加（粘几行 = 几条；选着的类别、日子这几条都带上）。下面按类别分组，没归类的在最上面，每条带类别按钮（Outing / Eat）。
 // 点文字就改；Plan = 放到哪天（建一条任务、挂上）；排了的划掉、写着哪天，Put back 放回池子；任务做完 = 去过了，这条就不再列出来。
-// 在 Leisure / Friends 下加任务时也能挑（见 js/ui/today.js 的 pickHTML）；手机上只能随手记一条。怎么算见 js/ideas.js。
+// 在 Leisure / Friends 下加任务时也能挑（见 js/ui/today.js 的 pickHTML）。怎么算见 js/ideas.js。
+// 手机上：随手记一条（加任务那行的 Idea 开关），再加一页只用来查的（顶栏的灯泡，#ideas）——一格搜索，下面按类别列出来，不能改。
 
 import * as store from "../store.js";
 import * as I from "../ideas.js";
@@ -15,6 +16,7 @@ let dated = false;      // 加的那一格开着日子
 let by = false;
 let edit = "";          // 正在改的那条
 let planning = "";      // 正在挑日子的那条
+let seek = "";          // 手机上查的那一页：搜索框里的字
 
 const afterRender = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));
 const taskOf = (id) => store.get("tasks", id);
@@ -92,6 +94,26 @@ export function ideasHTML(c) {
     b.groups.map((g) => '<section class="idea-group"><h3 class="idea-h">' + g.title + " <small>" + g.items.length + '</small></h3><ul class="idea-list">' + g.items.map(rowHTML).join("") + "</ul></section>").join("") + "</div>";
 }
 
+// 手机上查的那一页：名字、日子、备注；排了的划掉、写着哪天。搜的是名字和备注
+function foundHTML(c) {
+  const q = seek.trim().toLowerCase();
+  const groups = I.board(store.ideas(), taskOf, c.today).groups
+    .map((g) => ({ ...g, items: g.items.filter((r) => !q || (r.idea.text + " " + (r.idea.note || "")).toLowerCase().includes(q)) })).filter((g) => g.items.length);
+  if (!groups.length) return '<p class="empty">' + (q ? "Nothing matches." : "No ideas yet. To save one, switch on Idea when you add a task.") + "</p>";
+  return groups.map((g) => '<section class="idea-group"><h3 class="idea-h">' + g.title + " <small>" + g.items.length + '</small></h3><ul class="idea-list">' + g.items.map(({ idea, state, day }) => {
+    const when = state === "planned" ? "→ " + dayText(day) : state === "missed" ? "was " + fmtShort(idea.date) : I.whenText(idea);
+    return '<li class="idea-row ' + state + '"><span class="idea-text">' + esc(idea.text) + "</span>" + (when ? '<span class="idea-when">' + esc(when) + "</span>" : "") +
+      (idea.note ? '<span class="idea-note">' + esc(idea.note) + "</span>" : "") + "</li>";
+  }).join("") + "</ul></section>").join("");
+}
+
+export function ideasPhoneHTML(c) {
+  return '<div class="idea-page phone-ideas"><header class="phead"><div class="l"><a class="nav" href="#today">‹ Today</a></div></header>' +
+    '<header class="page-head"><div><h2>Ideas</h2></div></header>' +
+    '<input type="search" class="idea-seek" data-keep="idea-seek" value="' + esc(seek) + '" placeholder="Search ideas" aria-label="Search ideas" autocomplete="off" enterkeyhint="search">' +
+    '<div data-idea-found>' + foundHTML(c) + "</div></div>";
+}
+
 // 加进去：一行一条；池子里已经有的不重复加（去过的不算，可以再加）
 function addLines(text, form) {
   const lines = I.parseLines(text, I.left(store.ideas(), taskOf, store.today()));
@@ -152,6 +174,11 @@ export function initIdeas(rerender) {
     if (!idea || !date) return;
     planning = "";
     planIdea(idea, { date, group: form.group.value, est: form.est.value });
+  });
+  // 手机上查：边打边筛，只换下面那一块（整页重画的话输入框也跟着换）
+  on(document, "input", ".phone-ideas .idea-seek", (e, el) => {
+    seek = el.value;
+    el.closest(".phone-ideas").querySelector("[data-idea-found]").innerHTML = foundHTML(store.ctx());
   });
   on(document, "click", ".idea-due [data-act=idea-to-day]", (e, el) => {
     const idea = store.ideaOf(el.closest("[data-idea]").dataset.idea);

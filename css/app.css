@@ -200,6 +200,7 @@ body.side-min .sync-pill span { display: none; }
 .pset .ic { width: 20px; height: 20px; }
 .pread { display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; height: 30px; padding: 0 10px 0 8px; border: var(--b-ctl); border-radius: 999px; background: var(--bg); font-size: 12.5px; font-weight: 700; text-decoration: none; color: var(--ink); }
 .pread .ic { width: 16px; height: 16px; }
+.pread.pico { justify-content: center; width: 30px; padding: 0; }
 [data-theme="dark"] .pread { background: var(--surface); }
 .phone-settings .card { padding: 16px; }
 .phone-settings .btns .btn { flex: 1; }
@@ -1567,6 +1568,10 @@ select.open { border-color: var(--edge); }
 
 /* ---------- 灵感池（Projects 页的 Ideas）；加任务框底下的候选（.idea-pick）。这一段的类名都以 idea- 开头 ---------- */
 .idea-page { max-width: 760px; }
+/* 手机上查灵感的那一页（#ideas）：只看和搜 */
+.phone-ideas .idea-seek { width: 100%; margin: 4px 0 16px; padding: 10px 12px; border: var(--b-ctl); border-radius: 12px; font-size: 16px; }
+.phone-ideas .idea-row { min-height: 40px; padding: 8px 0; }
+.phone-ideas .idea-note { flex-basis: 100%; white-space: normal; }
 .idea-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
 .idea-add input[name="text"] { flex: 1 1 260px; min-width: 0; padding: 9px 12px; border: var(--b-ctl); border-radius: 12px; background: var(--bg); font-size: 15px; font-weight: 600; }
 .idea-add input[type="date"], .idea-row input[type="date"], .idea-plan input, .idea-plan select { padding: 5px 9px; border: var(--b-ctl); border-radius: 10px; background: var(--bg); font-size: 13px; }

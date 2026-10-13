@@ -15,7 +15,7 @@ import { todayHTML, initToday, shownDate } from "./ui/today.js";
 import { calendarHTML, poolHTML, initCalendar, handleDrop, refreshDayModal } from "./ui/calendar.js";
 import { projectsHTML, initProjects, refreshProjectEditor, projectAlerts } from "./ui/projects.js";
 import { initGoals } from "./ui/goals.js";
-import { initIdeas } from "./ui/ideas.js";
+import { initIdeas, ideasPhoneHTML } from "./ui/ideas.js";
 import { settingsHTML, initSettings } from "./ui/settings.js";
 import { initEditor, refreshEditor } from "./ui/editor.js";
 import { initDnd } from "./ui/dnd.js";
@@ -29,7 +29,7 @@ import { animateNext, takeTransition, nameParts, dusk, orb } from "./motion.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
-const VIEWS = ["today", "calendar", "projects", "stats", "meals", "shop", "reading", "friends", "settings"];
+const VIEWS = ["today", "calendar", "projects", "stats", "meals", "shop", "reading", "ideas", "friends", "settings"];
 const side = document.getElementById("side");
 const main = document.getElementById("main");
 const pool = document.getElementById("pool");
@@ -38,7 +38,8 @@ const dock = document.getElementById("dock");
 function route() {
   let v = location.hash.replace("#", "").split("/")[0] || "today";
   if (!VIEWS.includes(v)) v = "today";
-  if (phoneMQ.matches && v !== "settings" && v !== "reading" && v !== "shop") v = "today";
+  if (phoneMQ.matches && v !== "settings" && v !== "reading" && v !== "shop" && v !== "ideas") v = "today";
+  if (v === "ideas" && !phoneMQ.matches) v = "projects";   // #ideas 是手机上查灵感的那一页；电脑上灵感在 Projects 页里
   return v;
 }
 
@@ -151,7 +152,7 @@ function draw() {
   document.body.classList.toggle("side-min", !phone && Boolean(store.local().sideMin));
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
-  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : view === "friends" ? friendsHTML(c) : todayHTML(c, phone);
+  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : view === "ideas" ? ideasPhoneHTML(c) : view === "friends" ? friendsHTML(c) : todayHTML(c, phone);
   if (document.startViewTransition) nameParts(main, true);
   // 打开阅读页：同步时顺便拉一次阅读表格的列表（查重用）
   reading.want(view === "reading");

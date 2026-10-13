@@ -1,6 +1,6 @@
 // 统计页（电脑）。最上面：看哪段时间（Week / Month / Season / Year / 自己选两头；每次打开都从 Month 开始）、只看哪几个项目 / 计划（可以勾好几个）、只看深度。
 // 下面两个页签：
-//   Time —— 时间去哪了：花了多久、其中多少是深度、每天的柱子、一天 24 小时的饼图、时间表（项目 × 日子，点开看它下面的计划）、几点在干活、星期几
+//   Time —— 时间去哪了：每天的柱子、一天 24 小时的饼图、几点在干活、花了多久和其中多少是深度（窄窄一列，挨着星期几）、时间表（项目 × 日子，点开看它下面的计划）
 // 颜色的规矩：青柠 = 总量（每天的柱子）；项目自己的颜色 = 按项目拆开的图（饼图、时间表、星期几、几点在干活）。
 //   Plan —— 计划执行得怎样：做完多少、守住几天线、估时准不准、各项目、没做完的原因、项目健康
 // 图都是 HTML / SVG 画的，鼠标移上去有读数，数字都另有一份表格 / 图例可以看。「+ Add time」补一段忘了记的时间。
@@ -24,7 +24,6 @@ let pickOpen = false;      // 勾选的那块开着：重画时别收起来
 let deepOnly = false;
 let pieMode = "day";  // 饼图：day = 一天 24 小时都算 / logged = 只看记下来的
 let adjust = false;   // 饼图底下「Adjust」开着
-let pieBig = false;   // 饼图放大铺满窗口
 const tips = {};   // 图表 id → 每根柱子的读数
 
 const PREV = { week: "last week", month: "last month", season: "last season", year: "last year", custom: "the stretch before" };
@@ -138,6 +137,8 @@ function axisLabels(rows, byWeek) {
 
 // 三个多月以上一天一根太挤，按周合起来
 const trendRows = (s) => { const byWeek = s.daily.length > 92; return { byWeek, rows: byWeek ? S.weekly(s.daily, store.prefs().weekStartsOn) : s.daily }; };
+// 柱子多（Season 一天一根、Year 一周一根）的时候很细，白天那圈黑边太抢眼：标上 data-dense，css 里换成细的深绿边
+const dense = (rows) => (rows.length > 40 ? " data-dense" : "");
 
 // Time 页签的柱子：每天记了多久；深度到哪，哪里就有一道潮水线——同一个青柠深一点、水面在晃、往下很快淡掉（像浪花打在岸上那一小段），
 // 柱子还是一根，不另起颜色。两层浪错开着走，每根柱子的起点按位置错开。设了深度目标就画一条虚线
@@ -157,7 +158,7 @@ function timeTrendHTML(s) {
   return '<figure class="card chart"><figcaption><div><h3>Time per ' + (byWeek ? "week" : "day") + "</h3><p>" + insight + "</p></div>" +
     '<div class="legend"><span><i class="k tide"></i>Deep</span><span><i class="k dn"></i>Logged</span>' + (s.goal ? '<span><i class="k dgoal"></i>Deep goal</span>' : "") + "</div></figcaption>" +
     '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtMin(max * f) : "0") + "</span></i>").join("") +
-    '<div class="cols" data-chart="ttrend">' + rows.map((r, i) =>
+    '<div class="cols" data-chart="ttrend"' + dense(rows) + ">" + rows.map((r, i) =>
       '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.ttrend[i].title + ": " + fmtMin(r.spent) + " logged, " + fmtMin(r.deep) + " deep") + '">' +
       (r.spent ? '<i class="dn solo" style="height:' + h(r.spent) + '"></i>' : "") +
       (r.deep ? '<i class="tide" style="height:' + h(r.deep) + '"><span class="wv" style="animation-delay:-' + ((i * 0.7) % 5).toFixed(1) + "s,-" + ((i * 1.3) % 7).toFixed(1) + 's"></span><span class="wv b" style="animation-delay:-' + ((i * 1.1) % 8).toFixed(1) + "s,-" + ((i * 0.9) % 7).toFixed(1) + 's"></span></i>' : "") +
@@ -187,7 +188,7 @@ function trendHTML(s, filtered) {
   return '<figure class="card chart"><figcaption><div><h3>Planned and done, per ' + unit + "</h3><p>" + insight + "</p></div>" +
     '<div class="legend"><span><i class="k dn"></i>Done</span><span><i class="k pl"></i>Planned</span>' + (filtered ? "" : '<span><i class="k ln"></i>Project line</span>') + "</div></figcaption>" +
     '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtMin(max * f) : "0") + "</span></i>").join("") +
-    '<div class="cols" data-chart="trend">' + rows.map((r, i) =>
+    '<div class="cols" data-chart="trend"' + dense(rows) + ">" + rows.map((r, i) =>
       '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.trend[i].title + ": " + fmtMin(r.spent) + " done of " + fmtMin(r.planned) + " planned") + '">' +
       '<i class="pl" style="height:' + h(r.planned) + '"></i>' + (r.future ? "" : '<i class="dn" style="height:' + h(r.spent) + '"></i>') +
       (r.line ? '<i class="ln" style="bottom:' + h(r.line) + '"></i>' : "") + "</div>").join("") + "</div></div>" +
@@ -328,7 +329,7 @@ function projectsHTML(c, s) {
 // 粗的那圈：睡觉 / 吃饭洗澡 / 家务（灰，按默认值算）→ 各项目 → 没挂计划 → 没记的；外面细的一圈 = 每个项目里深度的那段。
 // 项目的颜色和圆盘是一套（js/ui/sun.js）：项目颜色的霓虹版（js/groups.js 的 neon），自己另选的颜色没有霓虹版就调亮（.boost）；
 // 白天底下垫一版错开的藏青，夜里发光（样子在 css 里的 .slice.ink）。
-// 右边的图例就是表格：名字、时长、占比。项目超过 6 个，后面的合成一片；点饼图 / 右上角放大铺满窗口（.pie-full），那时全列出来。
+// 右边的图例就是表格：名字、时长、占比。项目超过 6 个，后面的合成一片。
 
 const LIFE_COLOR = { sleep: "var(--k-sleep)", care: "var(--k-care)", chores: "var(--k-chores)" };
 const HATCH = "repeating-linear-gradient(45deg, var(--muted) 0 1.5px, var(--k-blank) 1.5px 5px)";
@@ -351,7 +352,7 @@ function pieParts(pie) {
 function pieHTML(c, s, rest) {
   const logged = pieMode === "logged";
   const pie = S.clockPie(c, s, { trackedOnly: logged, rest });
-  const parts = pieBig ? pie.parts : pieParts(pie), life = S.lifeOf(c);
+  const parts = pieParts(pie), life = S.lifeOf(c);
   const ink = (x) => (x.kind === "project" || x.kind === "none") && Boolean(x.color);   // 用项目颜色的那几片
   const lit = (x) => (neon(x.color) ? esc(neon(x.color)) : "oklch(from " + esc(x.color) + " calc(l + .12) calc(c * 1.9) h)");
   const color = (x) => (x.kind === "life" ? LIFE_COLOR[x.key] : x.kind === "blank" ? "var(--k-blank)" : x.kind === "rest" ? "url(#st-hatch)" : x.kind === "more" ? "var(--k-None)" : esc(neon(x.color) || x.color || "var(--c-None)"));
@@ -373,14 +374,13 @@ function pieHTML(c, s, rest) {
     '</span><b class="num">' + fmtMin(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("");
   const lede = logged ? "Only the time you logged." : "24 hours a day, up to today. Sleep, meals &amp; care and weekend housework are your usual amounts.";
   const field = (k, label, unit, v) => "<label><span>" + label + '</span><input class="num" type="number" min="0" max="24" step="0.5" data-life="' + k + '" data-keep="life-' + k + '" value="' + (v ? Math.round(v / 6) / 10 : "") + '" placeholder="' + (k === "deepGoal" ? "none" : "0") + '"><em>' + unit + "</em></label>";
-  const zoom = '<button type="button" class="icon-btn pie-zoom" data-act="pie-big" aria-pressed="' + pieBig + '" aria-label="' + (pieBig ? "Back to the page" : "Fill the window") + '" title="' + (pieBig ? "Back to the page (Esc)" : "Fill the window") + '">' + icon(pieBig ? "close" : "expand") + "</button>";
-  return '<section class="card piecard' + (pieBig ? " pie-full" : "") + '"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">' + lede +
+  return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">' + lede +
     ' <button type="button" class="link" data-act="life-adjust" aria-expanded="' + adjust + '">' + (adjust ? "Done" : "Adjust") + "</button></p></div>" +
-    '<span class="seg"><button type="button" data-act="pie-mode" data-v="day"' + (logged ? "" : ' class="on"') + '>24h</button><button type="button" data-act="pie-mode" data-v="logged"' + (logged ? ' class="on"' : "") + ">Logged only</button></span>" + zoom + "</header>" +
+    '<span class="seg"><button type="button" data-act="pie-mode" data-v="day"' + (logged ? "" : ' class="on"') + '>24h</button><button type="button" data-act="pie-mode" data-v="logged"' + (logged ? ' class="on"' : "") + ">Logged only</button></span></header>" +
     (adjust ? '<div class="life-form">' + field("sleep", "Sleep", "h a day", life.sleep) + field("care", "Meals, dishes, shower", "h a day", life.care) +
       field("chores", "Housework you don't log", "h a weekend", life.chores) + field("deepGoal", "Deep goal", "h a work day", life.deepGoal) + "</div>" : "") +
     (pie.total > 0
-      ? '<div class="pie-wrap"><div class="pie" data-chart="pie" data-act="pie-big"><svg viewBox="-60 -60 120 120" role="img" aria-label="' + esc(parts.map((x) => x.name + " " + share(x.min, pie.total)).join(", ")) + '">' +
+      ? '<div class="pie-wrap"><div class="pie" data-chart="pie"><svg viewBox="-60 -60 120 120" role="img" aria-label="' + esc(parts.map((x) => x.name + " " + share(x.min, pie.total)).join(", ")) + '">' +
         '<defs><pattern id="st-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="var(--k-blank)"/><rect width="1.5" height="5" fill="var(--muted)"/></pattern></defs>' +
         '<g transform="translate(.9 .9) rotate(-90)">' + under + '</g><g transform="rotate(-90)">' + arcs + "</g></svg>" +
         '<div class="pie-c"><b class="num">' + fmtMin(pie.tracked) + "</b><span>logged</span>" + (pie.deep > 0 ? '<span class="num" title="Deep work">◆ ' + fmtMin(pie.deep) + "</span>" : "") + "</div></div>" +
@@ -460,9 +460,10 @@ export function statsHTML(c) {
   } else {
     // 筛选之外记下来的时间：饼图里合成「Everything else」一片
     const rest = sc.on ? Math.max(0, S.summarize(c, r.from, r.to).spent - s.spent) : 0;
-    body = timeKpis(s, prev) +
-      '<div class="st-two">' + timeTrendHTML(s) + pieHTML(sc.c, s, rest) + "</div>" +
-      sheetHTML(sc.c, s, sc.by) + heatHTML(sc.c, s, sc.by) + '<div class="stat-grid">' + weekdayHTML(s) + "</div>";
+    body = '<div class="st-two">' + timeTrendHTML(s) + pieHTML(sc.c, s, rest) + "</div>" +
+      heatHTML(sc.c, s, sc.by) +
+      '<div class="st-rhythm">' + timeKpis(s, prev) + weekdayHTML(s) + "</div>" +
+      sheetHTML(sc.c, s, sc.by);
   }
   return '<div class="stats">' + headHTML(c, r) + body + "</div>";
 }
@@ -553,7 +554,6 @@ export function initStats(rerender) {
       if (kind === "custom") { const len = diffDays(custom.from, custom.to); custom = { from: addDays(T, -len), to: T }; }
     } else if (act === "pie-mode") pieMode = el.dataset.v;
     else if (act === "life-adjust") adjust = !adjust;
-    else if (act === "pie-big") pieBig = !pieBig;
     else if (act === "deep-only") deepOnly = !deepOnly;
     else if (act === "pick-clear") picks.clear();
     else if (act === "sheet-row") { const n = el.dataset.name; if (!sheetOpen.delete(n)) sheetOpen.add(n); }
@@ -561,9 +561,6 @@ export function initStats(rerender) {
     if (anchor > T) anchor = T;
     rerender();
   });
-  // 放大的饼图：Esc 收回去；换了页也收
-  addEventListener("keydown", (e) => { if (e.key === "Escape" && pieBig && !modalSheet()) { pieBig = false; rerender(); } });
-  addEventListener("hashchange", () => { pieBig = false; });
   on(document, "change", ".stats [data-st]", (e, el) => {
     const f = el.dataset.st;
     if (el.value) {

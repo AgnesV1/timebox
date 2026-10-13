@@ -65,9 +65,6 @@ const ICONS = {
   pool: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M14.5 4.5v15"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"/>',
-  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
-  auto: '<rect x="3.5" y="4.5" width="17" height="12" rx="2"/><path d="M8 20h8M12 16.5V20"/>',
   sync: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/>',
   trash: '<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
@@ -77,7 +74,6 @@ const ICONS = {
   meals: '<rect x="3.5" y="5.5" width="17" height="13" rx="3"/><path d="M12 5.5v13M3.5 12h8.5"/>',
   friends: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.6-3.4 3-5.2 6-5.2s5.4 1.8 6 5.2M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.6c2 .6 3.2 2.3 3.6 4.9"/>',
   cart: '<circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/><path d="M3 4.5h2.4l2.1 10.5h10.7l1.9-7.5H6.4"/>',
-  expand: '<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>',
   idea: '<path d="M9 17.5h6M10 20.5h4M8.6 14.5a6 6 0 1 1 6.8 0c-.6.5-.9 1.2-.9 2v1h-5v-1c0-.8-.3-1.5-.9-2Z"/>'
 };
 

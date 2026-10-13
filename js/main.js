@@ -7,8 +7,8 @@ import * as reading from "./reading.js";
 import * as Meal from "./meals.js";
 import { esc, on, icon, initDateTyping } from "./dom.js";
 import { paintPatterns } from "./patterns.js";
-import { initFx, setFx, burst, confetti, refreshFxColors } from "./fx.js";
-import { toast, lineInfo } from "./ui/common.js";
+import { initFx, setFx, confetti, refreshFxColors } from "./fx.js";
+import { toast, lineInfo, ballHTML } from "./ui/common.js";
 import { initModal, closeModal } from "./ui/modal.js";
 import { initSelect } from "./ui/select.js";
 import { todayHTML, initToday, shownDate } from "./ui/today.js";
@@ -25,7 +25,7 @@ import { readingHTML, initReading } from "./ui/reading.js";
 import { mealsHTML, shopHTML, initMeals, refreshMealEditor, mealDrop } from "./ui/meals.js";
 import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/friends.js";
 import { renderSun, initSun } from "./ui/sun.js";
-import { animateNext, takeTransition, nameParts, dusk, orb } from "./motion.js";
+import { animateNext, takeTransition, nameParts, dusk } from "./motion.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
@@ -43,7 +43,7 @@ function route() {
   return v;
 }
 
-// 白天夜里真的互换的那一下带一段过场（js/motion.js 的 dusk / orb）：先记着要换成什么，等下一次重画在过渡里一起换（draw 开头）。
+// 白天夜里真的互换的那一下带一段过场（底边的霞光 = js/motion.js 的 dusk；日月换班的样子在 css 里）：先记着要换成什么，等下一次重画在过渡里一起换（draw 开头）。
 // 刚打开、设置里关了动效、页面在后台：直接换
 let themePaint = null, booted = false;
 function applyTheme() {
@@ -73,16 +73,14 @@ function sidebarHTML(c, view) {
   const blocks = [["todo", [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", projectAlerts(c) || ""], ["stats", "Stats", ""]]],
     ["meals", [["meals", "Meals", deals || ""]]], ["read", [["reading", "Reading", ""]]], ["friends", [["friends", "Friends", friendsDue(c.today) || ""]]]];
   const link = ([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '" title="' + t + '">' + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>";
-  const theme = store.local().theme;
   const st = sync.getStatus();
   // 收起来只剩一列图标（记在这台设备上）：名字放进 title，角标缩成一个点
   const min = Boolean(store.local().sideMin);
-  return '<div class="brand"><span class="ball" data-act="ball"></span><h1>苦昼短</h1>' +
+  return '<div class="brand">' + ballHTML() + "<h1>苦昼短</h1>" +
     '<button type="button" class="icon-btn side-tog" data-act="side-toggle" aria-expanded="' + !min + '" aria-label="' + (min ? "Show" : "Hide") + ' the sidebar labels" title="' + (min ? "Expand" : "Collapse") + '">' + icon(min ? "right" : "left") + "</button></div>" +
     '<nav class="snav">' + blocks.map(([b, links]) => '<div class="sblock" data-b="' + b + '">' + links.map(link).join("") + "</div>").join("") + "</nav>" +
     '<div class="sbot"><nav class="snav">' + link(["settings", "Settings", ""]) + "</nav>" +
-    '<footer class="sfoot"><button type="button" class="sync-pill' + (st.bad ? " bad" : "") + '" data-act="sync" title="Sync now">' + icon("sync") + '<span data-sync-status>' + esc(st.text) + "</span></button>" +
-    '<button type="button" class="icon-btn" data-act="theme-cycle" title="Theme: ' + theme + '">' + icon(theme === "dark" ? "moon" : theme === "light" ? "sun" : "auto") + "</button></footer></div>";
+    '<footer class="sfoot"><button type="button" class="sync-pill' + (st.bad ? " bad" : "") + '" data-act="sync" title="Sync now">' + icon("sync") + '<span data-sync-status>' + esc(st.text) + "</span></button></footer></div>";
 }
 
 // ---------- 整页重画（正在打字的输入框，值、光标都留住） ----------
@@ -133,7 +131,7 @@ function frame() {
   const vt = document.startViewTransition(() => {
     draw();
     if (!rows) nameParts(main, false);
-    if (kind === "theme") { const dark = html.dataset.theme === "dark"; dusk(dark); orb(dark); }
+    if (kind === "theme") dusk(html.dataset.theme === "dark");
   });
   vt.ready.catch(() => {});   // 页面在后台时过渡会被取消，不算错
   vt.finished.finally(() => {
@@ -285,10 +283,9 @@ on(document, "click", ".psync", (e, el) => { if (el.title) toast(el.title); sync
 // 圆盘落着的时候盖在列表上：下面还有内容（没滚到底）就再淡一点
 const underSun = () => document.getElementById("sun")?.classList.toggle("over", document.documentElement.scrollHeight - innerHeight - scrollY > 8);
 addEventListener("scroll", underSun, { passive: true });
-on(document, "click", "[data-act=ball]", (e, el) => { const b = el.getBoundingClientRect(); burst(b.left + b.width / 2, b.top + b.height / 2); });
-on(document, "click", "[data-act=theme-cycle]", () => {
-  const next = { auto: "light", light: "dark", dark: "auto" }[store.local().theme] || "auto";
-  store.setLocal({ theme: next });
+// 那颗日月：点一下，白天换夜里、夜里换白天（之后就不跟系统了；想再跟着系统，去 Settings → Look 选 Auto）
+on(document, "click", "[data-act=theme-flip]", () => {
+  store.setLocal({ theme: document.documentElement.dataset.theme === "dark" ? "light" : "dark" });
   applyTheme();
 });
 on(document, "click", "[data-act=side-toggle]", () => store.setLocal({ sideMin: !store.local().sideMin }));

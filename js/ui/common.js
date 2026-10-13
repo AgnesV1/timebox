@@ -8,6 +8,15 @@ import { zebraFor } from "../patterns.js";
 
 export const STATUS = [["done", "Done"], ["partial", "Partial"], ["later", "Later"], ["drop", "Drop"]];
 
+// 侧栏左上 / 手机顶栏的那颗日月：白天是太阳、夜里是月亮（颜色在 css 的 .ball），点一下换白天 / 夜里（js/main.js）。
+// 上面一层镜面球的细格：纬线不动，八条经线各自走到下一条的位置（--a → --b 是这一格起止的 sin 值），首尾相接，看着就是球绕着竖轴在转
+const RAD = Math.PI / 180;
+const BALL = '<svg viewBox="0 0 100 100" aria-hidden="true"><g class="ball-grid">' +
+  [-67.5, -45, -22.5, 0, 22.5, 45, 67.5].map((f) => { const y = 50 + 50 * Math.sin(f * RAD), w = 50 * Math.cos(f * RAD); return '<path d="M' + (50 - w).toFixed(1) + " " + y.toFixed(1) + "H" + (50 + w).toFixed(1) + '"/>'; }).join("") +
+  Array.from({ length: 8 }, (_, k) => -90 + k * 22.5).map((t) => '<path class="ball-lon" style="--a:' + Math.sin(t * RAD).toFixed(3) + ";--b:" + Math.sin((t + 22.5) * RAD).toFixed(3) + '" d="M50 0A50 50 0 0 1 50 100"/>').join("") +
+  '</g><circle class="ball-shine" cx="33" cy="30" r="9"/></svg>';
+export const ballHTML = () => '<button type="button" class="ball" data-act="theme-flip" aria-label="Switch between day and night" title="Day / night">' + BALL + "</button>";
+
 export const projectOf = (t) => (t.projectId ? store.get("projects", t.projectId) : null);
 
 // 两层：上一层「项目」= 大类（计划的 group），下面是计划（projects 表里的行）。

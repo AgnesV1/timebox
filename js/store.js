@@ -555,6 +555,14 @@ export function saveProject(p) {
   return id;
 }
 
+// 归档 / 放回来（Projects 页卡片上的 Archive / Restore）：和编辑框里的 Status 是同一个字段（done / active），多一句能撤销的提示
+export function archiveProject(id, on = true) {
+  const p = get("projects", id);
+  if (!p || E.isActive(p) !== on) return;
+  change(() => put("projects", { ...p, status: on ? "done" : "active" }), (on ? "Archived " : "Restored ") + (p.name || "plan"));
+  if (!on && E.isAuto(p)) autoToday(id);   // 放回来的自动排的计划：今天的那份马上排进来（和 saveProject 一样）
+}
+
 // 改计划的「默认深度」：已经有的任务一起改（之后单个任务还能各自改）
 export function setPlanDeep(id, on) {
   const p = get("projects", id);
@@ -813,7 +821,7 @@ export const { ideas, ideaOf, ideaOfTask, saveIdea, addIdeas, deleteIdea, pickId
 const { ideaTaskDropped, moveIdea } = idea;
 
 const series = seriesStore({ ...core, timer, setTimer: tm.setTimer, moveMeet, moveIdea });
-export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries } = series;
+export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setSeriesGroup } = series;
 const { setRule } = series;
 
 export const { goals, saveGoal, deleteGoal } = goalStore(core);

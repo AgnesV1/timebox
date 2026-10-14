@@ -218,3 +218,29 @@ test("quarter sheet: progress is labour hours x 10, focus is deep hours / 10", (
     "from the start day; a past day with nothing is 0; today waits until something is logged");
   assert.equal(S.quarterRows(c, "2026-01-01").length, 13, "at most the last two weeks");
 });
+
+test("a project's last 14 days: done, planned but not done, nothing", () => {
+  const fit = GROUPS[1];
+  const c = gctx([
+    done("a", "2026-10-12", 40, { projectId: "gym" }), { id: "b", date: "2026-10-11", est: 30, status: "", group: "Fitness" },
+    { id: "c", date: "2026-10-10", est: 30, status: "later", group: "Fitness" }, { id: "d", date: "2026-10-09", est: 30, status: "partial", actual: 10, group: "Fitness" },
+    { id: "e", date: "2026-10-08", est: 30, status: "", actual: 12, projectId: "gym" }, { id: "f", date: "2026-10-07", est: 30, status: "", group: "Fitness" },
+    done("g", "2026-10-07", 20, { group: "Fitness" }), done("h", "2026-10-06", 60, { group: "Work" }),
+    done("i", "2026-09-29", 30, { group: "Fitness" }), done("j", "2026-09-28", 30, { group: "Fitness" })
+  ]);
+  const days = S.groupDays(c, fit);
+  assert.equal(days.length, 14);
+  assert.equal(days[0].date, "2026-09-29", "oldest first, today last");
+  assert.equal(days[13].date, "2026-10-12");
+  const at = (d) => days.find((x) => x.date === d).state;
+  assert.equal(at("2026-10-12"), "done");
+  assert.equal(at("2026-10-11"), "open", "planned, not marked");
+  assert.equal(at("2026-10-10"), "", "moved to later: nothing that day");
+  assert.equal(at("2026-10-09"), "done", "partial counts");
+  assert.equal(at("2026-10-08"), "done", "time logged counts even before it is marked");
+  assert.equal(at("2026-10-07"), "done", "one done task is enough, whatever else was planned");
+  assert.equal(at("2026-10-06"), "", "another project's day");
+  assert.equal(at("2026-09-29"), "done", "the 14th day back is in");
+  assert.equal(S.groupDays(c, fit, 7).length, 7);
+  assert.equal(S.groupDays(c, GROUPS[3], 14, ["2026-10-03", "2026-01-01"]).filter((x) => x.state === "done").map((x) => x.date).join(), "2026-10-03", "extra dates inside the window count");
+});

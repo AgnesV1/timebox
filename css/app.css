@@ -927,6 +927,20 @@ body.phone .logtime input, body.phone .add input, body.phone .add select { font-
 .pweek i.s { box-shadow: inset 0 0 0 2px var(--pc); background: transparent; }
 .pweek i.d { background: var(--pc); }
 .pweek span { margin-left: 6px; font-size: 12px; color: var(--muted); }
+/* 大类头下面：最近 14 天一天一格（同一种方框），第 7、8 格之间留一道缝，右边 7 格 = 那句话说的最近 7 天。
+   白天给实心和描边的格子都加一圈细边：Fitness 是象牙白，白底上不然看不见 */
+.g-days { margin: -2px 0 10px; }
+.g-days i:nth-child(8) { margin-left: 7px; }
+[data-theme="light"] .g-days i.d { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .22); }
+[data-theme="light"] .g-days i.s { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .28), inset 0 0 0 2.5px var(--pc); }
+/* 循环小事：不单独一张卡，大类头下面一行小字，点开是它的编辑框 */
+.g-reps { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: -2px 0 10px; }
+.g-rep { padding: 0; border: 0; background: none; font-size: 12.5px; font-weight: 600; text-align: left; }
+.g-rep small { margin-left: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.g-rep:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* 计划卡头上的 Archive / Restore：淡的小字，鼠标移上来才实 */
+.p-arch { flex-shrink: 0; margin-left: 2px; padding: 3px 0; border: 0; background: none; font-size: 11.5px; font-weight: 600; color: var(--muted); opacity: .75; }
+.p-arch:hover, .p-arch:focus-visible { opacity: 1; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .seg button[disabled] { opacity: .35; cursor: not-allowed; }
 
 /* ---------- 阅读页 ---------- */

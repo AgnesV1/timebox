@@ -6,7 +6,7 @@ import * as E from "../engine.js";
 import * as R from "../routines.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtMin, fmtShort, weekday, WEEKDAYS } from "../dates.js";
-import { projectOptions, pickTarget, targetOf } from "./common.js";
+import { projectOptions, pickable, pickTarget, targetOf } from "./common.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
 import { taskMeetHTML } from "./friends.js";
 
@@ -35,6 +35,15 @@ function repPanelHTML(t, rule) {
     '<label class="field"><span>Last day (empty = keeps going)</span><input type="date" data-r="until" min="' + t.date + '" value="' + esc(rep.until) + '"></label></div>' +
     '<div class="rep-go"><span class="hint" data-r-preview>' + previewText(t, n) + "</span>" +
     '<button type="button" class="btn cta" data-act="rep-apply">' + (rule ? "Update this & following" : "Repeat") + "</button></div></div>";
+}
+
+// 循环的任务属于哪个大类：整个循环一起（循环小事直接算在大类上），所以只列大类；现在那个名字不在清单里的也列上
+function seriesGroupHTML(id) {
+  const cur = String(store.routineOf(id)?.group || "").trim();
+  const list = store.groups().map((g) => ({ name: g.name, color: g.color || "" }));
+  if (cur && !list.some((g) => g.name === cur)) list.push({ name: cur, color: "" });
+  return '<label class="field"><span>Project · the whole repeat</span><select data-f="seriesGroup"><option value="">No project</option>' +
+    list.map((g) => '<option value="' + esc(g.name) + '"' + (g.name === cur ? " selected" : "") + ' data-color="' + esc(g.color) + '">' + esc(g.name) + "</option>").join("") + "</select></label>";
 }
 
 const previewText = (t, n) => (rep.until ? n + " time" + (n === 1 ? "" : "s") + " · " + fmtShort(t.date) + " → " + fmtShort(rep.until) : "From " + fmtShort(t.date) + ", no end");
@@ -75,7 +84,7 @@ function footHTML(t, rule) {
 
 function editorHTML(t) {
   const c = store.ctx();
-  const projects = c.projects.filter((p) => E.isActive(p) || p.id === t.projectId);
+  const projects = pickable(c.projects, t.projectId);
   const item = t.itemId ? store.get("items", t.itemId) : null;
   const st = item ? E.itemState(c, item) : null;
   const rule = ruleFor(t.id);
@@ -87,7 +96,7 @@ function editorHTML(t) {
     '<label class="field"><span>Task</span><input data-f="title" value="' + esc(t.title) + '"></label>' +
     '<div class="field-row"><label class="field"><span>Date</span><input type="date" data-f="date" value="' + esc(t.date) + '"></label>' +
     '<label class="field"><span>Minutes</span><input type="number" class="num" min="0" step="5" data-f="est" value="' + esc(t.est) + '"></label></div>' +
-    (rule ? "" : '<label class="field"><span>Project or plan</span><select data-f="projectId">' + projectOptions(projects, targetOf(t)) + "</select></label>") +
+    (rule ? seriesGroupHTML(t.id) : '<label class="field"><span>Project or plan</span><select data-f="projectId">' + projectOptions(projects, targetOf(t)) + "</select></label>") +
     (store.meetOfTask(t.id) || store.groupByName(store.groupOf(t))?.friends ? '<div class="field"><span>With · notes · remember</span>' + taskMeetHTML(t.id) + "</div>" : "") +
     (item ? '<p class="hint">Part of <b>' + esc(item.title) + "</b> · " + fmtMin(st.progress) + " of " + fmtMin(st.est) + " done</p>" : "") +
     '<label class="check"><input type="checkbox" data-f="optional"' + (t.optional ? " checked" : "") + "> Optional — nice to do, not a must</label>" +
@@ -136,6 +145,7 @@ export function initEditor() {
     if (f === "est") v = Math.max(0, Number(v) || 0);
     if (f === "title" && !String(v).trim()) return;
     if (f === "date" && !v) return;
+    if (f === "seriesGroup") return store.setSeriesGroup(editing, el.value);
     if (scope !== "this" && SERIES_FIELDS.includes(f) && ruleFor(editing)) return store.editSeries(editing, { [f]: v }, scope);
     if (f === "projectId") { const to = pickTarget(el.value); return store.setTaskProject(editing, to.projectId, to.group); }
     store.updateTask(editing, { [f]: v }, null, { quiet: f === "desc" || f === "title" });

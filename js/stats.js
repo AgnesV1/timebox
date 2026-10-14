@@ -250,6 +250,19 @@ export function groupHealth(ctx, g, { weekly = {}, lastContact = "" } = {}) {
   return { kind: track, min, lo, hi, level: lo > 0 && min < lo ? "low" : hi > 0 && min > hi ? "high" : "ok" };
 }
 
+// 这个大类最近 n 天（到今天为止，从旧到新）每天一格：[{ date, state }]。
+//   "done" 那天在这个大类里做了事（标了 Done / Partial，或记了时间）；extra 里的日子也算（Friends 记下的 catch-up）
+//   "open" 那天有安排，还没做（过去的 = 没标；今天的 = 还没轮到）        "" 那天没有
+export function groupDays(ctx, g, n = 14, extra = []) {
+  const from = addDays(ctx.today, -(n - 1)), also = new Set(extra), state = {};
+  for (const t of ctx.tasks) {
+    if (!t.date || t.date < from || t.date > ctx.today || rowOf(ctx, t, "group").name !== g.name) continue;
+    if (t.status === "done" || t.status === "partial" || E.spentMin(t) > 0) state[t.date] = "done";
+    else if (!t.status && !state[t.date]) state[t.date] = "open";
+  }
+  return Array.from({ length: n }, (_, i) => { const date = addDays(from, i); return { date, state: also.has(date) ? "done" : state[date] || "" }; });
+}
+
 // ---------- 季度表的两格 ----------
 // progress = 当天 labor 大类里实际花的分钟 ÷ 6，取整（6 小时 → 60，6.5 小时 → 65）；
 // focus = 当天 ◆ Deep 的分钟四舍五入到整小时，再 ÷ 10（1 小时 → 0.1，1.5 小时 → 0.2）。any = 这天有没有记下东西

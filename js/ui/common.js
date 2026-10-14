@@ -58,9 +58,13 @@ export function colorOf(t) {
   return projectOf(t)?.color || store.groupByName(t.group)?.color || "var(--c-None)";
 }
 
-// 任务旁边那个小标签：计划的名字，直接挂在大类上的是大类的名字
+// 加任务 / 改任务 / 补时间的下拉里能选的计划：在用的，不含循环小事（那是一条重复，不是能往下挂任务的计划）。keep = 任务现在挂着的那个，留着
+export const pickable = (projects, keep = "") => projects.filter((p) => (E.isActive(p) && !E.isRepeat(p)) || (keep && p.id === keep));
+
+// 任务旁边那个小标签：计划的名字；直接挂在大类上的、还有循环小事的那一次（它直接算在大类上），是大类的名字
 export function badgeOf(t) {
   const p = projectOf(t);
+  if (p && E.isRepeat(p)) return p.group ? { name: p.group, color: store.groupByName(p.group)?.color || p.color || "" } : null;
   return p ? { name: p.name || "", color: p.color || "" } : t.group ? { name: t.group, color: store.groupByName(t.group)?.color || "" } : null;
 }
 

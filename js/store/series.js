@@ -126,5 +126,12 @@ export default function (core) {
     }, scope === "all" ? "Deleted repeat" : "Stopped repeating");
   }
 
-  return { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setRule };
+  // 整个循环挪到别的大类（循环小事直接算在大类上，见 engine.js 的 isRepeat）：计划的 group 换掉，颜色跟着新的大类走
+  function setSeriesGroup(id, group) {
+    const p = routineOf(id), to = String(group || "").trim();
+    if (!p || (p.group || "") === to) return;
+    change(() => put("projects", { ...p, group: to, color: colorFor(to) }), to ? "Moved to " + to : "Taken out of its project");
+  }
+
+  return { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setRule, setSeriesGroup };
 }

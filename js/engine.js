@@ -53,6 +53,9 @@ export const isAutoTask = (t) => /^(rt|au):/.test(String(t.id || ""));
 export const isActive = (p) => !p.status || p.status === "active";
 export const isRegular = (p) => p?.kind === "regular";
 export const isAuto = (p) => p?.place === "auto";
+// 循环小事：自己按规律出现在每天清单里的（加任务时选 Repeat 建的就是这种）。它直接算在大类上——Projects 页不单独给它一张卡，
+// 下拉里也不列它；每周几次、自己从任务池拖的那种（Regular + Pool）还是一张计划
+export const isRepeat = (p) => isRegular(p) && isAuto(p);
 export const earlyDays = (p) => Math.max(0, Math.floor(num(p.early)));
 
 // ---------- 索引（同一个 ctx 只建一次） ----------

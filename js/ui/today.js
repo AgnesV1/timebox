@@ -15,7 +15,7 @@ import * as reading from "../reading.js";
 import * as Meal from "../meals.js";
 import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
-import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickTarget, segStyle, lineInfo, toast, STATUS, ballHTML } from "./common.js";
+import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickable, pickTarget, segStyle, lineInfo, toast, STATUS, ballHTML } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
 import { animateNext } from "../motion.js";
@@ -209,7 +209,7 @@ function pickHTML(d, query) {
 // 名字后面带一段钟点（Reading 14:00-15:10）= 已经做完的，直接记成一条 Done。
 // 手机上多一个 Idea 开关：打开后 Add = 记进灵感池（不建任务），回电脑再归类、挑日子
 function addHTML(c, d, phone = false) {
-  const projects = c.projects.filter(E.isActive);
+  const projects = pickable(c.projects);
   const target = addTarget[d] || "";
   const people = store.groupByName(store.groupOf(pickTarget(target)))?.friends;
   return '<form class="add" data-add="' + d + '" autocomplete="off">' +

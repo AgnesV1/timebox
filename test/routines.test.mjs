@@ -200,3 +200,25 @@ test("store: stopping from the very first time leaves no empty plan", async () =
   store.deleteSeries(a, "following");
   assert.equal(store.get("projects", rid), null);
 });
+
+test("store: a repeat sits right on its project; moving it takes the colour along; archive and restore", async () => {
+  const store = await import("../js/store.js?repeat-group");
+  const t = store.today();
+  const id = store.addRepeating({ date: t, title: "Stretch", est: 10, group: "Fitness" }, R.daysFor("daily", t, 10), "");
+  const rid = R.parseRoutineTaskId(id).rid;
+  assert.equal(E.isRepeat(store.get("projects", rid)), true);
+  assert.equal(store.groupOf(store.get("tasks", id)), "Fitness");
+  store.setSeriesGroup(id, "Leisure");
+  assert.equal(store.groupOf(store.get("tasks", id)), "Leisure");
+  assert.equal(store.get("projects", rid).color, store.groupByName("Leisure").color, "the colour follows the project");
+  store.setSeriesGroup(id, "");
+  assert.equal(store.get("projects", rid).group, "", "no project");
+  assert.equal(E.isRepeat({ kind: "regular", place: "pool" }), false, "a few times a week from the pool is still a plan");
+
+  store.archiveProject(rid);
+  assert.equal(E.isActive(store.get("projects", rid)), false);
+  store.archiveProject(rid);
+  assert.equal(store.get("projects", rid).status, "done", "archiving twice changes nothing");
+  store.archiveProject(rid, false);
+  assert.equal(E.isActive(store.get("projects", rid)), true);
+});

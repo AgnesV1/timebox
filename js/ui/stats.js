@@ -10,7 +10,7 @@ import * as S from "../stats.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtMin, fmtShort, fmtDay, fmtClock, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf } from "../dates.js";
-import { healthPill, groupsOf, projectOptions, pickTarget } from "./common.js";
+import { healthPill, groupsOf, projectOptions, pickable, pickTarget } from "./common.js";
 import { hourLabel } from "../day.js";
 import { neon } from "../groups.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
@@ -472,7 +472,7 @@ export function statsHTML(c) {
 
 function addTimeHTML(c) {
   const date = c.today;
-  const projects = c.projects.filter(E.isActive);
+  const projects = pickable(c.projects);
   return '<form class="addtime" autocomplete="off"><h2 class="sheet-title">Add time</h2>' +
     '<label class="field"><span>What</span><input name="title" placeholder="What did you do?" required></label>' +
     '<label class="field"><span>Project or plan</span><select name="project">' + projectOptions(projects) + "</select></label>" +

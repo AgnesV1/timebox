@@ -104,6 +104,18 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 #sky.still i { animation: none; }
 [data-theme="light"] body.phone #sky { background: radial-gradient(22rem 12rem at 0% 0%, rgba(255, 62, 165, .12), transparent 72%), linear-gradient(180deg, #E9F3FF, transparent 16rem); }
 @keyframes cloud-drift { to { transform: translateX(3rem); } }
+/* 天上偶尔经过的小东西（js/sky.js）：只在经过的那一会儿在，走完就拿掉。位置和走法都是脚本给的 transform。
+   白天的飞机 = 高空一个小点拖两道长尾迹；夜里的红眼航班 = 一闪一闪的红灯加一颗小白灯；花瓣；流星（头在右端，尾巴淡出去） */
+.sky-ev { position: absolute; left: 0; top: 0; will-change: transform; }
+.sky-plane, .sky-redeye { display: flex; align-items: center; transform-origin: 100% 50%; }
+.sky-trails { display: flex; flex-direction: column; gap: 3px; }
+.sky-trails b { display: block; width: 130px; height: 1px; background: linear-gradient(to left, rgba(11, 11, 11, .36), rgba(11, 11, 11, 0)); }
+.sky-dot { width: 4px; height: 4px; margin-left: 1px; border-radius: 50%; background: rgba(11, 11, 11, .6); }
+.sky-red { width: 3px; height: 3px; border-radius: 50%; background: #FF2D4A; animation: sky-blink 1.2s steps(1) infinite; }
+.sky-white { width: 2px; height: 2px; margin-left: 3px; border-radius: 50%; background: #F4F4F8; opacity: .8; }
+.sky-petal { border-radius: 80% 10% 80% 10%; opacity: .85; }
+.sky-meteor { height: 1.3px; border-radius: 2px; background: linear-gradient(to right, rgba(190, 244, 255, 0), rgba(233, 251, 255, .95)); transform-origin: 100% 50%; }
+@keyframes sky-blink { 0%, 16% { opacity: 1; } 17%, 100% { opacity: .12; } }
 @keyframes star-breathe { 0%, 100% { opacity: .7; } 50% { opacity: .08; } }
 
 /* ---------- 整体布局 ---------- */

@@ -1,6 +1,9 @@
 // 点哪里冒一圈细细的涟漪；标 Done 时在按钮上炸一把星星（Partial 一小把），守住安全线时撒礼花。纯装饰，不接收点击。
 // 系统开了「减弱动态效果」或设置里关掉时，全都不放。
 // 还有整站的底图（#sky，样子在 css 里）：白天蓝天白云，夜里碎星芒；关掉动效时停住不动。
+// 底图上偶尔经过的飞机、花瓣、流星雨在 js/sky.js。
+
+import { initSky, setSky, clearSky } from "./sky.js";
 
 let layer = null, live = 0, hue = 0, enabled = true;
 const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -12,8 +15,8 @@ function colors() {
   return (palette = ["--c-Main", "--c-Work", "--c-Fun", "--c-Chore", "--accent"].map((n) => cs.getPropertyValue(n).trim()));
 }
 
-// 换了白天/夜间主题后重新取颜色
-export function refreshFxColors() { palette = null; }
+// 换了白天/夜间主题后重新取颜色；天上正经过的那样也拿掉（白天的飞机不该飞进夜里）
+export function refreshFxColors() { palette = null; clearSky(); }
 
 function spawn(el, x, y, frames, ms, easing) {
   el.style.left = x + "px";
@@ -40,7 +43,7 @@ function star(x, y, dist, size, ms, fall, dotChance, palette) {
   ], ms * (0.85 + Math.random() * 0.4));
 }
 
-export function setFx(on) { enabled = on; document.getElementById("sky")?.classList.toggle("still", !on); }
+export function setFx(on) { enabled = on; document.getElementById("sky")?.classList.toggle("still", !on); setSky(on); }
 
 // 底图：一层云 + 四层星芒。每层星芒是一小块 SVG（几颗四角星，位置随机）平铺满屏，四层的大小和呼吸周期都不一样
 function sky() {
@@ -55,6 +58,7 @@ function sky() {
     return '<i class="st" style="background-image:url(&quot;data:image/svg+xml,' + encodeURIComponent(svg) + "&quot;);background-size:" + w + "px " + h + "px;animation-duration:" + dur + "s;animation-delay:-" + (k * 1.7).toFixed(1) + 's"></i>';
   }).join("");
   document.body.prepend(el);
+  initSky(el);
 }
 
 export function burst(x, y, n = 20, dist = 120) {

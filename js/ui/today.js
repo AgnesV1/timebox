@@ -31,6 +31,7 @@ let viewDate = "";
 let focus = "";   // 点开的那一行（四个状态按钮只在这一行）
 const addTarget = {};   // 加任务框里选的是哪个项目 / 计划（日期 → 下拉的值）：能选「和谁」的大类要多画一块
 const ideaDraft = {};   // 加任务框里从灵感池挑中的那条（日期 → 灵感 id）：任务建好后挂上去，池子里就划掉了
+let addOpen = "";       // 哪一天的加任务框展开着（下面那排选项）。自己记着，不靠焦点猜——见 initToday 里的 setAddOpen
 // 这个任务能不能选「和谁」：已经带着一条记录，或者它那个大类开了这一项
 const meetable = (t) => Boolean(store.meetOfTask(t.id) || store.groupByName(store.groupOf(t))?.friends);
 
@@ -212,7 +213,7 @@ function addHTML(c, d, phone = false) {
   const projects = pickable(c.projects);
   const target = addTarget[d] || "";
   const people = store.groupByName(store.groupOf(pickTarget(target)))?.friends;
-  return '<form class="add" data-add="' + d + '" autocomplete="off">' +
+  return '<form class="add' + (addOpen === d ? " open" : "") + '" data-add="' + d + '" autocomplete="off">' +
     '<div class="add-main"><input name="title" data-keep="add-title-' + d + '" placeholder="' + (phone || d > c.today ? "Add a task" : "Add a task, or log one: Reading 14:00-15:10") + '" enterkeyhint="done">' +
     '<input name="est" class="min num" data-keep="add-est-' + d + '" type="number" inputmode="numeric" value="30" min="5" step="5" aria-label="Minutes">' +
     '<button class="btn cta" type="submit">Add</button></div>' +
@@ -370,6 +371,23 @@ export function initToday(rerender) {
     animateNext();
     rerender();
   });
+
+  // 加任务框下面那排选项的收放：焦点进了表单就展开；点到 / 焦点走到表单和下拉（.menu，挂在 body 上）之外，或在表单里按 Esc，才收。
+  // 以前是看「表单里有没有焦点」，整页重画一丢焦点就猜错（刚选完 Project 就收起来）；现在重画时照 addOpen 画，焦点也还得回去
+  const setAddOpen = (d) => {
+    if (addOpen === d) return;
+    addOpen = d;
+    document.querySelectorAll("form.add[data-add]").forEach((f) => f.classList.toggle("open", f.dataset.add === d));
+  };
+  const addTouched = (e) => {
+    const form = e.target.closest?.("form.add[data-add]");
+    if (form) setAddOpen(form.dataset.add);
+    else if (addOpen && !e.target.closest?.(".menu")) setAddOpen("");
+  };
+  document.addEventListener("focusin", addTouched);
+  document.addEventListener("pointerdown", addTouched, true);
+  // 下拉开着的时候 Esc 先被它收走（js/ui/select.js，不往下传），到这里的都是表单自己的
+  on(document, "keydown", "form.add[data-add]", (e) => { if (e.key === "Escape" && addOpen) { document.activeElement?.blur?.(); setAddOpen(""); } });
 
   // 加任务时选了计划：Deep 跟着这个计划的默认；选的大类能选「和谁」就多画那一块
   on(document, "change", ".dayview form[data-add] select[name=project]", (e, el) => {

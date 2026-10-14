@@ -343,8 +343,8 @@ body.side-min .sync-pill span { display: none; }
 .add-main .min { width: 64px; text-align: center; border: var(--b-ctl); }
 .add-main .btn { padding: 0 14px; }
 .add-more { display: none; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
-/* 这一排平时收着：表单里有焦点、下拉开着时出来；已经打了名字或选了 Project 的，焦点走开也留着（不然刚选完就收起来，重画后焦点也还不回去） */
-.add:focus-within .add-more, .add:has(select.open) .add-more, .add:has(input[name="title"]:not(:placeholder-shown)) .add-more, .add:has(select[name="project"] option:checked:not([value=""])) .add-more { display: flex; }
+/* 这一排平时收着，开没开是 js 记着的（js/ui/today.js 的 addOpen）：焦点进表单时展开，点到外面 / 按 Esc 才收，重画不影响 */
+.add.open .add-more { display: flex; }
 .add-more select { padding: 7px 10px; font-size: 13px; border: var(--b-ctl); }
 
 .pfoot { display: flex; align-items: center; gap: 10px; margin-top: 22px; }
@@ -1634,7 +1634,7 @@ select.open { border-color: var(--edge); }
 .idea-plan .btn { padding: 5px 12px; color: var(--ink); }
 [data-theme="dark"] .idea-row.editing .idea-kinds .chip.on { color: var(--accent); }
 .idea-pick { display: none; margin-top: 8px; padding: 7px 9px 5px; border: 1px dashed #CDCDC6; border-radius: 10px; }
-.add:focus-within .idea-pick:not(:empty) { display: block; }
+.add.open .idea-pick:not(:empty) { display: block; }
 .idea-pick p { margin: 0 0 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .idea-pick ul { display: flex; flex-wrap: wrap; gap: 5px 6px; margin: 0 0 5px; padding: 0; list-style: none; }
 .idea-pick button { padding: 3px 10px; border: var(--b-ctl); border-radius: 999px; background: var(--bg); font-size: 12.5px; font-weight: 600; }

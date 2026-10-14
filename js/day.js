@@ -60,3 +60,27 @@ export function hourMinutes(from, to) {
 
 // 第 h 个小时的钟点：0 → "06:00"
 export const hourLabel = (h) => String((6 + h) % 24).padStart(2, "0") + ":00";
+
+// ---------- 白天还是夜里：跟着钟点走 ----------
+// 6 点到 18 点是白天（和圆盘两圈是同一条线），其余是夜里，用这台设备的当地时间。
+// 点一下日月 = 先照点的来（local.themeHold = { v: "light" | "dark", until }），管到下一个早 6 点 / 晚 6 点，之后又跟钟点。
+// index.html 开头那段小脚本是同一条规则（第一笔就要画对，等不到模块加载），改这里要一起改；test/day.test.mjs 守着两边一致
+export const DAY_FROM = DIAL_START / 60, DAY_TO = DAY_FROM + 12;
+export const isDaytime = (at = new Date()) => { const h = at.getHours(); return h >= DAY_FROM && h < DAY_TO; };
+
+// 下一次换班（早 6 点或晚 6 点）是什么时候（毫秒）
+export function nextTurn(at = new Date()) {
+  const d = new Date(at), h = d.getHours();
+  d.setMinutes(0, 0, 0);
+  if (h < DAY_FROM) d.setHours(DAY_FROM);
+  else if (h < DAY_TO) d.setHours(DAY_TO);
+  else { d.setDate(d.getDate() + 1); d.setHours(DAY_FROM); }
+  return d.getTime();
+}
+
+// 现在该是哪个样子："light" / "dark"
+export function lookAt(local, at = new Date()) {
+  const h = local?.themeHold;
+  if (h && (h.v === "light" || h.v === "dark") && at.getTime() < Number(h.until)) return h.v;
+  return isDaytime(at) ? "light" : "dark";
+}

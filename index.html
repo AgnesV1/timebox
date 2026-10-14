@@ -13,6 +13,19 @@
 <meta name="apple-mobile-web-app-title" content="苦昼短">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#FFFFFF">
+<script>
+// 第一笔就把白天 / 夜里画对，不等模块加载：夜里打开不闪一下白，手机顶上那一条取到的颜色也从一开始就对。
+// 规则同 js/day.js 的 lookAt（点过日月的管到下一个六点，别的看钟点：6 点到 18 点是白天），改那边要一起改
+(function () {
+  var now = new Date(), h = now.getHours(), look = h >= 6 && h < 18 ? "light" : "dark";
+  try {
+    var hold = ((JSON.parse(localStorage.getItem("kuzhouduan-v1")) || {}).local || {}).themeHold;
+    if (hold && (hold.v === "light" || hold.v === "dark") && now.getTime() < Number(hold.until)) look = hold.v;
+  } catch (e) { /* 存的东西读不出来：照钟点 */ }
+  document.documentElement.setAttribute("data-theme", look);
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", look === "dark" ? "#0C0C13" : "#FFFFFF");
+})();
+</script>
 <link rel="preload" href="fonts/space-grotesk.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/app.css">
 </head>

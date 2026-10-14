@@ -26,9 +26,9 @@ import { mealsHTML, shopHTML, initMeals, refreshMealEditor, mealDrop } from "./u
 import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/friends.js";
 import { renderSun, initSun } from "./ui/sun.js";
 import { animateNext, takeTransition, nameParts, dusk } from "./motion.js";
+import { lookAt, nextTurn } from "./day.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
-const darkMQ = matchMedia("(prefers-color-scheme: dark)");
 const VIEWS = ["today", "calendar", "projects", "stats", "meals", "shop", "reading", "ideas", "friends", "settings"];
 const side = document.getElementById("side");
 const main = document.getElementById("main");
@@ -43,12 +43,12 @@ function route() {
   return v;
 }
 
+// 白天还是夜里跟着钟点走（js/day.js 的 lookAt：6 点到 18 点是白天；点过日月的管到下一个六点）。
 // 白天夜里真的互换的那一下带一段过场（底边的霞光 = js/motion.js 的 dusk；日月换班的样子在 css 里）：先记着要换成什么，等下一次重画在过渡里一起换（draw 开头）。
 // 刚打开、设置里关了动效、页面在后台：直接换
 let themePaint = null, booted = false;
 function applyTheme() {
-  const t = store.local().theme;
-  const dark = t === "dark" || (t === "auto" && darkMQ.matches);
+  const dark = lookAt(store.local()) === "dark";
   const html = document.documentElement;
   const paint = () => {
     html.dataset.theme = dark ? "dark" : "light";
@@ -223,6 +223,7 @@ async function syncThenLog() {
 let lastToday = store.today();
 function tickDay() {
   const t = store.today();
+  if (lookAt(store.local()) !== document.documentElement.dataset.theme) applyTheme();   // 页面开着过了六点（或点日月的那一段到头了）：换班
   if (t !== lastToday) {
     lastToday = t;
     store.ensureTodayLog();
@@ -244,7 +245,7 @@ initCalendar(render);
 initProjects(render);
 initGoals(render);
 initIdeas(render);
-initSettings(applyTheme);
+initSettings();
 initEditor();
 initDnd((payload, target) => (target.startsWith("m") ? mealDrop(payload, target) : handleDrop(payload, target)));
 initStats(render);
@@ -269,7 +270,6 @@ addEventListener("hashchange", () => { closeModal(); animateNext("page"); render
 // 弹层里的日期框填完、离开了：填的时候没重画的编辑框（js/ui/modal.js 的 fillingDate）这时补画一次
 on(document, "focusout", "#modal input[type=date]", () => setTimeout(render, 0));
 phoneMQ.addEventListener("change", render);
-darkMQ.addEventListener("change", () => { if (store.local().theme === "auto") { applyTheme(); render(); } });
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") sync.beacon();
   else { tickDay(); syncThenLog(); }
@@ -283,9 +283,9 @@ on(document, "click", ".psync", (e, el) => { if (el.title) toast(el.title); sync
 // 圆盘落着的时候盖在列表上：下面还有内容（没滚到底）就再淡一点
 const underSun = () => document.getElementById("sun")?.classList.toggle("over", document.documentElement.scrollHeight - innerHeight - scrollY > 8);
 addEventListener("scroll", underSun, { passive: true });
-// 那颗日月：点一下，白天换夜里、夜里换白天（之后就不跟系统了；想再跟着系统，去 Settings → Look 选 Auto）
+// 那颗日月：点一下，白天换夜里、夜里换白天，管到下一个早 6 点 / 晚 6 点，之后又跟着钟点
 on(document, "click", "[data-act=theme-flip]", () => {
-  store.setLocal({ theme: document.documentElement.dataset.theme === "dark" ? "light" : "dark" });
+  store.setLocal({ themeHold: { v: document.documentElement.dataset.theme === "dark" ? "light" : "dark", until: nextTurn() } });
   applyTheme();
 });
 on(document, "click", "[data-act=side-toggle]", () => store.setLocal({ sideMin: !store.local().sideMin }));

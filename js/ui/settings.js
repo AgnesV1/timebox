@@ -35,9 +35,9 @@ export function settingsHTML(phone) {
     '<label class="check"><input type="checkbox" data-pref="level"' + (pr.level !== false ? " checked" : "") + "> Even out the load across projects (recommended)</label>" +
     '<p class="hint">Staying up past midnight still counts as the same day until the time above.</p></section>';
 
-  const look = '<section class="card"><h3>Look</h3><div class="seg">' +
-    [["auto", "Auto"], ["light", "Day"], ["dark", "Night"]].map(([v, t]) => '<button type="button" data-act="theme" data-v="' + v + '"' + (l.theme === v ? ' class="on"' : "") + ">" + t + "</button>").join("") + "</div>" +
-    '<p class="hint look-hint">Auto follows your phone or computer.</p>' +
+  // 白天夜里不在这儿选了：跟着钟点走，想换就点那颗日月（js/main.js）
+  const look = '<section class="card"><h3>Look</h3>' +
+    '<p class="hint look-hint">Day from 6:00, night from 18:00. Tap the sun or moon to switch until the next six o\'clock.</p>' +
     '<label class="check"><input type="checkbox" data-local-check="fx"' + (l.fx !== false ? " checked" : "") + "> Sparkles and confetti</label></section>";
 
   const read = '<section class="card"><h3>Reading</h3>' +
@@ -94,7 +94,7 @@ function weeklyFromInputs(root, def) {
   return vals.every((v) => v === null) ? null : vals.map((v) => (v === null ? def : v));
 }
 
-export function initSettings(applyTheme) {
+export function initSettings() {
   on(document, "change", ".settings [data-local]", (e, el) => {
     store.setLocal({ [el.dataset.local]: el.value.trim(), ...(el.dataset.local === "url" ? { serverVersion: 0 } : {}) });   // 换了表格：重新问它是哪一版
     if (el.dataset.local === "url" || el.dataset.local === "secret") sync.sync({ full: true });
@@ -143,8 +143,7 @@ export function initSettings(applyTheme) {
       });
       return;
     }
-    if (act === "theme") { store.setLocal({ theme: el.dataset.v }); applyTheme(); }
-    else if (act === "full") sync.sync({ full: true });
+    if (act === "full") sync.sync({ full: true });
     else if (act === "export") {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([JSON.stringify(store.exportData(), null, 2)], { type: "application/json" }));

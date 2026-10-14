@@ -76,6 +76,10 @@
   Regular 填每个星期几做几分钟（Auto）或每周几次、每次几分钟（Pool）；「Rename」改项目名，下面的计划一起改
 - **重复的快捷方式**：在加任务框里选「↻ Every day / Weekdays / Every 周几」和「for good / for 1 week …」再点 Add，
   就是建了一个 Regular + Auto 的计划；点任务的 ⋯ → Repeat 也一样，可以每个星期几填不同分钟。
+  这种循环的小事直接算在它的项目上：Projects 页不给它单独一张卡，只在项目头下面列一行（点开能改、能停）；任务旁边的标签是项目名；
+  编辑框里的 Project 一格可以把整个循环挪到别的项目。
+- **最近 14 天**：看钟点 / Relax / 联系的项目（Fitness、Leisure、Friends）头上有一排 14 个方块，一天一格——实心是那天做了，描边是有安排没做，中间那道缝右边是最近 7 天。
+- **Archive**：每张计划卡右上角有 Archive，点了折进项目头右边的「N archived」，点开能看、能 Restore（和编辑框里的 Status 是同一回事）。
   重复的任务在编辑框顶上选「This one / This & following / All」，改名字、分钟就作用到那些天；
   「Change…」从这一天起改重复方式。删的时候选 Only this / This & following / This & earlier / All，
   做过或计过时的留着当记录。错过的自动任务不算「left behind」

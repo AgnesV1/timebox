@@ -44,6 +44,8 @@
 html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.4 var(--body); }
 body.phone { background: var(--bg); }
+/* 手机宽度下底色从第一笔就是 --bg，不等脚本加上 body.phone：iPhone 顶上那一条（灵动岛那里）是照页面一打开时的底色取的 */
+@media (max-width: 760px) { body { background: var(--bg); } }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: inherit; }
@@ -197,12 +199,13 @@ body.side-min .sync-pill span { display: none; }
 .today-side { display: grid; gap: 10px; }
 .today-side .overdue, .today-side .bill { margin-top: 0; }
 
-/* 手机顶栏：吸顶毛玻璃，底下一条豹纹胶带 */
-.phead { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 -16px 6px; padding: calc(8px + env(safe-area-inset-top)) 16px 12px; background: rgba(255, 255, 255, .84); -webkit-backdrop-filter: saturate(180%) blur(14px); backdrop-filter: saturate(180%) blur(14px); }
+/* 手机顶栏：吸顶毛玻璃，底下一条豹纹胶带。
+   状态栏 / 灵动岛底下那一截（页面画到屏幕最顶上时才有，高 = --top）是实心的背景色，不透、不叠纹理：那一条要和背景完全一个颜色 */
+.phead { --top: env(safe-area-inset-top, 0px); position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 -16px 6px; padding: calc(8px + var(--top)) 16px 12px; background: linear-gradient(var(--bg), var(--bg)) top / 100% var(--top) no-repeat, rgba(255, 255, 255, .84); -webkit-backdrop-filter: saturate(180%) blur(14px); backdrop-filter: saturate(180%) blur(14px); }
 .phead::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 4px; height: 3px; border-radius: 999px; background: var(--accent); }
-[data-theme="dark"] .phead { background: rgba(12, 12, 19, .82); }
+[data-theme="dark"] .phead { background: linear-gradient(var(--bg), var(--bg)) top / 100% var(--top) no-repeat, rgba(12, 12, 19, .82); }
 [data-theme="dark"] .phead::after { height: 3px; bottom: 6px; border: 0; background: var(--meter); box-shadow: 0 0 12px rgba(204, 255, 0, .5); }
-[data-theme="dark"] .phead::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--leo-tex) 0 0/84px 84px; opacity: .14; -webkit-mask: linear-gradient(#000, transparent); mask: linear-gradient(#000, transparent); }
+[data-theme="dark"] .phead::before { content: ""; position: absolute; inset: var(--top) 0 0; z-index: -1; background: var(--leo-tex) 0 0/84px 84px; opacity: .14; -webkit-mask: linear-gradient(#000, transparent); mask: linear-gradient(#000, transparent); }
 .phead .l { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .phead h1 { margin: 0; font: 700 17px/1 var(--display); letter-spacing: -.01em; white-space: nowrap; cursor: pointer; }
 /* 手机：今天前后各 5 天的日期条 */
@@ -215,7 +218,7 @@ body.side-min .sync-pill span { display: none; }
 [data-theme="dark"] .pread { background: var(--surface); }
 .phone-settings .card { padding: 16px; }
 .phone-settings .btns .btn { flex: 1; }
-.hint.look-hint { margin: 10px 0 6px; }
+.hint.look-hint { margin: 0 0 8px; }
 .psync { display: inline-grid; place-items: center; flex-shrink: 0; width: 24px; height: 30px; padding: 0; border: 0; background: none; }
 .psync::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
 .psync.wait::before { background: var(--muted); }
@@ -782,25 +785,26 @@ body.phone .settings .page-head { margin-top: 4px; }
 ::view-transition { pointer-events: none; }
 ::view-transition-group(*) { animation-duration: .3s; animation-timing-function: var(--ease); }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .2s; }
-/* 白天夜里互换（html[data-vt="theme"]）：整页当一张图慢慢淡过去，底边泛一阵霞光（#dusk），那颗日月（.ball）原地换班。
+/* 白天夜里互换（html[data-vt="theme"]）：整页当一张图慢慢淡过去，底边泛一阵霞光（#dusk），那颗日月（.ball）一落一升。
+   快慢是照日出日落调的（全程约 3 秒）：整页淡 2.1s，霞光 3s，旧的那颗 1.2s 落下去，新的那颗接着 1.8s 升上来。
    霞光只在过渡里出现一下就拿掉（js/motion.js），会动的（明暗）放在 ::before 上，元素本身不动；日月在过渡里单独起一个名字（orb）。
    这样它们照自己的节奏走，不跟着整页淡 */
-html[data-vt="theme"]::view-transition-old(root), html[data-vt="theme"]::view-transition-new(root) { animation-duration: 1.3s; animation-timing-function: ease; }
+html[data-vt="theme"]::view-transition-old(root), html[data-vt="theme"]::view-transition-new(root) { animation-duration: 2.1s; animation-timing-function: ease; }
 html[data-vt="theme"] #dock, html[data-vt="theme"] #main .hero .meter .fill { view-transition-name: none; }
 ::view-transition-new(dusk) { animation: none; }
 #dusk { position: fixed; inset: auto 0 0; z-index: 44; height: 75vh; pointer-events: none; view-transition-name: dusk; }
-#dusk::before { content: ""; position: absolute; inset: 0; opacity: 0; animation: dusk 1.6s ease both; }
+#dusk::before { content: ""; position: absolute; inset: 0; opacity: 0; animation: dusk 3s ease both; }
 /* 朝霞（进白天）是黄 → 橙 → 粉，晚霞（进夜里）是玫红 → 紫 → 蓝 */
 #dusk[data-k="dawn"]::before { background: radial-gradient(65% 100% at 50% 100%, rgba(255, 226, 89, .8), rgba(255, 150, 60, .55) 40%, rgba(255, 105, 150, .3) 62%, transparent 80%); }
 #dusk[data-k="dusk"]::before { background: radial-gradient(65% 100% at 50% 100%, rgba(255, 62, 165, .72), rgba(140, 60, 255, .5) 44%, rgba(47, 91, 255, .26) 64%, transparent 80%); }
 @keyframes dusk { 35% { opacity: 1; } 100% { opacity: 0; } }
-/* 日月换班：原来那颗原地淡出，新的那颗淡入时往上升一小下（屏幕上没有它的页面就只有霞光） */
+/* 日月换班：原来那颗往下落、淡出；等它落完，新的那颗从下面升上来，过头一点再回到位（屏幕上没有它的页面就只有霞光） */
 html[data-vt="theme"] .ball { view-transition-name: orb; }
 html[data-vt="theme"]::view-transition-old(orb), html[data-vt="theme"]::view-transition-new(orb) { mix-blend-mode: normal; }
-html[data-vt="theme"]::view-transition-old(orb) { animation: orb-out .5s ease both; }
-html[data-vt="theme"]::view-transition-new(orb) { animation: orb-in 1.1s cubic-bezier(.2, .8, .2, 1) .2s both; }
-@keyframes orb-out { to { opacity: 0; transform: scale(.94); } }
-@keyframes orb-in { from { opacity: 0; transform: translateY(5px) scale(.9); } }
+html[data-vt="theme"]::view-transition-old(orb) { animation: orb-out 1.2s ease-in both; }
+html[data-vt="theme"]::view-transition-new(orb) { animation: orb-in 1.8s cubic-bezier(.34, 1.56, .64, 1) 1.1s both; }
+@keyframes orb-out { to { opacity: 0; transform: translateY(16px); } }
+@keyframes orb-in { from { opacity: 0; transform: translateY(18px); } }
 #dock { view-transition-name: dock; }
 #main .hero .meter .fill { view-transition-name: meter; }
 html[data-vt] .row.enter { animation: none; }

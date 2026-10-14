@@ -16,7 +16,7 @@ export function takeTransition() {
 }
 
 // 白天夜里互换的那一下（kind "theme"，整页慢慢淡过去），另外有两样，样子都在 css 里：
-// 底边泛一阵霞光（#dusk，朝霞 / 晚霞两种颜色，过渡里出现一下就拿掉）；那颗日月（.ball）原地换班——太阳淡出、月亮淡入时往上升一小下，反过来也一样
+// 底边泛一阵霞光（#dusk，朝霞 / 晚霞两种颜色，过渡里出现一下就拿掉）；那颗日月（.ball）一落一升——太阳落下去、月亮升上来，反过来也一样
 export function dusk(dark) {
   document.getElementById("dusk")?.remove();
   const el = document.createElement("i");
@@ -24,7 +24,7 @@ export function dusk(dark) {
   el.setAttribute("aria-hidden", "true");
   el.dataset.k = dark ? "dusk" : "dawn";   // 进夜里是晚霞，进白天是朝霞，颜色不一样
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1800);
+  setTimeout(() => el.remove(), 3200);   // 霞光那段动画是 3s（css 的 #dusk::before）
 }
 
 // 过渡里每一行单独挪动：给行起名字（安全线进度条、浮条的名字写在 CSS 里）；换页、翻天时整块动，先把名字摘掉

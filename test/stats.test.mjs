@@ -190,9 +190,6 @@ test("a task can sit right on a project, with or without a plan", () => {
   assert.deepEqual(rows("plan"), { Deck: 60, Work: 30, Chores: 20, "Solo plan": 15, "": 10 }, "by plan, a task without a plan stays on its project's row");
   assert.deepEqual(rows((t) => ({ name: t.id < "c" ? "first" : "rest", color: "" })), { first: 90, rest: 45 }, "rows can be decided by a function");
   assert.equal(S.rowOf(c, c.tasks[2], "group").color, "#840", "the project's colour when there's no plan");
-  const sh = S.shares(c, "2026-10-05", "2026-10-11");
-  assert.equal(sh.total, 135);
-  assert.deepEqual(sh.groups.map((g) => [g.name, g.min, g.parts.map((x) => x.name + ":" + x.min).join(",")]), [["Work", 90, "Deck:60,:30"], ["Chores", 20, ":20"], ["Solo plan", 15, "Solo plan:15"], ["", 10, ":10"]]);
 });
 
 test("weekly check: growth and relax, too little or too much", () => {

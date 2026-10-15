@@ -1448,17 +1448,6 @@ body.phone .mcoming { margin-top: 10px; padding: 10px 12px; }
 [data-theme="dark"] .gadd input:hover, [data-theme="dark"] .gadd input:focus { border-color: var(--edge); box-shadow: none; }
 
 /* ---------- Projects 页：各大类的占比、区头 ---------- */
-.pshare { margin-bottom: 16px; }
-.pshare > header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 7px; }
-.pshare h3 { margin: 0; font: 700 14px var(--display); }
-.pshare .seg { margin-left: auto; align-self: center; }
-.pshare .seg button { padding: 2px 9px; font-size: 12px; }
-.sbar { display: flex; gap: 2px; height: 12px; border-radius: 999px; overflow: hidden; }
-.sbar i { min-width: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
-.sbar.thin { flex: 0 0 120px; height: 6px; gap: 1px; }
-.sleg { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 7px 0 0; padding: 0; list-style: none; font-size: 12.5px; }
-.sleg li { display: inline-flex; align-items: center; gap: 6px; }
-.sleg i, .gdot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .2); }
 .pg-top h3 { display: inline-flex; align-items: center; gap: 8px; }
 .pg-top.editing { gap: 10px; }
 .pg-top.editing .rename { width: 200px; }

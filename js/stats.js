@@ -176,27 +176,6 @@ export function projectRows(ctx, from, last) {
   }).filter((r) => r.planned || r.spent);
 }
 
-// ---------- 占比：各大类各占多少，大类里面各计划各占多少（Projects 页用） ----------
-// → { total, groups: [{ name, color, min, parts: [{ name, color, min }] }] }；parts 里名字为空的 = 直接挂在大类上的
-export function shares(ctx, from, to) {
-  const last = to < ctx.today ? to : ctx.today;
-  const groups = new Map();
-  let total = 0;
-  for (const t of ctx.tasks) {
-    if (!t.date || t.date < from || t.date > last) continue;
-    const min = E.spentMin(t);
-    if (!min) continue;
-    const g = rowOf(ctx, t, "group"), p = t.projectId ? E.projectById(ctx, t.projectId) : null;
-    if (!groups.has(g.name)) groups.set(g.name, { name: g.name, color: g.color, min: 0, parts: new Map() });
-    const row = groups.get(g.name), key = p ? p.id : "";
-    if (!row.parts.has(key)) row.parts.set(key, { name: p ? p.name || "" : "", color: (p && p.color) || g.color, min: 0 });
-    row.min += min; total += min;
-    row.parts.get(key).min += min;
-  }
-  const big = (a, b) => b.min - a.min;
-  return { total, groups: [...groups.values()].map((g) => ({ ...g, parts: [...g.parts.values()].sort(big) })).sort(GR.byGroupOrder(ctx.groups)) };
-}
-
 // ---------- 每周：成长 / Relax 够不够、是不是太多 ----------
 // 大类的 grow = "all"：全部时间算成长；"deep"：标了 ◆ Deep 的算成长（比如深度阅读），没标的算 Relax。
 // 四个门槛（分钟，0 = 不提醒）：成长太少 / 太多、Relax 太少 / 太多。

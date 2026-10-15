@@ -1,7 +1,7 @@
 // 统计页（电脑）。最上面：看哪段时间（Week / Month / Season / Year / 自己选两头；每次打开都从 Month 开始）、只看哪几个项目 / 计划（可以勾好几个）、只看深度。
 // 下面两个页签：
 //   Time —— 时间去哪了：每天的柱子、一天 24 小时的饼图（带 On the side）、几点在干活（停在星期几上看那天平均多久）、Build 花了多久和其中多少是深度、时间表（项目 × 日子，点开看它下面的计划）。
-//   柱子和热力图默认只看 Build（右上角能切到 All）；大类永远按 Build、Work、Friends、Leisure、Fitness、Chores 排（js/groups.js 的 ORDER）
+//   柱子默认只看 Build、热力图默认看全部（右上角都能切）；大类永远按 Build、Work、Friends、Leisure、Fitness、Chores 排（js/groups.js 的 ORDER）
 // 颜色的规矩：青柠 = 总量（每天的柱子）；项目自己的颜色 = 按项目拆开的图（饼图、时间表、星期几、几点在干活）。
 //   Plan —— 计划执行得怎样：做完多少、守住几天线、估时准不准、各项目、没做完的原因、项目健康
 // 图都是 HTML / SVG 画的，鼠标移上去有读数，数字都另有一份表格 / 图例可以看。
@@ -25,7 +25,7 @@ let pickOpen = false;      // 勾选的那块开着：重画时别收起来
 let deepOnly = false;
 let pieMode = "day";  // 饼图：day = 一天 24 小时都算 / logged = 只看记下来的
 let adjust = false;   // 饼图底下「Adjust」开着
-const view = { trend: "build", heat: "build" };   // 柱子 / 热力图：只看 Build（默认）还是 All；这次打开记着
+const view = { trend: "build", heat: "all" };   // 柱子默认只看 Build、热力图默认 All（她定的）；这次打开记着
 let sideMonth = "";   // On the side 那一格选着的月份
 const tips = {};   // 图表 id → 每根柱子的读数
 

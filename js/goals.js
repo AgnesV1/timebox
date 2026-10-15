@@ -40,7 +40,8 @@ export function whenText(when, colYear) {
 }
 
 // → { cols: [{...column, items: [{ goal, done, late, ahead, when }]}], hidden: 做完了、已经过期不显示的有几条 }
-export function board(goals, today, { showDone = false } = {}) {
+// 每一栏里：没做完的在前；再按标签排——rank(tag) 给的先后（项目的顺序：Build、Work、Friends…，没标签的最后）；同一个标签里早到期的在前
+export function board(goals, today, { showDone = false, rank = () => 0 } = {}) {
   const cols = columns(today).map((c) => ({ ...c, items: [] }));
   let hidden = 0;
   for (const g of goals) {
@@ -55,8 +56,8 @@ export function board(goals, today, { showDone = false } = {}) {
     } else if (!col) { col = last; ahead = true; }
     col.items.push({ goal: g, done, late, ahead, when: whenText(done ? g.done : g.due, col.y) });
   }
-  const key = (x) => (x.done ? "1" + x.goal.done : "0" + (x.goal.due || ""));
-  for (const c of cols) c.items.sort((a, b) => key(a).localeCompare(key(b)) || (Number(a.goal.order) || 0) - (Number(b.goal.order) || 0));
+  const when = (x) => (x.done ? x.goal.done : x.goal.due) || "";
+  for (const c of cols) c.items.sort((a, b) => a.done - b.done || rank(a.goal.tag) - rank(b.goal.tag) || when(a).localeCompare(when(b)) || (Number(a.goal.order) || 0) - (Number(b.goal.order) || 0));
   return { cols, hidden };
 }
 

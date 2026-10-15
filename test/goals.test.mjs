@@ -51,3 +51,18 @@ test("text and tag are typed together", () => {
   assert.equal(G.whenText("2027-12", 2027), "Dec");
   assert.equal(G.whenText("", 2027), "");
 });
+
+test("in a column: open goals first, then by the project order of their tag, then by month", () => {
+  const goals = [
+    { id: "fit", text: "10k", tag: "Fitness", span: "year", due: "2026-12" },
+    { id: "none", text: "No tag", tag: "", span: "year", due: "2026-11" },
+    { id: "b2", text: "Band 8", tag: "build", span: "year", due: "2026-12" },
+    { id: "b1", text: "Mock test", tag: "Build", span: "year", due: "2026-11" },
+    { id: "x", text: "Odd tag", tag: "Garden", span: "year", due: "2026-10" },
+    { id: "w", text: "Ship it", tag: "Work", span: "year", due: "2026-12", done: "2026-10" }
+  ];
+  const order = ["build", "work", "friends", "leisure", "fitness", "chores"];
+  const rank = (tag) => { const t = String(tag || "").toLowerCase(); return !t ? Infinity : order.includes(t) ? order.indexOf(t) : order.length; };
+  const year = G.board(goals, "2026-10-11", { rank, showDone: true }).cols.find((c) => c.key === "year").items.map((x) => x.goal.id);
+  assert.deepEqual(year, ["b1", "b2", "fit", "x", "none", "w"]);
+});

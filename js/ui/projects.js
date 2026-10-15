@@ -1,5 +1,5 @@
 // 项目页，页头 Plans | Ideas 两格。Ideas = 灵感池（想去哪玩、想吃什么，没有时长和期限，见 js/ui/ideas.js）；下面说的都是 Plans。
-// 最上面是目标板（js/ui/goals.js）和各大类的时间占比；下面按「项目」分区（项目 = 大类 = 计划的 group），电脑上宽了分两栏（左 Build、Work，右别的），
+// 最上面是目标板（js/ui/goals.js）；下面按「项目」分区（项目 = 大类 = 计划的 group），电脑上宽了分两栏（左 Build、Work，右别的），
 // 清单里的大类一直都在（空的也在）；区头 Rename 可以改名、换颜色、并进别的大类。
 // 循环小事（engine.js 的 isRepeat）不单独给卡：直接算在大类上，区头下面一行小字，点开是它的编辑框。
 // 每张卡头上有 Archive：归档的折进区头右边的「3 archived」，点开在这个区里展开，卡上是 Restore。
@@ -97,19 +97,6 @@ function cardHTML(c, p, track = "progress") {
 
 const WORST = ["danger", "tight", "safe", "waiting", "open", "empty", "done", "dropped"];
 
-const pctOf = (v, total) => (total > 0 ? (v / total < 0.005 ? "<1%" : Math.round((v / total) * 100) + "%") : "0%");
-const SHARE_KINDS = [["week", "Week"], ["month", "Month"], ["season", "Season"]];
-const shareKind = () => (SHARE_KINDS.some(([k]) => k === store.local().shareKind) ? store.local().shareKind : "season");
-
-// 各大类的时间占比：一根叠起来的条 + 每个大类占百分之几（这周 / 这个月 / 这个季度，记在这台设备上）
-function sharesHTML(sh, kind) {
-  const seg = '<span class="seg">' + SHARE_KINDS.map(([k, l]) => '<button type="button" data-act="share-kind" data-v="' + k + '"' + (k === kind ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
-  const color = (g) => esc(g.color || "var(--c-None)");
-  return '<section class="pshare"><header><h3>Where the time went</h3><span class="msub">' + (sh.total ? fmtMin(sh.total) + " logged" : "Nothing logged yet") + "</span>" + seg + "</header>" +
-    (sh.total ? '<div class="sbar">' + sh.groups.map((g) => '<i style="flex-grow:' + g.min + ";background:" + color(g) + '" title="' + esc((g.name || "No project") + " · " + pctOf(g.min, sh.total) + " · " + fmtMin(g.min)) + '"></i>').join("") + "</div>" +
-      '<ul class="sleg">' + sh.groups.map((g) => '<li><i style="background:' + color(g) + '"></i>' + esc(g.name || "No project") + ' <b class="num">' + pctOf(g.min, sh.total) + "</b></li>").join("") + "</ul>" : "") + "</section>";
-}
-
 // 大类看的是什么（没存过的名字、哪都没归的计划照旧看进度）
 const trackFor = (name) => (name ? GR.trackOf(store.groupByName(name) || { name }) : "progress");
 // 最近一次和谁联系过（任何人）
@@ -202,12 +189,10 @@ const modeSeg = (ideas) => '<span class="seg">' + [["plans", "Plans"], ["ideas",
 export function projectsHTML(c) {
   if (ideasMode()) return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div><div class="tools">' + modeSeg(true) + "</div></header>" + ideasHTML(c) + "</div>";
   const groups = groupsOf(c.projects, { all: true });
-  const kind = shareKind(), r = S.periodRange(kind, c.today, store.prefs().weekStartsOn);
-  const sh = S.shares(c, r.from, r.to);
   const last = lastContactDate();
   return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div>' +
     '<div class="tools">' + modeSeg(false) + '<button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +
-    goalsHTML(c) + sharesHTML(sh, kind) +
+    goalsHTML(c) +
     (c.projects.length ? "" : '<p class="hint pintro">A project is an area of your life. Tasks can sit right on it, or under a plan inside it: a <b>Total</b> (so many hours by a deadline) or a <b>Regular</b> one (every Monday, three times a week).</p>') +
     columns(groups.map((g) => {
       const track = trackFor(g.name);
@@ -394,7 +379,6 @@ export function initProjects(rerender) {
     }
     else if (act === "rename-done") { renaming = null; rerender(); }
     else if (act === "remove-group") { renaming = null; store.removeGroup(group); }
-    else if (act === "share-kind") store.setLocal({ shareKind: el.dataset.v });
     else if (act === "proj-mode") store.setLocal({ projMode: el.dataset.v === "ideas" ? "ideas" : "plans" });
     else if (act === "edit-project") openProjectEditor(pid);
     else if ((act === "pkind" || act === "pplace") && !pid) {

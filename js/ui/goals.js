@@ -63,7 +63,10 @@ function colHTML(col, T, tags, colors) {
 export function goalsHTML(c) {
   const open = store.local().goalsOpen !== false;
   const goals = store.goals();
-  const b = G.board(goals, c.today, { showDone });
+  // 标签按项目的顺序排（c.groups 已经是 Build、Work、Friends… 的顺序）；不是项目名的标签排在后面，没标签的最后
+  const at = new Map(c.groups.map((g, i) => [low(g.name), i]));
+  const rank = (tag) => (!low(tag) ? Infinity : at.has(low(tag)) ? at.get(low(tag)) : c.groups.length);
+  const b = G.board(goals, c.today, { showDone, rank });
   const left = b.cols.reduce((a, col) => a + col.items.filter((x) => !x.done).length, 0);
   const head = "<header><h3>Goals</h3>" + (left ? '<span class="msub">' + left + " open</span>" : "") +
     '<span class="gtools">' + (open && (b.hidden || showDone) ? '<button type="button" class="link" data-act="g-finished">' + (showDone ? "Hide finished" : "Show " + b.hidden + " finished") + "</button>" : "") +

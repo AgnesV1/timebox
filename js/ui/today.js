@@ -200,9 +200,9 @@ function pickHTML(d, query) {
   if (!g) return "";
   const ideas = I.match(store.ideas(), taskOf, store.today(), query);
   const wants = GR.trackOf(g) === "contact" || !store.setting("reading")?.url ? [] : (reading.titleKey(query) ? reading.search(query, 20).filter((r) => r.want) : reading.wants()).slice(0, 4);
-  const item = (act, id, text, small, on) => '<li><button type="button" data-act="' + act + '" data-id="' + esc(id) + '" data-t="' + esc(text) + '"' + (on ? ' class="on"' : "") + ">" +
-    esc(text) + (small ? "<small>" + esc(small) + "</small>" : "") + "</button></li>";
-  return (ideas.length ? "<p>Ideas</p><ul>" + ideas.map((i) => item("idea-pick", i.id, i.text, i.date && i.date < store.today() ? "was " + fmtShort(i.date) : I.whenText(i), ideaDraft[d] === i.id && I.sameText(i.text, query))).join("") + "</ul>" : "") +
+  const item = (act, id, text, small, on, em = "") => '<li><button type="button" data-act="' + act + '" data-id="' + esc(id) + '" data-t="' + esc(text) + '"' + (on ? ' class="on"' : "") + ">" +
+    (em ? em + " " : "") + esc(text) + (small ? "<small>" + esc(small) + "</small>" : "") + "</button></li>";
+  return (ideas.length ? "<p>Ideas</p><ul>" + ideas.map((i) => item("idea-pick", i.id, i.text, i.date && i.date < store.today() ? "was " + fmtShort(i.date) : I.whenText(i), ideaDraft[d] === i.id && I.sameText(i.text, query), I.emojiOf(i))).join("") + "</ul>" : "") +
     (wants.length ? "<p>Want</p><ul>" + wants.map((r) => item("want-pick", "", r.title, r.tab, false)).join("") + "</ul>" : "");
 }
 

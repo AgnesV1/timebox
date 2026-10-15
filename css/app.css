@@ -1659,7 +1659,7 @@ select.open { border-color: var(--edge); }
 .idea-acts { margin-left: auto; opacity: 0; transition: opacity .15s; }
 .idea-row:hover .idea-acts, .idea-row:focus-within .idea-acts { opacity: 1; }
 .idea-acts .link { font-size: 12.5px; }
-.idea-row .idea-kinds .chip { padding: 1px 8px; font-size: 11.5px; color: var(--muted); }
+.idea-row .idea-kinds .chip { padding: 1px 7px; font-size: 13px; line-height: 1.3; color: var(--muted); }
 .idea-row.planned .idea-text { font-weight: 500; color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .idea-row.missed .idea-text { color: var(--muted); }
 .idea-row.missed .idea-when { color: var(--warn); }

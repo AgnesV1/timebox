@@ -1,14 +1,24 @@
 // 灵感池的纯计算（Projects 页的 Ideas）：想去哪玩、想吃什么、想参加什么活动。没有时长，大多也没有期限。
-// 一条灵感：{ id, text, kind: "out"（出门：去哪玩、什么活动）| "eat" | ""（还没归类）, date: "YYYY-MM-DD" | ""（少数才有）,
+// 一条灵感：{ id, text, kind: 见 KINDS | ""（还没归类）, date: "YYYY-MM-DD" | ""（少数才有）,
 //            by: true = 最晚这天 / 不是 = 就在这天, note, taskId（挑进了哪条任务）, order }
 // 挑进某天的任务 = 在池子里划掉；任务标了 Later / Drop、或者删了 = 回到池子；
 // 任务做完 = 去过了，这条就不要了：马上不再显示，过一周删掉（这一周里取消 Done、改成 Drop，它还回得来）。只算数，不碰页面和存储。
 
 import { addDays, fmtShort, weekday, WEEKDAYS } from "./dates.js";
 
-export const KINDS = [["out", "Outing"], ["eat", "Eat"]];
+// 类别 = [key, emoji, 名字]：界面上只露 emoji，名字在分组标题和 title 里。
+// 现场音乐归 🎭；户外、逛街市集这些不常去的都归 🛰️。以前的 Outing（"out"）当成 🎭（那时只有一条，是舞台剧），数据不改写
+export const KINDS = [["stage", "🎭", "Stage & exhibitions"], ["trip", "✈️", "Travel"], ["eat", "🍽️", "Eat"], ["bar", "🍹", "Bars"], ["other", "🛰️", "Other"]];
 const KEYS = KINDS.map(([k]) => k);
-export const kindOf = (idea) => (KEYS.includes(idea?.kind) ? idea.kind : "");
+const OLD = { out: "stage" };
+export const kindOf = (idea) => { const k = OLD[idea?.kind] || idea?.kind; return KEYS.includes(k) ? k : ""; };
+export const emojiOf = (idea) => KINDS.find(([k]) => k === kindOf(idea))?.[1] || "";
+// 每个类别下还能挑的有几条（筛选那一排的个数）；没归类的算在 "" 下
+export function kindCounts(ideas, taskOf, today) {
+  const out = {};
+  for (const i of ideas) if (stateOf(i, taskOf, today) !== "done") out[kindOf(i)] = (out[kindOf(i)] || 0) + 1;
+  return out;
+}
 const low = (s) => String(s ?? "").trim().toLowerCase();
 export const sameText = (a, b) => low(a) === low(b);
 
@@ -45,12 +55,12 @@ export const whenText = (idea) => (idea.date ? (idea.by ? "by " : "on " + WEEKDA
 const byDate = (a, b) => (a.date || "9999").localeCompare(b.date || "9999") || (Number(b.order) || 0) - (Number(a.order) || 0);
 const RANK = { open: 0, missed: 1, planned: 2 };
 
-// 整页的样子 → { groups: [{ kind, title, items: [{ idea, state, day }] }], open }（去过的不在里面）
+// 整页的样子 → { groups: [{ kind, emoji, title, items: [{ idea, state, day }] }], open }（去过的不在里面）
 //   groups：没归类的（Unsorted）在最前，然后照 KINDS 的顺序，空的不列；组里先是还在池子里的，过了日子的、已经排了的沉到后面
 //   open：还能挑的有几条
 export function board(ideas, taskOf, today) {
   const rows = ideas.map((idea) => ({ idea, state: stateOf(idea, taskOf, today), day: dayOf(idea, taskOf) })).filter((r) => r.state !== "done");
-  const groups = [["", "Unsorted"], ...KINDS].map(([kind, title]) => ({ kind, title,
+  const groups = [["", "", "Unsorted"], ...KINDS].map(([kind, emoji, title]) => ({ kind, emoji, title,
     items: rows.filter((r) => kindOf(r.idea) === kind).sort((a, b) => RANK[a.state] - RANK[b.state] || byDate(a.idea, b.idea)) })).filter((g) => g.items.length);
   return { groups, open: rows.filter((r) => r.state !== "planned").length };
 }
@@ -66,8 +76,8 @@ export function soon(ideas, taskOf, today, days = 7) {
   return upcoming(ideas, taskOf, today).filter((i) => i.date <= until);
 }
 
-// 放到某天时默认占多久（分钟）：出门算大半天，吃一顿算半天，还没归类的先按一小时
-const EST = { out: 360, eat: 180, "": 60 };
+// 放到某天时默认占多久（分钟）：看演出 / 吃一顿 / 喝一杯算半天，出去玩一整天，别的四小时，还没归类的先按一小时
+const EST = { stage: 180, trip: 480, eat: 180, bar: 180, other: 240, "": 60 };
 export const defaultEst = (idea) => EST[kindOf(idea)];
 
 // 加任务时能挑的：还在池子里的；打了字就只要对得上的。有日子的在前，过了日子的在最后

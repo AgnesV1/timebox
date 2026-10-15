@@ -1,5 +1,5 @@
 // 灵感池（Projects 页头的 Plans | Ideas 切到 Ideas，电脑）：想去哪玩、想吃什么、想参加什么活动——没有时长，大多也没有期限。
-// 顶上一格直接加（粘几行 = 几条；选着的类别、日子这几条都带上）。下面按类别分组，没归类的在最上面，每条带类别按钮（Outing / Eat）。
+// 顶上一格直接加（粘几行 = 几条；选着的类别、日子这几条都带上）。下面按类别分组，没归类的在最上面，每条带类别按钮（🎭 ✈️ 🍽️ 🍹 🛰️，见 js/ideas.js 的 KINDS），顶上一排能按类别筛。
 // 点文字就改；Plan = 放到哪天（建一条任务、挂上）；排了的划掉、写着哪天，Put back 放回池子；任务做完 = 去过了，这条就不再列出来。
 // 在 Leisure / Friends 下加任务时也能挑（见 js/ui/today.js 的 pickHTML）。怎么算见 js/ideas.js。
 // 手机上：随手记一条（加任务那行的 Idea 开关），再加一页只用来查的（顶栏的灯泡，#ideas）——一格搜索，下面按类别列出来，不能改。
@@ -9,7 +9,7 @@ import * as I from "../ideas.js";
 import * as GR from "../groups.js";
 import { esc, on } from "../dom.js";
 import { fmtShort, fmtMin, weekday, WEEKDAYS } from "../dates.js";
-import { toast } from "./common.js";
+import { toast, tagFilterHTML } from "./common.js";
 
 let kind = "";          // 加的那一格选着的类别
 let dated = false;      // 加的那一格开着日子
@@ -21,8 +21,12 @@ let seek = "";          // 手机上查的那一页：搜索框里的字
 const afterRender = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));
 const taskOf = (id) => store.get("tasks", id);
 const dayText = (d) => WEEKDAYS[weekday(d)] + " " + fmtShort(d);
-const chip = (act, v, label, cur) => '<button type="button" class="chip' + (cur ? " on" : "") + '" data-act="' + act + '" data-v="' + v + '" aria-pressed="' + cur + '">' + label + "</button>";
-const kindChips = (act, cur) => '<span class="idea-kinds">' + I.KINDS.map(([k, l]) => chip(act, k, l, cur === k)).join("") + "</span>";
+const chip = (act, v, label, cur, name) => '<button type="button" class="chip' + (cur ? " on" : "") + '" data-act="' + act + '" data-v="' + v + '" aria-pressed="' + cur + '" title="' + esc(name) + '" aria-label="' + esc(name) + '">' + label + "</button>";
+const kindChips = (act, cur) => '<span class="idea-kinds">' + I.KINDS.map(([k, e, name]) => chip(act, k, e, cur === k, name)).join("") + "</span>";
+// 顶上筛着哪个类别（记在这台设备上）；空 = 全部
+const kindFilter = () => (I.KINDS.some(([k]) => k === store.local().ideaKind) ? store.local().ideaKind : "");
+const lead = (idea) => (I.emojiOf(idea) ? I.emojiOf(idea) + " " : "");
+const groupTitle = (g) => (g.emoji ? g.emoji + " " : "") + g.title + " <small>" + g.items.length + "</small>";
 const bySeg = (act, cur) => '<span class="seg">' + [["on", "On"], ["by", "By"]].map(([v, l]) => '<button type="button" data-act="' + act + '" data-v="' + v + '"' + ((v === "by") === Boolean(cur) ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
 // 能挑灵感的大类：Plan 的时候放进哪个；没另外选就是 Leisure（没有这个名字的话，第一个）
 const homes = () => store.groups().filter(GR.ideasOf);
@@ -82,16 +86,17 @@ export function ideasPoolHTML(c) {
   const list = I.upcoming(store.ideas(), taskOf, c.today), g = store.groupByName(home());
   if (!list.length) return "";
   return '<section class="pg idea-due"><div class="pg-head" style="--pc:' + esc(g?.color || "var(--c-None)") + '"><i></i><span>Ideas</span></div><ul>' + list.map((i) =>
-    '<li data-idea="' + esc(i.id) + '"><span class="idea-due-t">' + esc(i.text) + "</span><em>" + esc(I.whenText(i)) + "</em>" +
+    '<li data-idea="' + esc(i.id) + '"><span class="idea-due-t">' + lead(i) + esc(i.text) + "</span><em>" + esc(I.whenText(i)) + "</em>" +
     '<button type="button" data-act="idea-to-day" title="' + esc("Add to " + dayText(i.date) + " · " + home() + " · " + fmtMin(I.defaultEst(i))) + '" aria-label="' + esc("Add to " + dayText(i.date)) + '">+</button></li>').join("") + "</ul></section>";
 }
 
 export function ideasHTML(c) {
-  const b = I.board(store.ideas(), taskOf, c.today);
-  return '<div class="idea-page">' + addHTML() +
+  const b = I.board(store.ideas(), taskOf, c.today), f = kindFilter();
+  const groups = b.groups.filter((g) => !f || g.kind === f);
+  return '<div class="idea-page">' + addHTML() + tagFilterHTML("idea-filter", I.KINDS, I.kindCounts(store.ideas(), taskOf, c.today), f) +
     (b.groups.length ? "" : '<p class="hint idea-intro">Places to go, things to eat, events to catch — no hours, no deadline. When you add a task under ' +
       esc(homes().map((g) => g.name).join(" or ") || "a project") + ", pick one and it's crossed off here; once that task is done, it's gone.</p>") +
-    b.groups.map((g) => '<section class="idea-group"><h3 class="idea-h">' + g.title + " <small>" + g.items.length + '</small></h3><ul class="idea-list">' + g.items.map(rowHTML).join("") + "</ul></section>").join("") + "</div>";
+    groups.map((g) => '<section class="idea-group"><h3 class="idea-h">' + groupTitle(g) + '</h3><ul class="idea-list">' + g.items.map(rowHTML).join("") + "</ul></section>").join("") + "</div>";
 }
 
 // 手机上查的那一页：名字、日子、备注；排了的划掉、写着哪天。搜的是名字和备注
@@ -100,7 +105,7 @@ function foundHTML(c) {
   const groups = I.board(store.ideas(), taskOf, c.today).groups
     .map((g) => ({ ...g, items: g.items.filter((r) => !q || (r.idea.text + " " + (r.idea.note || "")).toLowerCase().includes(q)) })).filter((g) => g.items.length);
   if (!groups.length) return '<p class="empty">' + (q ? "Nothing matches." : "No ideas yet. To save one, switch on Idea when you add a task.") + "</p>";
-  return groups.map((g) => '<section class="idea-group"><h3 class="idea-h">' + g.title + " <small>" + g.items.length + '</small></h3><ul class="idea-list">' + g.items.map(({ idea, state, day }) => {
+  return groups.map((g) => '<section class="idea-group"><h3 class="idea-h">' + groupTitle(g) + '</h3><ul class="idea-list">' + g.items.map(({ idea, state, day }) => {
     const when = state === "planned" ? "→ " + dayText(day) : state === "missed" ? "was " + fmtShort(idea.date) : I.whenText(idea);
     return '<li class="idea-row ' + state + '"><span class="idea-text">' + esc(idea.text) + "</span>" + (when ? '<span class="idea-when">' + esc(when) + "</span>" : "") +
       (idea.note ? '<span class="idea-note">' + esc(idea.note) + "</span>" : "") + "</li>";
@@ -128,6 +133,7 @@ export function initIdeas(rerender) {
   on(document, "click", ".idea-page [data-act]", (e, el) => {
     const { act, v } = el.dataset, id = el.closest("[data-idea]")?.dataset.idea || "", idea = id ? store.ideaOf(id) : null;
     if (act === "idea-kind") kind = kind === v ? "" : v;
+    else if (act === "idea-filter") { store.setLocal({ ideaKind: v }); return; }
     else if (act === "idea-dated") { dated = true; afterRender(() => document.querySelector(".idea-add [name=date]")?.focus()); }
     else if (act === "idea-by") by = v === "by";
     else if (act === "idea-edit") { edit = id; planning = ""; afterRender(() => document.querySelector('.idea-row.editing [data-if="text"]')?.focus()); }

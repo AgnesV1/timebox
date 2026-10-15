@@ -37,12 +37,23 @@ test("board: unsorted first, then by kind; dated first, planned last; done ones 
     idea({ text: "something", kind: "nope" }), idea({ text: "jazz", kind: "out", taskId: "z" })
   ];
   const b = I.board(list, of, T);
-  assert.deepEqual(b.groups.map((g) => g.title), ["Unsorted", "Outing", "Eat"]);
+  assert.deepEqual(b.groups.map((g) => g.emoji + g.title), ["Unsorted", "🎭Stage & exhibitions", "🍽️Eat"], "the old Outing ones count as stage");
   assert.deepEqual(b.groups[2].items.map((r) => r.idea.text), ["brunch", "omakase", "pho"], "dated, then newest");
   assert.deepEqual(b.groups[1].items.map((r) => r.idea.text + ":" + r.state), ["leaves:open", "old fair:missed", "museum:planned"], "jazz is done: gone from the page");
   assert.equal(b.groups[1].items[2].day, "2026-10-18");
   assert.equal(b.open, 6);
   assert.deepEqual(I.left(list, of, T).map((i) => i.text).includes("jazz"), false);
+});
+
+test("kinds: emoji, the old Outing, and how many are left under each", () => {
+  assert.equal(I.kindOf(idea({ text: "x", kind: "out" })), "stage");
+  assert.equal(I.kindOf(idea({ text: "x", kind: "bar" })), "bar");
+  assert.equal(I.kindOf(idea({ text: "x", kind: "nope" })), "");
+  assert.equal(I.emojiOf(idea({ text: "x", kind: "trip" })), "✈️");
+  assert.equal(I.emojiOf(idea({ text: "x" })), "");
+  const of = tasks([{ id: "z", date: "2026-10-05", status: "done" }]);
+  const list = [idea({ text: "a", kind: "eat" }), idea({ text: "b", kind: "eat" }), idea({ text: "c", kind: "out" }), idea({ text: "d" }), idea({ text: "e", kind: "bar", taskId: "z" })];
+  assert.deepEqual(I.kindCounts(list, of, T), { eat: 2, stage: 1, "": 1 }, "the one that's been done isn't counted");
 });
 
 test("stale: done for a week, ready to delete", () => {
@@ -68,7 +79,9 @@ test("upcoming: every dated idea still ahead, nearest first — past ones are le
 });
 
 test("how long an idea takes by default when it's put on a day", () => {
-  assert.equal(I.defaultEst(idea({ text: "x", kind: "out" })), 360);
+  assert.equal(I.defaultEst(idea({ text: "x", kind: "out" })), 180, "old Outing = stage");
+  assert.equal(I.defaultEst(idea({ text: "x", kind: "trip" })), 480);
+  assert.equal(I.defaultEst(idea({ text: "x", kind: "other" })), 240);
   assert.equal(I.defaultEst(idea({ text: "x", kind: "eat" })), 180);
   assert.equal(I.defaultEst(idea({ text: "x" })), 60);
   assert.equal(I.defaultEst(idea({ text: "x", kind: "something else" })), 60);

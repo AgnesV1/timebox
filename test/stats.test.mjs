@@ -244,3 +244,40 @@ test("a project's last 14 days: done, planned but not done, nothing", () => {
   assert.equal(S.groupDays(c, fit, 7).length, 7);
   assert.equal(S.groupDays(c, GROUPS[3], 14, ["2026-10-03", "2026-01-01"]).filter((x) => x.state === "done").map((x) => x.date).join(), "2026-10-03", "extra dates inside the window count");
 });
+
+test("on the side: a month's total spreads over its days; overlapping time is only a haze, full attention counts as Leisure", () => {
+  const groups = [{ name: "Work", labor: true }, { name: "Leisure", color: "#f0f" }];
+  const side = [
+    { id: "a", month: "2026-09", kind: "show", min: 1800, full: false },   // 30 小时，九月 30 天 → 每天 60 分钟
+    { id: "b", month: "2026-09", kind: "novel", min: 300, full: true },    // 每天 10 分钟
+    { id: "c", month: "2026-10", kind: "nope", min: 310, full: false },    // 十月 31 天 → 每天 10 分钟，到今天（5 号）为止
+    { id: "d", month: "bad", min: 99 }
+  ];
+  const c = ctx({ groups, side, tasks: [{ id: "w", date: "2026-09-10", est: 120, actual: 120, status: "done", group: "Work" }] });
+  const sep = S.sideHaze(c, "2026-09-01", "2026-09-30");
+  assert.equal(sep.min, 1800);
+  assert.deepEqual(sep.byKind, { show: 1800 });
+  const wk = S.sideHaze(c, "2026-09-28", "2026-10-04");
+  assert.equal(Math.round(wk.min), 3 * 60 + 4 * 10, "a week gets its days' share");
+  assert.deepEqual(Object.keys(wk.byKind).sort(), ["other", "show"], "an unknown kind is other");
+  assert.equal(S.sideHaze(c, "2026-10-01", "2026-10-31").min, 50, "this month only up to today");
+
+  assert.equal(S.sideGroup(c), "Leisure");
+  assert.equal(S.sideGroup(ctx({ groups: [{ name: "Fun", track: "range" }] })), "Fun", "no Leisure: the first one that tracks relax");
+  const st = S.sideTasks(c);
+  assert.equal(st.length, 30);
+  assert.ok(st.every((t) => t.side && t.group === "Leisure" && t.status === "done" && t.est === 10));
+
+  const plain = S.summarize(c, "2026-09-01", "2026-09-30"), full = S.summarize(S.withSide(c), "2026-09-01", "2026-09-30");
+  assert.equal(full.spent - plain.spent, 300);
+  assert.equal(full.byProject.find((x) => x.name === "Leisure").spent, 300);
+  assert.deepEqual([full.done, full.counted, full.planned], [plain.done, plain.counted, plain.planned], "counts and plans stay as they were");
+  const pie = S.clockPie(S.withSide(c), full);
+  assert.equal(Math.round(S.clockPie(c, plain).blank - pie.blank), 300, "only full attention comes out of Untracked");
+  assert.equal(S.withSide(ctx({ side: [side[0]] })).tasks.length, 0, "nothing full: nothing added");
+
+  const g = { name: "Leisure" };
+  const recent = ctx({ groups, today: "2026-09-20", side, tasks: [] });
+  assert.ok(S.groupDays(S.withSide(recent), g, 14).every((d) => d.state === ""), "the 14-day squares don't light up");
+  assert.equal(Math.round(S.groupHealth(S.withSide(recent), { name: "Leisure", track: "range" }).min), 70, "relax in the last 7 days does count it");
+});

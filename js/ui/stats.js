@@ -4,13 +4,14 @@
 // 颜色的规矩：青柠 = 总量（每天的柱子）；项目自己的颜色 = 按项目拆开的图（饼图、时间表、星期几、几点在干活）。
 //   Plan —— 计划执行得怎样：做完多少、守住几天线、估时准不准、各项目、没做完的原因、项目健康
 // 图都是 HTML / SVG 画的，鼠标移上去有读数，数字都另有一份表格 / 图例可以看。「+ Add time」补一段忘了记的时间。
+// 「On the side」按月补一个总数：边健身边通勤边看的剧 / 小说（js/stats.js 的 sideHaze / withSide）——叠在别的事上的只在饼图里压一段流光，完整投入的算进 Leisure。
 
 import * as store from "../store.js";
 import * as S from "../stats.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtMin, fmtShort, fmtDay, fmtClock, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf } from "../dates.js";
-import { healthPill, groupsOf, projectOptions, pickable, pickTarget } from "./common.js";
+import { healthPill, groupsOf, projectOptions, pickable, pickTarget, emojiPickHTML, toast } from "./common.js";
 import { hourLabel } from "../day.js";
 import { neon } from "../groups.js";
 import { openModal, closeModal, modalSheet } from "./modal.js";
@@ -349,7 +350,19 @@ function pieParts(pie) {
   return out;
 }
 
-function pieHTML(c, s, rest) {
+// On the side 里叠在别的事上的那些（sideHaze）：一段流光，从 Untracked 正中往回（往下）漫进前面那几片——多半是边健身、边通勤边看的。
+// 不占时间、不改任何一片；一道亮光从 Untracked 中间往下扫。关了动效 / 系统要求减少动态时不扫，只留那一段
+function hazeHTML(haze, total, mid) {
+  const len = Math.min(99.5, (haze.min / total) * 100);
+  if (len < 0.3) return "";
+  const at = mid - len, glint = Math.min(8, Math.max(0.6, len * 0.3));   // 亮光比那一段短，才扫得动
+  const still = document.getElementById("sky")?.classList.contains("still");
+  const arc = (cls, l, off, style = "") => '<circle class="' + cls + '" r="42" pathLength="100" stroke-dasharray="' + l.toFixed(3) + " " + (100 - l).toFixed(3) + '" stroke-dashoffset="' + (-off).toFixed(3) + '"' + style + "/>";
+  return '<g class="haze" aria-hidden="true">' + arc("haze-band", len, at) +
+    (still ? "" : arc("haze-glint", glint, mid - glint, ' style="--from:' + (-(mid - glint)).toFixed(3) + ";--to:" + (-at).toFixed(3) + ";--dur:" + Math.max(2.2, Math.min(4.5, 1.8 + len / 8)).toFixed(1) + 's"')) + "</g>";
+}
+
+function pieHTML(c, s, rest, haze = null) {
   const logged = pieMode === "logged";
   const pie = S.clockPie(c, s, { trackedOnly: logged, rest });
   const parts = pieParts(pie), life = S.lifeOf(c);
@@ -360,18 +373,22 @@ function pieHTML(c, s, rest) {
   const what = logged ? "of what you logged" : "of the whole period";
   tips.pie = parts.map((x) => ({ title: x.name, rows: [[what, fmtMin(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.deep > 0 ? [["deep", fmtMin(x.deep), "tide"]] : [])] }));
   // 每片之间留一条缝（周长的 0.5% ≈ 2px）；pathLength = 100，所以长度直接写百分比
-  let at = 0, under = "";
+  let at = 0, under = "", mid = 100;   // mid = Untracked 正中（流光从这里往下扫）；没有 Untracked 就从 12 点
   const arcs = parts.map((x, i) => {
     const len = (x.min / pie.total) * 100, start = at;
     at += len;
+    if (x.kind === "blank") mid = start + len / 2;
     const dash = (v) => { const d = Math.max(0.2, v - (parts.length > 1 ? 0.5 : 0)); return d.toFixed(3) + " " + (100 - d).toFixed(3); };
     const where = ' r="42" pathLength="100" stroke-dasharray="' + dash(len) + '" stroke-dashoffset="' + (-start).toFixed(3) + '"';
     if (ink(x)) under += '<circle class="slice-sh"' + where + "/>";
     return '<circle class="slice' + (ink(x) ? " ink" + (neon(x.color) ? "" : " boost") : "") + '" data-i="' + i + '"' + where + ' stroke="' + color(x) + '"' + (ink(x) ? ' style="--c:' + color(x) + '"' : "") + "/>" +
       (x.deep > 0 ? '<circle class="dring" r="53" pathLength="100" stroke-dasharray="' + dash((x.deep / pie.total) * 100) + '" stroke-dashoffset="' + (-start).toFixed(3) + '"/>' : "");
   }).join("");
+  const hz = !logged && haze && haze.min >= 1 && pie.total > 0 ? haze : null;
+  const hzTitle = hz ? S.SIDE_KINDS.filter(([k]) => hz.byKind[k]).map(([k, e, name]) => e + " " + name + " ~" + fmtMin(hz.byKind[k])).join(" · ") + " — alongside other things, so it overlaps" : "";
   const legend = parts.map((x) => '<li title="' + esc(x.name + (x.deep > 0 ? " · " + fmtMin(x.deep) + " deep" : "")) + '"><i style="background:' + swatch(x) + '"></i><span>' + esc(x.name) +
-    '</span><b class="num">' + fmtMin(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("");
+    '</span><b class="num">' + fmtMin(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("") +
+    (hz ? '<li class="haze-li" title="' + esc(hzTitle) + '"><i class="haze-sw"></i><span>On the side</span><b class="num">~' + fmtMin(hz.min) + "</b><em>overlaps</em></li>" : "");
   const lede = logged ? "Only the time you logged." : "24 hours a day, up to today. Sleep, meals &amp; care and weekend housework are your usual amounts.";
   const field = (k, label, unit, v) => "<label><span>" + label + '</span><input class="num" type="number" min="0" max="24" step="0.5" data-life="' + k + '" data-keep="life-' + k + '" value="' + (v ? Math.round(v / 6) / 10 : "") + '" placeholder="' + (k === "deepGoal" ? "none" : "0") + '"><em>' + unit + "</em></label>";
   return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">' + lede +
@@ -382,7 +399,7 @@ function pieHTML(c, s, rest) {
     (pie.total > 0
       ? '<div class="pie-wrap"><div class="pie" data-chart="pie"><svg viewBox="-60 -60 120 120" role="img" aria-label="' + esc(parts.map((x) => x.name + " " + share(x.min, pie.total)).join(", ")) + '">' +
         '<defs><pattern id="st-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="var(--k-blank)"/><rect width="1.5" height="5" fill="var(--muted)"/></pattern></defs>' +
-        '<g transform="translate(.9 .9) rotate(-90)">' + under + '</g><g transform="rotate(-90)">' + arcs + "</g></svg>" +
+        '<g transform="translate(.9 .9) rotate(-90)">' + under + '</g><g transform="rotate(-90)">' + arcs + (hz ? hazeHTML(hz, pie.total, mid) : "") + "</g></svg>" +
         '<div class="pie-c"><b class="num">' + fmtMin(pie.tracked) + "</b><span>logged</span>" + (pie.deep > 0 ? '<span class="num" title="Deep work">◆ ' + fmtMin(pie.deep) + "</span>" : "") + "</div></div>" +
         '<ul class="pie-legend">' + legend + "</ul></div>"
       : '<p class="empty">' + (s.days ? "Nothing logged in this period." : "This period hasn't started yet.") + "</p>") +
@@ -441,11 +458,13 @@ function headHTML(c, r) {
     '<button type="button" class="nav" data-act="st-next" aria-label="Later"' + (r.to >= c.today ? " disabled" : "") + ">" + icon("right") + "</button></div></header>" +
     '<div class="st-bar"><span class="seg"><button type="button" data-act="st-tab" data-v="time"' + (tab === "time" ? ' class="on"' : "") + '>Time</button><button type="button" data-act="st-tab" data-v="plan"' + (tab === "plan" ? ' class="on"' : "") + ">Plan</button></span>" +
     filter + '<button type="button" class="dk-deep' + (deepOnly ? " on" : "") + '" data-act="deep-only" aria-pressed="' + deepOnly + '">◆<span>Deep only</span></button>' +
-    '<button type="button" class="btn primary st-add" data-act="add-time">' + icon("plus") + " Add time</button></div>";
+    '<button type="button" class="btn primary st-add" data-act="add-time">' + icon("plus") + " Add time</button>" +
+    '<button type="button" class="btn" data-act="on-side" title="Shows, novels… you took in while doing something else">On the side</button></div>';
 }
 
 export function statsHTML(c) {
   remember();
+  c = S.withSide(c);   // On the side 里完整投入的那些：算进 Leisure 的分钟
   if (!anchor) anchor = c.today;
   const ws = store.prefs().weekStartsOn;
   const r = rangeOf(c);
@@ -460,7 +479,9 @@ export function statsHTML(c) {
   } else {
     // 筛选之外记下来的时间：饼图里合成「Everything else」一片
     const rest = sc.on ? Math.max(0, S.summarize(c, r.from, r.to).spent - s.spent) : 0;
-    body = '<div class="st-two">' + timeTrendHTML(s) + pieHTML(sc.c, s, rest) + "</div>" +
+    // 流光：只在什么都没勾、或者勾了算它的那个大类（Leisure）时画；只看深度时不画
+    const haze = !deepOnly && (!picks.size || picks.has("g:" + S.sideGroup(c))) ? S.sideHaze(c, r.from, r.to) : null;
+    body = '<div class="st-two">' + timeTrendHTML(s) + pieHTML(sc.c, s, rest, haze) + "</div>" +
       heatHTML(sc.c, s, sc.by) +
       '<div class="st-rhythm">' + timeKpis(s, prev) + weekdayHTML(s) + "</div>" +
       sheetHTML(sc.c, s, sc.by);
@@ -489,6 +510,48 @@ function paintLen(form) {
   const el = form.querySelector("[data-at-len]");
   const from = form.from.value, to = form.to.value;
   el.textContent = from && to ? fmtMin((((m(to) - m(from)) % 1440) + 1440) % 1440) + (m(to) < m(from) ? " · past midnight" : "") : "";
+}
+
+// ---------- On the side：按月补一个总数 ----------
+// 上面加一条（哪个月、什么、几个小时、备注、是不是完整投入），下面列已经记的：小时能改、能切完整投入、能删
+
+let sideKindDraft = "show";
+const monthLabel = (m) => MONTHS[Number(m.slice(5, 7)) - 1] + " " + m.slice(0, 4);
+const hoursOf = (min) => Math.round((Number(min) || 0) / 6) / 10;
+
+function sideHTML() {
+  const T = store.today(), months = Array.from({ length: 13 }, (_, i) => shiftMonth(T, -i));   // 这个月 + 前 12 个月，先选着上个月
+  const list = store.sides();
+  return '<div class="ots"><h2 class="sheet-title">On the side</h2>' +
+    '<p class="hint">Shows, novels, podcasts you took in while doing something else — at the gym, on the way somewhere. A rough total for the month is enough. ' +
+    "It's spread over that month's days and drawn over the untracked part of the 24h chart. Tick <b>Full attention</b> when you gave it your whole attention: that part counts as Leisure.</p>" +
+    '<form class="ots-add" autocomplete="off"><div class="field-row three">' +
+    '<label class="field"><span>Month</span><select name="month">' + months.map((m, i) => '<option value="' + m + '"' + (i === 1 ? " selected" : "") + ">" + monthLabel(m) + "</option>").join("") + "</select></label>" +
+    '<label class="field"><span>Hours</span><input class="num" type="number" name="hours" min="0.5" step="0.5" placeholder="12" data-keep="ots-hours"></label>' +
+    '<label class="field"><span>Note</span><input name="note" placeholder="The Bear, season 3" data-keep="ots-note"></label></div>' +
+    '<div class="field"><span>What</span>' + emojiPickHTML("ots-kind", S.SIDE_KINDS, sideKindDraft) + "</div>" +
+    '<div class="sheet-foot"><label class="deep-tog"><input type="checkbox" name="full"><span>Full attention — count it as Leisure</span></label><button type="submit" class="btn primary">Add</button></div></form>' +
+    (list.length ? '<ul class="ots-list">' + list.map((x) => {
+      const k = S.SIDE_KINDS.find(([v]) => v === S.sideKind(x));
+      return '<li data-side="' + esc(x.id) + '"><span class="ots-m">' + esc(monthLabel(x.month)) + '</span><span title="' + esc(k[2]) + '">' + k[1] + "</span>" +
+        '<label class="ots-h"><input class="num" type="number" min="0" step="0.5" value="' + hoursOf(x.min) + '" data-ots-h aria-label="Hours"> h</label>' +
+        '<span class="ots-note">' + esc(x.note || "") + "</span>" +
+        '<button type="button" class="chip' + (x.full ? " on" : "") + '" data-act="ots-full" aria-pressed="' + Boolean(x.full) + '" title="Full attention: counts as Leisure">Full attention</button>' +
+        '<button type="button" class="link" data-act="ots-del">Remove</button></li>';
+    }).join("") + "</ul>" : "") + "</div>";
+}
+
+// 往前 / 往后 n 个月的那个月（"2026-09"）
+function shiftMonth(date, n) {
+  const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7)) - 1 + n;
+  const yy = y + Math.floor(m / 12), mm = ((m % 12) + 12) % 12 + 1;
+  return yy + "-" + String(mm).padStart(2, "0");
+}
+
+// 弹层里那一块换成新的（加了 / 改了 / 删了以后）
+function refreshSide() {
+  const box = modalSheet()?.querySelector(".ots");
+  if (box) box.outerHTML = sideHTML();
 }
 
 // ---------- 交互：切时间段、读数提示 ----------
@@ -558,6 +621,7 @@ export function initStats(rerender) {
     else if (act === "pick-clear") picks.clear();
     else if (act === "sheet-row") { const n = el.dataset.name; if (!sheetOpen.delete(n)) sheetOpen.add(n); }
     else if (act === "add-time") { openModal(addTimeHTML(store.ctx())); modalSheet()?.querySelector("[name=title]")?.focus(); return; }
+    else if (act === "on-side") { openModal(sideHTML()); modalSheet()?.querySelector("[name=hours]")?.focus(); return; }
     if (anchor > T) anchor = T;
     rerender();
   });
@@ -596,6 +660,25 @@ export function initStats(rerender) {
     const id = store.addLogged({ date: form.date.value || store.today(), title, ...pickTarget(form.project?.value), deep: form.deep.checked }, form.from.value, form.to.value);
     if (!id) { form.to.focus(); return; }
     closeModal();
+  });
+  on(document, "click", ".ots [data-act]", (e, el) => {
+    const act = el.dataset.act, id = el.closest("[data-side]")?.dataset.side, x = id ? store.sideOf(id) : null;
+    if (act === "ots-kind") { sideKindDraft = el.dataset.v; refreshSide(); return; }
+    if (!x) return;
+    if (act === "ots-full") store.saveSide({ id, full: !x.full });
+    else if (act === "ots-del") store.deleteSide(id);
+    refreshSide();
+  });
+  on(document, "change", ".ots [data-ots-h]", (e, el) => {
+    const id = el.closest("[data-side]").dataset.side, h = Number(el.value);
+    if (h > 0) store.saveSide({ id, min: Math.round(h * 60) });
+  });
+  on(document, "submit", ".ots-add", (e, form) => {
+    e.preventDefault();
+    const h = Number(form.hours.value);
+    if (!(h > 0)) { form.hours.focus(); toast("How many hours, roughly?"); return; }
+    store.saveSide({ month: form.month.value, kind: sideKindDraft, min: Math.round(h * 60), full: form.full.checked, note: form.note.value.trim() }, "Added " + h + "h on the side");
+    refreshSide();
   });
   on(document, "pointerover", ".stats .col, .stats .hc, .stats .slice", (e, col) => showTip(col));
   on(document, "pointerout", ".stats .col, .stats .hc, .stats .slice", (e, col) => hideTip(col));

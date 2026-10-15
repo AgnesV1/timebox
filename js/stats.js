@@ -70,14 +70,16 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
   const last = to < ctx.today ? to : ctx.today;
   const days = from <= last ? range(from, last) : [];
   const inRange = (d) => d >= from && d <= last;
-  const tasks = ctx.tasks.filter((t) => t.date && inRange(t.date));
+  const all = ctx.tasks.filter((t) => t.date && inRange(t.date));
+  // side = On the side 里标了 full 摊出来的（见 withSide）：只算分钟，不算做完几条、估时准不准、原因、安排了多少
+  const tasks = all.filter((t) => !t.side);
 
   const spentBy = {}, plannedBy = {}, deepBy = {}, wdBy = {};   // wdBy：每一行（大类 / 计划）在星期几各花了多少
-  for (const t of tasks) {
+  for (const t of all) {
     spentBy[t.date] = (spentBy[t.date] || 0) + E.spentMin(t);
     if (E.spentMin(t)) { const n = rowOf(ctx, t, by).name; (wdBy[n] = wdBy[n] || Array(7).fill(0))[weekday(t.date)] += E.spentMin(t); }
     if (t.deep) deepBy[t.date] = (deepBy[t.date] || 0) + E.spentMin(t);
-    if (t.status !== "drop" && t.status !== "later") plannedBy[t.date] = (plannedBy[t.date] || 0) + num(t.est);
+    if (!t.side && t.status !== "drop" && t.status !== "later") plannedBy[t.date] = (plannedBy[t.date] || 0) + num(t.est);
   }
   const spent = days.reduce((a, d) => a + (spentBy[d] || 0), 0);
   const planned = days.reduce((a, d) => a + (plannedBy[d] || 0), 0);
@@ -99,14 +101,14 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
 
   // 按大类（或者按计划，见 rowOf）；哪都没挂的放最后
   const nameOf = (t) => rowOf(ctx, t, by).name;
-  const byProject = [...new Set(tasks.map(nameOf))].map((name) => {
-    const ts = tasks.filter((t) => nameOf(t) === name);
+  const byProject = [...new Set(all.map(nameOf))].map((name) => {
+    const mins = all.filter((t) => nameOf(t) === name), ts = mins.filter((t) => !t.side);
     const tm = ts.filter((t) => t.status === "done" && num(t.actual) > 0 && num(t.est) > 0);
     return {
       name,
-      color: ts.map((t) => rowOf(ctx, t, by).color).find(Boolean) || "",
-      spent: ts.reduce((a, t) => a + E.spentMin(t), 0),
-      deep: ts.reduce((a, t) => a + (t.deep ? E.spentMin(t) : 0), 0),
+      color: mins.map((t) => rowOf(ctx, t, by).color).find(Boolean) || "",
+      spent: mins.reduce((a, t) => a + E.spentMin(t), 0),
+      deep: mins.reduce((a, t) => a + (t.deep ? E.spentMin(t) : 0), 0),
       done: ts.filter((t) => t.status === "done").length,
       counted: ts.filter((t) => !t.optional || t.status === "done").length,
       accuracy: tm.length ? tm.reduce((a, t) => a + num(t.actual), 0) / tm.reduce((a, t) => a + num(t.est), 0) : null
@@ -256,7 +258,7 @@ export function groupHealth(ctx, g, { weekly = {}, lastContact = "" } = {}) {
 export function groupDays(ctx, g, n = 14, extra = []) {
   const from = addDays(ctx.today, -(n - 1)), also = new Set(extra), state = {};
   for (const t of ctx.tasks) {
-    if (!t.date || t.date < from || t.date > ctx.today || rowOf(ctx, t, "group").name !== g.name) continue;
+    if (t.side || !t.date || t.date < from || t.date > ctx.today || rowOf(ctx, t, "group").name !== g.name) continue;
     if (t.status === "done" || t.status === "partial" || E.spentMin(t) > 0) state[t.date] = "done";
     else if (!t.status && !state[t.date]) state[t.date] = "open";
   }
@@ -420,4 +422,58 @@ export function heatWeeks(grid, weekStartsOn) {
     weeks.get(w)[(weekday(x.date) - weekday(w) + 7) % 7] = x;
   }
   return [...weeks.entries()].map(([from, days]) => ({ from, days })).sort((a, b) => b.from.localeCompare(a.from));
+}
+
+// ---------- On the side：边健身、边通勤、边干别的边看的剧 / 小说（按月手填的总数，Stats 页的「On the side」） ----------
+// 一条：{ id, month: "2026-09", kind, min, full, note }。按月平摊到那个月每一天（到今天为止），所以看一周拿到的是那 7 天的份（界面上写 ~）。
+//   没标 full = 和别的事叠在一起的：只在 24h 饼图里压一段流光在 Untracked 上（sideHaze），不占时间、不进任何总数；
+//   标了 full = 完整投入地看了：算进 Leisure（sideTasks / withSide 摊成每天一条只有分钟的假任务，side: true）。
+export const SIDE_KINDS = [["show", "📺", "Shows"], ["novel", "📖", "Novels"], ["podcast", "🎧", "Podcasts"], ["film", "🎬", "Films"], ["other", "🪐", "Other"]];
+const SIDE_KEYS = SIDE_KINDS.map(([k]) => k);
+export const sideKind = (x) => (SIDE_KEYS.includes(x?.kind) ? x.kind : "other");
+const MONTH_RE = /^\d{4}-\d{2}$/;
+
+// 这条摊在哪几天（那个月里、[from, last] 以内）、每天多少分钟
+function spread(x, from, last) {
+  if (!MONTH_RE.test(String(x?.month || "")) || !(num(x.min) > 0)) return { days: [], per: 0 };
+  const first = x.month + "-01", n = daysInMonth(first), end = addDays(first, n - 1);
+  const a = first > from ? first : from, b = end < last ? end : last;
+  return { days: a <= b ? range(a, b) : [], per: num(x.min) / n };
+}
+
+// 叠在一起的那些在 [from, to]（到今天为止）里摊到多少：{ min, byKind: { show: 分钟, … } }
+export function sideHaze(ctx, from, to) {
+  const last = to < ctx.today ? to : ctx.today, out = { min: 0, byKind: {} };
+  for (const x of ctx.side || []) {
+    if (x.full) continue;
+    const { days, per } = spread(x, from, last), m = days.length * per;
+    if (!m) continue;
+    out.min += m;
+    out.byKind[sideKind(x)] = (out.byKind[sideKind(x)] || 0) + m;
+  }
+  return out;
+}
+
+// 算进哪个大类：叫 Leisure 的；没有就第一个看 Relax 的；再没有就不挂
+export function sideGroup(ctx) {
+  const list = ctx.groups || [];
+  return (list.find((g) => g.name === "Leisure") || list.find((g) => GR.trackOf(g) === "range"))?.name || "";
+}
+
+// 标了 full 的：那个月每天（到今天为止）一条只有分钟的假任务
+export function sideTasks(ctx) {
+  const group = sideGroup(ctx), out = [];
+  for (const x of ctx.side || []) {
+    if (!x.full) continue;
+    const { days, per } = spread(x, "0000-01-01", ctx.today);
+    const title = SIDE_KINDS.find(([k]) => k === sideKind(x))[2];
+    for (const d of days) out.push({ id: "side:" + x.id + ":" + d, date: d, title, group, projectId: "", status: "done", est: per, actual: per, deep: false, side: true });
+  }
+  return out;
+}
+
+// ctx 加上 sideTasks：Stats 的分钟、Projects 的时间占比和 Relax 那一句用这个；14 天方块、Plan 页签照旧（summarize 和 groupDays 自己会跳过 side）
+export function withSide(ctx) {
+  if (!(ctx.side || []).some((x) => x.full)) return ctx;
+  return { ...ctx, tasks: ctx.tasks.concat(sideTasks(ctx)) };
 }

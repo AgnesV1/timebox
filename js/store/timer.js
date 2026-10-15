@@ -41,7 +41,8 @@ export default function (core) {
     const t = get("tasks", taskId);
     if (!t) return;
     const sorted = list.slice().sort((a, b) => clockKey(a.from || a.to) - clockKey(b.from || b.to));
-    put("tasks", { ...t, times: formatTimes(sorted), actual: sumTimes(sorted) || null });
+    // Chore 键那条（chore-日期）没有「打算做多久」：est 跟着记下的合计走
+    put("tasks", { ...t, times: formatTimes(sorted), actual: sumTimes(sorted) || null, ...(String(taskId).startsWith("chore-") ? { est: sumTimes(sorted) } : {}) });
   }
 
   function addTime(taskId, min, to, from, tag = "") {

@@ -189,3 +189,27 @@ test("deep work: a plan's default marks its tasks, old ones too, and repeats car
   assert.equal(store.routineOf(first).rule.deep, false);
   assert.equal(store.get("tasks", first).deep, false);
 });
+
+test("chore key: one Chores task a day with a fixed id; each press is a segment; whatever was running is logged first", () => {
+  const T = store.today(), [y, m, d] = T.split("-").map(Number);
+  const id = store.choreId(T);
+  const other = store.addTask({ title: "Reading", est: 30 });
+  at(new Date(y, m - 1, d, 8, 0).getTime());
+  store.startTimer(other);
+  at(new Date(y, m - 1, d, 8, 20).getTime());
+  const r = store.startChore("🍳");
+  assert.deepEqual(r, { taskId: other, min: 20 }, "the one that was running is logged");
+  const c = store.get("tasks", id);
+  assert.ok(c && store.isChore(c));
+  assert.deepEqual([c.title, c.status, c.group, c.date], ["Chores", "done", "Chores", T]);
+  at(new Date(y, m - 1, d, 8, 50).getTime());
+  store.stopTimer();
+  at(new Date(y, m - 1, d, 12, 0).getTime());
+  store.startChore();
+  at(new Date(y, m - 1, d, 12, 10).getTime());
+  store.stopTimer();
+  const after = store.get("tasks", id);
+  assert.equal(after.times, "08:20-08:50 30m 🍳; 12:00-12:10 10m");
+  assert.deepEqual([after.actual, after.est], [40, 40], "est follows the total");
+  assert.equal(store.tasksOn(T).filter(store.isChore).length, 1, "still one a day");
+});

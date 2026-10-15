@@ -28,6 +28,17 @@ export function formatTimes(list) {
 
 export const sumTimes = (list) => (list || []).reduce((a, x) => a + (Number(x.min) || 0), 0);
 
+// 按记号并起来（Chore 那一条一行放得下）：[{ tag, min, n }]，多的在前，没记号的放最后
+export function groupTags(list) {
+  const by = new Map();
+  for (const x of list || []) {
+    const k = x.tag || "", g = by.get(k) || { tag: k, min: 0, n: 0 };
+    g.min += Number(x.min) || 0; g.n += 1;
+    by.set(k, g);
+  }
+  return [...by.values()].sort((a, b) => (!a.tag) - (!b.tag) || b.min - a.min);
+}
+
 // 加任务框里一句话补记：「Reading 14:00-15:10」「Read 2:30-3」→ { title, from, to }；不是这种写法就是 null。
 // 至少一头要带冒号，「Chapter 3-4」这种不算；钟点不合理的也不算。
 export function parseLogLine(text) {

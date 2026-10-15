@@ -1,7 +1,7 @@
 // 计时记录的文字写法，和加任务框里的一句话补记
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseTimes, formatTimes, parseLogLine } from "../js/times.js";
+import { parseTimes, formatTimes, parseLogLine, groupTags } from "../js/times.js";
 
 test("times text round-trips", () => {
   const list = parseTimes("09:10-09:40 30m; 20m");
@@ -15,6 +15,7 @@ test("a segment can end in an emoji mark; old text reads the same", () => {
   assert.equal(formatTimes(list), "18:00-18:40 40m 🍳; 09:10-09:30 20m ☎️; 12m; 14:00-14:15 15m 🗃️");
   assert.deepEqual(parseTimes("🪪"), [], "a mark on its own isn't a segment");
   assert.deepEqual(parseTimes("10m 🪪"), [{ from: "", to: "", min: 10, tag: "🪪" }]);
+  assert.deepEqual(groupTags(parseTimes("10m 🍳; 8m; 25m ☎️; 30m 🍳; 4m")), [{ tag: "🍳", min: 40, n: 2 }, { tag: "☎️", min: 25, n: 1 }, { tag: "", min: 12, n: 2 }], "same mark together, most first, none last");
 });
 
 test("a line that ends in a time range is something already done", () => {

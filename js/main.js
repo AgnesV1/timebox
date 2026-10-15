@@ -21,6 +21,7 @@ import { initEditor, refreshEditor } from "./ui/editor.js";
 import { initDnd } from "./ui/dnd.js";
 import { statsHTML, initStats } from "./ui/stats.js";
 import { dockHTML, initTimer, tick } from "./ui/timer.js";
+import { choreDockHTML, initChores } from "./ui/chores.js";
 import { readingHTML, initReading } from "./ui/reading.js";
 import { mealsHTML, shopHTML, initMeals, refreshMealEditor, mealDrop } from "./ui/meals.js";
 import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/friends.js";
@@ -160,7 +161,7 @@ function draw() {
   pool.hidden = !showPool;
   pool.innerHTML = showPool ? poolHTML(c) : "";
   const hadDock = document.body.classList.contains("has-dock");
-  dock.innerHTML = dockHTML(c, view === "today" && shownDate() === c.today && (!phone || Boolean(store.local().url)));
+  dock.innerHTML = dockHTML(c, view === "today" && shownDate() === c.today && (!phone || Boolean(store.local().url)), (t) => (store.isChore(t) ? choreDockHTML() : null));
   document.body.classList.toggle("has-dock", Boolean(dock.innerHTML));
   if (!hadDock) dock.firstElementChild?.classList.add("enter");   // 只在浮条刚出现时滑上来，重画时不闪
   // 圆盘落着的时候坐在浮条上面
@@ -250,6 +251,7 @@ initEditor();
 initDnd((payload, target) => (target.startsWith("m") ? mealDrop(payload, target) : handleDrop(payload, target)));
 initStats(render);
 initTimer(render);
+initChores(render);
 initReading(render);
 initMeals(render);
 initFriends(render);

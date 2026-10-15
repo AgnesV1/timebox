@@ -772,6 +772,17 @@ body.phone .settings .page-head { margin-top: 4px; }
 .pie-legend i { width: 10px; height: 10px; border-radius: 3px; }
 .pie-legend span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pie-legend b { font-weight: 600; }
+/* On the side 的流光（js/ui/stats.js 的 hazeHTML）：压在粗圈上的一段半透明青柠（夜里冰蓝），一道亮光从 Untracked 正中往下扫；不接鼠标，读数在图例那一行 */
+.haze circle { fill: none; stroke-width: 15; pointer-events: none; }
+.haze-band { stroke: rgba(178, 230, 0, .4); }
+.haze-glint { stroke: #C6FF00; stroke-dashoffset: var(--from); animation: haze-sweep var(--dur, 3s) cubic-bezier(.4, 0, .6, 1) infinite; }
+@keyframes haze-sweep { 0% { stroke-dashoffset: var(--from); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { stroke-dashoffset: var(--to); opacity: 0; } }
+[data-theme="dark"] .haze-band { stroke: rgba(190, 244, 255, .22); }
+[data-theme="dark"] .haze-glint { stroke: rgba(233, 251, 255, .9); filter: drop-shadow(0 0 3px rgba(190, 244, 255, .8)); }
+.pie-legend .haze-sw { background: linear-gradient(90deg, rgba(178, 230, 0, .25), #C6FF00, rgba(178, 230, 0, .25)); }
+[data-theme="dark"] .pie-legend .haze-sw { background: linear-gradient(90deg, rgba(190, 244, 255, .2), #E9FBFF, rgba(190, 244, 255, .2)); }
+.pie-legend .haze-li { grid-template-columns: 10px minmax(0, 1fr) auto auto; }
+.pie-legend .haze-li em { font-style: normal; font-size: 11px; color: var(--muted); }
 .pie-legend em { font-style: normal; text-align: right; color: var(--muted); }
 .life-form { display: grid; gap: 6px; margin: 0 0 12px; padding: 10px; border-radius: 12px; background: var(--surface); font-size: 12.5px; }
 .life-form label { display: grid; grid-template-columns: minmax(0, 1fr) 54px auto; align-items: center; gap: 6px; }
@@ -1752,6 +1763,29 @@ select.open { border-color: var(--edge); }
 .rprios .chip.on { color: var(--accent-ink); }
 [data-theme="dark"] .rprios .chip.on { color: var(--accent); }
 .radd:not(.done) .rlab { width: 52px; }
+
+/* ---------- Chore 键（js/ui/chores.js）：列表顶上一行、靠右——小圆键，前面是按 emoji 并好的小块；计时中是四个记号 + 走着的时间 ---------- */
+.chore { margin: 0 0 6px; }
+.chore-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.chore-k { font-size: 12px; font-weight: 600; color: var(--muted); }
+.chore-key { display: inline-grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; padding: 0; border: var(--b); border-radius: 50%; background: var(--accent); color: var(--accent-ink); box-shadow: var(--hard); transition: transform .15s var(--ease); }
+.chore-key:active { transform: scale(.9); }
+.chore-key .tri { width: 0; height: 0; margin-left: 2px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 8px solid currentColor; }
+.chore-key .sq { width: 9px; height: 9px; border-radius: 2px; background: currentColor; }
+.chore-key.run { background: var(--hot); color: #fff; }
+.chore-time { font: 700 13px/1 var(--num); font-variant-numeric: tabular-nums; }
+.chore-sum { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px; padding: 0; border: 0; background: none; cursor: pointer; }
+.chore-cc { padding: 1px 8px; border-radius: 999px; background: var(--surface); font-size: 12px; line-height: 1.5; white-space: nowrap; }
+.chore-sum b { margin: 0 2px 0 3px; font-size: 12px; }
+.chore-sum[aria-expanded="true"] .chore-cc { box-shadow: inset 0 0 0 1px var(--edge); }
+.chore-tags { display: inline-flex; gap: 3px; }
+.chore-tags .chip { padding: 1px 6px; font-size: 13px; line-height: 1.3; }
+.chore-each { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; margin-top: 6px; }
+.chore-each .chore-tags .chip { padding: 0 4px; border-color: transparent; background: none; font-size: 12px; opacity: .45; }
+.chore-each .chore-tags .chip.on { opacity: 1; border-color: var(--edge); background: var(--accent); box-shadow: none; }
+[data-theme="dark"] .chore-key { border-color: var(--accent); box-shadow: var(--glow); }
+[data-theme="dark"] .chore-key.run { border-color: var(--hot); background: var(--hot); box-shadow: 0 0 14px rgba(255, 43, 214, .5); }
+[data-theme="dark"] .chore-each .chore-tags .chip.on { background: rgba(204, 255, 0, .12); border-color: var(--accent); }
 
 /* ---------- 半透明（2026-10，她挑的「50% + 轻磨砂」）：卡片、侧栏、日历池、浮条都透得出底图（#sky 的天、云、星芒、飞机和潮水） ----------
    --card = 半透明的 --bg，--frost = 轻轻糊一点（只糊 4px，花样还看得出来）。日历格子、备餐的每一天格子太多，只透不糊。

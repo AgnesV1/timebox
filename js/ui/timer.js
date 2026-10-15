@@ -49,7 +49,8 @@ function atForm(kind, value) {
     '<button type="submit" class="btn">' + (kind === "since" ? "Set" : "Stop") + '</button><button type="button" class="link" data-act="at-x">Cancel</button></form>';
 }
 
-export function dockHTML(c, onToday, extra = (t) => deepBtn(t)) {
+// extra = 换掉 Deep 按钮的那一块（计时的是 Chore 键那条时，main.js 递进来四个记号）；返回 null 就照旧是 Deep
+export function dockHTML(c, onToday, extra = () => null) {
   const run = store.timer();
   const rt = run && store.get("tasks", run.taskId);
   if (rt) {
@@ -57,7 +58,7 @@ export function dockHTML(c, onToday, extra = (t) => deepBtn(t)) {
     const next = p && p !== rt.id && onToday ? store.get("tasks", p) : null;
     return '<div class="dock run" style="--bar:' + colorOf(rt) + '">' +
       '<i class="pulse" aria-hidden="true"></i><div class="dk-main"><button type="button" class="dk-k dk-since' + (atEdit === "since" ? " on" : "") + '" data-act="at-edit" data-v="since" title="Started earlier? Change the time">Since ' + store.clockOf(run.start) + "</button>" + titleOf(rt) + "</div>" +
-      extra(rt) + '<span class="dk-time num" data-since="' + run.start + '">' + elapsed(run.start) + "</span>" +
+      (extra(rt) ?? deepBtn(rt)) + '<span class="dk-time num" data-since="' + run.start + '">' + elapsed(run.start) + "</span>" +
       '<button type="button" class="dk-early' + (atEdit === "stop" ? " on" : "") + '" data-act="at-edit" data-v="stop" title="Stopped earlier? Pick the time" aria-label="Stopped earlier? Pick the time">⏱</button>' +
       '<button type="button" class="dk-btn stop" data-act="timer-stop"><i class="sq"></i>Stop</button>' +
       '<button type="button" class="icon-btn dk-x" data-act="timer-discard" aria-label="Discard this timer" title="Discard">×</button>' +

@@ -114,7 +114,8 @@ function sharesHTML(sh, kind) {
 const trackFor = (name) => (name ? GR.trackOf(store.groupByName(name) || { name }) : "progress");
 // 最近一次和谁联系过（任何人）
 const lastContactDate = () => Object.values(store.lastContact()).sort().pop() || "";
-const healthOf = (c, g, last) => S.groupHealth(c, g, { weekly: store.setting("weekly", {}), lastContact: last });
+// Relax 那一句也算上 On the side 里完整投入的那些（Stats 页的；只有分钟，14 天方块不亮）
+const healthOf = (c, g, last) => S.groupHealth(S.withSide(c), g, { weekly: store.setting("weekly", {}), lastContact: last });
 // 有几个大类不达标（侧栏 Projects 上的角标）
 export function projectAlerts(c) {
   const last = lastContactDate();
@@ -203,7 +204,7 @@ export function projectsHTML(c) {
   if (ideasMode()) return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div><div class="tools">' + modeSeg(true) + "</div></header>" + ideasHTML(c) + "</div>";
   const groups = groupsOf(c.projects, { all: true });
   const kind = shareKind(), r = S.periodRange(kind, c.today, store.prefs().weekStartsOn);
-  const sh = S.shares(c, r.from, r.to);
+  const sh = S.shares(S.withSide(c), r.from, r.to);
   const last = lastContactDate();
   return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div>' +
     '<div class="tools">' + modeSeg(false) + '<button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +

@@ -12,6 +12,7 @@ import { readLocal, writeLocal } from "./dom.js";
 import { formatTimes, sumTimes } from "./times.js";
 import seriesStore from "./store/series.js";
 import timerStore from "./store/timer.js";
+import sideStore from "./store/side.js";
 import friendStore from "./store/friends.js";
 import goalStore from "./store/goals.js";
 import mealStore from "./store/meals.js";
@@ -194,6 +195,7 @@ export function ctx() {
     weekStartsOn: prefs().weekStartsOn,
     commute: setting("commute", null),
     life: setting("life", null),
+    side: sides(),
     groups: groups()
   };
   return ctxCache;
@@ -392,7 +394,7 @@ function itemFor(projectId, title, est) {
 }
 
 export function addTask(fields) {
-  const id = newId();
+  const id = fields.id || newId();   // 给了 id 就用它（Chore 键那条每天固定是 chore-日期）
   const date = fields.date || today();
   change(() => {
     const itemId = fields.projectId && !fields.itemId ? itemFor(fields.projectId, fields.title, fields.est) : fields.itemId || "";
@@ -811,6 +813,23 @@ const core = { all, get, entries: (t) => Object.entries(S.data[t]), put, drop, c
 
 const tm = timerStore(core);
 export const { timer, timeOf, hasTime, timeTotal, clockOf, clockNow, startTimer, stopTimer, setTimerStart, setTimerTag, discardTimer, logTime, addLogged, tagTime, editTime, deleteTime } = tm;
+
+// Chore 键：每天一条 Chores 任务（ID 固定 chore-日期，表格里不用加列就认得出），标着 Done、est = 当天合计；每按一次 = 多一段计时。
+// 挂在叫 Chores 的大类上，没有就第一个 labor 的，再没有就不挂。有别的在跑先停下记好（返回记了多少，和 startTimer 一样）
+export const choreId = (date) => "chore-" + date;
+export const isChore = (t) => String(t?.id || "").startsWith("chore-");
+const choreGroup = () => (groups().find((g) => g.name === "Chores") || groups().find((g) => g.labor))?.name || "";
+export function startChore(tag = "") {
+  const id = choreId(today());
+  let logged = null;
+  change(() => {
+    if (!get("tasks", id)) addTask({ id, title: "Chores", est: 0, status: "done", group: choreGroup() });
+    logged = startTimer(id, tag);
+  });
+  return logged;
+}
+
+export const { sides, sideOf, saveSide, deleteSide } = sideStore(core);
 
 const fr = friendStore(core);
 export const { friends, meets, meetOfTask, friendFields, lastContact, saveFriend, deleteFriend, saveMeet, deleteMeet, setTaskMeet, importFriends, friendSpecial, adoptMarks, occasionDone, toggleOccasion, doneNext } = fr;

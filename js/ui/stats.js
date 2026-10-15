@@ -378,13 +378,14 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
   const legend = parts.map((x) => '<li title="' + esc(x.name + (x.unlogged ? " · includes " + fmtMin(x.unlogged) + " usual housework" : "") + (x.deep > 0 ? " · " + fmtMin(x.deep) + " deep" : "")) + '"><i style="background:' + swatch(x) + '"></i><span>' + esc(x.name) +
     '</span><b class="num">' + fmtMin(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("") +
     (hz ? '<li class="haze-li" title="' + esc(hzTitle) + '"><i class="haze-sw"></i><span>On the side</span><b class="num">~' + fmtMin(hz.min) + "</b><em>overlaps</em></li>" : "");
-  const lede = logged ? "Only the time you logged." : "Each 24-hour day, up to today. Sleep and meals count but aren't drawn; Chores includes your usual weekend housework.";
+  const lede = logged ? "Only the time you logged." : "Each 24-hour day. Sleep and meals count but aren't drawn.";
   const field = (k, label, unit, v) => "<label><span>" + label + '</span><input class="num" type="number" min="0" max="24" step="0.5" data-life="' + k + '" data-keep="life-' + k + '" value="' + (v ? Math.round(v / 6) / 10 : "") + '" placeholder="' + (k === "deepGoal" ? "none" : "0") + '"><em>' + unit + "</em></label>";
   return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">' + lede +
     ' <button type="button" class="link" data-act="life-adjust" aria-expanded="' + adjust + '">' + (adjust ? "Done" : "Adjust") + "</button></p></div>" +
     '<span class="seg"><button type="button" data-act="pie-mode" data-v="day"' + (logged ? "" : ' class="on"') + '>24h</button><button type="button" data-act="pie-mode" data-v="logged"' + (logged ? ' class="on"' : "") + ">Logged only</button></span></header>" +
+    // Adjust 一个月才开一次：几个默认值 + On the side 都收在这里面，平常不占地方
     (adjust ? '<div class="life-form">' + field("sleep", "Sleep", "h a day", life.sleep) + field("care", "Meals, dishes, shower", "h a day", life.care) +
-      field("chores", "Chores you don't log", "h a weekend", life.chores) + field("deepGoal", "Deep goal", "h a work day", life.deepGoal) + "</div>" : "") +
+      field("chores", "Chores you don't log", "h a weekend · in Chores", life.chores) + field("deepGoal", "Deep goal", "h a work day", life.deepGoal) + sideRowHTML(c) + "</div>" : "") +
     (pie.total > 0
       ? '<div class="pie-wrap"><div class="pie" data-chart="pie"><svg viewBox="-60 -60 120 120" role="img" aria-label="' + esc(parts.map((x) => x.name + " " + share(x.min, pie.total) + " of the day").join(", ")) + '">' +
         '<defs><pattern id="st-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="var(--k-blank)"/><rect width="1.5" height="5" fill="var(--muted)"/></pattern></defs>' +
@@ -392,18 +393,17 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
         '<div class="pie-c"><b class="num">' + fmtMin(pie.tracked) + "</b><span>logged</span>" + (pie.deep > 0 ? '<span class="num" title="Deep work">◆ ' + fmtMin(pie.deep) + "</span>" : "") + "</div></div>" +
         '<ul class="pie-legend">' + legend + "</ul></div>"
       : '<p class="empty">' + (s.days ? "Nothing logged in this period." : "This period hasn't started yet.") + "</p>") +
-    sideRowHTML(c) + "</section>";
+    "</section>";
 }
 
-// On the side：一个月填一个总数（小时）。平常能填前两个月，这个月最后三天里这个月也能填；先选着上个月
+// On the side（在 Adjust 里）：一个月填一个总数（小时）。平常能填前两个月，这个月最后三天里这个月也能填；先选着上个月
 function sideRowHTML(c) {
   const months = S.sideMonths(c.today), last = months[months.length - 2];
   if (!months.includes(sideMonth)) sideMonth = last;
   const h = Math.round(store.sideOf(sideMonth) / 6) / 10;
-  return '<div class="ots-row"><span class="ots-k">On the side</span>' +
-    '<select data-ots-m aria-label="Month">' + months.map((m) => '<option value="' + m + '"' + (m === sideMonth ? " selected" : "") + ">" + MONTHS[Number(m.slice(5, 7)) - 1] + "</option>").join("") + "</select>" +
-    '<input class="num" type="number" min="0" step="0.5" value="' + (h || "") + '" placeholder="0" data-ots-h data-keep="ots-h-' + sideMonth + '" aria-label="Hours that month"><em>h</em>' +
-    '<span class="msub">shows, novels… while doing something else — a haze over Untracked</span></div>';
+  return '<div class="ots-row" title="Shows, novels… taken in while doing something else. Drawn as a haze over Untracked">' +
+    '<span>On the side in <select data-ots-m aria-label="Month">' + months.map((m) => '<option value="' + m + '"' + (m === sideMonth ? " selected" : "") + ">" + MONTHS[Number(m.slice(5, 7)) - 1] + "</option>").join("") + "</select></span>" +
+    '<input class="num" type="number" min="0" step="0.5" value="' + (h || "") + '" placeholder="0" data-ots-h data-keep="ots-h-' + sideMonth + '" aria-label="Hours that month"><em>h that month</em></div>';
 }
 
 // ---------- 时间表：项目 × 日子 ----------

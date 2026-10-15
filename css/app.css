@@ -644,13 +644,11 @@ body.phone .settings .page-head { margin-top: 4px; }
 .heat-head h3 { margin: 0; }
 .hday { cursor: default; text-decoration: underline dotted; text-underline-offset: 3px; }
 .hday:hover, .hday:focus-visible { color: var(--ink); }
-/* 饼图那一块最底下：On the side 一个月一个总数 */
-.ots-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12.5px; }
-.ots-k { font-weight: 700; }
-.ots-row select { padding: 3px 8px; font-size: 12.5px; }
-.ots-row input { width: 64px; padding: 3px 8px; font-size: 12.5px; }
-.ots-row em { font-style: normal; color: var(--muted); }
-.ots-row .msub { flex-basis: 100%; font-size: 11.5px; }
+/* Adjust 里最后一行：On the side 一个月一个总数（和上面几行同一个格子排法，月份是个小下拉） */
+.ots-row { display: grid; grid-template-columns: minmax(0, 1fr) 54px auto; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.ots-row select { padding: 1px 6px; font-size: 12px; }
+.ots-row input { padding: 4px 6px; border: var(--b-ctl); text-align: center; }
+.ots-row em { font-style: normal; color: var(--muted); white-space: nowrap; }
 .k { display: inline-block; width: 12px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 /* 总量的柱子是青柠（界面的那个强调色）：白底上要一圈细黑边才看得清，夜间不用。按项目拆开的图用项目自己的颜色 */
 .k.dn { background: var(--accent); box-shadow: inset 0 0 0 1px var(--edge); }

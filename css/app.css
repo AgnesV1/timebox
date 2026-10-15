@@ -16,6 +16,7 @@
   --meter: linear-gradient(90deg, #C6FF00, #FF3EA5 70%, #2F5BFF);
   --b: 1.5px solid var(--edge); --b-soft: 1.5px solid #E2E2DC; --b-ctl: 1px solid #CDCDC6;
   --hard: 2px 2px 0 var(--edge); --hard-lg: 3px 3px 0 var(--edge); --glow: none;
+  --card: rgba(255, 255, 255, .5); --frost: blur(4px) saturate(140%);
   --r: 14px; --r-sm: 10px;
   --leo-spot: #0B0B0B; --leo-inner: #FF3EA5; --zebra-ink: #0B0B0B;
   --k-Main: #719507; --k-Work: #1B4BFE; --k-Fun: #E40187; --k-Chore: #E36B02; --k-None: #85858F; --k-sleep: #5F5F6C; --k-care: #9A9AA6; --k-chores: #D3D3DA; --k-blank: #EFEFEA; --grid: #ECECE6;
@@ -35,6 +36,7 @@
   --meter: linear-gradient(90deg, #CCFF00, #00E5FF 60%, #FF2BD6);
   --b: 1px solid var(--edge); --b-soft: 1px solid #222232; --b-ctl: var(--b);
   --hard: 0 0 0 1px rgba(204, 255, 0, .05), 0 0 24px rgba(204, 255, 0, .06) inset; --hard-lg: 0 0 40px rgba(0, 229, 255, .06); --glow: 0 0 14px rgba(204, 255, 0, .5);
+  --card: rgba(12, 12, 19, .5);
   --leo-spot: #FF2BD6; --leo-inner: rgba(255, 43, 214, .35); --zebra-ink: rgba(255, 255, 255, .85);
   --k-Main: #7BA208; --k-Work: #0083FC; --k-Fun: #F504A2; --k-Chore: #DB7206; --k-None: #6A6A80; --k-sleep: #A2A2BA; --k-care: #666680; --k-chores: #343446; --k-blank: #1B1B28; --grid: #1F1F2D;
   --num: "JetBrains Mono", ui-monospace, monospace;
@@ -83,15 +85,15 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 [data-theme="dark"] .seg button.on { box-shadow: var(--glow); }
 
 /* ---------- 整站底图（#sky，js/fx.js 建的）：白天 = 蓝天白云，夜里 = 碎星芒 ----------
-   全是渐变加几小块 SVG 平铺，没有图片。云有七朵，云影一朵带粉、一朵带蓝。垫在所有东西下面：侧栏、卡片都是不透明的，只在它们之间露出来。
+   全是渐变加几小块 SVG 平铺，没有图片。云有七朵，云影一朵带粉、一朵带蓝。垫在所有东西下面：侧栏、卡片都是半透明的（--card + 轻磨砂，见文件最后），透得出来。
    云极慢地飘；星芒分四层，每层平铺的大小、呼吸的快慢都不一样，看着就不齐。设置里关了动效（.still）或系统要求减少动态时都停住。
-   手机上任务是直接铺在底色上的，所以只留顶上一点天色，不放云和星 */
+   手机上也是整片天、云和星芒（2026-10 她要的）：任务行本来就是透明的；白天的天从顶上的纯白开始，灵动岛那一条和下面接得上 */
 #sky { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 #sky i { position: absolute; inset: 0; }
 /* 白天是「酸性霞光」：天只有很淡的蓝，左上漫一团玫红、右边一团电光蓝，地平线泛青柠——白昼酸自己的三个颜色 */
 [data-theme="light"] #sky { background: radial-gradient(46rem 28rem at 6% 0%, rgba(255, 62, 165, .2), transparent 72%), radial-gradient(48rem 30rem at 100% 32%, rgba(47, 91, 255, .15), transparent 72%), linear-gradient(180deg, #E9F3FF, #FAFCFF 52%, #EEFFB8); }
 [data-theme="dark"] #sky { background: radial-gradient(44rem 30rem at 88% 6%, rgba(123, 44, 255, .17), transparent 70%), radial-gradient(38rem 26rem at 4% 92%, rgba(47, 91, 255, .14), transparent 70%); }
-[data-theme="light"] #sky .st, [data-theme="dark"] #sky .cloud, body.phone #sky i { display: none; }
+[data-theme="light"] #sky .st, [data-theme="dark"] #sky .cloud { display: none; }
 #sky .cloud { inset: 0 -4rem; will-change: transform; animation: cloud-drift 150s ease-in-out infinite alternate;
   background-image: radial-gradient(30rem 11rem at 76% 8%, rgba(255, 255, 255, .96), transparent 62%), radial-gradient(34rem 12rem at 78% 12%, rgba(255, 62, 165, .12), transparent 66%),
     radial-gradient(22rem 8rem at 30% 6%, rgba(255, 255, 255, .94), transparent 62%), radial-gradient(26rem 9rem at 32% 10%, rgba(47, 91, 255, .1), transparent 66%),
@@ -102,7 +104,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
     radial-gradient(22rem 7.5rem at 34% 96%, rgba(255, 255, 255, .9), transparent 62%); }
 #sky .st { will-change: opacity; animation: star-breathe 7s ease-in-out infinite; }
 #sky.still i { animation: none; }
-[data-theme="light"] body.phone #sky { background: radial-gradient(22rem 12rem at 0% 0%, rgba(255, 62, 165, .12), transparent 72%), linear-gradient(180deg, #E9F3FF, transparent 16rem); }
+[data-theme="light"] body.phone #sky { background: radial-gradient(22rem 14rem at 0% 6rem, rgba(255, 62, 165, .16), transparent 72%), radial-gradient(24rem 16rem at 100% 40%, rgba(47, 91, 255, .13), transparent 72%), linear-gradient(180deg, #FFFFFF, #E9F3FF 9rem, #FAFCFF 55%, #EEFFB8); }
 @keyframes cloud-drift { to { transform: translateX(3rem); } }
 /* 天上偶尔经过的小东西（js/sky.js）：只在经过的那一会儿在，走完就拿掉。位置和走法都是脚本给的 transform。
    白天的飞机 = 高空一个小点拖两道长尾迹；夜里的红眼航班 = 一闪一闪的红灯加一颗小白灯；四季飘的东西（样子是脚本里的 svg）；
@@ -141,7 +143,7 @@ body.phone #main { max-width: 560px; margin: 0 auto; padding: 0 16px calc(40px +
 /* 四段（排时间 / 备餐 / 阅读 / 人）：每段一块很淡的底，两个颜色慢慢过渡；上一段收尾的颜色就是下一段开头的，
    所以从上到下是连着的一条，又各有各的色调。颜色是大类用的那套油画色，压得很淡。选中的那一项还是青柠 */
 .sblock { display: grid; gap: 3px; padding: 4px; border-radius: 13px;
-  background: linear-gradient(168deg, color-mix(in srgb, var(--w1) var(--wash), var(--bg)), color-mix(in srgb, var(--w2) var(--wash), var(--bg))); }
+  background: linear-gradient(168deg, color-mix(in srgb, var(--w1) var(--wash), transparent), color-mix(in srgb, var(--w2) var(--wash), transparent)); }
 #side { --wash: 17%; }
 [data-theme="dark"] #side { --wash: 14%; }
 .sblock[data-b="todo"] { --w1: #3E8E6E; --w2: #D2A52E; }
@@ -221,9 +223,9 @@ body.side-min .sync-pill span { display: none; }
 
 /* 手机顶栏：吸顶毛玻璃，底下一条豹纹胶带。
    状态栏 / 灵动岛底下那一截（页面画到屏幕最顶上时才有，高 = --top）是实心的背景色，不透、不叠纹理：那一条要和背景完全一个颜色 */
-.phead { --top: env(safe-area-inset-top, 0px); position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 -16px 6px; padding: calc(8px + var(--top)) 16px 12px; background: linear-gradient(var(--bg), var(--bg)) top / 100% var(--top) no-repeat, rgba(255, 255, 255, .84); -webkit-backdrop-filter: saturate(180%) blur(14px); backdrop-filter: saturate(180%) blur(14px); }
+.phead { --top: env(safe-area-inset-top, 0px); position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 -16px 6px; padding: calc(8px + var(--top)) 16px 12px; background: linear-gradient(var(--bg), var(--bg)) top / 100% var(--top) no-repeat, var(--card); -webkit-backdrop-filter: saturate(180%) blur(14px); backdrop-filter: saturate(180%) blur(14px); }
 .phead::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 4px; height: 3px; border-radius: 999px; background: var(--accent); }
-[data-theme="dark"] .phead { background: linear-gradient(var(--bg), var(--bg)) top / 100% var(--top) no-repeat, rgba(12, 12, 19, .82); }
+[data-theme="dark"] .phead { background: linear-gradient(var(--bg), var(--bg)) top / 100% var(--top) no-repeat, var(--card); }
 [data-theme="dark"] .phead::after { height: 3px; bottom: 6px; border: 0; background: var(--meter); box-shadow: 0 0 12px rgba(204, 255, 0, .5); }
 [data-theme="dark"] .phead::before { content: ""; position: absolute; inset: var(--top) 0 0; z-index: -1; background: var(--leo-tex) 0 0/84px 84px; opacity: .14; -webkit-mask: linear-gradient(#000, transparent); mask: linear-gradient(#000, transparent); }
 .phead .l { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -1750,3 +1752,21 @@ select.open { border-color: var(--edge); }
 .rprios .chip.on { color: var(--accent-ink); }
 [data-theme="dark"] .rprios .chip.on { color: var(--accent); }
 .radd:not(.done) .rlab { width: 52px; }
+
+/* ---------- 半透明（2026-10，她挑的「50% + 轻磨砂」）：卡片、侧栏、日历池、浮条都透得出底图（#sky 的天、云、星芒、飞机和潮水） ----------
+   --card = 半透明的 --bg，--frost = 轻轻糊一点（只糊 4px，花样还看得出来）。日历格子、备餐的每一天格子太多，只透不糊。
+   不透的：弹层（.sheet）、读数（.ctip）、提示条、下拉菜单、输入框和小按钮。卡里的任务行自己不上底色，不然是一条条白杠 */
+#side, #pool, .today-main, .hero, .overdue, .lineband, .pcard, .goals, .settings .card, .stats .card, .tile, .mcard, .mweek, .rweek, .mbox, .mshelf, .mtable, .friends .card, .note {
+  background: var(--card); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); }
+.cell, .mday { background: var(--card); }
+.dock { background: rgba(255, 255, 255, .72); -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%); }
+.dock.run { background: rgba(244, 255, 214, .8); }
+[data-theme="dark"] .dock { background: rgba(21, 21, 31, .72); }
+[data-theme="dark"] .hero { background: rgba(17, 17, 27, .5); }
+[data-theme="dark"] .mshelf { background: rgba(21, 21, 31, .5); }
+.row { background: transparent; }
+.row.dragging { background: var(--bg); }
+.row.picked { background: rgba(198, 255, 0, .2); }
+.row.open:not(.picked) { background: rgba(11, 11, 11, .045); }
+[data-theme="dark"] .row.open:not(.picked) { background: rgba(255, 255, 255, .045); }
+

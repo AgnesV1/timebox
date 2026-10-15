@@ -475,10 +475,13 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
 .pgrid.closed { margin-top: 12px; opacity: .7; }
 .pcard { padding: 11px 12px 10px; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); }
 .pcard header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.pname { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; font: 700 14.5px/1.25 var(--display); text-align: left; letter-spacing: -.01em; }
+.pname { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0; border: 0; background: none; font: 700 14.5px/1.25 var(--display); text-align: left; letter-spacing: -.01em; }
 .pname i { width: 12px; height: 12px; flex-shrink: 0; border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 1.5px var(--edge); }
 [data-theme="dark"] .pname i { box-shadow: 0 0 10px var(--pc); }
 .psub { margin: 4px 0 8px; font-size: 12px; color: var(--muted); }
+/* 看进度的卡：健康度那颗挪到第二行右边，卡窄了自己折到下一行（卡头只剩名字、Auto / Pool、Archive，不会被挤出去） */
+.pc-sub { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; margin: 4px 0 8px; }
+.pc-sub .psub { margin: 0; }
 .pbar { display: flex; height: 9px; border: var(--b); border-radius: 999px; background: var(--track); overflow: hidden; }
 .pbar .d { background: var(--pc); }
 .pbar .s { background: var(--zebra-tex) 0 0/20px 20px, var(--surface); opacity: .55; }
@@ -945,7 +948,6 @@ body.phone .logtime input, body.phone .add input, body.phone .add select { font-
 .row.ghost { opacity: .5; pointer-events: none; }
 .row.ghost .bar { background: transparent; box-shadow: inset 0 0 0 1.5px var(--bar); }
 .ptag { flex-shrink: 0; margin-left: auto; padding: 2px 7px; border: 1px solid var(--line); border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-.pcard header .ptag + .health { margin-left: 6px; }
 .pweek { display: flex; align-items: center; gap: 4px; }
 .pweek i { width: 14px; height: 14px; border-radius: 4px; background: var(--track); }
 .pweek i.s { box-shadow: inset 0 0 0 2px var(--pc); background: transparent; }

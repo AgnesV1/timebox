@@ -87,8 +87,8 @@ function cardHTML(c, p, track = "progress") {
     '<div><button type="button" class="btn primary" data-act="calib-apply" data-module="' + esc(s.module) + '">Update</button><button type="button" class="btn" data-act="calib-keep" data-module="' + esc(s.module) + '">Keep plan</button></div></div>').join("");
   const sub = [p.deadline ? "due " + fmtShort(p.deadline) : "no deadline", E.earlyDays(p) && p.deadline ? "aim " + E.earlyDays(p) + "d early" : ""].filter(Boolean).join(" · ");
   return '<article class="pcard" data-project="' + p.id + '" style="--pc:' + esc(p.color) + '">' +
-    '<header><button type="button" class="pname" data-act="edit-project"><i></i>' + esc(p.name || "Untitled") + "</button>" + placeTag(p) + healthPill(h) + archBtn(p) + "</header>" +
-    '<p class="psub">' + esc(sub) + "</p>" +
+    '<header><button type="button" class="pname" data-act="edit-project"><i></i>' + esc(p.name || "Untitled") + "</button>" + placeTag(p) + archBtn(p) + "</header>" +
+    '<div class="pc-sub"><p class="psub">' + esc(sub) + "</p>" + healthPill(h) + "</div>" +
     '<div class="pbar" title="Done · on the calendar · not placed yet"><i class="d" style="width:' + w(plan.done) + '"></i><i class="s" style="width:' + w(plan.scheduled) + '"></i></div>' +
     '<p class="pnums num">' + pct + "% · " + fmtMin(plan.remaining) + " left" + (plan.unscheduled > 0.5 && !E.isAuto(p) ? " · " + fmtMin(plan.unscheduled) + " in pool" : "") + (today ? " · <b>today " + fmtMin(today) + "</b>" : "") + "</p>" +
     timeline(c, p, plan) +

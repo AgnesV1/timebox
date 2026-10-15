@@ -155,6 +155,22 @@ export function healthPill(h) {
   return '<span class="health h-' + h.level + '">' + (HEALTH[h.level] || "●") + " " + esc(h.text) + "</span>";
 }
 
+// ---------- emoji 记号（Restock 的标记、Ideas 的类别） ----------
+// tags = [[key, emoji, 名字]]。名字只在 title / aria-label 里，界面上只露 emoji。
+
+// 挑一个：一排 emoji 小块，选着的那个亮；再点一下选着的 = 不要了（由调用的地方决定）
+export function emojiPickHTML(act, tags, cur) {
+  return '<span class="em-pick">' + tags.map(([k, e, name]) => '<button type="button" class="chip' + (cur === k ? " on" : "") + '" data-act="' + act + '" data-v="' + k + '" aria-pressed="' + (cur === k) + '" title="' + esc(name) + '" aria-label="' + esc(name) + '">' + e + "</button>").join("") + "</span>";
+}
+
+// 页面顶上的筛选：All + 有东西的那几个记号（带个数）；cur = 正在看的那个，空 = 全部。一样东西都没有就不画
+export function tagFilterHTML(act, tags, counts, cur) {
+  const total = Object.values(counts).reduce((a, n) => a + n, 0);
+  if (!total) return "";
+  const b = (k, label, n, title) => '<button type="button" class="tagf-b' + (cur === k ? " on" : "") + '" data-act="' + act + '" data-v="' + k + '" aria-pressed="' + (cur === k) + '"' + (title ? ' title="' + esc(title) + '"' : "") + ">" + label + ' <small class="num">' + n + "</small></button>";
+  return '<div class="tagf" role="group" aria-label="Filter">' + b("", "All", total) + tags.filter(([k]) => counts[k] || cur === k).map(([k, e, name]) => b(k, e, counts[k] || 0, name)).join("") + "</div>";
+}
+
 // ---------- 提示条（带撤销） ----------
 
 let toastTimer = 0;

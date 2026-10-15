@@ -6,7 +6,7 @@
 //     （到了周五，这周就不再显示，从下周看起）
 //     Boxes 页底下一块 To try = 在外面吃过、想自己做的菜（菜名 + 备注），分 For meal prep / Try once 两种：
 //     直接在这里写（粘几行 = 几道），或者在今天页一条做完的 Leisure / Friends 任务底下记；Make a box = 建一个同名的 Box、从这里拿掉
-//   Restock（#meals/restock）：规律要换 / 要补的非食物：价格、每隔多久、下次哪天；最上面按月列接下来三个月要花的；
+//   Restock（#meals/restock）：规律要换 / 要补的非食物：价格、每隔多久、下次哪天；每样一个 emoji 记号，顶上一排能筛（连 Coming up 一起）；最上面按月列接下来三个月要花的；
 //     底下一块 Buy once = 只买一次的（一条裙子）：价钱、可以不填的日子，买了点 Bought
 // 「下次采购」手机上也有：顶栏的 🛒 进 #shop，只列要买的东西（不写价钱和说明），在超市里打勾，单子下面是这次采购的备注（只看）；下面挤着一张「Coming up」。
 
@@ -14,7 +14,7 @@ import * as store from "../store.js";
 import * as M from "../meals.js";
 import { esc, on, icon } from "../dom.js";
 import { addDays, diffDays, fmtDay, fmtShort, startOfWeek, weekday, WEEKDAYS } from "../dates.js";
-import { toast } from "./common.js";
+import { toast, emojiPickHTML, tagFilterHTML } from "./common.js";
 import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
 
 let editing = null;   // 编辑框：{ kind: ing / box / day / prefs, id, draft, date }
@@ -327,24 +327,26 @@ function groceriesHTML(D, c) {
 // ---------- Restock：规律要换 / 要补的东西 ----------
 
 // 接下来三个月要花的，按月挤在一起（手机上接在采购单下面，电脑上在 Restock 页最上面）；只看不点
-function comingHTML(D, c) {
+function comingHTML(D, c, tag = "") {
   if (!Object.keys(D.sup).length) return "";
-  const C = M.coming(D, c.today, 3);
-  const chip = (x) => '<span class="cchip" title="' + esc(fmtDue(x.date, c.today)) + '"><b>' + esc(x.sup.name || "Untitled") + "</b>" + (Number(x.sup.price) ? " " + money0(x.sup.price) : "") + "</span>";
+  const C = M.coming(D, c.today, 3, tag);
+  const chip = (x) => '<span class="cchip" title="' + esc(fmtDue(x.date, c.today)) + '">' + M.supEmoji(x.sup) + " <b>" + esc(x.sup.name || "Untitled") + "</b>" + (Number(x.sup.price) ? " " + money0(x.sup.price) : "") + "</span>";
   const line = (label, total, items, cls) => '<div class="cmonth' + cls + '"><span class="cm"><b>' + label + "</b>" + (total ? money0(total) : "") + '</span><span class="cchips">' + items.map(chip).join("") + "</span></div>";
   const months = C.months.filter((m) => m.items.length);   // 没东西的月份不占一行
   return '<section class="mcard mcoming"><header><h3>Coming up</h3><span class="msub">next 3 months</span></header>' +
     (C.overdue.length ? line("Overdue", C.overdue.reduce((a, x) => a + (Number(x.sup.price) || 0), 0), C.overdue, " late") : "") +
     months.map((m) => line(m.label, m.total, m.items, "")).join("") +
-    (C.overdue.length || months.length ? "" : '<p class="msub">Nothing due in the next three months.</p>') + "</section>";
+    (C.overdue.length || months.length ? "" : '<p class="msub">' + (tag ? "Nothing of these" : "Nothing") + " due in the next three months.</p>") + "</section>";
 }
 
 let showBought = false;   // 只买一次的里面，买过的那几样列不列出来
+// 顶上筛着哪个记号（记在这台设备上）；空 = 全部
+const supFilter = () => (M.SUP_TAGS.some(([k]) => k === store.local().supTag) ? store.local().supTag : "");
 
 function restockHTML(D, c) {
-  const R = M.restock(D);
+  const tag = supFilter(), R = M.restock(D, tag);
   const dash = '<span class="msub">—</span>';
-  const name = (s) => "<td><b>" + esc(s.name || "Untitled") + "</b>" + (s.note ? " <small>" + esc(s.note) + "</small>" : "") + "</td><td>" + (s.store ? esc(s.store) : dash) + '</td><td class="r num">' + (Number(s.price) ? money(s.price) : dash) + "</td>";
+  const name = (s) => '<td><span class="sup-em" title="' + esc(M.SUP_TAGS.find(([k]) => k === M.supTag(s))[2]) + '">' + M.supEmoji(s) + "</span><b>" + esc(s.name || "Untitled") + "</b>" + (s.note ? " <small>" + esc(s.note) + "</small>" : "") + "</td><td>" + (s.store ? esc(s.store) : dash) + '</td><td class="r num">' + (Number(s.price) ? money(s.price) : dash) + "</td>";
   const due = (s) => (s.next ? '<span class="num">' + fmtDue(s.next, c.today) + '</span> <span class="dstate ' + (s.next < c.today ? "d-check" : "d-checked") + '">' + dueText(s.next, c.today) + "</span>" : dash);
   const tr = (s, cls = "") => '<tr data-act="edit-sup" data-id="' + esc(s.id) + '" tabindex="0"' + (cls ? ' class="' + cls + '"' : "") + ">";
   const tools = '<div class="msec-head"><p class="msub">Things you replace or restock on a cycle — vitamins, brush heads, a phone. What it costs, how often, and when it\'s next due.</p>' +
@@ -353,7 +355,7 @@ function restockHTML(D, c) {
     '<td class="r">' + (M.nextAfter(c.today, s) ? '<button type="button" class="chip" data-act="sup-done" data-id="' + esc(s.id) + '" title="Replaced or restocked today: move the next date one cycle on">Replaced</button>' : "") + "</td></tr>";
   const regular = R.regular.length
     ? '<table class="mtable"><thead><tr><th>Item</th><th>Where</th><th class="r">Price</th><th>How often</th><th>Next</th><th></th></tr></thead><tbody>' + R.regular.map(row).join("") + "</tbody></table>"
-    : '<p class="empty">Nothing here yet. Add what you replace on a schedule: the next three months of spending show up here, and on your phone under the shopping list.</p>';
+    : tag ? '<p class="empty">Nothing on a cycle under this one.</p>' : '<p class="empty">Nothing here yet. Add what you replace on a schedule: the next three months of spending show up here, and on your phone under the shopping list.</p>';
   // 只买一次的（一条裙子、一盏灯）：价钱，有打算哪天之前买就填日子（填了算进 Coming up 那个月）；买了点 Bought，收到底下
   const sum = R.once.reduce((a, s) => a + (Number(s.price) || 0), 0);
   const onceRow = (s) => tr(s) + name(s) + "<td>" + due(s) + "</td>" +
@@ -366,7 +368,7 @@ function restockHTML(D, c) {
     (R.once.length || (showBought && R.bought.length) ? '<table class="mtable"><thead><tr><th>Item</th><th>Where</th><th class="r">Price</th><th>By</th><th></th></tr></thead><tbody>' +
       R.once.map(onceRow).join("") + (showBought ? R.bought.map(boughtRow).join("") : "") + "</tbody></table>" : "") +
     (R.bought.length ? '<button type="button" class="link mbought" data-act="bought-toggle" aria-expanded="' + showBought + '">Bought (' + R.bought.length + ")</button>" : "");
-  return tools + comingHTML(D, c) + regular + once;
+  return tools + tagFilterHTML("sup-filter", M.SUP_TAGS, M.supCounts(D), tag) + comingHTML(D, c, tag) + regular + once;
 }
 
 function supEditor(D, row) {
@@ -375,7 +377,8 @@ function supEditor(D, row) {
   const head = '<h3 class="sheet-title">' + (editing.id ? esc(row.name || "Untitled") : row.once ? "Buy once" : "New item") + "</h3>" +
     '<div class="field-row"><label class="field"><span>Name</span><input data-f="name" data-k="name" value="' + esc(row.name || "") + '" placeholder="' + (row.once ? "A dress" : "Vitamin D") + '" autocomplete="off"></label>' +
     '<label class="field"><span>Where</span><input data-f="store" data-k="store" list="sup-stores" value="' + esc(row.store || "") + '" placeholder="Amazon" autocomplete="off"></label></div>' +
-    '<datalist id="sup-stores">' + stores.map((s) => '<option value="' + esc(s) + '">').join("") + "</datalist>";
+    '<datalist id="sup-stores">' + stores.map((s) => '<option value="' + esc(s) + '">').join("") + "</datalist>" +
+    '<div class="field"><span>Kind</span>' + emojiPickHTML("sup-tag", M.SUP_TAGS, M.supTag(row)) + "</div>";
   const price = '<label class="field"><span>Price ($)</span><input data-f="price" data-k="price" class="num" type="number" step="0.01" min="0" value="' + esc(row.price || "") + '" placeholder="0.00"></label>';
   const note = '<label class="field"><span>Note</span><input data-f="note" data-k="note" value="' + esc(row.note || "") + '" placeholder="Brand, size…" autocomplete="off"></label>';
   // 只买一次的：没有周期；日子可以不填（填了就算进 Coming up 的那个月）；买过的能改是哪天买的
@@ -632,17 +635,18 @@ export function initMeals(rerender) {
     else if (act === "edit-box") openEditor({ kind: "box", id });
     else if (act === "new-ing") openEditor({ kind: "ing", id: "", draft: { name: "", store: "", price: "", lasts: "", level: "mid", cat: "", keep: false, staple: false, every: 0, from: "", checked: "", sale: null } });
     else if (act === "edit-ing") openEditor({ kind: "ing", id });
-    else if (act === "new-sup") openEditor({ kind: "sup", id: "", draft: { name: "", store: "", price: "", n: "", unit: "m", next: "", note: "" } });
+    else if (act === "new-sup") openEditor({ kind: "sup", id: "", draft: { name: "", store: "", price: "", n: "", unit: "m", next: "", note: "", tag: supFilter() } });
     else if (act === "edit-sup") openEditor({ kind: "sup", id });
     else if (act === "dish-kind") { dishKind = el.dataset.v === "once" ? "once" : "box"; rerender(); }
     else if (act === "edit-dish") openEditor({ kind: "dish", id });
     else if (act === "dish-tried" && D.dish[id]) store.deleteMeal("dish", id, "Tried " + (D.dish[id].name || "it"));
     else if (act === "del-dish" && D.dish[id]) store.deleteMeal("dish", id, "Removed " + (D.dish[id].name || "it"));
     else if (act === "dish-box" && D.dish[id]) { const box = store.dishToBox(id); if (box) openEditor({ kind: "box", id: box }); }
-    else if (act === "new-once") openEditor({ kind: "sup", id: "", draft: { name: "", store: "", price: "", next: "", note: "", once: true, bought: "" } });
+    else if (act === "new-once") openEditor({ kind: "sup", id: "", draft: { name: "", store: "", price: "", next: "", note: "", once: true, bought: "", tag: supFilter() } });
     else if (act === "once-done" && D.sup[id]) store.saveMeal("sup", { ...D.sup[id], bought: T }, "Bought " + (D.sup[id].name || "it"));
     else if (act === "once-back" && D.sup[id]) store.saveMeal("sup", { ...D.sup[id], bought: "" }, (D.sup[id].name || "It") + " is back on the list");
     else if (act === "bought-toggle") { showBought = !showBought; rerender(); }
+    else if (act === "sup-filter") store.setLocal({ supTag: el.dataset.v });
     else if (act === "sup-done" && D.sup[id]) { const next = M.nextAfter(T, D.sup[id]); store.saveMeal("sup", { ...D.sup[id], next }, D.sup[id].name + ": next " + fmtDue(next, T)); }
   });
   // To try：回车 / Add = 加；粘进来的是好几行就一行一道（输入框自己会把换行吃掉）
@@ -696,6 +700,7 @@ export function initMeals(rerender) {
       store.deleteMeal(kind, id, "Deleted " + (row.name || "it"));
     }
     else if (act === "dish-set-kind") update({ kind: el.dataset.v === "box" ? "box" : "once" });
+    else if (act === "sup-tag") update({ tag: el.dataset.v });
     else if (act === "box-slot") update({ slot: el.dataset.v });
     else if (act === "box-level") update({ level: el.dataset.v });
     else if (act === "ing-level") update({ level: el.dataset.v });

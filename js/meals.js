@@ -5,7 +5,7 @@
 //   东西分类（肉 / 菜 / 碳水 / 常驻 / 零食）；Box 里可以放「随便哪种肉」（Any meat）：买的时候再挑，等级和价钱按这一类估
 //   购物单：这周哪几天要用到某样东西 ÷ 一次买够几天 = 买几次；之前勾了「买了」的会往后顶掉几天（米这种一买吃一个月的不会每周都出现）
 //   To try：在外面吃过、想自己做的菜，分「打算做成 Box 的」和「只试一次的」（见下面 toTry）
-//   Restock：规律要换 / 要补的非食物（维生素、牙刷头、手机）：价格 + 周期 + 下次哪天，按月看接下来要花的钱
+//   Restock：规律要换 / 要补的非食物（维生素、牙刷头、手机）：价格 + 周期 + 下次哪天，按月看接下来要花的钱；每样一个 emoji 记号，能筛
 // 数据从 store.meals() 来：{ ing, box, week, days }，days 是 日期 → {boxes} / {off}。这里不碰 store，测试直接喂数据。
 
 import { addDays, addMonths, daysInMonth, diffDays, startOfMonth, startOfWeek, weekday, range, MONTHS } from "./dates.js";
@@ -351,24 +351,38 @@ export function nextAfter(date, s) {
   return s.unit === "d" ? addDays(date, n) : s.unit === "w" ? addDays(date, 7 * n) : plusMonths(date, s.unit === "y" ? 12 * n : n);
 }
 
-// Restock 页的两块：规律的；只买一次的——还没买的、买了的（最近买的在前）。前两样有日子的在前
-export function restock(D) {
-  const all = Object.values(D.sup || {}), once = all.filter((s) => s.once);
+// 每样一个记号（Restock 页能按它筛）：没标过的算 🪐
+export const SUP_TAGS = [["home", "🏠", "Household"], ["style", "💅", "Clothes & skincare"], ["health", "🩺", "Health"], ["tech", "💻", "Tech"], ["gift", "🎁", "Gifts"], ["other", "🪐", "Other"]];
+const TAG_KEYS = SUP_TAGS.map(([k]) => k);
+export const supTag = (s) => (TAG_KEYS.includes(s?.tag) ? s.tag : "other");
+export const supEmoji = (s) => SUP_TAGS.find(([k]) => k === supTag(s))[1];
+// tag 空 = 全部；不认识的 tag 也当全部
+const tagged = (D, tag) => Object.values(D.sup || {}).filter((s) => !TAG_KEYS.includes(tag) || supTag(s) === tag);
+// 每个记号下有几样（买过的不算）
+export function supCounts(D) {
+  const out = {};
+  for (const s of Object.values(D.sup || {})) if (!(s.once && s.bought)) out[supTag(s)] = (out[supTag(s)] || 0) + 1;
+  return out;
+}
+
+// Restock 页的两块：规律的；只买一次的——还没买的、买了的（最近买的在前）。前两样有日子的在前。tag = 只看这个记号的
+export function restock(D, tag = "") {
+  const all = tagged(D, tag), once = all.filter((s) => s.once);
   const byNext = (a, b) => (!a.next - !b.next) || String(a.next || "").localeCompare(String(b.next || "")) || byName(a, b);
   return { regular: all.filter((s) => !s.once).sort(byNext), once: once.filter((s) => !s.bought).sort(byNext),
     bought: once.filter((s) => s.bought).sort((a, b) => String(b.bought).localeCompare(String(a.bought)) || byName(a, b)) };
 }
 
 // 接下来几个月（这个月算第一个）要花钱的：过期的单列（当成今天换，再往后推）；周期短的一样会出现好几次。
-// 只买一次的：填了日子、还没买的算进那个月（过了日子就在过期里），只出现一次
-export function coming(D, today, months = 3) {
+// 只买一次的：填了日子、还没买的算进那个月（过了日子就在过期里），只出现一次。tag = 只算这个记号的
+export function coming(D, today, months = 3, tag = "") {
   const first = startOfMonth(today), end = addDays(addMonths(first, months), -1);
   const out = { overdue: [], months: [] };
   for (let i = 0; i < months; i++) {
     const m = addMonths(first, i);
     out.months.push({ key: m.slice(0, 7), label: MONTHS[Number(m.slice(5, 7)) - 1], total: 0, items: [] });
   }
-  for (const sup of Object.values(D.sup || {})) {
+  for (const sup of tagged(D, tag)) {
     let date = sup.next;
     if (!date || (sup.once && sup.bought)) continue;
     if (date < today) { out.overdue.push({ sup, date }); date = nextAfter(today, sup); }
@@ -387,7 +401,7 @@ export function coming(D, today, months = 3) {
 
 const ING_FIELDS = ["store", "price", "lasts", "level", "cat", "keep", "staple", "every", "from", "checked", "sale"];
 const BOX_FIELDS = ["slot", "level", "note"];
-const SUP_FIELDS = ["store", "price", "n", "unit", "next", "note"];
+const SUP_FIELDS = ["store", "price", "n", "unit", "next", "note", "tag"];
 const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
 const pick = (r, fields) => Object.fromEntries(fields.filter((f) => r[f] !== undefined).map((f) => [f, r[f]]));
 

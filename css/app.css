@@ -353,6 +353,16 @@ body.side-min .sync-pill span { display: none; }
 .chip.ghost { border-style: dashed; color: var(--blue); }
 [data-theme="dark"] .chip { background: var(--surface); }
 [data-theme="dark"] .chip.on { background: rgba(204, 255, 0, .12); color: var(--accent); border-color: var(--accent); box-shadow: 0 0 14px rgba(204, 255, 0, .45); }
+/* emoji 记号：挑一个（.em-pick，emoji 本身就是字，chip 收窄一点）；页面顶上的筛选（.tagf，Restock 和 Ideas 共用） */
+.em-pick { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.em-pick .chip { padding: 2px 7px; font-size: 14px; line-height: 1.3; }
+.tagf { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.tagf-b { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border: var(--b-ctl); border-radius: 999px; background: var(--bg); font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+.tagf-b small { font-size: 11px; color: var(--muted); }
+.tagf-b.on { border-color: var(--edge); background: var(--accent); color: var(--accent-ink); }
+.tagf-b.on small { color: inherit; }
+[data-theme="dark"] .tagf-b { background: var(--surface); }
+[data-theme="dark"] .tagf-b.on { background: rgba(204, 255, 0, .12); color: var(--accent); border-color: var(--accent); }
 .reason { display: block; width: 100%; margin-top: 8px; padding: 9px 12px; border: var(--b-ctl); font-size: 14px; }
 .desc { display: block; width: 100%; min-height: 90px; margin-top: 10px; resize: vertical; border: var(--b-ctl); font-size: 15px; line-height: 1.55; }
 .empty { padding: 18px 0; color: var(--muted); }
@@ -1197,6 +1207,8 @@ body.phone .rpick { padding: 8px 6px; }
 .cchips { display: flex; flex-wrap: wrap; gap: 3px 4px; min-width: 0; }
 .cchip { padding: 0 7px; border: 1px solid var(--line); border-radius: 999px; font-size: 11.5px; line-height: 1.6; white-space: nowrap; color: var(--muted); }
 .cchip b { font-weight: 600; color: var(--ink); }
+/* Restock 每样名字前面的记号 */
+.sup-em { display: inline-block; width: 1.5em; font-size: 13px; }
 .cmonth.late .cm b, .cmonth.late .cchip b { color: var(--hot); }
 .mstores li.st-bought .lname span, .mstores li.st-have .lname span { text-decoration: line-through; color: var(--muted); }
 .mstores li.st-have .lp, .mstores li.st-bought .lp { opacity: .5; }

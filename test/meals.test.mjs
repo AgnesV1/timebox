@@ -263,6 +263,27 @@ test("restock: things you buy once sit apart, count once, and drop out when boug
   assert.deepEqual(C.months.map((m) => m.total), [20, 140, 20]);
 });
 
+test("restock: each thing has a mark (untagged = other); the page and Coming up filter by it", () => {
+  const D = { sup: {
+    vit: { id: "vit", name: "Vitamin D", price: 20, n: 30, unit: "d", next: "2026-10-20", tag: "health" },
+    brush: { id: "brush", name: "Brush heads", price: 15, n: 3, unit: "m", next: "2026-11-02" },
+    dress: { id: "dress", name: "Dress", price: 120, once: true, next: "2026-11-15", tag: "style" },
+    serum: { id: "serum", name: "Serum", price: 40, once: true, next: "", tag: "style", bought: "2026-10-01" },
+    odd: { id: "odd", name: "Odd", price: 5, once: true, next: "", tag: "nope" }
+  } };
+  assert.equal(M.supTag(D.sup.brush), "other");
+  assert.equal(M.supTag(D.sup.odd), "other", "a mark it doesn't know counts as other");
+  assert.equal(M.supEmoji(D.sup.vit), "🩺");
+  assert.deepEqual(M.supCounts(D), { health: 1, other: 2, style: 1 }, "bought ones aren't counted");
+  const R = M.restock(D, "style");
+  assert.deepEqual([R.regular.length, R.once.map((s) => s.id), R.bought.map((s) => s.id)], [0, ["dress"], ["serum"]]);
+  assert.equal(M.restock(D, "").regular.length, 2, "empty = everything");
+  assert.equal(M.restock(D, "whatever").regular.length, 2, "an unknown filter = everything");
+  const C = M.coming(D, TODAY, 3, "health");
+  assert.deepEqual(C.months.map((m) => m.total), [20, 20, 20]);
+  assert.deepEqual(M.coming(D, TODAY, 3).months.map((m) => m.total), [20, 155, 20]);
+});
+
 test("to try: two kinds, newest first; lines become dishes", () => {
   const D = { dish: {
     a: { id: "a", name: "Beef pho", note: "rare", kind: "box", order: 1 },

@@ -723,7 +723,7 @@ function putGroups(list) { put("settings", { id: "groups", key: "groups", value:
 // 还没存过（刚更新、还没从表格拉到数据）就先用默认的六个，加上计划里出现过的名字
 export function groups() {
   const saved = setting("groups", null);
-  return Array.isArray(saved) ? saved : GR.withPlans(GR.DEFAULTS, all("projects"));
+  return GR.sortGroups(Array.isArray(saved) ? saved : GR.withPlans(GR.DEFAULTS, all("projects")));
 }
 export const groupByName = (name) => (name ? GR.byName(groups(), name) : null);
 
@@ -830,7 +830,7 @@ export function startChore(tag = "") {
   return logged;
 }
 
-export const { sides, sideOf, saveSide, deleteSide } = sideStore(core);
+export const { sides, sideOf, setSide } = sideStore(core);
 
 const fr = friendStore(core);
 export const { friends, meets, meetOfTask, friendFields, lastContact, saveFriend, deleteFriend, saveMeet, deleteMeet, setTaskMeet, importFriends, friendSpecial, adoptMarks, occasionDone, toggleOccasion, doneNext } = fr;

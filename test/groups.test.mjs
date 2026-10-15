@@ -17,19 +17,19 @@ test("old project names find their new home; unknown ones stay as they are", () 
     { id: "e", name: "Beans", group: "Garden", color: "#FFC400" }, { id: "f", name: "Loose plan", group: "", color: "#ABCDEF" },
     { id: "g", name: "Emails", group: "Work", color: blue }
   ]);
-  assert.deepEqual(groups.map((g) => g.name), ["Work", "Fitness", "Chores", "Build", "Leisure", "Friends", "Garden"]);
+  assert.deepEqual(groups.map((g) => g.name), ["Build", "Work", "Friends", "Leisure", "Fitness", "Chores", "Garden"]);
   assert.deepEqual(moves, [
     { id: "a", group: "Work", color: blue }, { id: "b", group: "Build", color: green }, { id: "c", group: "Fitness", color: ivory },
     { id: "d", group: "Garden", color: purple }, { id: "e", group: "Garden", color: purple }
   ], "plans keep their own names; a plan with no project is matched by its name; untouched ones aren't listed");
   assert.equal(groups.find((g) => g.name === "Garden").color, purple, "an unknown project keeps going, in the new palette");
-  assert.deepEqual(GR.withPlans(GR.DEFAULTS, [{ group: "Garden", color: "#111" }, { group: "Work" }]).map((g) => g.name).slice(-2), ["Friends", "Garden"]);
+  assert.deepEqual(GR.withPlans(GR.DEFAULTS, [{ group: "Garden", color: "#111" }, { group: "Work" }]).map((g) => g.name).slice(-2), ["Chores", "Garden"]);
 });
 
 test("the six projects, sorted into once, with an undo", () => {
   const a = store.saveProject({ name: "IELTS", group: "Main - English", kind: "regular", place: "pool", rule: { perWeek: 3, min: 30 }, color: "#FF3EA5" });
   const b = store.saveProject({ name: "Gym", group: "", kind: "regular", place: "pool", rule: { perWeek: 3, min: 30 }, color: "#FF7A1A" });
-  assert.deepEqual(store.groups().map((g) => g.name), ["Work", "Fitness", "Chores", "Build", "Leisure", "Friends", "Main - English"], "before sorting: the defaults plus what's there");
+  assert.deepEqual(store.groups().map((g) => g.name), ["Build", "Work", "Friends", "Leisure", "Fitness", "Chores", "Main - English"], "before sorting: the defaults plus what's there");
   const done = store.adoptGroups();
   assert.deepEqual(done.names.sort(), ["Build", "Fitness"]);
   assert.deepEqual([store.get("projects", a).group, store.get("projects", b).group], ["Build", "Fitness"]);
@@ -37,7 +37,7 @@ test("the six projects, sorted into once, with an undo", () => {
   assert.equal(store.adoptGroups(), null, "only once");
   done.undo();
   assert.deepEqual([store.get("projects", a).group, store.get("projects", b).group, store.get("projects", a).color], ["Main - English", "", "#FF3EA5"]);
-  assert.deepEqual(store.groups().map((g) => g.name), ["Work", "Fitness", "Chores", "Build", "Leisure", "Friends", "Main - English"]);
+  assert.deepEqual(store.groups().map((g) => g.name), ["Build", "Work", "Friends", "Leisure", "Fitness", "Chores", "Main - English"]);
   assert.equal(store.adoptGroups(), null, "undone stays undone");
 });
 

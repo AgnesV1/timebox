@@ -103,7 +103,7 @@ test("pasting several lines", () => {
 
 test("which projects offer the pool", () => {
   const by = (name) => GR.DEFAULTS.find((g) => g.name === name);
-  assert.deepEqual(GR.DEFAULTS.filter(GR.ideasOf).map((g) => g.name), ["Leisure", "Friends"]);
+  assert.deepEqual(GR.DEFAULTS.filter(GR.ideasOf).map((g) => g.name), ["Friends", "Leisure"]);
   assert.equal(GR.ideasOf({ ...by("Leisure"), ideas: false }), false);
   assert.equal(GR.ideasOf({ ...by("Build"), ideas: true }), true);
   assert.equal(GR.ideasOf(null), false);

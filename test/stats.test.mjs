@@ -106,7 +106,7 @@ test("deep work: totals, per day, per project, and the daily goal on work days o
   assert.equal(none.goalDays, 0);
 });
 
-test("where the time went: 24 hours a day, usual life first, then what was tracked, then the blank", () => {
+test("where the time went: 24 hours a day; sleep and meals are counted but hidden, weekend housework goes into Chores", () => {
   const c = deepCtx();
   assert.deepEqual(S.lifeOn(S.lifeOf(c), "2026-10-03"), { sleep: 420, care: 180, chores: 60 }, "Saturday gets half the weekend chores");
   assert.equal(S.lifeOn(S.lifeOf(c), "2026-10-05").chores, 0);
@@ -116,20 +116,23 @@ test("where the time went: 24 hours a day, usual life first, then what was track
   const part = (k) => pie.parts.find((x) => x.key === k)?.min;
   assert.equal(part("sleep"), 5 * 420);
   assert.equal(part("care"), 5 * 180);
-  assert.equal(part("chores"), 120);
+  assert.ok(pie.parts.filter((x) => x.kind === "life").every((x) => x.hidden), "sleep and meals: counted, not drawn");
+  assert.equal(part("chores"), undefined, "no Housework slice of its own");
+  const logged = S.clockPie(c, s, { trackedOnly: true }).parts.find((x) => x.key === "p:Chores").min;
+  assert.equal(part("p:Chores"), logged + 120, "the usual weekend housework sits in Chores");
   assert.equal(part("p:IELTS"), 135);
   assert.equal(part("p:"), 40);
   assert.equal(pie.tracked, 195);
   assert.equal(part("blank"), 5 * 1440 - 5 * 600 - 120 - 195);
   assert.equal(pie.parts.reduce((a, x) => a + x.min, 0), pie.total);
-  assert.deepEqual(pie.parts.map((x) => x.key), ["sleep", "care", "chores", "p:IELTS", "p:Chores", "p:", "blank"]);
+  assert.deepEqual(pie.parts.map((x) => x.key), ["sleep", "care", "p:Chores", "p:IELTS", "p:", "blank"], "projects in the fixed order, not by size");
   const only = S.clockPie(c, s, { trackedOnly: true });
   assert.equal(only.total, 195);
   assert.ok(only.parts.every((x) => x.kind === "project" || x.kind === "none"));
   // 只看 IELTS：别的记录合成一片；默认值调得再大，空白也不会是负的
   const ielts = { ...c, tasks: c.tasks.filter((t) => t.projectId === "r" || t.projectId === "l") };
-  const f = S.clockPie(ielts, S.summarize(ielts, "2026-10-01", "2026-10-07", { by: "plan" }), { rest: 60 });
-  assert.equal(f.parts.find((x) => x.key === "rest").min, 60);
+  const f = S.clockPie(ielts, S.summarize(ielts, "2026-10-01", "2026-10-07", { by: "plan" }), { rest: 60, filtered: true });
+  assert.equal(f.parts.find((x) => x.key === "rest").min, 60 + 120, "filtered: the housework goes with everything else");
   assert.equal(f.tracked, 195);
   const busy = { ...c, life: { sleep: 1000, care: 440 } };
   assert.equal(S.clockPie(busy, S.summarize(busy, "2026-10-05", "2026-10-05")).blank, 0);
@@ -245,40 +248,30 @@ test("a project's last 14 days: done, planned but not done, nothing", () => {
   assert.equal(S.groupDays(c, GROUPS[3], 14, ["2026-10-03", "2026-01-01"]).filter((x) => x.state === "done").map((x) => x.date).join(), "2026-10-03", "extra dates inside the window count");
 });
 
-test("on the side: a month's total spreads over its days; overlapping time is only a haze, full attention counts as Leisure", () => {
-  const groups = [{ name: "Work", labor: true }, { name: "Leisure", color: "#f0f" }];
-  const side = [
-    { id: "a", month: "2026-09", kind: "show", min: 1800, full: false },   // 30 小时，九月 30 天 → 每天 60 分钟
-    { id: "b", month: "2026-09", kind: "novel", min: 300, full: true },    // 每天 10 分钟
-    { id: "c", month: "2026-10", kind: "nope", min: 310, full: false },    // 十月 31 天 → 每天 10 分钟，到今天（5 号）为止
-    { id: "d", month: "bad", min: 99 }
-  ];
-  const c = ctx({ groups, side, tasks: [{ id: "w", date: "2026-09-10", est: 120, actual: 120, status: "done", group: "Work" }] });
-  const sep = S.sideHaze(c, "2026-09-01", "2026-09-30");
-  assert.equal(sep.min, 1800);
-  assert.deepEqual(sep.byKind, { show: 1800 });
-  const wk = S.sideHaze(c, "2026-09-28", "2026-10-04");
-  assert.equal(Math.round(wk.min), 3 * 60 + 4 * 10, "a week gets its days' share");
-  assert.deepEqual(Object.keys(wk.byKind).sort(), ["other", "show"], "an unknown kind is other");
+test("on the side: one total a month, spread over its days, only ever a haze", () => {
+  const side = [{ month: "2026-09", min: 1800 }, { month: "2026-10", min: 310 }, { month: "bad", min: 99 }];
+  const c = ctx({ side });
+  assert.equal(S.sideHaze(c, "2026-09-01", "2026-09-30").min, 1800);
+  assert.equal(Math.round(S.sideHaze(c, "2026-09-28", "2026-10-04").min), 3 * 60 + 4 * 10, "a week gets its days' share");
   assert.equal(S.sideHaze(c, "2026-10-01", "2026-10-31").min, 50, "this month only up to today");
+  const s = S.summarize(c, "2026-09-01", "2026-09-30");
+  assert.equal(s.spent, 0, "it never adds to the time spent");
+  assert.deepEqual(S.sideMonths("2026-10-14"), ["2026-09", "2026-08"], "usually the two months before");
+  assert.deepEqual(S.sideMonths("2026-10-29"), ["2026-10", "2026-09", "2026-08"], "in the last three days, this month too");
+  assert.deepEqual(S.sideMonths("2026-10-28"), ["2026-09", "2026-08"]);
+  assert.deepEqual(S.sideMonths("2026-02-27"), ["2026-02", "2026-01", "2025-12"], "February's last three days; and across the year");
+});
 
-  assert.equal(S.sideGroup(c), "Leisure");
-  assert.equal(S.sideGroup(ctx({ groups: [{ name: "Fun", track: "range" }] })), "Fun", "no Leisure: the first one that tracks relax");
-  const st = S.sideTasks(c);
-  assert.equal(st.length, 30);
-  assert.ok(st.every((t) => t.side && t.group === "Leisure" && t.status === "done" && t.est === 10));
-
-  const plain = S.summarize(c, "2026-09-01", "2026-09-30"), full = S.summarize(S.withSide(c), "2026-09-01", "2026-09-30");
-  assert.equal(full.spent - plain.spent, 300);
-  assert.equal(full.byProject.find((x) => x.name === "Leisure").spent, 300);
-  const pie = S.clockPie(S.withSide(c), full);
-  assert.equal(Math.round(S.clockPie(c, plain).blank - pie.blank), 300, "only full attention comes out of Untracked");
-  assert.equal(S.withSide(ctx({ side: [side[0]] })).tasks.length, 0, "nothing full: nothing added");
-
-  const g = { name: "Leisure" };
-  const recent = ctx({ groups, today: "2026-09-20", side, tasks: [] });
-  assert.ok(S.groupDays(S.withSide(recent), g, 14).every((d) => d.state === ""), "the 14-day squares don't light up");
-  assert.equal(Math.round(S.groupHealth(S.withSide(recent), { name: "Leisure", track: "range" }).min), 70, "relax in the last 7 days does count it");
+test("on the side in the store: one row a month; older rows of that month are folded in and replaced", async () => {
+  const store = await import("../js/store.js?side");
+  store.setSetting("side:old1", { month: "2026-09", min: 600, kind: "show", full: true });   // 上一版的写法
+  store.setSetting("side:old2", { month: "2026-09", min: 120 });
+  assert.equal(store.sideOf("2026-09"), 720, "the same month adds up");
+  store.setSide("2026-09", 900);
+  assert.deepEqual(store.sides(), [{ month: "2026-09", min: 900 }]);
+  assert.ok(!store.get("settings", "side:old1"), "the old row is gone");
+  store.setSide("2026-09", 0);
+  assert.deepEqual(store.sides(), []);
 });
 
 test("the Chores task from the chore key counts its minutes, not as a done task", () => {

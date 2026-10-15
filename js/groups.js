@@ -11,13 +11,24 @@ export const PALETTE = ["#3E8E6E", "#3F62B5", "#E07A2B", "#8B62AE", "#E6DCC3", "
 const [GREEN, BLUE, ORANGE, PURPLE, IVORY, BROWN, OCHRE, CRIMSON] = PALETTE;
 
 export const DEFAULTS = [
-  { name: "Work", color: BLUE, labor: true, grow: "all" },
-  { name: "Fitness", color: IVORY, labor: false, grow: "all" },
-  { name: "Chores", color: BROWN, labor: true, grow: "" },
   { name: "Build", color: GREEN, labor: true, grow: "all" },
+  { name: "Work", color: BLUE, labor: true, grow: "all" },
+  { name: "Friends", color: PURPLE, labor: true, grow: "", friends: true },
   { name: "Leisure", color: ORANGE, labor: false, grow: "deep" },
-  { name: "Friends", color: PURPLE, labor: true, grow: "", friends: true }
+  { name: "Fitness", color: IVORY, labor: false, grow: "all" },
+  { name: "Chores", color: BROWN, labor: true, grow: "" }
 ];
+
+// 大类永远按这个顺序摆（她定的，2026-10）：Projects 页、下拉、Stats 的饼图 / 时间表 / 图例都是。清单里别的名字排在后面，照原来的先后
+export const ORDER = ["Build", "Work", "Friends", "Leisure", "Fitness", "Chores"];
+const rankOf = (name) => { const i = ORDER.indexOf(name); return i < 0 ? ORDER.length : i; };
+export const sortGroups = (list) => list.map((g, i) => [g, i]).sort((a, b) => rankOf(a[0].name) - rankOf(b[0].name) || a[1] - b[1]).map(([g]) => g);
+// 按大类清单排：清单里的按清单的先后，不在清单里的排后面，空名字（No project）最后
+export function byGroupOrder(groups) {
+  const at = new Map((groups || []).map((g, i) => [g.name, i]));
+  const key = (name) => (!name ? Infinity : at.has(name) ? at.get(name) : (groups || []).length + rankOf(name));
+  return (a, b) => key(a.name) - key(b.name);
+}
 
 // 圆盘上用的霓虹版：色块压在金属上，要比油画色亮得多。八个颜色一个对一个（绿 → 薄荷霓虹、蓝 → 电光蓝、橘 → 霓虹橙、紫 → 霓虹紫、
 // 白 → 纯白、棕 → 琥珀、赭黄 → 霓虹黄、茜红 → 霓虹红）；自己另选的颜色没有对应的，返回空（圆盘那边会把它调亮）

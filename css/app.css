@@ -581,6 +581,10 @@ body.phone .settings .page-head { margin-top: 4px; }
 
 /* ---------- 项目 → 子项目 ---------- */
 .pgroup { margin-bottom: 18px; }
+/* Projects 页两栏：内容区宽过 900px 才分（侧栏开着收着、窗口拉宽拉窄都按实际的宽度算），左 3 份放 Build、Work，右 2 份放别的 */
+.projects { container-type: inline-size; }
+.pj-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 20px; }
+@container (min-width: 900px) { .pj-cols { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; } .pj-side .pgrid { grid-template-columns: minmax(0, 1fr); } }
 .pg-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .pg-top h3 { margin: 0; font: 700 15.5px var(--display); letter-spacing: -.01em; }
 .pg-top .rename { width: 260px; padding: 6px 10px; font: 700 16px var(--display); border: var(--b-ctl); }
@@ -634,6 +638,19 @@ body.phone .settings .page-head { margin-top: 4px; }
 .chart figcaption b { color: var(--ink); font-weight: 600; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .seg { gap: 0; margin-right: 2px; }
+/* 热力图：标题右边是 Build | All；左边的星期几停上去看那天平均多久（以前的 Weekly rhythm） */
+.heat-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.heat-head h3 { margin: 0; }
+.hday { cursor: default; text-decoration: underline dotted; text-underline-offset: 3px; }
+.hday:hover, .hday:focus-visible { color: var(--ink); }
+/* 饼图那一块最底下：On the side 一个月一个总数 */
+.ots-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12.5px; }
+.ots-k { font-weight: 700; }
+.ots-row select { padding: 3px 8px; font-size: 12.5px; }
+.ots-row input { width: 64px; padding: 3px 8px; font-size: 12.5px; }
+.ots-row em { font-style: normal; color: var(--muted); }
+.ots-row .msub { flex-basis: 100%; font-size: 11.5px; }
 .k { display: inline-block; width: 12px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 /* 总量的柱子是青柠（界面的那个强调色）：白底上要一圈细黑边才看得清，夜间不用。按项目拆开的图用项目自己的颜色 */
 .k.dn { background: var(--accent); box-shadow: inset 0 0 0 1px var(--edge); }
@@ -701,22 +718,12 @@ body.phone .settings .page-head { margin-top: 4px; }
 .st-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 12px; }
 .st-bar select { max-width: 220px; padding: 5px 10px; border: var(--b-ctl); border-radius: 999px; font-size: 13px; font-weight: 600; }
 .st-bar .dk-deep { min-height: 30px; padding: 4px 11px; }
-.st-add { margin-left: auto; padding: 6px 13px; }
-.st-add .ic { width: 15px; height: 15px; }
 .st-range { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .st-range input { padding: 4px 8px; border: var(--b-ctl); border-radius: 999px; font-size: 12.5px; }
 .st-two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); gap: 0 12px; align-items: stretch; }
 .st-two > * { margin-bottom: 10px; }
 @media (max-width: 1100px) { .st-two { grid-template-columns: minmax(0, 1fr); } }
 /* 花了多久 / 深度那两个数字竖着叠成窄窄一列，挨着 Weekly rhythm；窄了就回到上面并排两块 */
-.st-rhythm { display: grid; grid-template-columns: minmax(170px, 210px) minmax(0, 1fr); gap: 0 12px; align-items: stretch; }
-.st-rhythm > * { margin-bottom: 10px; }
-.st-rhythm .kpis { grid-template-columns: minmax(0, 1fr); grid-auto-rows: 1fr; }
-.st-rhythm .tile { padding: 9px 11px; }
-.st-rhythm .tv { margin: 3px 0 2px; font-size: 20px; }
-.st-rhythm .ts { font-size: 11.5px; }
-.st-rhythm .delta { margin-top: 5px; font-size: 11px; }
-@media (max-width: 1100px) { .st-rhythm { grid-template-columns: minmax(0, 1fr); } .st-rhythm .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* 深度（.tide；别叫 .dp，那是任务名后面「◆ Deep」小字的类，带 margin，会把这一段挤偏）：柱子还是那一根青柠。
    深度大概到哪，哪里漫上来一道电光蓝的潮水：顶上的浪边是虚的（不画线，不用知道得那么准），在慢慢走；往下二十来像素就淡没了，
    像浪打在岸上那一小段。两层浪（.wv / .wv.b）波长、快慢、方向都不一样，叠出层次；整道水还会很轻地涨落。
@@ -806,8 +813,6 @@ body.phone .settings .page-head { margin-top: 4px; }
 .tsheet tr.sub th, .tsheet tr.sub td { padding-top: 4px; padding-bottom: 4px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
 .tsheet tr.sub th { padding-left: 32px; }
 .tsheet tr.sub .pdot { width: 7px; height: 7px; }
-.addtime .deep-tog { margin: 2px 0 4px; }
-.addtime .sheet-foot { align-items: center; }
 
 /* ---------- 提示条、装饰 ---------- */
 #toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 60; display: flex; align-items: center; gap: 14px; max-width: calc(100vw - 32px); padding: 10px 12px 10px 16px; border: var(--b); border-radius: 999px; background: var(--ink); color: var(--bg); font-size: 13.5px; box-shadow: var(--hard); transform: translateX(-50%); }

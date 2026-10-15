@@ -1,5 +1,5 @@
 // 项目页，页头 Plans | Ideas 两格。Ideas = 灵感池（想去哪玩、想吃什么，没有时长和期限，见 js/ui/ideas.js）；下面说的都是 Plans。
-// 最上面是目标板（js/ui/goals.js）和各大类的时间占比；下面按「项目」分区（项目 = 大类 = 计划的 group），
+// 最上面是目标板（js/ui/goals.js）和各大类的时间占比；下面按「项目」分区（项目 = 大类 = 计划的 group），电脑上宽了分两栏（左 Build、Work，右别的），
 // 清单里的大类一直都在（空的也在）；区头 Rename 可以改名、换颜色、并进别的大类。
 // 循环小事（engine.js 的 isRepeat）不单独给卡：直接算在大类上，区头下面一行小字，点开是它的编辑框。
 // 每张卡头上有 Archive：归档的折进区头右边的「3 archived」，点开在这个区里展开，卡上是 Restore。
@@ -114,8 +114,7 @@ function sharesHTML(sh, kind) {
 const trackFor = (name) => (name ? GR.trackOf(store.groupByName(name) || { name }) : "progress");
 // 最近一次和谁联系过（任何人）
 const lastContactDate = () => Object.values(store.lastContact()).sort().pop() || "";
-// Relax 那一句也算上 On the side 里完整投入的那些（Stats 页的；只有分钟，14 天方块不亮）
-const healthOf = (c, g, last) => S.groupHealth(S.withSide(c), g, { weekly: store.setting("weekly", {}), lastContact: last });
+const healthOf = (c, g, last) => S.groupHealth(c, g, { weekly: store.setting("weekly", {}), lastContact: last });
 // 有几个大类不达标（侧栏 Projects 上的角标）
 export function projectAlerts(c) {
   const last = lastContactDate();
@@ -204,22 +203,31 @@ export function projectsHTML(c) {
   if (ideasMode()) return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div><div class="tools">' + modeSeg(true) + "</div></header>" + ideasHTML(c) + "</div>";
   const groups = groupsOf(c.projects, { all: true });
   const kind = shareKind(), r = S.periodRange(kind, c.today, store.prefs().weekStartsOn);
-  const sh = S.shares(S.withSide(c), r.from, r.to);
+  const sh = S.shares(c, r.from, r.to);
   const last = lastContactDate();
   return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div>' +
     '<div class="tools">' + modeSeg(false) + '<button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +
     goalsHTML(c) + sharesHTML(sh, kind) +
     (c.projects.length ? "" : '<p class="hint pintro">A project is an area of your life. Tasks can sit right on it, or under a plan inside it: a <b>Total</b> (so many hours by a deadline) or a <b>Regular</b> one (every Monday, three times a week).</p>') +
-    groups.map((g) => {
+    columns(groups.map((g) => {
       const track = trackFor(g.name);
       const live = g.subs.filter(E.isActive), gone = g.subs.filter((p) => !E.isActive(p));
       const cards = live.filter((p) => !E.isRepeat(p)), reps = live.filter(E.isRepeat);
       const shown = openArchived.has(g.name) && gone.length > 0;
-      return '<section class="pgroup" data-group="' + esc(g.name) + '">' + groupHead(c, g.name, cards, !g.subs.length, track, last, { reps: reps.length, gone: gone.length, shown }) +
+      return { name: g.name, html: '<section class="pgroup" data-group="' + esc(g.name) + '">' + groupHead(c, g.name, cards, !g.subs.length, track, last, { reps: reps.length, gone: gone.length, shown }) +
         repsHTML(reps) +
         (cards.length ? '<div class="pgrid">' + cards.map((p) => cardHTML(c, p, track)).join("") + "</div>" : "") +
-        (shown ? '<div class="pgrid closed">' + gone.map((p) => cardHTML(c, p, track)).join("") + "</div>" : "") + "</section>";
-    }).join("") + "</div>";
+        (shown ? '<div class="pgrid closed">' + gone.map((p) => cardHTML(c, p, track)).join("") + "</div>" : "") + "</section>" };
+    })) + "</div>";
+}
+
+// 电脑上分两栏（她定的）：左边宽的是 Build、Work（GR.ORDER 的前两个，有进度卡的那种），右边窄的是别的（一句话 + 14 天方块的那种）。
+// 内容区不够宽（css 里的 container query）就按顺序一栏排下来；左边一个都没有就只有一栏
+function columns(list) {
+  const main = new Set(GR.ORDER.slice(0, 2));
+  const left = list.filter((x) => main.has(x.name)), right = list.filter((x) => !main.has(x.name));
+  if (!left.length || !right.length) return list.map((x) => x.html).join("");
+  return '<div class="pj-cols"><div class="pj-main">' + left.map((x) => x.html).join("") + '</div><div class="pj-side">' + right.map((x) => x.html).join("") + "</div></div>";
 }
 
 // ---------- 编辑框 ----------

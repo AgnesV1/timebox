@@ -32,21 +32,31 @@ let focus = "";   // 点开的那一行（四个状态按钮只在这一行）
 const addTarget = {};   // 加任务框里选的是哪个项目 / 计划（日期 → 下拉的值）：能选「和谁」的大类要多画一块
 const ideaDraft = {};   // 加任务框里从灵感池挑中的那条（日期 → 灵感 id）：任务建好后挂上去，池子里就划掉了
 let addOpen = "";       // 哪一天的加任务框展开着（下面那排选项）。自己记着，不靠焦点猜——见 initToday 里的 setAddOpen
+let timeEdit = "";      // 正在改头尾的那一段（「任务 id#第几段」）
 // 这个任务能不能选「和谁」：已经带着一条记录，或者它那个大类开了这一项
 const meetable = (t) => Boolean(store.meetOfTask(t.id) || store.groupByName(store.groupOf(t))?.friends);
 
 export const shownDate = () => viewDate || store.today();
 export function showDate(d) { viewDate = d === store.today() ? "" : d; }
 
-// 计时记录：「09:10–09:40 · 30m ×」；正在计时的那个显示走着的时间
+// 计时记录：「09:10–09:40 · 30m ×」；正在计时的那个显示走着的时间。点钟点那段 = 改头尾（忘了按 / 停晚了的补救）
+export function timeEditHTML(x) {
+  const k = (f) => 'name="' + f + '" value="' + esc(x[f]) + '" data-keep="tm-' + f + "-" + esc(x.id) + '"';
+  return '<form class="tm-edit" data-tid="' + esc(x.id) + '" autocomplete="off"><input type="time" ' + k("from") + ' aria-label="From"><span>–</span><input type="time" ' + k("to") + ' aria-label="To">' +
+    '<button type="submit" class="btn">Save</button><button type="button" class="link" data-act="time-edit-x">Cancel</button></form>';
+}
+export const timeEditing = () => timeEdit;
+export function timeRangeHTML(x) {
+  return x.from ? '<button type="button" class="tm-at num" data-act="time-edit" data-tid="' + x.id + '" title="Change the times">' + esc(x.from) + "–" + esc(x.to) + "</button> · " : "";
+}
 function timesHTML(c, t, list, form) {
   const run = store.timer();
   const live = run?.taskId === t.id;
   const fin = t.status === "done" || t.status === "partial";
   if (!list.length && !live) return "";
   return '<div class="times">' + (live ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : "") +
-    list.map((x) => '<span class="tm">' + (x.from ? '<span class="num">' + esc(x.from) + "–" + esc(x.to) + "</span> · " : "") + fmtMin(x.min) +
-      '<button type="button" class="tm-x" data-act="time-del" data-tid="' + x.id + '" aria-label="Delete this time">×</button></span>').join("") +
+    list.map((x) => (timeEdit === x.id && x.from ? timeEditHTML(x) : '<span class="tm">' + timeRangeHTML(x) + fmtMin(x.min) +
+      '<button type="button" class="tm-x" data-act="time-del" data-tid="' + x.id + '" aria-label="Delete this time">×</button></span>')).join("") +
     (list.length > 1 ? '<span class="tm sum">= ' + fmtMin(store.timeTotal(t.id)) + "</span>" : "") +
     (fin && !form ? '<button type="button" class="tm more-time" data-act="time-more">+ time</button>' : "") + "</div>";
 }
@@ -326,6 +336,8 @@ export function initToday(rerender) {
       store.setStatus(id, el.dataset.s);
     } else if (act === "edit") openTaskEditor(id);
     else if (act === "time-del") store.deleteTime(el.dataset.tid);
+    else if (act === "time-edit") { timeEdit = el.dataset.tid; rerender(); requestAnimationFrame(() => setTimeout(() => document.querySelector(".tm-edit [name=from]")?.focus(), 0)); }
+    else if (act === "time-edit-x") { timeEdit = ""; rerender(); }
     else if (act === "time-more") { logOpen.add(id); rerender(); }
     else if (act === "time-log") logFromRow(el.closest(".row"));
     else if (act === "tomorrow") store.toTomorrow(id);
@@ -398,6 +410,13 @@ export function initToday(rerender) {
   });
 
   // 记这一顿吃了什么：回车 / Add = 加一道，接着还能加
+  // 改一段的头尾：两个钟点都填了、中间至少一分钟才收
+  on(document, "submit", ".tm-edit", (e, form) => {
+    e.preventDefault();
+    const tid = form.dataset.tid;
+    timeEdit = "";
+    if (!store.editTime(tid, form.from.value, form.to.value)) { timeEdit = tid; toast("Check the two times"); }
+  });
   on(document, "submit", ".dish-quick", (e, form) => {
     e.preventDefault();
     const t = store.get("tasks", form.dataset.task);

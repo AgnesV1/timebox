@@ -9,6 +9,14 @@ test("times text round-trips", () => {
   assert.equal(formatTimes(list), "09:10-09:40 30m; 20m");
 });
 
+test("a segment can end in an emoji mark; old text reads the same", () => {
+  const list = parseTimes("18:00-18:40 40m 🍳; 09:10-09:30 20m ☎️; 12m; 14:00-14:15 🗃️");
+  assert.deepEqual(list, [{ from: "18:00", to: "18:40", min: 40, tag: "🍳" }, { from: "09:10", to: "09:30", min: 20, tag: "☎️" }, { from: "", to: "", min: 12 }, { from: "14:00", to: "14:15", min: 15, tag: "🗃️" }]);
+  assert.equal(formatTimes(list), "18:00-18:40 40m 🍳; 09:10-09:30 20m ☎️; 12m; 14:00-14:15 15m 🗃️");
+  assert.deepEqual(parseTimes("🪪"), [], "a mark on its own isn't a segment");
+  assert.deepEqual(parseTimes("10m 🪪"), [{ from: "", to: "", min: 10, tag: "🪪" }]);
+});
+
 test("a line that ends in a time range is something already done", () => {
   assert.deepEqual(parseLogLine("Reading 14:00-15:10"), { title: "Reading", from: "14:00", to: "15:10" });
   assert.deepEqual(parseLogLine("Read 2:30-3"), { title: "Read", from: "02:30", to: "03:00" });

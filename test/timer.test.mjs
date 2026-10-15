@@ -118,6 +118,54 @@ test("logging something already done: a finished task with its time, undoable as
   assert.equal(late.times, "23:30-00:20 50m");
 });
 
+test("forgot to press Start / stopped late: move the start, stop at an earlier clock time, fix a segment", () => {
+  const id = store.addTask({ title: "Essay", est: 60 });
+  at(new Date(2026, 9, 4, 10, 0).getTime());
+  store.startTimer(id);
+  at(new Date(2026, 9, 4, 10, 5).getTime());
+  assert.equal(store.setTimerStart("10:30"), false, "later than now");
+  assert.equal(store.setTimerStart("9:50"), true);
+  assert.equal(store.timer().start, new Date(2026, 9, 4, 9, 50).getTime());
+  at(new Date(2026, 9, 4, 11, 0).getTime());
+  assert.deepEqual(store.stopTimer("9:40"), { error: "before" }, "can't stop before it started");
+  assert.ok(store.timer(), "still running");
+  assert.deepEqual(store.stopTimer("10:30"), { taskId: id, min: 40 });
+  assert.equal(store.get("tasks", id).times, "09:50-10:30 40m");
+  assert.equal(store.editTime(id + "#0", "9:45", "10:15"), true);
+  assert.equal(store.get("tasks", id).times, "09:45-10:15 30m");
+  assert.equal(store.get("tasks", id).actual, 30);
+  assert.equal(store.editTime(id + "#0", "10:15", "10:15"), false, "nothing in between");
+  assert.equal(store.editTime(id + "#7", "10:00", "10:15"), false, "no such segment");
+});
+
+test("past midnight: an earlier clock time than now on the same night is yesterday", () => {
+  const id = store.addTask({ title: "Night read", est: 60 });
+  at(new Date(2026, 9, 4, 23, 40).getTime());
+  store.startTimer(id);
+  at(new Date(2026, 9, 5, 0, 30).getTime());
+  assert.equal(store.setTimerStart("23:20"), true);
+  assert.equal(store.timer().start, new Date(2026, 9, 4, 23, 20).getTime());
+  assert.deepEqual(store.stopTimer("0:10"), { taskId: id, min: 50 });
+});
+
+test("a running timer can carry a mark; it goes onto the segment", () => {
+  const id = store.addTask({ title: "Kitchen", est: 30 });
+  at(new Date(2026, 9, 4, 18, 0).getTime());
+  store.startTimer(id, "🍳");
+  store.setTimerTag("☎️");
+  assert.equal(store.timer().tag, "☎️");
+  store.setTimerTag("☎️");
+  assert.equal(store.timer().tag, "", "the same one again = none");
+  store.setTimerTag("🍳");
+  at(new Date(2026, 9, 4, 18, 25).getTime());
+  store.stopTimer();
+  assert.equal(store.get("tasks", id).times, "18:00-18:25 25m 🍳");
+  store.tagTime(id + "#0", "🍳");
+  assert.equal(store.get("tasks", id).times, "18:00-18:25 25m");
+  store.tagTime(id + "#0", "🪪");
+  assert.equal(store.timeOf(id)[0].tag, "🪪");
+});
+
 test("deep work: a plan's default marks its tasks, old ones too, and repeats carry it", () => {
   const pid = store.saveProject({ name: "IELTS", kind: "total", place: "pool" });
   const before = store.addTask({ title: "Passage 1", projectId: pid });

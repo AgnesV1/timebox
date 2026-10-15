@@ -1,5 +1,6 @@
 // 计时：在今天的列表里点一个任务选中它，底部浮条点 Start；计时中浮条显示走着的时间和 Stop，
 // 停下后浮条上可以顺手标 Done / Partial。手机和电脑一样；开着的计时器跟着表格同步，哪台设备都能停。
+// 忘了按 / 停晚了：计时中点「Since 09:10」改开始的钟点；Stop 旁边的 ⏱ = 按某个钟点停。浮条底下多一行小框，填完点按钮才算（钟点框边打边发 change，不能一改就停）。
 
 import * as store from "../store.js";
 import { esc, on } from "../dom.js";
@@ -10,6 +11,7 @@ import { cheer } from "../fx.js";
 
 let picked = "";     // 这台设备上选中的任务
 let stopped = null;  // 刚停下的那段 {taskId, min}：浮条上给 Done / Partial
+let atEdit = "";     // 浮条上正在改的钟点：since = 其实几点开始的 / stop = 其实几点就停了
 const TITLE = document.title;
 
 // 能计时的：今天的、还没做完的（Partial 可以接着做）
@@ -40,19 +42,29 @@ const titleOf = (t) => '<b class="dk-title">' + esc(t.title) + "</b>";
 const deepBtn = (t) => '<button type="button" class="dk-deep' + (t.deep ? " on" : "") + '" data-act="dock-deep" data-id="' + t.id + '" aria-pressed="' + Boolean(t.deep) + '" title="Deep work">◆<span>Deep</span></button>';
 
 // 浮条：在计时 → 时间 + Stop；刚停下 → Done / Partial；看着今天 → 选中的任务 + Start；别的时候不出现
-export function dockHTML(c, onToday) {
+// 浮条底下那一行：一个钟点框 + 按钮
+function atForm(kind, value) {
+  return '<form class="dk-at" data-at="' + kind + '" autocomplete="off"><span>' + (kind === "since" ? "Started at" : "Stopped at") + "</span>" +
+    '<input type="time" name="at" value="' + value + '" data-keep="dock-at-' + kind + '" aria-label="' + (kind === "since" ? "Started at" : "Stopped at") + '">' +
+    '<button type="submit" class="btn">' + (kind === "since" ? "Set" : "Stop") + '</button><button type="button" class="link" data-act="at-x">Cancel</button></form>';
+}
+
+export function dockHTML(c, onToday, extra = (t) => deepBtn(t)) {
   const run = store.timer();
   const rt = run && store.get("tasks", run.taskId);
   if (rt) {
     const p = pickedId(c);
     const next = p && p !== rt.id && onToday ? store.get("tasks", p) : null;
     return '<div class="dock run" style="--bar:' + colorOf(rt) + '">' +
-      '<i class="pulse" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Since ' + store.clockOf(run.start) + "</span>" + titleOf(rt) + "</div>" +
-      deepBtn(rt) + '<span class="dk-time num" data-since="' + run.start + '">' + elapsed(run.start) + "</span>" +
+      '<i class="pulse" aria-hidden="true"></i><div class="dk-main"><button type="button" class="dk-k dk-since' + (atEdit === "since" ? " on" : "") + '" data-act="at-edit" data-v="since" title="Started earlier? Change the time">Since ' + store.clockOf(run.start) + "</button>" + titleOf(rt) + "</div>" +
+      extra(rt) + '<span class="dk-time num" data-since="' + run.start + '">' + elapsed(run.start) + "</span>" +
+      '<button type="button" class="dk-early' + (atEdit === "stop" ? " on" : "") + '" data-act="at-edit" data-v="stop" title="Stopped earlier? Pick the time" aria-label="Stopped earlier? Pick the time">⏱</button>' +
       '<button type="button" class="dk-btn stop" data-act="timer-stop"><i class="sq"></i>Stop</button>' +
       '<button type="button" class="icon-btn dk-x" data-act="timer-discard" aria-label="Discard this timer" title="Discard">×</button>' +
-      (next ? '<button type="button" class="dk-switch" data-act="timer-start" data-id="' + next.id + '">Switch to <b>' + esc(next.title) + "</b> ▶</button>" : "") + "</div>";
+      (atEdit ? atForm(atEdit, atEdit === "since" ? store.clockOf(run.start) : store.clockNow()) : "") +
+      (next && !atEdit ? '<button type="button" class="dk-switch" data-act="timer-start" data-id="' + next.id + '">Switch to <b>' + esc(next.title) + "</b> ▶</button>" : "") + "</div>";
   }
+  atEdit = "";
   const st = stopped && store.get("tasks", stopped.taskId);
   if (st && st.status !== "done") {
     return '<div class="dock logged" style="--bar:' + colorOf(st) + '">' +
@@ -79,9 +91,11 @@ export function tick() {
   document.title = e + " · " + t.title;
 }
 
-function stop() {
-  const r = store.stopTimer();
+function stop(at = "") {
+  const r = store.stopTimer(at);
   if (!r) return;
+  if (r.error) { toast(r.error === "before" ? "That's before it started" : "That's later than now"); return; }
+  atEdit = "";
   if (r.min < 1) { toast("Under a minute — not logged"); return; }
   stopped = r;
 }
@@ -96,7 +110,22 @@ export function initTimer(rerender) {
     if (r?.min) toast("Logged " + fmtMin(r.min) + " on the last one");
     rerender();
   });
-  on(document, "click", "[data-act=timer-stop]", () => { stop(); rerender(); });
+  on(document, "click", "[data-act=timer-stop]", () => { atEdit = ""; stop(); rerender(); });
+  on(document, "click", "#dock [data-act=at-edit]", (e, el) => {
+    atEdit = atEdit === el.dataset.v ? "" : el.dataset.v;
+    rerender();
+    if (atEdit) requestAnimationFrame(() => setTimeout(() => document.querySelector(".dk-at [name=at]")?.focus(), 0));
+  });
+  on(document, "click", "#dock [data-act=at-x]", () => { atEdit = ""; rerender(); });
+  on(document, "submit", ".dk-at", (e, form) => {
+    e.preventDefault();
+    const v = form.at.value;
+    if (!v) { form.at.focus(); return; }
+    if (form.dataset.at === "stop") stop(v);
+    else if (store.setTimerStart(v)) atEdit = "";
+    else toast("That's later than now");
+    rerender();
+  });
   on(document, "click", "[data-act=timer-discard]", () => { store.discardTimer(); rerender(); });
   on(document, "click", "[data-act=dock-status]", (e, el) => {
     const id = stopped?.taskId;

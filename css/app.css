@@ -882,6 +882,16 @@ html[data-vt="prev"]::view-transition-new(daylist) { animation: .3s var(--ease) 
 .dk-x { margin-left: -4px; font-size: 22px; line-height: 1; }
 .dk-switch { flex-basis: 100%; overflow: hidden; padding: 8px 0 0; border: 0; border-top: 1px dashed var(--line); background: none; font-size: 13px; color: var(--muted); text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .dk-switch b { color: var(--ink); }
+/* 改钟点：「Since 09:10」本身是个按钮（看着还是那行小字，带一条虚下划线）；Stop 旁边小小的 ⏱；底下一行钟点框 */
+.dk-since { justify-self: start; padding: 0; border: 0; background: none; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+.dk-since:hover, .dk-since.on { color: var(--ink); }
+.dk-early { flex-shrink: 0; width: 30px; height: 30px; padding: 0; border: var(--b-ctl); border-radius: 50%; background: var(--bg); font-size: 14px; line-height: 1; }
+.dk-early.on { border-color: var(--edge); background: var(--accent); }
+.dk-at { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 7px; border-top: 1px dashed var(--line); font-size: 13px; color: var(--muted); }
+.dk-at input { padding: 4px 8px; font-size: 14px; }
+.dk-at .btn { padding: 5px 12px; }
+[data-theme="dark"] .dk-early { background: var(--surface); }
+[data-theme="dark"] .dk-early.on { background: rgba(204, 255, 0, .12); border-color: var(--accent); }
 body.has-dock #main { padding-bottom: 140px; }
 body.phone.has-dock #main { padding-bottom: calc(140px + env(safe-area-inset-bottom)); }
 body.has-dock #toast { bottom: calc(108px + env(safe-area-inset-bottom)); }
@@ -938,6 +948,11 @@ body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
 .tm-x { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; font-size: 14px; line-height: 1; color: var(--muted); }
 .tm-x:hover { background: var(--surface); color: var(--warn); }
 .tm.sum { padding-right: 9px; border-style: dashed; }
+/* 一段的钟点点了能改头尾 */
+.tm-at { padding: 0; border: 0; background: none; color: var(--ink); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+.tm-edit { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.tm-edit input { padding: 3px 6px; font-size: 13px; }
+.tm-edit .btn { padding: 4px 10px; font-size: 12px; }
 .tm.more-time { padding: 2px 10px; border-style: dashed; background: none; color: var(--blue); cursor: pointer; }
 .tm.live { gap: 6px; padding-right: 9px; border: var(--b); background: var(--accent); color: var(--accent-ink); }
 .tm.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--hot); animation: pulse 1.4s ease-in-out infinite; }

@@ -85,9 +85,9 @@ function sidebarHTML(c, view) {
 
 // ---------- 整页重画（正在打字的输入框，值、光标都留住） ----------
 
-// 重画前后留住正在填的东西（带 data-keep 的输入框）：页面、任务池，还有弹层——日历里点开某一天的那块也是整块重画的。
-// 记的时候带上它在哪一块里（main / pool / modal），同一个名字在两块里各算各的
-const KEEP_IN = ["main", "pool", "modal"];
+// 重画前后留住正在填的东西（带 data-keep 的输入框）：页面、任务池、底部浮条（改钟点的框），还有弹层——日历里点开某一天的那块也是整块重画的。
+// 记的时候带上它在哪一块里（main / pool / dock / modal），同一个名字在两块里各算各的
+const KEEP_IN = ["main", "pool", "dock", "modal"];
 const keepRoot = (el) => el?.closest?.(KEEP_IN.map((id) => "#" + id).join(","))?.id || "";
 function captureKeep() {
   const keep = {};

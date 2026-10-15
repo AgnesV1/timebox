@@ -810,7 +810,7 @@ const core = { all, get, entries: (t) => Object.entries(S.data[t]), put, drop, c
   groupFor, colorFor, nextPlanOrder, nextOrder, started, dropTask, addTask, updateTask, deleteTask };
 
 const tm = timerStore(core);
-export const { timer, timeOf, hasTime, timeTotal, clockOf, clockNow, startTimer, stopTimer, discardTimer, logTime, addLogged, deleteTime } = tm;
+export const { timer, timeOf, hasTime, timeTotal, clockOf, clockNow, startTimer, stopTimer, setTimerStart, setTimerTag, discardTimer, logTime, addLogged, tagTime, editTime, deleteTime } = tm;
 
 const fr = friendStore(core);
 export const { friends, meets, meetOfTask, friendFields, lastContact, saveFriend, deleteFriend, saveMeet, deleteMeet, setTaskMeet, importFriends, friendSpecial, adoptMarks, occasionDone, toggleOccasion, doneNext } = fr;

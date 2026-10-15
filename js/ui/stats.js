@@ -90,18 +90,14 @@ function tile(label, value, sub, dlt = "") {
   return '<div class="tile"><p class="tl">' + label + '</p><p class="tv">' + value + "</p>" + (sub ? '<p class="ts">' + sub + "</p>" : "") + dlt + "</div>";
 }
 
-// Time 页签：大字 = Build 花了多久 / 其中多少深度（b、bp = 只看 Build 的这一段和上一段；没有 Build 就是全部），小字 = 全部一共多少
-function timeKpis(s, p, b, bp, name) {
-  const goal = s.goal ? "Goal " + fmtMin(s.goal) + " a day · reached on " + s.goalHit + " of " + s.goalDays + (s.goalDays === 1 ? " day" : " days") : "";
-  if (!b) {
-    const deepSub = goal || (s.deep ? pct(s.deep / s.spent) + " of the time you logged" : "Mark a task ◆ Deep to see this");
-    return '<div class="kpis">' + tile("Time spent", fmtMin(s.spent), s.days ? "About " + fmtMin(s.avgSpent) + " a day" : "Nothing yet", delta(s.spent, p.spent, fmtMin)) +
-      tile("◆ Deep work", fmtMin(s.deep), deepSub, delta(s.deep, p.deep, fmtMin)) + "</div>";
-  }
-  return '<div class="kpis">' +
-    tile(esc(name), fmtMin(b.spent), s.days ? "of " + fmtMin(s.spent) + " in all · about " + fmtMin(s.avgSpent) + " a day" : "Nothing yet", delta(b.spent, bp.spent, fmtMin)) +
-    tile("◆ Deep · " + esc(name), fmtMin(b.deep), "of " + fmtMin(s.deep) + " deep in all" + (goal ? " · " + goal : ""), delta(b.deep, bp.deep, fmtMin)) +
-    "</div>";
+// Time 页签顶上一条细条（她挑的，替掉原来两块大卡片）：左边 Build 花了多久、其中多少深度、比上一段；右边全部一共、深度、平均一天。
+// b、bp = 只看 Build 的这一段和上一段；没有 Build 就只有全部那一半（带比上一段）
+function timeStrip(s, p, b, bp, name) {
+  const n = (v, cls = "") => '<b class="num' + (cls ? " " + cls : "") + '">' + fmtMin(v) + "</b>";
+  const all = "All " + n(s.spent) + ' <span class="ss-m">· ◆ ' + fmtMin(s.deep) + (s.days ? " · ~" + fmtMin(s.avgSpent) + " a day" : "") + "</span>";
+  if (!b) return '<div class="st-strip"><span>' + all + "</span>" + delta(s.spent, p.spent, fmtMin) + "</div>";
+  return '<div class="st-strip"><span>' + esc(name) + " " + n(b.spent, "ss-b") + "</span><span>◆ deep " + n(b.deep) + "</span>" + delta(b.spent, bp.spent, fmtMin) +
+    '<span class="ss-all">' + all + "</span></div>";
 }
 
 // 柱子 / 热力图右上角：Build | All
@@ -483,9 +479,8 @@ export function statsHTML(c) {
     const bOn = Boolean(bc) && (!picks.size || bc.tasks.length > 0);
     const b = bOn ? S.summarize(bc, r.from, r.to, { by: "plan" }) : null, bp = bOn ? S.summarize(bc, p.from, p.to, { by: "plan" }) : null;
     const tv = bOn && view.trend === "build", hv = bOn && view.heat === "build";
-    body = '<div class="st-two">' + timeTrendHTML(tv ? b : s, bOn ? viewSeg("trend", bName) : "") + pieHTML(sc.c, s, rest, haze, sc.on) + "</div>" +
+    body = timeStrip(s, prev, b, bp, bName) + '<div class="st-two">' + timeTrendHTML(tv ? b : s, bOn ? viewSeg("trend", bName) : "") + pieHTML(sc.c, s, rest, haze, sc.on) + "</div>" +
       heatHTML(hv ? bc : sc.c, hv ? b : s, hv ? "plan" : sc.by, bOn ? viewSeg("heat", bName) : "") +
-      timeKpis(s, prev, b, bp, bName) +
       sheetHTML(sc.c, s, sc.by);
   }
   return '<div class="stats">' + headHTML(c, r) + body + "</div>";

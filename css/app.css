@@ -633,6 +633,14 @@ body.phone .settings .page-head { margin-top: 4px; }
 .delta { display: block; margin-top: 8px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .delta.good { color: var(--ok); }
 .delta.bad { color: var(--warn); }
+/* Time 页签顶上那条细条：Build 的时长、深度、比上一段 …… 右边全部一共 */
+.st-strip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; margin: 0 0 10px; padding: 7px 12px; border: var(--b); border-radius: 12px; background: var(--card); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); font-size: 12.5px; color: var(--muted); }
+.st-strip b { font-size: 15px; color: var(--ink); }
+.st-strip .ss-b { color: var(--blue); }
+[data-theme="dark"] .st-strip .ss-b { color: var(--accent); }
+.st-strip .delta { display: inline; margin: 0; }
+.st-strip .ss-all { margin-left: auto; }
+.st-strip .ss-all b { font-size: 13px; }
 .chart figcaption { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .chart figcaption p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
 .chart figcaption b { color: var(--ink); font-weight: 600; }
@@ -645,7 +653,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .hday { cursor: default; text-decoration: underline dotted; text-underline-offset: 3px; }
 .hday:hover, .hday:focus-visible { color: var(--ink); }
 /* Adjust 里最后一行：On the side 一个月一个总数（和上面几行同一个格子排法，月份是个小下拉） */
-.ots-row { display: grid; grid-template-columns: minmax(0, 1fr) 54px auto; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.ots-row { display: grid; grid-template-columns: minmax(0, 1fr) 54px 10.5em; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
 .ots-row select { padding: 1px 6px; font-size: 12px; }
 .ots-row input { padding: 4px 6px; border: var(--b-ctl); text-align: center; }
 .ots-row em { font-style: normal; color: var(--muted); white-space: nowrap; }
@@ -790,7 +798,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .pie-legend .haze-li em { font-style: normal; font-size: 11px; color: var(--muted); }
 .pie-legend em { font-style: normal; text-align: right; color: var(--muted); }
 .life-form { display: grid; gap: 6px; margin: 0 0 12px; padding: 10px; border-radius: 12px; background: var(--surface); font-size: 12.5px; }
-.life-form label { display: grid; grid-template-columns: minmax(0, 1fr) 54px auto; align-items: center; gap: 6px; }
+.life-form label { display: grid; grid-template-columns: minmax(0, 1fr) 54px 10.5em; align-items: center; gap: 6px; }   /* 单位那一列定宽：几行的输入框对齐 */
 .life-form input { padding: 4px 6px; border: var(--b-ctl); text-align: center; }
 .life-form em { font-style: normal; color: var(--muted); white-space: nowrap; }
 .tsheet { width: 100%; border-collapse: collapse; font-size: 13px; }

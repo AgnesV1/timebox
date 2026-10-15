@@ -1767,12 +1767,16 @@ select.open { border-color: var(--edge); }
 /* ---------- Chore 键（js/ui/chores.js）：列表顶上一行、靠右——小圆键，前面是按 emoji 并好的小块；计时中是四个记号 + 走着的时间 ---------- */
 .chore { margin: 0 0 6px; }
 .chore-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
-.chore-k { font-size: 12px; font-weight: 600; color: var(--muted); }
-.chore-key { display: inline-grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; padding: 0; border: var(--b); border-radius: 50%; background: var(--accent); color: var(--accent-ink); box-shadow: var(--hard); transition: transform .15s var(--ease); }
-.chore-key:active { transform: scale(.9); }
-.chore-key .tri { width: 0; height: 0; margin-left: 2px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 8px solid currentColor; }
-.chore-key .sq { width: 9px; height: 9px; border-radius: 2px; background: currentColor; }
-.chore-key.run { background: var(--hot); color: #fff; }
+.chore-k { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+/* 键本身 16px 的圆点（她挑的，颜色比青柠 / 玫红各暗一档）；按钮透明地大到 28px，手机上好点。圆点画在 ::before 上 */
+.chore-key { position: relative; display: inline-grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; margin: -6px -6px -6px -4px; padding: 0; border: 0; background: none; color: var(--accent-ink); transition: transform .15s var(--ease); }
+.chore-key::before { content: ""; position: absolute; left: 6px; top: 6px; width: 16px; height: 16px; box-sizing: border-box; border: 1.5px solid var(--edge); border-radius: 50%; background: #B2E600; }
+.chore-key:active { transform: scale(.88); }
+.chore-key i { position: relative; }
+.chore-key .tri { width: 0; height: 0; margin-left: 1.5px; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; border-left: 5.5px solid currentColor; }
+.chore-key .sq { width: 6px; height: 6px; border-radius: 1.5px; background: currentColor; }
+.chore-key.run { color: #fff; }
+.chore-key.run::before { background: #E0338F; }
 .chore-time { font: 700 13px/1 var(--num); font-variant-numeric: tabular-nums; }
 .chore-sum { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px; padding: 0; border: 0; background: none; cursor: pointer; }
 .chore-cc { padding: 1px 8px; border-radius: 999px; background: var(--surface); font-size: 12px; line-height: 1.5; white-space: nowrap; }
@@ -1783,8 +1787,8 @@ select.open { border-color: var(--edge); }
 .chore-each { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; margin-top: 6px; }
 .chore-each .chore-tags .chip { padding: 0 4px; border-color: transparent; background: none; font-size: 12px; opacity: .45; }
 .chore-each .chore-tags .chip.on { opacity: 1; border-color: var(--edge); background: var(--accent); box-shadow: none; }
-[data-theme="dark"] .chore-key { border-color: var(--accent); box-shadow: var(--glow); }
-[data-theme="dark"] .chore-key.run { border-color: var(--hot); background: var(--hot); box-shadow: 0 0 14px rgba(255, 43, 214, .5); }
+[data-theme="dark"] .chore-key::before { border: 1px solid #A8D100; background: #A8D100; box-shadow: 0 0 7px rgba(168, 209, 0, .45); }
+[data-theme="dark"] .chore-key.run::before { border-color: #D624B8; background: #D624B8; box-shadow: 0 0 8px rgba(214, 36, 184, .45); }
 [data-theme="dark"] .chore-each .chore-tags .chip.on { background: rgba(204, 255, 0, .12); border-color: var(--accent); }
 
 /* ---------- 半透明（2026-10，她挑的「50% + 轻磨砂」）：卡片、侧栏、日历池、浮条都透得出底图（#sky 的天、云、星芒、飞机和潮水） ----------

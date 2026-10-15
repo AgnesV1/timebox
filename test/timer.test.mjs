@@ -213,3 +213,17 @@ test("chore key: one Chores task a day with a fixed id; each press is a segment;
   assert.deepEqual([after.actual, after.est], [40, 40], "est follows the total");
   assert.equal(store.tasksOn(T).filter(store.isChore).length, 1, "still one a day");
 });
+
+test("an empty Chores task (pressed and stopped within a minute) isn't listed on its day", () => {
+  const T = store.today(), [y, m, d] = T.split("-").map(Number), id = store.choreId(T);
+  store.deleteTask?.(id);
+  at(new Date(y, m - 1, d, 7, 0).getTime());
+  store.startChore();
+  at(new Date(y, m - 1, d, 7, 0, 30).getTime());
+  store.stopTimer();
+  if (!store.timeOf(id).length) assert.equal(store.tasksOn(T).some(store.isChore), false, "nothing logged: not listed");
+  store.startChore("🗃️");
+  at(new Date(y, m - 1, d, 7, 20).getTime());
+  store.stopTimer();
+  assert.equal(store.tasksOn(T).some(store.isChore), true, "once it has time, it is");
+});

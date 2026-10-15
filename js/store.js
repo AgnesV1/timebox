@@ -201,8 +201,9 @@ export function ctx() {
   return ctxCache;
 }
 
+// 按了 Chore 又不到一分钟就停的那天：Chores 那条建了、没记到时间，不列出来（不然条上、日历里多一个小点）
 export function tasksOn(date) {
-  return all("tasks").filter((t) => t.date === date).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  return all("tasks").filter((t) => t.date === date && !(E.isChore(t) && !t.times && !(Number(t.actual) > 0))).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
 }
 
 // ---------- 订阅 ----------
@@ -817,7 +818,7 @@ export const { timer, timeOf, hasTime, timeTotal, clockOf, clockNow, startTimer,
 // Chore 键：每天一条 Chores 任务（ID 固定 chore-日期，表格里不用加列就认得出），标着 Done、est = 当天合计；每按一次 = 多一段计时。
 // 挂在叫 Chores 的大类上，没有就第一个 labor 的，再没有就不挂。有别的在跑先停下记好（返回记了多少，和 startTimer 一样）
 export const choreId = (date) => "chore-" + date;
-export const isChore = (t) => String(t?.id || "").startsWith("chore-");
+export const isChore = E.isChore;
 const choreGroup = () => (groups().find((g) => g.name === "Chores") || groups().find((g) => g.labor))?.name || "";
 export function startChore(tag = "") {
   const id = choreId(today());

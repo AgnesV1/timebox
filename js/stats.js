@@ -71,15 +71,15 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
   const days = from <= last ? range(from, last) : [];
   const inRange = (d) => d >= from && d <= last;
   const all = ctx.tasks.filter((t) => t.date && inRange(t.date));
-  // side = On the side 里标了 full 摊出来的（见 withSide）：只算分钟，不算做完几条、估时准不准、原因、安排了多少
-  const tasks = all.filter((t) => !t.side);
+  // Chore 键那条（E.isChore）只算分钟：它一直标着 Done，算进做完几条、完成率、估时、原因就不对了
+  const tasks = all.filter((t) => !E.isChore(t));
 
   const spentBy = {}, plannedBy = {}, deepBy = {}, wdBy = {};   // wdBy：每一行（大类 / 计划）在星期几各花了多少
   for (const t of all) {
     spentBy[t.date] = (spentBy[t.date] || 0) + E.spentMin(t);
     if (E.spentMin(t)) { const n = rowOf(ctx, t, by).name; (wdBy[n] = wdBy[n] || Array(7).fill(0))[weekday(t.date)] += E.spentMin(t); }
     if (t.deep) deepBy[t.date] = (deepBy[t.date] || 0) + E.spentMin(t);
-    if (!t.side && t.status !== "drop" && t.status !== "later") plannedBy[t.date] = (plannedBy[t.date] || 0) + num(t.est);
+    if (t.status !== "drop" && t.status !== "later") plannedBy[t.date] = (plannedBy[t.date] || 0) + num(t.est);
   }
   const spent = days.reduce((a, d) => a + (spentBy[d] || 0), 0);
   const planned = days.reduce((a, d) => a + (plannedBy[d] || 0), 0);
@@ -102,7 +102,7 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
   // 按大类（或者按计划，见 rowOf）；哪都没挂的放最后
   const nameOf = (t) => rowOf(ctx, t, by).name;
   const byProject = [...new Set(all.map(nameOf))].map((name) => {
-    const mins = all.filter((t) => nameOf(t) === name), ts = mins.filter((t) => !t.side);
+    const mins = all.filter((t) => nameOf(t) === name), ts = mins.filter((t) => !E.isChore(t));
     const tm = ts.filter((t) => t.status === "done" && num(t.actual) > 0 && num(t.est) > 0);
     return {
       name,

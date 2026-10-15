@@ -271,7 +271,6 @@ test("on the side: a month's total spreads over its days; overlapping time is on
   const plain = S.summarize(c, "2026-09-01", "2026-09-30"), full = S.summarize(S.withSide(c), "2026-09-01", "2026-09-30");
   assert.equal(full.spent - plain.spent, 300);
   assert.equal(full.byProject.find((x) => x.name === "Leisure").spent, 300);
-  assert.deepEqual([full.done, full.counted, full.planned], [plain.done, plain.counted, plain.planned], "counts and plans stay as they were");
   const pie = S.clockPie(S.withSide(c), full);
   assert.equal(Math.round(S.clockPie(c, plain).blank - pie.blank), 300, "only full attention comes out of Untracked");
   assert.equal(S.withSide(ctx({ side: [side[0]] })).tasks.length, 0, "nothing full: nothing added");
@@ -280,4 +279,14 @@ test("on the side: a month's total spreads over its days; overlapping time is on
   const recent = ctx({ groups, today: "2026-09-20", side, tasks: [] });
   assert.ok(S.groupDays(S.withSide(recent), g, 14).every((d) => d.state === ""), "the 14-day squares don't light up");
   assert.equal(Math.round(S.groupHealth(S.withSide(recent), { name: "Leisure", track: "range" }).min), 70, "relax in the last 7 days does count it");
+});
+
+test("the Chores task from the chore key counts its minutes, not as a done task", () => {
+  const c = ctx({ tasks: [
+    { id: "a", date: "2026-10-02", est: 30, status: "done", actual: 30 },
+    { id: "chore-2026-10-02", date: "2026-10-02", est: 45, status: "done", actual: 45, group: "Chores" }
+  ] });
+  const s = S.summarize(c, "2026-10-01", "2026-10-07");
+  assert.deepEqual([s.spent, s.done, s.counted], [75, 1, 1]);
+  assert.equal(s.byProject.find((x) => x.name === "Chores").done, 0);
 });

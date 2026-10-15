@@ -36,7 +36,7 @@
   --meter: linear-gradient(90deg, #CCFF00, #00E5FF 60%, #FF2BD6);
   --b: 1px solid var(--edge); --b-soft: 1px solid #222232; --b-ctl: var(--b);
   --hard: 0 0 0 1px rgba(204, 255, 0, .05), 0 0 24px rgba(204, 255, 0, .06) inset; --hard-lg: 0 0 40px rgba(0, 229, 255, .06); --glow: 0 0 14px rgba(204, 255, 0, .5);
-  --card: rgba(12, 12, 19, .5);
+  --card: rgba(12, 12, 19, .5); --frost: none;   /* 夜里不糊：星芒只有一两个像素，糊 4px 就整片没了（白天的云又大又软，糊一点没关系） */
   --leo-spot: #FF2BD6; --leo-inner: rgba(255, 43, 214, .35); --zebra-ink: rgba(255, 255, 255, .85);
   --k-Main: #7BA208; --k-Work: #0083FC; --k-Fun: #F504A2; --k-Chore: #DB7206; --k-None: #6A6A80; --k-sleep: #A2A2BA; --k-care: #666680; --k-chores: #343446; --k-blank: #1B1B28; --grid: #1F1F2D;
   --num: "JetBrains Mono", ui-monospace, monospace;
@@ -1788,7 +1788,7 @@ select.open { border-color: var(--edge); }
 [data-theme="dark"] .chore-each .chore-tags .chip.on { background: rgba(204, 255, 0, .12); border-color: var(--accent); }
 
 /* ---------- 半透明（2026-10，她挑的「50% + 轻磨砂」）：卡片、侧栏、日历池、浮条都透得出底图（#sky 的天、云、星芒、飞机和潮水） ----------
-   --card = 半透明的 --bg，--frost = 轻轻糊一点（只糊 4px，花样还看得出来）。日历格子、备餐的每一天格子太多，只透不糊。
+   --card = 半透明的 --bg，--frost = 白天轻轻糊一点（只糊 4px，云还看得出来），夜里不糊（不然星芒透不出来）。日历格子、备餐的每一天格子太多，只透不糊。
    不透的：弹层（.sheet）、读数（.ctip）、提示条、下拉菜单、输入框和小按钮。卡里的任务行自己不上底色，不然是一条条白杠 */
 #side, #pool, .today-main, .hero, .overdue, .lineband, .pcard, .goals, .settings .card, .stats .card, .tile, .mcard, .mweek, .rweek, .mbox, .mshelf, .mtable, .friends .card, .note {
   background: var(--card); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); }

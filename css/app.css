@@ -364,20 +364,20 @@ body.side-min .sync-pill span { display: none; }
 [data-theme="light"] .chip.ghost, [data-theme="light"] .tm.more-time, [data-theme="light"] .shopadd select, [data-theme="light"] .rpacks select { color: var(--muted); }
 .chip.ghost { background: transparent; color: var(--blue); }
 [data-theme="dark"] .chip.on { background: rgba(204, 255, 0, .12); color: var(--accent); border-color: var(--accent); box-shadow: 0 0 14px rgba(204, 255, 0, .45); }
-/* emoji 记号：挑一个（.em-pick，emoji 本身就是字，chip 收窄一点）；页面顶上的筛选（.tagf，Restock 和 Ideas 共用） */
-/* 一排 emoji / 记号里挑一个（Ideas 的类别、Restock 的记号、这两页顶上的筛选、Reading 的 Vibe）：连成一条格子，
-   格子之间一道细线，选中的那格是青柠（夜里是一圈霓虹）——不再每个套一个圆框 */
-.em-pick, .idea-kinds, .vibes { display: inline-flex; width: max-content; max-width: 100%; justify-self: start; border: var(--b-ctl); }
-.tagf { display: flex; width: max-content; max-width: 100%; margin: 0 0 12px; border: var(--b-ctl); }
-.em-pick > .chip, .idea-kinds > .chip { min-width: 34px; height: 30px; padding: 0 7px; border: 0; border-radius: 0; background: transparent; font-size: 15px; line-height: 1; }
-.tagf-b { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border: 0; border-radius: 0; background: transparent; font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+/* 一排 emoji / 记号里挑一个（Ideas 的类别、Restock 的记号、这两页顶上的筛选、Reading 的 Vibe）：像表情键盘——
+   不画线，每个占一格，选中的那格整块亮：白天青柠实底；夜里淡青柠底 + 一圈霓虹和一点光（和夜里别的「选中」一样）。
+   没选的 emoji 淡一点；筛选带数字，不淡 */
+.em-pick, .idea-kinds, .vibes { display: inline-flex; gap: 3px; width: max-content; max-width: 100%; justify-self: start; }
+.tagf { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
+.em-pick > .chip, .idea-kinds > .chip { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; font-size: 17px; line-height: 1; }
+.em-pick > .chip:not(.on), .idea-kinds > .chip:not(.on) { opacity: .6; filter: grayscale(.4); }
+.tagf-b { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; font-size: 13.5px; font-weight: 600; line-height: 1.3; }
 .tagf-b small { font-size: 11px; color: var(--muted); }
-.em-pick > .chip + .chip, .idea-kinds > .chip + .chip, .tagf-b + .tagf-b, .vibe + .vibe { border-left: var(--b-ctl); }
-.em-pick > .chip:hover, .idea-kinds > .chip:hover, .tagf-b:hover, .vibe:hover { background: var(--tonal); }
+.em-pick > .chip:hover, .idea-kinds > .chip:hover, .tagf-b:hover, .vibe:hover { opacity: 1; filter: none; background: var(--tonal); }
 .em-pick > .chip:active, .idea-kinds > .chip:active { transform: none; }
 .em-pick > .chip.on, .idea-kinds > .chip.on, .tagf-b.on, .vibes > .vibe.on { background: var(--accent); color: var(--accent-ink); }
 .tagf-b.on small { color: inherit; }
-[data-theme="dark"] :is(.em-pick, .idea-kinds) > .chip.on, [data-theme="dark"] .tagf-b.on, [data-theme="dark"] .vibes > .vibe.on { background: rgba(204, 255, 0, .12); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+[data-theme="dark"] :is(.em-pick, .idea-kinds) > .chip.on, [data-theme="dark"] .tagf-b.on, [data-theme="dark"] .vibes > .vibe.on { background: rgba(204, 255, 0, .12); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent), 0 0 12px rgba(204, 255, 0, .35); }
 .reason { display: block; width: 100%; margin-top: 8px; padding: 9px 12px; border: var(--b-ctl); font-size: 14px; }
 .desc { display: block; width: 100%; min-height: 90px; margin-top: 10px; resize: vertical; border: var(--b-ctl); font-size: 15px; line-height: 1.55; }
 .empty { padding: 18px 0; color: var(--muted); }
@@ -405,7 +405,7 @@ body.side-min .sync-pill span { display: none; }
 /* 格子不挤扁：有最小宽度，窗口 + 任务池放不下时日历区左右滑 */
 .cal-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px 6px; }
 .week { display: grid; grid-template-columns: repeat(7, minmax(104px, 1fr)); gap: 5px; }
-.cell { position: relative; display: flex; flex-direction: column; gap: 3px; min-height: 160px; padding: 6px 6px 26px; border: 1.5px solid transparent; border-radius: 12px; background: var(--bg); transition: background-color .15s, box-shadow .15s; }
+.cell { position: relative; display: flex; flex-direction: column; gap: 5px; min-height: 160px; padding: 6px 6px 26px; border: 1.5px solid transparent; border-radius: 12px; background: var(--bg); transition: background-color .15s, box-shadow .15s; }
 .cell.past { background: color-mix(in srgb, var(--bg) 60%, var(--page)); }
 .cell.rest { background: repeating-linear-gradient(-45deg, transparent 0 7px, var(--surface) 7px 8px), var(--bg); }
 .cell.today { border: 2px solid var(--edge); box-shadow: 2px 2px 0 var(--accent); }
@@ -424,13 +424,13 @@ body.side-min .sync-pill span { display: none; }
 .load i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--hot)); }
 [data-theme="dark"] .load i { background: linear-gradient(90deg, #00E5FF, #CCFF00); }
 .ln { font-size: 10.5px; font-weight: 600; color: var(--muted); }
-/* 日历上的任务 = 一张张便利贴：直角，纸按项目的颜色染淡，底边一点点纸的阴影（夜里是染了色的暗纸，不要阴影）；
-   不写时长（一天合计多少在格子头上） */
-.ev { --paper: #FFFEF2; position: relative; display: flex; align-items: flex-start; gap: 4px; padding: 4px 6px; border-radius: 0; background: color-mix(in srgb, var(--c) 28%, var(--paper)); box-shadow: 0 1px 1px rgba(11, 11, 11, .06), 0 5px 6px -5px rgba(11, 11, 11, .35); font-size: 11.5px; line-height: 1.3; cursor: grab; }
+/* 日历上的任务 = 一张张便利贴：直角，纸按项目的颜色染淡，顶上一道深一点的同色胶条（分得清上一张下一张），
+   底边一点点纸的阴影（夜里是染了色的暗纸，只留胶条不要阴影）；不写时长（一天合计多少在格子头上） */
+.ev { --paper: #FFFEF2; position: relative; display: flex; align-items: flex-start; gap: 4px; padding: 6px 6px 4px; border-radius: 0; background: color-mix(in srgb, var(--c) 28%, var(--paper)); box-shadow: inset 0 3px 0 color-mix(in srgb, var(--c) 75%, var(--paper)), 0 1px 1px rgba(11, 11, 11, .06), 0 5px 6px -5px rgba(11, 11, 11, .35); font-size: 11.5px; line-height: 1.3; cursor: grab; }
 .ev .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .ev .m { display: none; }
 .ev:hover { background: color-mix(in srgb, var(--c) 38%, var(--paper)); }
-[data-theme="dark"] .ev { --paper: #0C0C13; background: color-mix(in srgb, var(--c) 22%, var(--paper)); box-shadow: none; }
+[data-theme="dark"] .ev { --paper: #0C0C13; background: color-mix(in srgb, var(--c) 22%, var(--paper)); box-shadow: inset 0 3px 0 color-mix(in srgb, var(--c) 75%, var(--paper)); }
 [data-theme="dark"] .ev:hover { background: color-mix(in srgb, var(--c) 32%, var(--paper)); }
 .ev.st-done { opacity: .5; }
 .ev.st-done .t, .ev.st-drop .t { text-decoration: line-through; }
@@ -640,8 +640,8 @@ body.phone .settings .page-head { margin-top: 4px; }
 
 /* ---------- 统计 ---------- */
 /* 图上的颜色用 --k-*（校验过的同色系），文字一律用正文颜色；柱子 ≤24px、顶端 4px 圆角、相邻留 2px 缝 */
-/* 每张图自己就是一块：标题 + 一句说明 + 图，不再套框（框里的线不带信息）；段和段之间靠留白 */
-.stats .card { margin-bottom: 34px; }
+/* 每张图一块半透明的软板：不描边、不投影（和 Settings 一样）——全去掉的话一页的图连成一片，分不清哪块是哪块 */
+.stats .card { margin-bottom: 14px; padding: 14px 16px 12px; border-radius: 14px; background: var(--bg); }
 .stats h3 { margin: 0; font: 700 15px var(--display); letter-spacing: -.01em; }
 .stats figure { margin: 0 0 16px; }
 .stats .lede { margin: 4px 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
@@ -747,7 +747,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .st-bar .dk-deep { min-height: 30px; padding: 4px 11px; }
 .st-range { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .st-range input { padding: 4px 8px; border: var(--b-ctl); border-radius: 999px; font-size: 12.5px; }
-.st-two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); gap: 0 44px; align-items: stretch; }
+.st-two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); gap: 0 14px; align-items: stretch; }
 .st-two > * { margin-bottom: 10px; }
 @media (max-width: 1100px) { .st-two { grid-template-columns: minmax(0, 1fr); } }
 /* 花了多久 / 深度那两个数字竖着叠成窄窄一列，挨着 Weekly rhythm；窄了就回到上面并排两块 */
@@ -1061,7 +1061,7 @@ body.phone .logtime input, body.phone .add input, body.phone .add select { font-
 .rstuck { margin: 0; font-size: 12.5px; color: var(--warn); }
 .rstuck b { color: var(--ink); }
 [data-rstuck]:empty { display: none; }
-.vibe { width: 40px; height: 34px; border: 0; border-radius: 0; background: transparent; font-size: 19px; line-height: 1; filter: grayscale(.8); opacity: .7; }
+.vibe { width: 40px; height: 34px; border: 0; border-radius: 8px; background: transparent; font-size: 19px; line-height: 1; filter: grayscale(.8); opacity: .7; }
 .vibe.on { filter: none; opacity: 1; }
 .rtypes { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 6px; }
 .rgo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -1811,7 +1811,7 @@ select.open { border-color: var(--edge); }
 /* ---------- 半透明（2026-10，她挑的「50% + 轻磨砂」）：卡片、侧栏、日历池、浮条都透得出底图（#sky 的天、云、星芒、飞机和潮水） ----------
    --card = 半透明的 --bg，--frost = 白天轻轻糊一点（只糊 4px，云还看得出来），夜里不糊（不然星芒透不出来）。日历格子、备餐的每一天格子太多，只透不糊。
    不透的：弹层（.sheet）、读数（.ctip）、提示条、下拉菜单、输入框和小按钮。卡里的任务行自己不上底色，不然是一条条白杠 */
-#side, #pool, .today-main, .pcard, .goals, .settings .card, .rweek, .mbox, .mshelf {
+#side, #pool, .today-main, .pcard, .goals, .settings .card, .stats .card, .rweek, .mbox, .mshelf {
   background: var(--card); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); }
 .cell, .mday { background: var(--card); }
 .dock { background: rgba(255, 255, 255, .72); -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%); }

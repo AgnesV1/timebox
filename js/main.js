@@ -253,7 +253,7 @@ initDnd((payload, target) => (target.startsWith("m") ? mealDrop(payload, target)
 initStats(render);
 initTimer(render);
 initChores(render);
-initScores();
+initScores(render);
 initReading(render);
 initMeals(render);
 initFriends(render);

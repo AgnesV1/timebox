@@ -226,8 +226,8 @@ body.side-min .sync-pill span { display: none; }
 .today-main .strip { margin-top: 2px; }
 .today-side { display: grid; gap: 10px; }
 .today-side .overdue, .today-side .bill { margin-top: 0; }
-/* 每天的打分（js/ui/scores.js）：电脑上排在右栏、汇总那块下面；窄了（右栏挪到最上面）就排到清单后面。不套框：
-   一行 = 名字和意思 · 几档（只有字，选中的铺青柠）· 只有下划线的数字格（灰字是平常的范围）；底下一格 note */
+/* 每天的打分（js/ui/scores.js）：电脑上排在右栏、汇总那块下面；窄了（右栏挪到最上面）就排到清单后面。不套框，靠留白分组：
+   一块 = 上面名字、意思、只有下划线的数字格（灰字是平常的范围），下面几档（只有字，选中的铺青柠）；底下一格 note */
 .today-grid { grid-template-rows: auto 1fr; }
 .today-main { grid-column: 1; grid-row: 1 / span 2; }
 .today-side { grid-column: 2; grid-row: 1; }
@@ -236,22 +236,30 @@ body.side-min .sync-pill span { display: none; }
 .dsc-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .dsc-head b { font-size: 13px; letter-spacing: 0; color: var(--ink); }
 [data-theme="dark"] .dsc-head b { color: var(--accent); text-shadow: var(--glow); }
-.dsc-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 44px; align-items: center; gap: 8px; min-height: 30px; }
-.dsc-name { min-width: 0; line-height: 1.2; }
-.dsc-name b { display: block; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
-.dsc-name span { display: block; font-size: 11px; color: var(--muted); }
-.dsc-opts { display: flex; flex-wrap: wrap; gap: 1px 2px; }
+.dsc-row { padding: 5px 0 7px; }
+.dsc-row + .dsc-row { margin-top: 2px; }
+.dsc-top { display: flex; align-items: baseline; gap: 8px; }
+.dsc-name { flex: 1; min-width: 0; }
+.dsc-name b { font-size: 13px; font-weight: 700; }
+.dsc-name span { margin-left: 8px; font-size: 11.5px; color: var(--muted); }
+.dsc-opts { display: flex; flex-wrap: wrap; gap: 1px 2px; margin: 2px 0 0 -8px; }   /* 选项的字和名字左边对齐（按钮自己有 8px 内边距） */
 .dsc-opts button { padding: 3px 8px; border: 1px solid transparent; border-radius: 999px; background: none; font-size: 12.5px; line-height: 1.3; color: var(--muted); text-align: left; }
 .dsc-opts button:hover { background: var(--tonal); color: var(--ink); }
 .dsc-opts button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 [data-theme="dark"] .dsc-opts button.on { background: rgba(204, 255, 0, .12); color: var(--accent); border-color: var(--accent); box-shadow: 0 0 10px rgba(204, 255, 0, .35); }
-.dsc input { width: 100%; padding: 2px 0 3px; border: 0; border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent); border-radius: 0; background: transparent; }
+.dsc input { padding: 2px 0 3px; border: 0; border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent); border-radius: 0; background: transparent; }
 .dsc input:focus { border-color: transparent; border-bottom-color: var(--ink); }
 [data-theme="dark"] .dsc input:focus { border-bottom-color: var(--accent); box-shadow: 0 7px 8px -7px rgba(204, 255, 0, .7); }
-.dsc-num { font: 700 18px var(--num); text-align: center; }
+.dsc-num { flex: none; width: 44px; font: 700 18px var(--num); text-align: center; }
 .dsc-num::placeholder { font-size: 12px; font-weight: 500; }
-.dsc-note { margin-top: 8px; font-size: 13px; }
+.dsc-note { width: 100%; margin-top: 8px; font-size: 13px; }
 .dsc-msg { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+/* 收好的样子：一行摘要（换行就换行）、note、Edit */
+.dsc-sum { margin: 0; font-size: 13px; line-height: 1.75; }
+.dsc-sum b { font: 700 13px var(--num); }
+.dsc-sum i { font-style: normal; color: var(--muted); }
+.dsc-sumnote { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.dsc .link { justify-self: start; margin-top: 6px; font-size: 12.5px; }
 
 /* 手机顶栏：吸顶毛玻璃，底下一条豹纹胶带。
    状态栏 / 灵动岛底下那一截（页面画到屏幕最顶上时才有，高 = --top）是实心的背景色，不透、不叠纹理：那一条要和背景完全一个颜色 */
@@ -304,7 +312,7 @@ body.side-min .sync-pill span { display: none; }
 /* 安全线卡片 */
 /* 今日总数：次要的汇总，不套框，直接放在天上——主角是左边那张任务列表 */
 .hero { position: relative; padding: 2px 0 4px; }
-.hero .k { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.hero-k { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }   /* 不叫 .k：Stats 图例的 .k 是 12px 宽的小色块，撞上就把 TODAY'S LINE 挤成两行 */
 .nums { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .big { font: 900 34px/1 var(--display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 [data-theme="dark"] .big { font-family: var(--num); font-weight: 800; color: var(--accent); text-shadow: 0 0 18px rgba(204, 255, 0, .55); }
@@ -314,14 +322,12 @@ body.side-min .sync-pill span { display: none; }
 .hero.held .state { background: var(--ink); color: var(--accent); }
 [data-theme="dark"] .state { background: transparent; color: var(--accent); }
 [data-theme="dark"] .hero.held .state { background: var(--accent); color: var(--accent-ink); box-shadow: var(--glow); }
-.meter { position: relative; height: 10px; margin: 10px 0 20px; border: var(--b); border-radius: 999px; background: var(--track); }
+.meter { position: relative; height: 10px; margin: 10px 0 14px; border: var(--b); border-radius: 999px; background: var(--track); }
 [data-theme="dark"] .meter { border: 0; }
 .meter .fill { height: 100%; max-width: 100%; border-radius: inherit; background: var(--meter); transition: width .5s var(--ease); }
 [data-theme="dark"] .meter .fill { box-shadow: 0 0 14px rgba(204, 255, 0, .55); }
 .meter .tick { position: absolute; top: -6px; bottom: -6px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--ink); }
 [data-theme="dark"] .meter .tick { background: var(--hot); box-shadow: 0 0 8px var(--hot); }
-.meter .tick span { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); font: 700 10.5px var(--num); white-space: nowrap; color: var(--muted); }
-.hero.free .meter { margin-bottom: 14px; }
 .shares { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
 .share { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 7px; border-radius: 999px; background: var(--surface); font-size: 12px; font-weight: 500; }
 .share i { width: 8px; height: 8px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 1.5px var(--edge); }
@@ -426,7 +432,7 @@ body.side-min .sync-pill span { display: none; }
 /* ---------- 日历 ---------- */
 .lineband { display: flex; align-items: center; gap: 12px; margin: -2px 0 10px; padding: 4px 0; font-size: 13px; font-weight: 600; }
 .lineband .meter { flex: 1; height: 9px; margin: 0; }
-.lineband .meter .tick span { display: none; }
+.lineband > span { white-space: nowrap; }
 .lineband em { font-style: normal; font-weight: 500; color: var(--muted); white-space: nowrap; }
 /* 格子不挤扁：有最小宽度，窗口 + 任务池放不下时日历区左右滑 */
 .cal-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px 6px; }

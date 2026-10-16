@@ -88,7 +88,7 @@ export function calendarHTML(c) {
     '<button type="button" class="nav" data-act="cal-prev" aria-label="Previous">' + icon("left") + '</button><button type="button" class="nav" data-act="cal-next" aria-label="Next">' + icon("right") + "</button>" +
     '<span class="seg"><button type="button" data-act="cal-mode" data-mode="week"' + (week ? ' class="on"' : "") + '>Week</button><button type="button" data-act="cal-mode" data-mode="month"' + (!week ? ' class="on"' : "") + ">Month</button></span>" +
     '<button type="button" class="nav' + (store.local().pool ? " on" : "") + '" data-act="pool-toggle">' + icon("pool") + " Pool</button></div></header>" +
-    (line > 0 ? '<div class="lineband"><span>Today\'s line ' + fmtMin(line) + '</span><div class="meter"><div class="fill" style="width:' + Math.min(100, (done / scale) * 100) + '%"></div><i class="tick" style="left:' + Math.min(100, (line / scale) * 100) + '%"></i></div><em>' + fmtMin(done) + " done" + (E.streak(c) ? " · 🔥 " + E.streak(c) : "") + "</em></div>" : "") +
+    (line > 0 ? '<div class="lineband"><span>Today\'s line ' + fmtMin(line) + '</span><div class="meter"><div class="fill" style="width:' + Math.min(100, (done / scale) * 100) + '%"></div><i class="tick" style="left:' + Math.min(100, (line / scale) * 100) + '%"></i></div><em>' + fmtMin(done) + " done</em></div>" : "") +
     body + "</div>";
 }
 

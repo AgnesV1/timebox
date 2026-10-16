@@ -502,7 +502,7 @@ test("quarter sheet: only the two cells of that day are written", () => {
   assert.deepEqual(sh.rows.slice(2, 6).map((r) => [r[4], r[5], r[6], r[7]]), [[65, 0.2, 8, "by hand"], [10, 0, 6, "by hand"], [60, 0.3, "", "keep me"], [0, 0, "", ""]]);
   assert.deepEqual(sh.rows[1].slice(1, 6), [1.25, 116, 50, 70, 0.4], "the row under the header is left alone");
   // 只发日期、不带数：什么都不写，只回这一天找不找得到（贴完链接先探一下用）
-  assert.deepEqual(ask([{ date: "2026-10-12" }, { date: "2026-10-20" }]), { done: ["2026-10-12"], missing: [{ date: "2026-10-20", why: "No row for 2026-10-20 on 2026 Q4" }] });
+  assert.deepEqual(ask([{ date: "2026-10-12" }, { date: "2026-10-20" }]), { done: ["2026-10-12"], missing: [{ date: "2026-10-20", why: "No row for 2026-10-20 on 2026 Q4" }], cells: true });
   assert.deepEqual(sh.rows[5].slice(4, 6), [0, 0], "a look-up without numbers writes nothing");
   // 没有这个页签、但整个表格就叫这个名字：用第一页
   const solo = g.spreadsheet("https://docs.google.com/spreadsheets/d/1SoloQuarterIdAbcdefghijklmnopq");
@@ -512,6 +512,32 @@ test("quarter sheet: only the two cells of that day are written", () => {
   push(g, { settings: [{ key: "quarter", value: { url: "https://docs.google.com/spreadsheets/d/1SoloQuarterIdAbcdefghijklmnopq/edit" }, updated: 2 }] });
   assert.deepEqual(ask([{ date: "2027-01-02", progress: 42, focus: 0.1 }]).done, ["2027-01-02"]);
   assert.deepEqual(s1.rows[1].slice(1, 3), [42, 0.1]);
+});
+
+test("quarter sheet: the day's own scores and note go under their headers; nothing else moves", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  const book = g.spreadsheet("https://docs.google.com/spreadsheets/d/1QuarterSheetIdAbcdefghijklmnop");
+  const sh = book.insertSheet("2026 Q4");
+  [["", "+", "progress", "focus", "Read ", "g y m", "$", "note", "rest"], ["", 116, 70, 0.4, 10, 15, 2, "", 10],
+    [D("2026-10-15"), 14, 14, 0, "", "", "", "Leak - wall", 0], [D("2026-10-16"), 0, "", "", 7, 8, 1, "by hand", 0]]
+    .forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v)));
+  push(g, { settings: [{ key: "quarter", value: { url: "https://docs.google.com/spreadsheets/d/1QuarterSheetIdAbcdefghijklmnop/edit" }, updated: 1 }] });
+  const ask = (rows) => g.post({ secret: SEC, quarter: { rows } }).quarter;
+  const raw = [], put = sh.put.bind(sh);
+  sh.put = (r, c, v) => { raw.push(v); put(r, c, v); };   // 写进去之前的样子（表格会把开头的 ' 吃掉）
+  const res = ask([{ date: "2026-10-15", progress: 20, focus: 0.1, cells: { read: 8, gym: 0, $: 2, note: "period", nap: 3 } }, { date: "2026-10-16", cells: { read: 9, gym: "", note: "=1+1" } }]);
+  assert.deepEqual(res.done, ["2026-10-15", "2026-10-16"]);
+  assert.equal(res.cells, true, "tells the page this script knows cells");
+  assert.deepEqual(res.skipped, [{ date: "2026-10-15", col: "nap", why: 'No "nap" column on 2026 Q4' }]);
+  assert.deepEqual(sh.rows[2].slice(1, 9), [14, 20, 0.1, 8, 0, 2, "period", 0], "headers matched without case or spaces; 0 is written; the other cells stay");
+  assert.deepEqual(sh.rows[3].slice(1, 9), [0, "", "", 9, "", 1, "=1+1", 0], "no progress / focus sent: those stay empty; \"\" clears a cell");
+  assert.ok(raw.includes("'period") && raw.includes("'=1+1"), "a note goes in as plain text, never as a formula");
+  raw.length = 0;
+  ask([{ date: "2026-10-16", cells: { read: 9, note: "=1+1" } }]);
+  assert.deepEqual(raw, [], "the same values again: nothing is rewritten");
+  assert.deepEqual(ask([{ date: "2026-10-15", cells: { progress: 99, focus: 9 } }]).skipped.map((x) => x.col), ["progress", "focus"], "cells can't write over the two worked-out columns");
+  assert.deepEqual(sh.rows[2].slice(2, 4), [20, 0.1]);
 });
 
 test("archive: old tasks move to the Archive tab, except ones a running plan still counts on", () => {

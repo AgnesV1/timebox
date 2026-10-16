@@ -11,8 +11,8 @@ import { initFx, setFx, confetti, refreshFxColors } from "./fx.js";
 import { toast, lineInfo, ballHTML } from "./ui/common.js";
 import { initModal, closeModal } from "./ui/modal.js";
 import { initSelect } from "./ui/select.js";
-import { todayHTML, initToday, shownDate } from "./ui/today.js";
-import { calendarHTML, poolHTML, initCalendar, handleDrop, refreshDayModal } from "./ui/calendar.js";
+import { todayHTML, initToday, shownDate, showDate } from "./ui/today.js";
+import { calendarHTML, poolHTML, initCalendar, handleDrop } from "./ui/calendar.js";
 import { projectsHTML, initProjects, refreshProjectEditor, projectAlerts } from "./ui/projects.js";
 import { initGoals } from "./ui/goals.js";
 import { initIdeas, ideasPhoneHTML } from "./ui/ideas.js";
@@ -22,6 +22,7 @@ import { initDnd } from "./ui/dnd.js";
 import { statsHTML, initStats } from "./ui/stats.js";
 import { dockHTML, initTimer, tick } from "./ui/timer.js";
 import { choreDockHTML, initChores } from "./ui/chores.js";
+import { initScores } from "./ui/scores.js";
 import { readingHTML, initReading } from "./ui/reading.js";
 import { mealsHTML, shopHTML, initMeals, refreshMealEditor, mealDrop } from "./ui/meals.js";
 import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/friends.js";
@@ -86,7 +87,8 @@ function sidebarHTML(c, view) {
 
 // ---------- 整页重画（正在打字的输入框，值、光标都留住） ----------
 
-// 重画前后留住正在填的东西（带 data-keep 的输入框）：页面、任务池、底部浮条（改钟点的框），还有弹层——日历里点开某一天的那块也是整块重画的。
+// 重画前后留住正在填的东西（带 data-keep 的输入框）：页面、任务池、底部浮条（改钟点的框），还有弹层。
+// 留住的是格子里现在的样子：别处改了它的值（比如点一档填上数），要先把格子改好再存，不然重画完又变回去
 // 记的时候带上它在哪一块里（main / pool / dock / modal），同一个名字在两块里各算各的
 const KEEP_IN = ["main", "pool", "dock", "modal"];
 const keepRoot = (el) => el?.closest?.(KEEP_IN.map((id) => "#" + id).join(","))?.id || "";
@@ -171,7 +173,6 @@ function draw() {
   tick();
   paintSync();
   refreshEditor();
-  refreshDayModal();
   refreshProjectEditor();
   refreshMealEditor();
   refreshFriendEditor();
@@ -252,6 +253,7 @@ initDnd((payload, target) => (target.startsWith("m") ? mealDrop(payload, target)
 initStats(render);
 initTimer(render);
 initChores(render);
+initScores();
 initReading(render);
 initMeals(render);
 initFriends(render);
@@ -280,6 +282,8 @@ addEventListener("online", () => syncThenLog());
 setInterval(() => { if (document.visibilityState === "visible") syncThenLog(); }, 120000);
 setInterval(tickDay, 60000);
 
+// 侧栏的 Today 永远是今天：日历里点过某一天、或在今天页往前翻过，从这里回来都从今天看起（已经在今天页上也照样翻回今天）
+on(document, "click", '#side a[href="#today"]', () => { showDate(store.today()); render(); });
 on(document, "click", "[data-act=sync]", () => syncThenLog());
 on(document, "click", ".psync", (e, el) => { if (el.title) toast(el.title); syncThenLog(); });
 // 圆盘落着的时候盖在列表上：下面还有内容（没滚到底）就再淡一点

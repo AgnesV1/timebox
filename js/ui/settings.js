@@ -1,4 +1,4 @@
-// 设置：连表格、每天能用多少时间、新的一天从几点开始、各个大类算不算数和每周的门槛、季度表、阅读表格、外观、
+// 设置：连表格、每天能用多少时间、新的一天从几点开始、各个大类算不算数和每周的门槛、季度表（和每天打分的那几列）、阅读表格、外观、
 // 这台设备的存储（快满了可以归档）、导出备份（手机上只有外观和连表格）
 
 import * as store from "../store.js";
@@ -63,11 +63,21 @@ export function settingsHTML(phone) {
     '<p class="hint">Last week\'s numbers show on Today when one of them is off. Leave a box empty to skip that check.</p></section>';
 
   const q = store.setting("quarter", null) || {};
+  // 每天自己打的分：有哪几列、每列几档是下面这段字（一行一列，js/scores.js 读）；今天页右栏照它画，填的数写进季度表同名的列
+  const sc = store.scoreSetup(), cols = sc.defs.map((d) => d.col);
+  const scoreState = !sc.text.trim() ? "" : (cols.length ? cols.length + (cols.length === 1 ? " column: " : " columns: ") + cols.join(", ") + "." : "No columns yet.") +
+    (sc.bad.length ? " Skipped line " + sc.bad.join(", ") + " — it needs a name of its own, and note is the box under the rows." : "");
   const quarter = '<section class="card"><h3>Quarter sheet</h3>' +
     '<label class="field"><span>Link to the Sheet with your quarter tabs</span><input data-quarter="url" value="' + esc(q.url || "") + '" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false"></label>' +
     '<label class="field small"><span>Fill from</span><input type="date" data-quarter="from" value="' + esc(q.from || "") + '" max="' + store.today() + '"></label>' +
-    '<p class="hint">Each day from that date, two cells are filled on the tab named like <b>2026 Q4</b>: <b>progress</b> (hours on projects ticked above × 10) and <b>focus</b> (◆ Deep hours ÷ 10). Days before it, and every other cell, are left alone.</p>' +
-    (q.url && l.quarterNote ? '<p class="hint qnote">' + esc(l.quarterNote) + "</p>" : "") + "</section>";
+    '<p class="hint">Each day from that date, two cells are filled on the tab named like <b>2026 Q4</b>: <b>progress</b> (hours on projects ticked above × 10) and <b>focus</b> (◆ Deep hours ÷ 10). Days before it are left alone.</p>' +
+    (q.url && l.quarterNote ? '<p class="hint qnote">' + esc(l.quarterNote) + "</p>" : "") +
+    '<h4 class="dsc-set">Daily scores</h4>' +
+    '<label class="field"><span>One line per column, as it\'s named on the tab</span><textarea data-score-set="text" data-keep="score-set-text" rows="9" spellcheck="false" placeholder="gym · moving · 3–15 · 3 stayed in · 5 usual · 8 walk out">' + esc(sc.text) + "</textarea></label>" +
+    '<p class="hint">Pieces split by <b>·</b> or <b>|</b>: the column name · what it means · the usual range · then each choice as a number and a few words. They show on Today from the start date; what you pick goes into that column, and the box under them into <b>note</b>. Nothing else on the tab changes.</p>' +
+    (scoreState ? '<p class="hint">' + esc(scoreState) + "</p>" : "") +
+    '<label class="field small"><span>Start from</span><input type="date" data-score-set="from" data-keep="score-set-from" value="' + esc(sc.from) + '" max="' + store.today() + '"></label>' +
+    (q.url && l.scoreNote ? '<p class="hint qnote">' + esc(l.scoreNote) + "</p>" : "") + "</section>";
 
   // 这台设备的存储：用了多少、还能撑多久；一年多以前的任务可以搬进表格的 Archive 页
   const use = store.storage(), cut = isoOf(Number(store.today().slice(0, 4)) - 1, 1, 1);
@@ -125,12 +135,24 @@ export function initSettings() {
     const url = root.querySelector('[data-quarter="url"]').value.trim(), from = root.querySelector('[data-quarter="from"]').value;
     const cur = store.setting("quarter", null) || {};
     if ((cur.url || "") === url && (cur.from || "") === (from || cur.from || "")) return;
-    store.setLocal({ quarterSent: {}, quarterNote: "" });
+    store.setLocal({ quarterSent: {}, quarterNote: "", scoreSent: {}, scoreNote: "" });   // 换了表格：都重新发
     store.setSetting("quarter", url ? { url, from: from || cur.from || store.today() } : { url: "" });
     if (url) sync.sync();
   };
   on(document, "input", '.settings [data-quarter="url"]', (e, el) => { if (looksLikeSheet(el.value)) saveQuarter(el.closest(".settings")); });
   on(document, "change", ".settings [data-quarter]", (e, el) => saveQuarter(el.closest(".settings")));
+  // 打分的那段字和开始日：第一次写的时候开始日定成今天；改了就把打过的分全部重发一遍（列名可能刚改对）
+  on(document, "change", ".settings [data-score-set]", (e, el) => {
+    const root = el.closest(".settings");
+    const text = root.querySelector('[data-score-set="text"]').value.replace(/\s+$/, ""), from = root.querySelector('[data-score-set="from"]').value;
+    const cur = store.setting("scores", null) || {};
+    const next = { text, from: from || cur.from || (text.trim() ? store.today() : "") };
+    if ((cur.text || "") === next.text && (cur.from || "") === next.from) return;
+    root.querySelector('[data-score-set="from"]').value = next.from;   // 开始日是这里定的：先填进格子，重画时才不会被换回空的
+    store.setLocal({ scoreSent: {}, scoreNote: "" });
+    store.setSetting("scores", next);
+    if (store.setting("quarter", null)?.url) sync.sync();
+  });
 
   on(document, "click", ".settings [data-act]", (e, el) => {
     const act = el.dataset.act;

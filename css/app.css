@@ -226,6 +226,32 @@ body.side-min .sync-pill span { display: none; }
 .today-main .strip { margin-top: 2px; }
 .today-side { display: grid; gap: 10px; }
 .today-side .overdue, .today-side .bill { margin-top: 0; }
+/* 每天的打分（js/ui/scores.js）：电脑上排在右栏、汇总那块下面；窄了（右栏挪到最上面）就排到清单后面。不套框：
+   一行 = 名字和意思 · 几档（只有字，选中的铺青柠）· 只有下划线的数字格（灰字是平常的范围）；底下一格 note */
+.today-grid { grid-template-rows: auto 1fr; }
+.today-main { grid-column: 1; grid-row: 1 / span 2; }
+.today-side { grid-column: 2; grid-row: 1; }
+.dsc { grid-column: 2; grid-row: 2; display: grid; gap: 1px; align-content: start; }
+@media (max-width: 1100px) { .today-grid { grid-template-rows: none; } .today-main, .today-side, .dsc { grid-column: auto; grid-row: auto; } }
+.dsc-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.dsc-head b { font-size: 13px; letter-spacing: 0; color: var(--ink); }
+[data-theme="dark"] .dsc-head b { color: var(--accent); text-shadow: var(--glow); }
+.dsc-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 44px; align-items: center; gap: 8px; min-height: 30px; }
+.dsc-name { min-width: 0; line-height: 1.2; }
+.dsc-name b { display: block; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.dsc-name span { display: block; font-size: 11px; color: var(--muted); }
+.dsc-opts { display: flex; flex-wrap: wrap; gap: 1px 2px; }
+.dsc-opts button { padding: 3px 8px; border: 1px solid transparent; border-radius: 999px; background: none; font-size: 12.5px; line-height: 1.3; color: var(--muted); text-align: left; }
+.dsc-opts button:hover { background: var(--tonal); color: var(--ink); }
+.dsc-opts button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+[data-theme="dark"] .dsc-opts button.on { background: rgba(204, 255, 0, .12); color: var(--accent); border-color: var(--accent); box-shadow: 0 0 10px rgba(204, 255, 0, .35); }
+.dsc input { width: 100%; padding: 2px 0 3px; border: 0; border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent); border-radius: 0; background: transparent; }
+.dsc input:focus { border-color: transparent; border-bottom-color: var(--ink); }
+[data-theme="dark"] .dsc input:focus { border-bottom-color: var(--accent); box-shadow: 0 7px 8px -7px rgba(204, 255, 0, .7); }
+.dsc-num { font: 700 18px var(--num); text-align: center; }
+.dsc-num::placeholder { font-size: 12px; font-weight: 500; }
+.dsc-note { margin-top: 8px; font-size: 13px; }
+.dsc-msg { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
 
 /* 手机顶栏：吸顶毛玻璃，底下一条豹纹胶带。
    状态栏 / 灵动岛底下那一截（页面画到屏幕最顶上时才有，高 = --top）是实心的背景色，不透、不叠纹理：那一条要和背景完全一个颜色 */
@@ -417,6 +443,9 @@ body.side-min .sync-pill span { display: none; }
 .dn { display: flex; align-items: baseline; gap: 5px; padding: 0; border: 0; background: none; font-size: 11px; font-weight: 600; color: var(--muted); }
 .dn b { font: 700 16px var(--num); color: var(--ink); }
 .dn:hover b { text-decoration: underline; text-underline-offset: 3px; }
+/* 打分开始日以后、过完了还没打满分的日子：日期旁边一个红点（填满就没了） */
+.dsc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); align-self: center; flex-shrink: 0; }
+[data-theme="dark"] .dsc-dot { box-shadow: 0 0 6px var(--warn); }
 .cap { padding: 1px 7px; border: 1px solid transparent; border-radius: 999px; background: none; font-size: 10.5px; color: var(--muted); }
 .cap:hover, .cap.set { border-color: var(--line); background: var(--surface); }
 .cap-input { width: 56px; padding: 2px 6px; font-size: 11px; text-align: center; border: var(--b-ctl); }
@@ -550,7 +579,6 @@ body.modal-open { overflow: hidden; }
 .sheet-title { margin: 0 40px 12px 0; font: 700 17px var(--display); letter-spacing: -.01em; }
 .sheet-title small { font: 600 12px var(--body); color: var(--muted); }
 .sheet-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
-.sheet .dayview .list { margin-top: 4px; }
 .field { display: grid; gap: 4px; margin-bottom: 10px; font-size: 14px; }
 .field > span { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .field.small input { max-width: 120px; }
@@ -590,6 +618,7 @@ body.modal-open { overflow: hidden; }
 .settings { max-width: 720px; }
 .settings .card { margin-bottom: 12px; padding: 14px; border-radius: 14px; background: var(--bg); }
 .settings h3 { margin: 0 0 10px; font: 700 14px var(--display); }
+.settings h4.dsc-set { margin: 18px 0 10px; font: 700 13px var(--display); }
 .settings .btns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .weekly { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .weekly label { display: grid; gap: 4px; text-align: center; font-size: 11px; color: var(--muted); }

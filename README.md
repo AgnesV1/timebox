@@ -85,7 +85,7 @@
   重复的任务在编辑框顶上选「This one / This & following / All」，改名字、分钟就作用到那些天；
   「Change…」从这一天起改重复方式。删的时候选 Only this / This & following / This & earlier / All，
   做过或计过时的留着当记录。错过的自动任务不算「left behind」
-- `Calendar`：每天的日程永远全部显示（名字完整换行）；格子有最小宽度，窗口放不下就左右滑。右边是任务池，把条目拖到某天就排进去；Pool 的 Regular 计划在「This week」里，显示这周还剩几次，拖一次排一次。
+- `Calendar`：点日期就到今天页的那一天。每天的日程永远全部显示（名字完整换行）；格子有最小宽度，窗口放不下就左右滑。右边是任务池，把条目拖到某天就排进去；Pool 的 Regular 计划在「This week」里，显示这周还剩几次，拖一次排一次。
   日历里的任务能拖到别的天，拖回任务池就撤回；以后几天的淡色预览里，Regular 的那一次可以拖走或点开，Total 的预计份额只能看。
   格子右上角的数字是那天能用的时间，点一下就能改
 - `Today`：左边是今天的清单，右边是安全线、昨天的账单、过期没做的。
@@ -188,7 +188,11 @@
 有个叫 Gift 的字段、而且填了东西的人，生日那条带 🎁。这些都存在 Friends 页签的 Birthday / Greetings / Key dates 三列里，是看得懂的文字，表格里也能直接改。
 
 **季度表**：Settings → Quarter sheet 贴你那个表格的链接（每个季度一页，页名 `2026 Q4`）。从 Fill from 那天起，每天自动填两格：
-`progress` = 算进 progress 的项目当天实际花的小时 × 10，`focus` = 当天 ◆ Deep 的小时 ÷ 10（四舍五入到整小时）。别的格子不碰。
+`progress` = 算进 progress 的项目当天实际花的小时 × 10，`focus` = 当天 ◆ Deep 的小时 ÷ 10（四舍五入到整小时）。
+没法自动算的几列（每天自己打的分）在同一张卡片的 Daily scores 里写：一行一列，`表头原名 · 什么意思 · 平常的范围 · 一档一段「数字 + 几个字」`，
+比如 `gym · moving · 3–15 · 3 stayed in · 5 usual · 8 walk out`。从 Start from 那天起，电脑今天页右边每天一块：点一档就填上那个数，
+右边那格也能自己敲，底下一格 note；写进季度表那一天同名的列和 `note` 列。日历上过完了还没打满分的日子，日期旁边有个红点。
+别的格子不碰。
 哪些项目算 progress、哪些算成长（全部 / 只算 Deep，剩下的是 Relax）在 Settings → Projects 里勾；
 上周成长或 Relax 的时间太少、太多，今天页右边会提醒一句（四个门槛也在那里改）。
 
@@ -210,7 +214,7 @@ Catch-ups 一行是一次记录。Projects 页一行是一个计划，`Group` �
 自动出现的任务 ID 以 `rt:`（Regular）或 `au:`（Total 的今日份额）开头；
 计时记录在 Tasks 的 `Times` 列，是不是深度在 `Deep` 列（打勾 = 是，可以直接在表格里改）；
 正在跑的计时器、每天单独改的可用时间、通勤日、阅读表格链接、饼图的默认值和深度目标（`life`）在（隐藏的）Settings 页。
-项目清单（名字、颜色、算不算 progress / 成长）是 Settings 页的 `groups`，目标一条一行 `goal:<id>`，每周的门槛 `weekly`，季度表链接 `quarter`，Friends 的格子 `friend-fields`。
+项目清单（名字、颜色、算不算 progress / 成长）是 Settings 页的 `groups`，目标一条一行 `goal:<id>`，每周的门槛 `weekly`，季度表链接 `quarter`，每天打分的那几列 `scores`（每天打的分一天一行 `score:<日期>`），Friends 的格子 `friend-fields`。
 备餐的东西也在 Settings 页，一样一行：`meal-ing:` 常买的东西、`meal-box:` 一顿、`meal-week:<这周第一天>` 这周排了什么 / 买了没有、`meal-prefs` 设置（`meal-pack:` 是旧版的 Day pack，读的时候自动展开成 Box）。
 
 ## 同步是怎么工作的

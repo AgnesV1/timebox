@@ -85,15 +85,16 @@ if (g.spreadsheet) {
   readingBook = book;
 }
 
-// 一个假的季度表格（一页一个季度，页名「2026 Q4」，表头写着 progress / focus）：
-// 在页面设置的 Quarter sheet 里填 https://docs.google.com/spreadsheets/d/FAKE-QUARTER-0000000000000000/edit ；GET /quarter 看它现在的样子
+// 一个假的季度表格（一页一个季度，页名「2026 Q4」，表头写着 progress / focus，后面几列是每天自己打的分和 note）：
+// 在页面设置的 Quarter sheet 里填 https://docs.google.com/spreadsheets/d/FAKE-QUARTER-0000000000000000/edit ；GET /quarter 看它现在的样子。
+// Daily scores 那一格可以写：read · 6–10 · 6 nothing · 8 something · 10 really good（下一行 gym …、$ … 同样写法）
 let quarterBook = null;
 if (g.spreadsheet) {
   quarterBook = g.spreadsheet("https://docs.google.com/spreadsheets/d/FAKE-QUARTER-0000000000000000");
   const now = new Date(), y = now.getFullYear(), q = Math.floor(now.getMonth() / 3);
   const sh = quarterBook.insertSheet(y + " Q" + (q + 1));
-  const rows = [["", "", "+", "-", "progress", "focus", "read", "note"], ["", 1.25, 116, 50, 70, 0.4, 10, ""]];
-  for (let d = new Date(y, q * 3, 1); d.getMonth() < q * 3 + 3 && d.getFullYear() === y; d.setDate(d.getDate() + 1)) rows.push([new Date(d), "", "", "", d < now - 2 * 864e5 ? 33 : "", d < now - 2 * 864e5 ? 0.1 : "", "", d < now - 2 * 864e5 ? "by hand" : ""]);
+  const rows = [["", "", "+", "-", "progress", "focus", "read", "gym", "$", "note"], ["", 1.25, 116, 50, 70, 0.4, 10, 15, 2, ""]];
+  for (let d = new Date(y, q * 3, 1); d.getMonth() < q * 3 + 3 && d.getFullYear() === y; d.setDate(d.getDate() + 1)) rows.push([new Date(d), "", "", "", d < now - 2 * 864e5 ? 33 : "", d < now - 2 * 864e5 ? 0.1 : "", "", "", "", d < now - 2 * 864e5 ? "by hand" : ""]);
   rows.forEach((r, i) => r.forEach((v, j) => sh.put(i + 1, j + 1, v)));
 }
 const dump = (ss) => Object.fromEntries(ss.getSheets().map((sh) => [sh.getName(), sh.rows.slice(0, sh.getLastRow()).map((r) => r.slice(0, sh.getLastColumn()).map((v) => (v instanceof Date ? iso(new Date(v.getTime() - v.getTimezoneOffset() * 60000)) : v)))]));

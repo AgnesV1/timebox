@@ -1,11 +1,12 @@
 // 和 Google Sheet（Apps Script）同步：先推本机的改动，再拉表格里比上次新的。
 // 改完 2.5 秒推一次（连着点几下只发一次）；页面切走时用 sendBeacon 补发；回到页面、联网时再同步。
 // 表格里的 Code.gs 和页面要是同一版（VERSION）：不知道表格是哪版时先问一句，旧版就先不推，改动都留在本机。
-// 同步完顺手做的：季度表里这几天的两格（设了链接才发，值变了才发）；每天让表格清一次过期的删除记录。
+// 同步完顺手做的：季度表里这几天的两格和自己打的分（设了链接才发，值变了才发）；每天让表格清一次过期的删除记录。
 
 import * as store from "./store.js";
 import * as reading from "./reading.js";
 import * as S from "./stats.js";
+import * as SC from "./scores.js";
 import { debounce } from "./dom.js";
 import { quarterOf } from "./dates.js";
 
@@ -95,37 +96,62 @@ export async function sync({ full = false, archive = null } = {}) {
 }
 
 let tried = { key: "", at: 0 };
-// 季度表：把最近两周里和上次发的不一样的那几天发过去（数据刚拉过，是最新的）。出了问题只记一句，不影响同步
+const OLD_SCRIPT = "Update Code.gs in your Sheet so the daily scores reach the quarter sheet";
+// 季度表：把最近两周里和上次发的不一样的那几天发过去（数据刚拉过，是最新的）；再加上自己打的分和 note，
+// 凡是和上次写进去的不一样的那几天（不管多久以前）都带上 cells——两周以前的只带 cells，不带 progress / focus，
+// 免得归档掉的任务把那几天的旧数算成 0。出了问题只记一句，不影响同步
 async function quarter(url, secret) {
   const q = store.setting("quarter");
   if (!q?.url) return;
-  const sent = store.local().quarterSent || {};
+  const L = store.local(), sent = L.quarterSent || {}, scoreSent = L.scoreSent || {};
   const mark = (r) => r.progress + "|" + r.focus;
   const all = S.quarterRows(store.ctx(), q.from || store.today());
-  let rows = all.filter((r) => sent[r.date] !== mark(r));
+  const byDate = new Map(all.filter((r) => sent[r.date] !== mark(r)).map((r) => [r.date, { ...r }]));
+  const cur = store.scoreCells(), keys = new Set([...store.scoreSetup().defs.map((d) => d.key), SC.NOTE]);
+  for (const date of new Set([...Object.keys(cur), ...Object.keys(scoreSent)])) {
+    const cells = SC.cellsToSend(cur[date], scoreSent[date], keys);
+    if (cells) byDate.set(date, { ...(byDate.get(date) || { date }), cells });
+  }
+  let rows = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   // 没有要填的（比如刚贴链接、今天还没记东西）：还没说过话就先探一下——只发今天的日期、不带数，表格那边什么都不写，
   // 只回这一天那一行找不找得到。这样贴完链接马上知道对不对
-  const T = store.today(), probe = !rows.length && !store.local().quarterNote;
+  const T = store.today(), probe = !rows.length && !L.quarterNote;
   if (probe) rows = [{ date: T }];
   if (!rows.length) return;
   // 上次发的就是这几行、没填进去（比如那个季度的页签还没建）：十分钟内不重发
   const key = q.url + JSON.stringify(rows);   // 换了链接就不算「上次发过」
   if (key === tried.key && Date.now() - tried.at < 6e5) return;
   tried = { key, at: Date.now() };
-  let note = "", done = [];
+  const asked = rows.some((r) => r.cells);
+  let note = "", done = [], cellsOk = false, scoreNote = L.scoreNote || "";
   try {
     const res = (await post(url, { secret, quarter: { rows } })).quarter || {};
     if (res.error) note = res.error === "no sheet" ? "Can't open that Sheet" : String(res.error);
     else {
       done = res.done || [];
+      cellsOk = res.cells === true;
       const miss = (res.missing || [])[0];
       note = miss ? miss.why : !done.length ? "" : probe ? "Connected — found today on the " + T.slice(0, 4) + " Q" + quarterOf(T) + " tab. It fills in once you log something today." : "Filled through " + done.slice().sort().pop();
+      // 打的分：旧版 Code.gs 不认 cells（不回 cells: true），先不算发过，等换了新版再发；表格里没有的那一列照样算发过，只提示一句
+      if (asked) scoreNote = !cellsOk ? OLD_SCRIPT : (res.skipped || [])[0]?.why || "";
     }
   } catch (e) { note = e.message || "Couldn't reach the quarter sheet"; }
   // 只记着还在这两周里的日子
   const keep = Object.fromEntries(all.map((r) => [r.date, sent[r.date]]).filter(([, v]) => v !== undefined));
-  if (!probe) for (const r of rows) if (done.includes(r.date)) keep[r.date] = mark(r);
-  if (JSON.stringify(keep) !== JSON.stringify(sent) || (note && note !== store.local().quarterNote)) store.setLocal({ quarterSent: keep, ...(note ? { quarterNote: note } : {}) });
+  if (!probe) for (const r of rows) if (done.includes(r.date) && "progress" in r) keep[r.date] = mark(r);
+  const keepScores = { ...scoreSent };
+  if (cellsOk) for (const r of rows) {
+    if (!r.cells || !done.includes(r.date)) continue;
+    const s = Object.fromEntries(Object.entries(keepScores[r.date] || {}).filter(([k]) => keys.has(k)));   // 拿掉了的列不再记着
+    for (const [k, v] of Object.entries(r.cells)) { if (v === "") delete s[k]; else s[k] = v; }
+    if (Object.keys(s).length) keepScores[r.date] = s; else delete keepScores[r.date];
+  }
+  const patch = {};
+  if (JSON.stringify(keep) !== JSON.stringify(sent)) patch.quarterSent = keep;
+  if (note && note !== L.quarterNote) patch.quarterNote = note;
+  if (JSON.stringify(keepScores) !== JSON.stringify(scoreSent)) patch.scoreSent = keepScores;
+  if (scoreNote !== (L.scoreNote || "")) patch.scoreNote = scoreNote;
+  if (Object.keys(patch).length) store.setLocal(patch);
 }
 
 export const queue = debounce(() => sync(), 2500);

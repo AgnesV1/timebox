@@ -1,5 +1,5 @@
-// 「今天」页：安全线、当天的任务块、昨天的账单、过期没做的、任务列表、加任务、给这天的备注。
-// 电脑上左边是清单，右边是安全线和账单；日历里点开某一天也用它。
+// 「今天」页：安全线、当天的任务块、昨天的账单、过期没做的、任务列表、加任务、这一天自己打的分。
+// 电脑上左边是清单，右边是安全线、账单和打分；日历里点日期就是到这一页的那一天。
 // 手机上：看今天前后各 5 天的任务、给任务标结果、计时、加任务；右上角齿轮进去只有白天黑夜和连表格。计划都在电脑上做。
 
 import * as store from "../store.js";
@@ -23,6 +23,7 @@ import { cheer } from "../fx.js";
 import { shopCount } from "./meals.js";
 import { withHTML, taskMeetHTML, withText, takeWith } from "./friends.js";
 import { choreHTML } from "./chores.js";
+import { scoreHTML } from "./scores.js";
 
 const openDesc = new Set();
 const logOpen = new Set();   // 已经有计时记录、又点了「+ time」要再补一段的任务
@@ -248,14 +249,9 @@ export function dayParts(c, d) {
     notices: isToday ? noticesHTML(c) : "",
     overdue: isToday ? overdueHTML(c) : "",
     list: choreHTML(c, d) + '<div class="list" data-list="' + d + '">' + (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, false, openId)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">No tasks for this day.</div>') + ghostsHTML(c, d) + "</div>",
-    add: addHTML(c, d)
+    add: addHTML(c, d),
+    score: scoreHTML(c, d)   // 开始日到今天才有（js/ui/scores.js）
   };
-}
-
-// 日历里点开某一天：同一套，竖着排
-export function dayModalHTML(c, d) {
-  const x = dayParts(c, d);
-  return '<div class="dayview" data-date="' + d + '"><h2 class="sheet-title">' + fmtDay(d) + (d === c.today ? " <small>Today</small>" : "") + "</h2>" + x.hero + x.strip + x.list + x.add + "</div>";
 }
 
 // ---------- 手机 ----------
@@ -309,7 +305,7 @@ export function todayHTML(c, phone) {
     '<header class="page-head"><div><h2>' + fmtDay(d) + " <small>" + (isToday ? "Today" : d < store.today() ? "Looking back" : "Looking ahead") + "</small></h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="day-prev" aria-label="Previous day">' + icon("left") + '</button><button type="button" class="nav" data-act="day-today">Today</button><button type="button" class="nav" data-act="day-next" aria-label="Next day">' + icon("right") + "</button></div></header>" +
     '<div class="today-grid"><div class="today-main">' + x.strip + x.list + x.add + "</div>" +
-    '<div class="today-side">' + x.hero + x.bill + x.notices + x.overdue + "</div></div></div>";
+    '<div class="today-side">' + x.hero + x.bill + x.notices + x.overdue + "</div>" + x.score + "</div></div>";
 }
 
 // ---------- 交互（挂在 document 上，今天页和弹出的某一天都能用） ----------

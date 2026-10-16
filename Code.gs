@@ -1002,8 +1002,13 @@ function reading_(req) {
 
 // ================= 季度表：你自己的另一个表格 =================
 // 链接在 Settings 的 quarter（{url, from}），在网页电脑端的设置里填一次。那个表格每个季度一页，页名「2026 Q4」。
-// 网页把每天的两个数算好发来（progress、focus）；这里只管找到那一天那一行，写这两格，别的格子一概不碰。
+// 网页把每天的两个数算好发来（progress、focus），还有每天自己打的分和 note（cells：{ 表头: 数 / 字 }，表头去空格、转小写来对）；
+// 这里只管找到那一天那一行，写发来的这几格，别的格子一概不碰。cells 里的 "" = 清空那一格（网页上清掉了原来填过的）。
 var QUARTER_COLS = ['progress', 'focus'];
+
+function flat_(v) {
+  return String(v === null || v === undefined ? '' : v).replace(/\s+/g, '').toLowerCase();
+}
 
 function quarterBook_() {
   var row = readAll_('settings').filter(function (r) { return r.id === 'quarter'; })[0];
@@ -1015,17 +1020,17 @@ function quarterBook_() {
 
 // 页名不分大小写、不管空格（2026 Q4 / 2026Q4 / 2026 q4）；没有这一页、但整个表格就叫这个名字，就用第一页
 function quarterTab_(book, name) {
-  var flat = function (v) { return String(v || '').replace(/\s+/g, '').toLowerCase(); };
   var sheets = book.getSheets();
-  for (var i = 0; i < sheets.length; i++) if (flat(sheets[i].getName()) === flat(name)) return sheets[i];
-  return flat(book.getName()) === flat(name) ? sheets[0] : null;
+  for (var i = 0; i < sheets.length; i++) if (flat_(sheets[i].getName()) === flat_(name)) return sheets[i];
+  return flat_(book.getName()) === flat_(name) ? sheets[0] : null;
 }
 
-// req = { rows: [{date, progress, focus}] } → { done: [date], missing: [{date, why}] }
+// req = { rows: [{date, progress, focus, cells}] } → { done: [date], missing: [{date, why}], cells: true, skipped: [{date, col, why}] }
+// cells: true 是告诉网页「这一版认得 cells」（旧版不回这个，网页就知道打的分还没写进去）；skipped = 表格里没有这一列，别的格照写
 function quarter_(req) {
   var book = quarterBook_();
   if (!book) return { error: 'no sheet' };
-  var tz = book.getSpreadsheetTimeZone(), out = { done: [], missing: [] }, byTab = {};
+  var tz = book.getSpreadsheetTimeZone(), out = { done: [], missing: [], cells: true }, byTab = {}, skipped = [];
   (req.rows || []).forEach(function (r) {
     var m = /^(\d{4})-(\d{2})-\d{2}$/.exec(String(r && r.date || ''));
     if (!m) return;
@@ -1039,10 +1044,14 @@ function quarter_(req) {
     var last = sh.getLastRow(), width = sh.getLastColumn();
     if (last < 2 || width < 1) return miss('The ' + tab + ' tab is empty');
     // 前 5 行里找表头：同一行里写着 progress 和 focus
-    var top = sh.getRange(1, 1, Math.min(5, last), width).getValues(), head = 0, col = {};
+    var top = sh.getRange(1, 1, Math.min(5, last), width).getValues(), head = 0, col = {}, named = {};
     for (var r = 0; r < top.length && !head; r++) {
       var low = top[r].map(function (v) { return String(v === null ? '' : v).trim().toLowerCase(); });
-      if (QUARTER_COLS.every(function (k) { return low.indexOf(k) >= 0; })) { head = r + 1; QUARTER_COLS.forEach(function (k) { col[k] = low.indexOf(k) + 1; }); }
+      if (QUARTER_COLS.every(function (k) { return low.indexOf(k) >= 0; })) {
+        head = r + 1;
+        QUARTER_COLS.forEach(function (k) { col[k] = low.indexOf(k) + 1; });
+        top[r].forEach(function (v, i) { var k = flat_(v); if (k && !named[k]) named[k] = i + 1; });   // 表头那一行每一列：cells 按这个找
+      }
     }
     if (!head) return miss('No progress / focus columns on ' + tab);
     if (last <= head) return miss('No dates on ' + tab);
@@ -1063,9 +1072,20 @@ function quarter_(req) {
         var cell = sh.getRange(row, col[k]);
         if (cell.getValue() !== v) cell.setValue(v);
       });
+      var cells = r.cells && typeof r.cells === 'object' ? r.cells : {};
+      Object.keys(cells).forEach(function (k) {
+        var c = named[flat_(k)];
+        if (!c || c === col.progress || c === col.focus) { skipped.push({ date: r.date, col: k, why: 'No "' + k + '" column on ' + tab }); return; }
+        var v = cells[k], cell = sh.getRange(row, c), now = cell.getValue();
+        if (v === '' || v === null) { if (now !== '' && now !== null) cell.setValue(''); return; }
+        if (typeof v === 'number') { if (isFinite(v) && now !== v) cell.setValue(v); return; }
+        var text = String(v);
+        if (String(now) !== text) cell.setValue("'" + text);   // 前面加 '：照字写，= 开头不当公式，像日期、数字的也不变样
+      });
       out.done.push(r.date);
     });
   });
+  if (skipped.length) out.skipped = skipped;
   return out;
 }
 
@@ -1124,7 +1144,7 @@ function archive_(before, now) {
 // ================= 网页接口 =================
 // App 只发 POST：{ secret, version, push: { rows: { tasks: [...] }, deletes: [{table, id, at}] }, pull: true, since }
 // 返回 { ok, now, pull: { tables, deleted } }。所有请求排队执行，所以 since 不会漏掉数据。
-// 还可以带：tidy（清过期的删除记录）、quarter（季度表的两格）、archive（{before}，旧任务搬进 Archive 页）、reading（阅读表格）
+// 还可以带：tidy（清过期的删除记录）、quarter（季度表那一天的几格）、archive（{before}，旧任务搬进 Archive 页）、reading（阅读表格）
 
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);

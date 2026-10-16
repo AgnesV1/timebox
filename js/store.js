@@ -1,6 +1,6 @@
 // 数据层：本机存一份（localStorage），所有改动都从这里走，记下哪些行还没推到表格。
 // 每行都有 updated（改动时间），两台设备改了同一行，以后改的为准。
-// 数据和读写都在这个文件里；几块各管一摊的（重复、计时、Friends、目标、备餐、灵感池）写在 js/store/ 下面，
+// 数据和读写都在这个文件里；几块各管一摊的（重复、计时、Friends、目标、备餐、灵感池、每天的打分）写在 js/store/ 下面，
 // 最底下把它们接回来——对外还是 store.xxx，名字不变。
 
 import { todayIso, addDays, fmtShort } from "./dates.js";
@@ -17,6 +17,7 @@ import friendStore from "./store/friends.js";
 import goalStore from "./store/goals.js";
 import mealStore from "./store/meals.js";
 import ideaStore from "./store/ideas.js";
+import scoreStore from "./store/scores.js";
 
 const KEY = "kuzhouduan-v1";
 const OLD_KEY = "timebox-v1";
@@ -843,6 +844,8 @@ const { ideaTaskDropped, moveIdea } = idea;
 const series = seriesStore({ ...core, timer, setTimer: tm.setTimer, moveMeet, moveIdea });
 export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setSeriesGroup } = series;
 const { setRule } = series;
+
+export const { scores, scoreOf, scoreSetup, scoreCells, setScore, setScoreNote } = scoreStore(core);
 
 export const { goals, saveGoal, deleteGoal } = goalStore(core);
 export const { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples, addDishes, dishToBox } = mealStore(core);

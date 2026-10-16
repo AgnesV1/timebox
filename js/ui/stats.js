@@ -23,7 +23,6 @@ let custom = null;    // 自己选的两头 { from, to }
 const picks = new Set();   // 只看哪几个：g:<大类> / p:<计划 id> / none（哪都没挂的）；一个都不勾 = 全部，按大类分
 let pickOpen = false;      // 勾选的那块开着：重画时别收起来
 let deepOnly = false;
-let pieMode = "day";  // 饼图：day = 一天 24 小时都算 / logged = 只看记下来的
 let adjust = false;   // 饼图底下「Adjust」开着
 const view = { trend: "build", heat: "all" };   // 柱子默认只看 Build、热力图默认 All（她定的）；这次打开记着
 let sideMonth = "";   // On the side 那一格选着的月份
@@ -347,16 +346,14 @@ function hazeHTML(haze, total, mid) {
 
 // 睡觉、吃饭（hidden）算在 24 小时里、不画也不列：剩下的各片铺满一圈（角度按 shown 放大），百分比照旧是占整天的多少
 function pieHTML(c, s, rest, haze = null, filtered = false) {
-  const logged = pieMode === "logged";
-  const pie = S.clockPie(c, s, { trackedOnly: logged, rest, filtered });
+  const pie = S.clockPie(c, s, { rest, filtered });
   const parts = pieParts(pie).filter((x) => !x.hidden), life = S.lifeOf(c);
   const shown = parts.reduce((a, x) => a + x.min, 0);
   const ink = (x) => (x.kind === "project" || x.kind === "none") && Boolean(x.color);   // 用项目颜色的那几片
   const lit = (x) => (neon(x.color) ? esc(neon(x.color)) : "oklch(from " + esc(x.color) + " calc(l + .12) calc(c * 1.9) h)");
   const color = (x) => (x.kind === "life" ? LIFE_COLOR[x.key] : x.kind === "blank" ? "var(--k-blank)" : x.kind === "rest" ? "url(#st-hatch)" : x.kind === "more" ? "var(--k-None)" : esc(neon(x.color) || x.color || "var(--c-None)"));
   const swatch = (x) => (x.kind === "rest" ? HATCH : ink(x) ? lit(x) : color(x));
-  const what = logged ? "of what you logged" : "of the whole period";
-  tips.pie = parts.map((x) => ({ title: x.name, rows: [[what, fmtMin(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.unlogged ? [["usual housework", fmtMin(x.unlogged), "pl"]] : []), ...(x.deep > 0 ? [["deep", fmtMin(x.deep), "tide"]] : [])] }));
+  tips.pie = parts.map((x) => ({ title: x.name, rows: [["of the whole period", fmtMin(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.unlogged ? [["usual housework", fmtMin(x.unlogged), "pl"]] : []), ...(x.deep > 0 ? [["deep", fmtMin(x.deep), "tide"]] : [])] }));
   // 每片之间留一条缝（周长的 0.5% ≈ 2px）；pathLength = 100，所以长度直接写百分比
   let at = 0, under = "", mid = 100;   // mid = Untracked 正中（流光从这里往下扫）；没有 Untracked 就从 12 点
   const arcs = parts.map((x, i) => {
@@ -369,16 +366,14 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
     return '<circle class="slice' + (ink(x) ? " ink" + (neon(x.color) ? "" : " boost") : "") + '" data-i="' + i + '"' + where + ' stroke="' + color(x) + '"' + (ink(x) ? ' style="--c:' + color(x) + '"' : "") + "/>" +
       (x.deep > 0 ? '<circle class="dring" r="53" pathLength="100" stroke-dasharray="' + dash((x.deep / shown) * 100) + '" stroke-dashoffset="' + (-start).toFixed(3) + '"/>' : "");
   }).join("");
-  const hz = !logged && haze && haze.min >= 1 && shown > 0 ? haze : null;
+  const hz = haze && haze.min >= 1 && shown > 0 ? haze : null;
   const hzTitle = "Shows, novels… taken in alongside other things, so it overlaps";
   const legend = parts.map((x) => '<li title="' + esc(x.name + (x.unlogged ? " · includes " + fmtMin(x.unlogged) + " usual housework" : "") + (x.deep > 0 ? " · " + fmtMin(x.deep) + " deep" : "")) + '"><i style="background:' + swatch(x) + '"></i><span>' + esc(x.name) +
     '</span><b class="num">' + fmtMin(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("") +
     (hz ? '<li class="haze-li" title="' + esc(hzTitle) + '"><i class="haze-sw"></i><span>On the side</span><b class="num">~' + fmtMin(hz.min) + "</b><em>overlaps</em></li>" : "");
-  const lede = logged ? "Only the time you logged." : "Each 24-hour day. Sleep and meals count but aren't drawn.";
   const field = (k, label, unit, v) => "<label><span>" + label + '</span><input class="num" type="number" min="0" max="24" step="0.5" data-life="' + k + '" data-keep="life-' + k + '" value="' + (v ? Math.round(v / 6) / 10 : "") + '" placeholder="' + (k === "deepGoal" ? "none" : "0") + '"><em>' + unit + "</em></label>";
-  return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">' + lede +
-    ' <button type="button" class="link" data-act="life-adjust" aria-expanded="' + adjust + '">' + (adjust ? "Done" : "Adjust") + "</button></p></div>" +
-    '<span class="seg"><button type="button" data-act="pie-mode" data-v="day"' + (logged ? "" : ' class="on"') + '>24h</button><button type="button" data-act="pie-mode" data-v="logged"' + (logged ? ' class="on"' : "") + ">Logged only</button></span></header>" +
+  return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">Each 24-hour day. Sleep and meals count but aren\'t drawn.' +
+    ' <button type="button" class="link" data-act="life-adjust" aria-expanded="' + adjust + '">' + (adjust ? "Done" : "Adjust") + "</button></p></div></header>" +
     // Adjust 一个月才开一次：几个默认值 + On the side 都收在这里面，平常不占地方
     (adjust ? '<div class="life-form">' + field("sleep", "Sleep", "h a day", life.sleep) + field("care", "Meals, dishes, shower", "h a day", life.care) +
       field("chores", "Chores you don't log", "h a weekend · in Chores", life.chores) + field("deepGoal", "Deep goal", "h a work day", life.deepGoal) + sideRowHTML(c) + "</div>" : "") +
@@ -547,8 +542,7 @@ export function initStats(rerender) {
     } else if (act === "st-today") {
       anchor = T;
       if (kind === "custom") { const len = diffDays(custom.from, custom.to); custom = { from: addDays(T, -len), to: T }; }
-    } else if (act === "pie-mode") pieMode = el.dataset.v;
-    else if (act === "life-adjust") adjust = !adjust;
+    } else if (act === "life-adjust") adjust = !adjust;
     else if (act === "deep-only") deepOnly = !deepOnly;
     else if (act === "pick-clear") picks.clear();
     else if (act === "sheet-row") { const n = el.dataset.name; if (!sheetOpen.delete(n)) sheetOpen.add(n); }

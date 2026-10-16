@@ -42,7 +42,7 @@ function cellHTML(c, d, { month = false, outside = false, scores = null } = {}) 
   const line = d >= c.today || c.log[d] ? lineInfo(c, d).line : 0;
   const capOver = c.capacity.overrides[d] !== undefined;
   const commute = store.isCommuteDay(d);
-  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : "", commute ? "commute" : ""].filter(Boolean).join(" ");
+  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : ""].filter(Boolean).join(" ");
   const all = [...tasks.map(chipHTML), ...ghosts.map(ghostHTML)];
   const loadPct = sum.cap ? Math.min(100, (sum.planned / sum.cap) * 100) : 0;
   let h = '<div class="' + cls + '" data-drop="day:' + d + '">' +
@@ -52,7 +52,6 @@ function cellHTML(c, d, { month = false, outside = false, scores = null } = {}) 
       ? '<input class="cap-input num" type="number" min="0" step="15" data-cap-input="' + d + '" data-keep="cap-' + d + '" value="' + sum.cap + '" title="Minutes available · 0 = rest day · empty = weekly default">'
       : '<button type="button" class="cap num' + (capOver ? " set" : "") + '" data-act="cap" data-date="' + d + '" title="Available minutes this day — click to change">' + (sum.rest ? "rest" : fmtMin(sum.cap)) + "</button>") + "</div>" +
     '<div class="load"><i style="width:' + loadPct + '%"></i></div>' +
-    (commute ? '<div class="cm-band">Commute</div>' : "") +
     (line && !month ? '<div class="ln num">line ' + fmtMin(line) + "</div>" : "") +
     all.join("");
   if (!month) {

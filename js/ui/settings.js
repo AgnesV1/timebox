@@ -69,14 +69,12 @@ export function settingsHTML(phone) {
     (sc.bad.length ? " Skipped line " + sc.bad.join(", ") + " — it needs a name of its own, and note is the box under the rows." : "");
   const quarter = '<section class="card"><h3>Quarter sheet</h3>' +
     '<label class="field"><span>Link to the Sheet with your quarter tabs</span><input data-quarter="url" value="' + esc(q.url || "") + '" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false"></label>' +
-    '<label class="field small"><span>Fill from</span><input type="date" data-quarter="from" value="' + esc(q.from || "") + '" max="' + store.today() + '"></label>' +
-    '<p class="hint">Each day from that date, two cells are filled on the tab named like <b>2026 Q4</b>: <b>progress</b> (hours on projects ticked above × 10) and <b>focus</b> (◆ Deep hours ÷ 10). Days before it are left alone.</p>' +
+    '<p class="hint">Each day from the day you link it, two cells are filled on the tab named like <b>2026 Q4</b>: <b>progress</b> (hours on projects ticked above × 10) and <b>focus</b> (◆ Deep hours ÷ 10). Earlier days are left alone.</p>' +
     (q.url && l.quarterNote ? '<p class="hint qnote">' + esc(l.quarterNote) + "</p>" : "") +
     '<h4 class="dsc-set">Daily scores</h4>' +
     '<label class="field"><span>One line per column, as it\'s named on the tab</span><textarea data-score-set="text" data-keep="score-set-text" rows="9" spellcheck="false" placeholder="gym · moving · 3–15 · 3 stayed in · 5 usual · 8 walk out">' + esc(sc.text) + "</textarea></label>" +
-    '<p class="hint">Pieces split by <b>·</b> or <b>|</b>: the column name · what it means · the usual range · then each choice as a number and a few words. They show on Today from the start date; what you pick goes into that column, and the box under them into <b>note</b>. Nothing else on the tab changes.</p>' +
+    '<p class="hint">Pieces split by <b>·</b> or <b>|</b>: the column name · what it means · the usual range · then each choice as a number and a few words. They show on Today from the day you add them; what you pick goes into that column, and the box under them into <b>note</b>. Nothing else on the tab changes.</p>' +
     (scoreState ? '<p class="hint">' + esc(scoreState) + "</p>" : "") +
-    '<label class="field small"><span>Start from</span><input type="date" data-score-set="from" data-keep="score-set-from" value="' + esc(sc.from) + '" max="' + store.today() + '"></label>' +
     (q.url && l.scoreNote ? '<p class="hint qnote">' + esc(l.scoreNote) + "</p>" : "") + "</section>";
 
   // 这台设备的存储：用了多少、还能撑多久；一年多以前的任务可以搬进表格的 Archive 页
@@ -130,25 +128,23 @@ export function initSettings() {
   on(document, "change", ".settings [data-wk]", (e, el) => {
     store.setSetting("weekly", { ...WEEKLY, ...(store.setting("weekly", {}) || {}), [el.dataset.wk]: Math.max(0, Number(el.value) || 0) * 60 });
   });
-  // 季度表：贴了链接就存；第一次贴的时候「从哪天开始填」定成今天，之前手填的不动
+  // 季度表：贴了链接就存；第一次贴的那天就是「从哪天开始填」（不给改），之前的日子不动
   const saveQuarter = (root) => {
-    const url = root.querySelector('[data-quarter="url"]').value.trim(), from = root.querySelector('[data-quarter="from"]').value;
+    const url = root.querySelector('[data-quarter="url"]').value.trim();
     const cur = store.setting("quarter", null) || {};
-    if ((cur.url || "") === url && (cur.from || "") === (from || cur.from || "")) return;
+    if ((cur.url || "") === url) return;
     store.setLocal({ quarterSent: {}, quarterNote: "", scoreSent: {}, scoreNote: "" });   // 换了表格：都重新发
-    store.setSetting("quarter", url ? { url, from: from || cur.from || store.today() } : { url: "" });
+    store.setSetting("quarter", url ? { url, from: cur.from || store.today() } : { url: "" });
     if (url) sync.sync();
   };
   on(document, "input", '.settings [data-quarter="url"]', (e, el) => { if (looksLikeSheet(el.value)) saveQuarter(el.closest(".settings")); });
   on(document, "change", ".settings [data-quarter]", (e, el) => saveQuarter(el.closest(".settings")));
-  // 打分的那段字和开始日：第一次写的时候开始日定成今天；改了就把打过的分全部重发一遍（列名可能刚改对）
+  // 打分的那段字：第一次写的那天就是开始日（不给改）；改了就把打过的分全部重发一遍（列名可能刚改对）
   on(document, "change", ".settings [data-score-set]", (e, el) => {
-    const root = el.closest(".settings");
-    const text = root.querySelector('[data-score-set="text"]').value.replace(/\s+$/, ""), from = root.querySelector('[data-score-set="from"]').value;
+    const text = el.value.replace(/\s+$/, "");
     const cur = store.setting("scores", null) || {};
-    const next = { text, from: from || cur.from || (text.trim() ? store.today() : "") };
+    const next = { text, from: cur.from || (text.trim() ? store.today() : "") };
     if ((cur.text || "") === next.text && (cur.from || "") === next.from) return;
-    root.querySelector('[data-score-set="from"]').value = next.from;   // 开始日是这里定的：先填进格子，重画时才不会被换回空的
     store.setLocal({ scoreSent: {}, scoreNote: "" });
     store.setSetting("scores", next);
     if (store.setting("quarter", null)?.url) sync.sync();

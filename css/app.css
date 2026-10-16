@@ -220,7 +220,7 @@ body.side-min .sync-pill span { display: none; }
 @keyframes ball-lon { to { transform: scaleX(var(--b)); } }
 
 /* ---------- 今天 ---------- */
-.today-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 14px; align-items: start; }
+.today-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 18px 40px; align-items: start; }
 @media (max-width: 1100px) { .today-grid { grid-template-columns: minmax(0, 1fr); } .today-side { order: -1; } }
 .today-main { padding: 12px 14px 14px; border: var(--b); border-radius: 16px; background: var(--bg); box-shadow: var(--hard); }
 .today-main .strip { margin-top: 2px; }
@@ -365,14 +365,19 @@ body.side-min .sync-pill span { display: none; }
 .chip.ghost { background: transparent; color: var(--blue); }
 [data-theme="dark"] .chip.on { background: rgba(204, 255, 0, .12); color: var(--accent); border-color: var(--accent); box-shadow: 0 0 14px rgba(204, 255, 0, .45); }
 /* emoji 记号：挑一个（.em-pick，emoji 本身就是字，chip 收窄一点）；页面顶上的筛选（.tagf，Restock 和 Ideas 共用） */
-.em-pick { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-.em-pick .chip { padding: 2px 7px; font-size: 14px; line-height: 1.3; }
-.tagf { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
-.tagf-b { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border: 1px solid transparent; border-radius: 999px; background: var(--tonal); font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+/* 一排 emoji / 记号里挑一个（Ideas 的类别、Restock 的记号、这两页顶上的筛选、Reading 的 Vibe）：连成一条格子，
+   格子之间一道细线，选中的那格是青柠（夜里是一圈霓虹）——不再每个套一个圆框 */
+.em-pick, .idea-kinds, .vibes { display: inline-flex; width: max-content; max-width: 100%; justify-self: start; border: var(--b-ctl); }
+.tagf { display: flex; width: max-content; max-width: 100%; margin: 0 0 12px; border: var(--b-ctl); }
+.em-pick > .chip, .idea-kinds > .chip { min-width: 34px; height: 30px; padding: 0 7px; border: 0; border-radius: 0; background: transparent; font-size: 15px; line-height: 1; }
+.tagf-b { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border: 0; border-radius: 0; background: transparent; font-size: 13.5px; font-weight: 600; line-height: 1.3; }
 .tagf-b small { font-size: 11px; color: var(--muted); }
-.tagf-b.on { background: var(--accent); color: var(--accent-ink); }
+.em-pick > .chip + .chip, .idea-kinds > .chip + .chip, .tagf-b + .tagf-b, .vibe + .vibe { border-left: var(--b-ctl); }
+.em-pick > .chip:hover, .idea-kinds > .chip:hover, .tagf-b:hover, .vibe:hover { background: var(--tonal); }
+.em-pick > .chip:active, .idea-kinds > .chip:active { transform: none; }
+.em-pick > .chip.on, .idea-kinds > .chip.on, .tagf-b.on, .vibes > .vibe.on { background: var(--accent); color: var(--accent-ink); }
 .tagf-b.on small { color: inherit; }
-[data-theme="dark"] .tagf-b.on { background: rgba(204, 255, 0, .12); color: var(--accent); border-color: var(--accent); }
+[data-theme="dark"] :is(.em-pick, .idea-kinds) > .chip.on, [data-theme="dark"] .tagf-b.on, [data-theme="dark"] .vibes > .vibe.on { background: rgba(204, 255, 0, .12); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .reason { display: block; width: 100%; margin-top: 8px; padding: 9px 12px; border: var(--b-ctl); font-size: 14px; }
 .desc { display: block; width: 100%; min-height: 90px; margin-top: 10px; resize: vertical; border: var(--b-ctl); font-size: 15px; line-height: 1.55; }
 .empty { padding: 18px 0; color: var(--muted); }
@@ -419,17 +424,21 @@ body.side-min .sync-pill span { display: none; }
 .load i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--hot)); }
 [data-theme="dark"] .load i { background: linear-gradient(90deg, #00E5FF, #CCFF00); }
 .ln { font-size: 10.5px; font-weight: 600; color: var(--muted); }
-.ev { position: relative; display: flex; align-items: flex-start; gap: 4px; padding: 3px 5px 3px 7px; border-radius: 8px; background: var(--surface); box-shadow: inset 3px 0 0 var(--c); font-size: 11.5px; line-height: 1.3; cursor: grab; }
+/* 日历上的任务 = 一张张便利贴：直角，纸按项目的颜色染淡，底边一点点纸的阴影（夜里是染了色的暗纸，不要阴影）；
+   不写时长（一天合计多少在格子头上） */
+.ev { --paper: #FFFEF2; position: relative; display: flex; align-items: flex-start; gap: 4px; padding: 4px 6px; border-radius: 0; background: color-mix(in srgb, var(--c) 28%, var(--paper)); box-shadow: 0 1px 1px rgba(11, 11, 11, .06), 0 5px 6px -5px rgba(11, 11, 11, .35); font-size: 11.5px; line-height: 1.3; cursor: grab; }
 .ev .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.ev .m { flex-shrink: 0; font-size: 10px; color: var(--muted); }
-.ev:hover { background: var(--surface2); }
+.ev .m { display: none; }
+.ev:hover { background: color-mix(in srgb, var(--c) 38%, var(--paper)); }
+[data-theme="dark"] .ev { --paper: #0C0C13; background: color-mix(in srgb, var(--c) 22%, var(--paper)); box-shadow: none; }
+[data-theme="dark"] .ev:hover { background: color-mix(in srgb, var(--c) 32%, var(--paper)); }
 .ev.st-done { opacity: .5; }
 .ev.st-done .t, .ev.st-drop .t { text-decoration: line-through; }
 .ev.st-drop { opacity: .35; }
-.ev.st-later { opacity: .55; background: transparent; box-shadow: inset 0 0 0 1px var(--line), inset 3px 0 0 var(--c); }
+.ev.st-later { opacity: .55; background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
 .ev.st-partial { padding-right: 14px; }
-.ev.st-partial::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 8px; border-radius: 0 8px 8px 0; background: var(--leo-dark) 0 0/24px 24px, var(--c); }
-.ev.opt { background: var(--leo-tex) 0 0/60px 60px, var(--surface); background-blend-mode: soft-light; }
+.ev.st-partial::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 8px; background: var(--leo-dark) 0 0/24px 24px, var(--c); }
+.ev.opt { background: var(--leo-tex) 0 0/60px 60px, color-mix(in srgb, var(--c) 28%, var(--paper)); background-blend-mode: soft-light; }
 .cell-add { position: absolute; left: 7px; right: 7px; bottom: 6px; display: grid; place-items: center; height: 20px; padding: 0; border: 1px dashed transparent; border-radius: 8px; background: none; color: var(--muted); opacity: 0; transition: opacity .15s; }
 .cell:hover .cell-add { opacity: 1; border-color: var(--line); }
 .cell-add .ic { width: 14px; height: 14px; }
@@ -631,7 +640,8 @@ body.phone .settings .page-head { margin-top: 4px; }
 
 /* ---------- 统计 ---------- */
 /* 图上的颜色用 --k-*（校验过的同色系），文字一律用正文颜色；柱子 ≤24px、顶端 4px 圆角、相邻留 2px 缝 */
-.stats .card { margin-bottom: 10px; padding: 14px 14px 12px; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); }
+/* 每张图自己就是一块：标题 + 一句说明 + 图，不再套框（框里的线不带信息）；段和段之间靠留白 */
+.stats .card { margin-bottom: 34px; }
 .stats h3 { margin: 0; font: 700 15px var(--display); letter-spacing: -.01em; }
 .stats figure { margin: 0 0 16px; }
 .stats .lede { margin: 4px 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
@@ -737,7 +747,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .st-bar .dk-deep { min-height: 30px; padding: 4px 11px; }
 .st-range { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .st-range input { padding: 4px 8px; border: var(--b-ctl); border-radius: 999px; font-size: 12.5px; }
-.st-two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); gap: 0 12px; align-items: stretch; }
+.st-two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); gap: 0 44px; align-items: stretch; }
 .st-two > * { margin-bottom: 10px; }
 @media (max-width: 1100px) { .st-two { grid-template-columns: minmax(0, 1fr); } }
 /* 花了多久 / 深度那两个数字竖着叠成窄窄一列，挨着 Weekly rhythm；窄了就回到上面并排两块 */
@@ -1003,7 +1013,7 @@ body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
 body.phone .logtime input, body.phone .add input, body.phone .add select { font-size: 16px; }
 
 /* ---------- 计划：预览、种类标签、这周几次 ---------- */
-.ev.ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--line), inset 3px 0 0 var(--c); opacity: .6; }
+.ev.ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--line); opacity: .6; }   /* 还没落到这天的预览：只有一张纸的轮廓 */
 .ev.ghost.proj { cursor: default; border-style: dashed; box-shadow: inset 0 0 0 1px var(--line); }
 .row.ghost { opacity: .5; pointer-events: none; }
 .row.ghost .bar { background: transparent; box-shadow: inset 0 0 0 1.5px var(--bar); }
@@ -1051,9 +1061,8 @@ body.phone .logtime input, body.phone .add input, body.phone .add select { font-
 .rstuck { margin: 0; font-size: 12.5px; color: var(--warn); }
 .rstuck b { color: var(--ink); }
 [data-rstuck]:empty { display: none; }
-.vibes { display: flex; gap: 6px; }
-.vibe { width: 40px; height: 36px; border: 1px solid transparent; border-radius: 10px; background: var(--tonal); font-size: 19px; line-height: 1; filter: grayscale(.8); opacity: .7; }
-.vibe.on { filter: none; opacity: 1; background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.vibe { width: 40px; height: 34px; border: 0; border-radius: 0; background: transparent; font-size: 19px; line-height: 1; filter: grayscale(.8); opacity: .7; }
+.vibe.on { filter: none; opacity: 1; }
 .rtypes { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 6px; }
 .rgo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 body.phone .reading { padding: 0 2px 90px; }
@@ -1207,11 +1216,9 @@ body.phone .rpick { padding: 8px 6px; }
 .mintro .tools { gap: 8px; }
 
 /* 卡片：下次采购、打折 */
-.mcard { margin-bottom: 12px; padding: 12px 14px; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); }
+.mcard { margin-bottom: 32px; }   /* 不套框：标题 + 内容，块和块之间靠留白 */
 .mcard > header { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 8px; }
 .mcard h3 { margin: 0; font: 700 14px var(--display); }
-.mcard.mcoming { padding: 2px 0 0; border-color: transparent; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }   /* 未来三个月的汇总：次要信息，不套框 */
-.nextshop { border-width: 2px; }
 .nextshop > header .btn { margin-left: auto; padding: 5px 12px; font-size: 12.5px; }
 .shopadd { margin-top: 10px; }
 .shopadd select { padding: 4px 10px; border-style: dashed; border-radius: 999px; font-size: 12.5px; color: var(--blue); }
@@ -1234,7 +1241,9 @@ body.phone .rpick { padding: 8px 6px; }
 [data-theme="dark"] .saletag { background: rgba(204, 255, 0, .14); color: var(--accent); }
 
 /* 单子：按超市分 */
-.mstores { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px 16px; }
+/* 几家店顺着栏往下排（像砌砖），短的店不会在一行里留一大块空；一家店整块不拆到两栏 */
+.mstores { columns: 250px; column-gap: 32px; }
+.mstores > section { break-inside: avoid; padding-bottom: 16px; }
 .mstores h4 { margin: 0 0 4px; font: 700 13px var(--display); }
 .mstores h4 small { margin-left: 4px; font: 600 12px var(--num); color: var(--muted); }
 .mstores ul { margin: 0; padding: 0; list-style: none; }
@@ -1274,7 +1283,7 @@ body.phone .rpick { padding: 8px 6px; }
 [data-theme="dark"] .mpk:hover { background: rgba(204, 255, 0, .12); color: var(--accent); }
 
 /* 这周 / 下周 */
-.mweek { margin-bottom: 14px; padding: 12px; border: var(--b); border-radius: 16px; background: var(--bg); box-shadow: var(--hard); }
+.mweek { margin-bottom: 32px; }
 .mweek.skip .mdays { opacity: .45; }
 .mweek-head { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; margin-bottom: 10px; }
 .mw-title { display: flex; align-items: baseline; gap: 8px; }
@@ -1320,7 +1329,7 @@ body.phone .rpick { padding: 8px 6px; }
 .mlater .msec { margin-bottom: 10px; }
 .rgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 1180px) { .rgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.rweek { display: flex; flex-direction: column; gap: 6px; padding: 10px 11px; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); transition: background-color .15s, box-shadow .15s; }
+.rweek { display: flex; flex-direction: column; gap: 6px; padding: 10px 11px; border: 1.5px solid transparent; border-radius: 12px; background: var(--bg); transition: background-color .15s, box-shadow .15s; }
 .rweek.skip { opacity: .55; }
 .rweek header { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
 .rweek header b { font: 700 13.5px var(--display); letter-spacing: -.01em; }
@@ -1371,7 +1380,8 @@ body.phone .rpick { padding: 8px 6px; }
 .mbox footer { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 6px; border-top: 1px solid var(--line); font: 700 12px var(--num); }
 
 /* Groceries：按超市分的表 */
-.mtable { width: 100%; border-collapse: collapse; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); overflow: hidden; font-size: 13px; }
+/* 表格不套框：表头一道线、行间细线；往两边各伸出 10px，字和上面的标题对齐，悬停的底色比字宽一点 */
+.mtable { width: calc(100% + 20px); margin: 0 -10px; border-collapse: collapse; font-size: 13px; }
 .mtable th, .mtable td { padding: 7px 10px; text-align: left; }
 .mtable thead th { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); border-bottom: var(--b-soft); }
 .mtable .r { text-align: right; }
@@ -1406,10 +1416,10 @@ body.phone .rpick { padding: 8px 6px; }
 .pshop { padding: 0 9px 0 8px; }
 .pshop span { font: 700 12px var(--num); }
 body.phone .shop-page { padding-bottom: 90px; }
-body.phone .nextshop { margin: 4px 0 0; padding: 12px; }
+body.phone .nextshop { margin: 4px 0 0; }
 body.phone .nextshop > header { margin-bottom: 12px; }
 body.phone .nextshop > header .btn { margin-left: 0; }
-body.phone .mstores { grid-template-columns: minmax(0, 1fr); }
+body.phone .mstores { columns: auto; }
 body.phone .mstores li { grid-template-columns: minmax(0, 1fr); padding: 10px 0; font-size: 15.5px; }
 body.phone .lname input { width: 20px; height: 20px; }
 body.phone .lnote { padding-left: 44px; }
@@ -1495,9 +1505,8 @@ body.phone .wchip { padding: 5px 6px 5px 11px; font-size: 14px; }
 body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 
 /* ---------- Friends 页 ---------- */
-.friends .card { margin-bottom: 10px; padding: 12px 14px; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); }
-.friends .fr-side .card { margin-bottom: 22px; padding: 2px 0 0; border-color: transparent; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.fr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
+.friends .card { margin-bottom: 30px; }   /* 不套框：每块靠标题分，表格自己的细线就够了 */
+.fr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0 44px; align-items: start; }
 @media (max-width: 1100px) { .fr-grid { grid-template-columns: 1fr; } .fr-side { order: -1; } }
 .fr-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
 .fr-head h3 { margin: 0; font: 700 14px var(--display); }
@@ -1670,9 +1679,8 @@ select.open { border-color: var(--edge); }
 .st-pick-panel footer .link { font-size: 12px; }
 .st-pick-panel footer .link:disabled { opacity: .4; }
 
-/* 颜色点、色条都加一圈发丝细边：象牙白在白底上才看得见（暗色主题不用） */
+/* 颜色点、色条都加一圈发丝细边：象牙白在白底上才看得见（暗色主题不用）。日历上的便利贴是整张染色，不用这圈 */
 [data-theme="light"] .bar, [data-theme="light"] .pj::before, [data-theme="light"] .pdot { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .22); }
-[data-theme="light"] .ev { box-shadow: inset 3px 0 0 var(--c), inset 4px 0 0 rgba(0, 0, 0, .08); }
 [data-theme="light"] .pie .slice { filter: drop-shadow(0 0 .35px rgba(0, 0, 0, .55)); }
 [data-theme="light"] .pie-legend i { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .22); }
 
@@ -1686,7 +1694,6 @@ select.open { border-color: var(--edge); }
 .idea-add input[name="text"] { flex: 1 1 260px; min-width: 0; padding: 9px 12px; border: var(--b-ctl); border-radius: 12px; background: var(--bg); font-size: 15px; font-weight: 600; }
 .idea-add input[type="date"], .idea-row input[type="date"], .idea-plan input, .idea-plan select { padding: 5px 9px; border: var(--b-ctl); border-radius: 10px; background: var(--bg); font-size: 13px; }
 .idea-add .link { font-size: 12.5px; }
-.idea-kinds { display: inline-flex; gap: 5px; }
 .idea-intro { max-width: 560px; margin: 0 0 14px; }
 .idea-group { margin-bottom: 16px; }
 .idea-h { margin: 0 0 2px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
@@ -1804,7 +1811,7 @@ select.open { border-color: var(--edge); }
 /* ---------- 半透明（2026-10，她挑的「50% + 轻磨砂」）：卡片、侧栏、日历池、浮条都透得出底图（#sky 的天、云、星芒、飞机和潮水） ----------
    --card = 半透明的 --bg，--frost = 白天轻轻糊一点（只糊 4px，云还看得出来），夜里不糊（不然星芒透不出来）。日历格子、备餐的每一天格子太多，只透不糊。
    不透的：弹层（.sheet）、读数（.ctip）、提示条、下拉菜单、输入框和小按钮。卡里的任务行自己不上底色，不然是一条条白杠 */
-#side, #pool, .today-main, .pcard, .goals, .settings .card, .stats .card, .mcard, .mweek, .rweek, .mbox, .mshelf, .mtable, .friends .card {
+#side, #pool, .today-main, .pcard, .goals, .settings .card, .rweek, .mbox, .mshelf {
   background: var(--card); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); }
 .cell, .mday { background: var(--card); }
 .dock { background: rgba(255, 255, 255, .72); -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%); }

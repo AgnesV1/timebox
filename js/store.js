@@ -7,6 +7,7 @@ import { todayIso, addDays, fmtShort } from "./dates.js";
 import * as E from "./engine.js";
 import * as R from "./routines.js";
 import * as GR from "./groups.js";
+import * as OD from "./offdays.js";
 import * as F from "./friends.js";
 import { readLocal, writeLocal } from "./dom.js";
 import { formatTimes, sumTimes } from "./times.js";
@@ -646,16 +647,31 @@ export function setSetting(key, value) {
   change(() => put("settings", { id: key, key, value }));
 }
 
-// 通勤日：电脑日历里一天天点。存在 Settings 的 commute（{days: {"2026-10-08": true}}），一年前的顺手清掉
-export const isCommuteDay = (date) => Boolean(setting("commute", null)?.days?.[date]);
+// 电脑日历里一天天点的标记：Settings 里一条 {days: {"2026-10-08": true}}，一年前的顺手清掉；v 是 undefined = 去掉那天
+const dayMarks = (key) => setting(key, null)?.days || {};
 
-export function toggleCommute(date) {
+function markDay(key, date, v, msg) {
   const cut = addDays(today(), -366);
-  const days = Object.fromEntries(Object.entries(setting("commute", null)?.days || {}).filter(([d, v]) => v && d >= cut));
-  if (days[date]) delete days[date];
-  else days[date] = true;
-  change(() => put("settings", { id: "commute", key: "commute", value: { days } }), days[date] ? "Commute day " + fmtShort(date) : "Not a commute day");
+  const days = Object.fromEntries(Object.entries(dayMarks(key)).filter(([d, x]) => typeof x === "boolean" && d >= cut));
+  if (v === undefined) delete days[date];
+  else days[date] = v;
+  change(() => put("settings", { id: key, key, value: { days } }), msg);
 }
+
+// 通勤日
+export const isCommuteDay = (date) => Boolean(dayMarks("commute")[date]);
+export const toggleCommute = (date) => (isCommuteDay(date) ? markDay("commute", date, undefined, "Not a commute day") : markDay("commute", date, true, "Commute day " + fmtShort(date)));
+
+// 不上班（请假、公众假日，js/offdays.js）：点回和自动算的一样时就不留记录
+export const offDay = (date) => OD.offState(date, setting("offday", null));
+export function toggleOffDay(date) {
+  const { off, holiday } = offDay(date);
+  markDay("offday", date, !off === Boolean(holiday) ? undefined : !off, (off ? "Work day " : "Day off ") + fmtShort(date));
+}
+
+// 超级休息日：日历上那天的进度条变金色，别的都不管
+export const isSuperRest = (date) => Boolean(dayMarks("super-rest")[date]);
+export const toggleSuperRest = (date) => (isSuperRest(date) ? markDay("super-rest", date, undefined, "Not a super rest day") : markDay("super-rest", date, true, "Super rest day " + fmtShort(date)));
 
 // 自动排出来的任务（generated：改动时间记成 1，哪台设备真改过它都比这个新）
 function putAuto(x) {

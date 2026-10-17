@@ -1201,6 +1201,23 @@ body[data-view="today"] #main, body.phone.has-dock[data-view="today"] #main { pa
 .cell:hover .cm-t, .cm-t:focus-visible, .cm-t.on { opacity: 1; }
 .cm-t.on { background: var(--ink); color: var(--bg); }
 [data-theme="dark"] .cm-t.on { background: var(--surface2); color: var(--ink); }
+/* 发薪日：日期后面一个小 $ */
+.payday { margin-left: -2px; font: 700 11px var(--num); color: var(--muted); }
+/* 不上班（请假、公众假日）：日期右上角一个很小的 💤，不占格子顶上那一行的宽度；工作日没标的时候，鼠标移上来才淡淡出现 */
+.dn-w { position: relative; display: flex; align-items: center; }
+.offday-t { position: absolute; left: 100%; top: -4px; padding: 0 1px; border: 0; background: none; font-size: 10px; line-height: 1; opacity: 0; transition: opacity .15s; }
+.cell:hover .offday-t { opacity: .3; }
+.offday-t.on { opacity: .7; }
+.cell:hover .offday-t.on, .offday-t:focus-visible { opacity: 1; }
+/* 超级休息日：顶上那条进度条换成金箔（她点名的金色，只用在这一条上）。整条能点，上下多留 4px 好点中 */
+.load-t { display: block; width: 100%; margin: -4px 0; padding: 4px 0; border: 0; background: none; cursor: pointer; }
+.load-t .load { display: block; transition: background-color .15s; }
+.load-t:hover .load { background: rgba(212, 166, 42, .28); }
+.cell.superrest .load { background: rgba(212, 166, 42, .3); }
+.cell.superrest .load i { background: linear-gradient(110deg, #B8860B 0%, #F5C542 30%, #FFF4C2 45%, #F5C542 60%, #C99A1E 100%); background-size: 250% 100%; }
+.cell.superrest .load.shine i { animation: gold-sheen 3.2s ease-in-out infinite; }
+@keyframes gold-sheen { 0% { background-position: 100% 0; } 60%, 100% { background-position: 0 0; } }
+[data-theme="dark"] .cell.superrest .load { box-shadow: 0 0 6px rgba(255, 200, 40, .45); }
 
 /* ---------- 统计页：几点在干活的热力图 ---------- */
 .heat { display: grid; gap: 2px; margin-top: 4px; }

@@ -2,6 +2,8 @@
 // 把任务池里的条目拖到某天就排进去；日历里的任务拖到别的天就挪过去，拖回任务池就撤回。
 // 自动排的计划在以后的日子里画成淡色预览：规律的那一次可以拖走 / 点开（这时才变成真任务），整块的预计份额只看。
 // 格子里的日程永远全部显示（名字完整换行）；格子有最小宽度，放不下就左右滑。格子顶上的小开关标「通勤日」。
+// 上班那一层（js/offdays.js）：发薪日日期后面一个小 $；请假、公众假日日期旁边一个很小的 💤（工作日鼠标移上来能点）；
+// 点顶上那条进度条 = 超级休息日，整条变金色。都只是标记，不改可用时间、不影响排计划。
 // 点日期 = 到今天页的那一天；从打分开始日起、过完了还没打满分的日子，日期旁边一个红点（js/scores.js）。
 
 import * as store from "../store.js";
@@ -9,6 +11,7 @@ import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { addDays, addMonths, startOfWeek, startOfMonth, range, fmtShort, fmtMin, WEEKDAYS, MONTHS, MONTHS_LONG, weekday } from "../dates.js";
 import * as SC from "../scores.js";
+import { isPayday } from "../offdays.js";
 import { colorOf, lineInfo, badgeOf, projectOptions, groupsOf, toast } from "./common.js";
 import { ideasPoolHTML } from "./ideas.js";
 import { showDate } from "./today.js";
@@ -34,24 +37,26 @@ function ghostHTML(g) {
     '<span class="t">' + (reg ? '<i class="rt">↻</i>' : "") + esc(g.title) + '</span><span class="m num">' + g.est + "</span></div>";
 }
 
-function cellHTML(c, d, { month = false, outside = false, scores = null } = {}) {
+function cellHTML(c, d, { month = false, outside = false, scores = null, still = false } = {}) {
   const tasks = store.tasksOn(d);
   const unscored = scores && SC.unscored(scores, store.scoreOf(d), d, c.today);
   const ghosts = E.ghostsOn(c, d);
   const sum = E.daySummary(c, d);
   const line = d >= c.today || c.log[d] ? lineInfo(c, d).line : 0;
   const capOver = c.capacity.overrides[d] !== undefined;
-  const commute = store.isCommuteDay(d);
-  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : ""].filter(Boolean).join(" ");
+  const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d);
+  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
   const all = [...tasks.map(chipHTML), ...ghosts.map(ghostHTML)];
   const loadPct = sum.cap ? Math.min(100, (sum.planned / sum.cap) * 100) : 0;
   let h = '<div class="' + cls + '" data-drop="day:' + d + '">' +
-    '<div class="cell-head"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"' + (unscored ? ' title="Not scored yet"' : "") + "><span>" + (month ? "" : WEEKDAYS[weekday(d)]) + "</span><b>" + Number(d.slice(8)) + "</b>" + (unscored ? '<i class="dsc-dot" aria-label="Not scored yet"></i>' : "") + "</button>" +
+    '<div class="cell-head"><span class="dn-w"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"' + (unscored ? ' title="Not scored yet"' : "") + "><span>" + (month ? "" : WEEKDAYS[wd]) + "</span><b>" + Number(d.slice(8)) + "</b>" + (isPayday(d) ? '<span class="payday" title="Payday">$</span>' : "") + (unscored ? '<i class="dsc-dot" aria-label="Not scored yet"></i>' : "") + "</button>" +
+    (wd === 0 || wd === 6 ? "" : '<button type="button" class="offday-t' + (off.off ? " on" : "") + '" data-act="off-day" data-date="' + d + '" aria-pressed="' + off.off + '" title="' + esc(off.off ? (off.holiday || "Day off") + " — click to clear" : "Mark as a day off") + '">💤</button>') + "</span>" +
     '<button type="button" class="cm-t' + (commute ? " on" : "") + '" data-act="commute" data-date="' + d + '" aria-pressed="' + commute + '" title="' + (commute ? "Commute day — click to clear" : "Mark as a commute day") + '">' + icon("commute") + "</button>" +
     (month ? "" : capEdit === d
       ? '<input class="cap-input num" type="number" min="0" step="15" data-cap-input="' + d + '" data-keep="cap-' + d + '" value="' + sum.cap + '" title="Minutes available · 0 = rest day · empty = weekly default">'
       : '<button type="button" class="cap num' + (capOver ? " set" : "") + '" data-act="cap" data-date="' + d + '" title="Available minutes this day — click to change">' + (sum.rest ? "rest" : fmtMin(sum.cap)) + "</button>") + "</div>" +
-    '<div class="load"><i style="width:' + loadPct + '%"></i></div>' +
+    '<button type="button" class="load-t" data-act="super-rest" data-date="' + d + '" aria-pressed="' + gold + '" title="' + (gold ? "Super rest day — click to clear" : "Mark as a super rest day") + '">' +
+    '<span class="load' + (gold && !still ? " shine" : "") + '"><i style="width:' + loadPct + '%"></i></span></button>' +
     (line && !month ? '<div class="ln num">line ' + fmtMin(line) + "</div>" : "") +
     all.join("");
   if (!month) {
@@ -65,19 +70,20 @@ function cellHTML(c, d, { month = false, outside = false, scores = null } = {}) 
 export function calendarHTML(c) {
   if (!anchor) anchor = c.today;
   const week = mode() === "week", scores = store.scoreSetup();
+  const still = Boolean(document.getElementById("sky")?.classList.contains("still"));   // 设置里关了动效：金条不反光
   let title, body;
   if (week) {
     const s = startOfWeek(anchor, weekStart());
     const e = addDays(s, 6);
     title = fmtShort(s) + " – " + (s.slice(5, 7) === e.slice(5, 7) ? Number(e.slice(8)) : fmtShort(e));
-    body = '<div class="cal-scroll"><div class="week">' + range(s, e).map((d) => cellHTML(c, d, { scores })).join("") + "</div></div>";
+    body = '<div class="cal-scroll"><div class="week">' + range(s, e).map((d) => cellHTML(c, d, { scores, still })).join("") + "</div></div>";
   } else {
     const m0 = startOfMonth(anchor);
     const s = startOfWeek(m0, weekStart());
     title = MONTHS_LONG[Number(m0.slice(5, 7)) - 1] + " " + m0.slice(0, 4);
     const heads = range(s, addDays(s, 6)).map((d) => "<span>" + WEEKDAYS[weekday(d)] + "</span>").join("");
     body = '<div class="cal-scroll"><div class="month-head">' + heads + '</div><div class="month">' +
-      range(s, addDays(s, 41)).map((d) => cellHTML(c, d, { month: true, outside: d.slice(0, 7) !== m0.slice(0, 7), scores })).join("") + "</div></div>";
+      range(s, addDays(s, 41)).map((d) => cellHTML(c, d, { month: true, outside: d.slice(0, 7) !== m0.slice(0, 7), scores, still })).join("") + "</div></div>";
   }
   const { line, done } = lineInfo(c, c.today);
   const scale = Math.max(line * 1.2, done, 60);
@@ -154,6 +160,8 @@ export function initCalendar(rerender) {
     else if (act === "edit-task") openTaskEditor(el.dataset.id);
     else if (act === "open-ghost") { const id = store.materialize(el.dataset.key); if (id) openTaskEditor(id); }
     else if (act === "commute") store.toggleCommute(el.dataset.date);
+    else if (act === "off-day") store.toggleOffDay(el.dataset.date);
+    else if (act === "super-rest") store.toggleSuperRest(el.dataset.date);
     else if (act === "open-day") { showDate(el.dataset.date); location.hash = "today"; }   // 浏览器后退回到日历
     else if (act === "cell-add") {
       adding = el.dataset.date;

@@ -107,7 +107,8 @@ function sunHTML(c, d) {
     '<path class="arc ' + x.kind + (i === picked ? " on" : "") + (x.color && !neon(x.color) ? " boost" : "") + '" data-i="' + i + '" data-t="' + x.a + '" d="' + arcPath(x.ring === "outer" ? RO : RI, x.a, x.b) + '"' +
     (x.color ? ' style="--c:' + esc(neon(x.color) || x.color) + '"' : "") + "><title>" + esc(x.label + " · " + x.from + "–" + x.to) + "</title></path>" +
     (x.kind === "fixed" ? "" : print(x, neon(x.color) || x.color || "#B4B4BC", Boolean(x.color) && !neon(x.color)))).join("");
-  return '<div class="sun" role="button" tabindex="0" aria-label="Your day on a clock — drag up or press Enter">' +
+  // 圆盘后面那一大片很虚的彩虹（白天）/ 极光（夜里）：跟着圆盘升起来的程度（--p）浮现，收下去就没了（她 2026-10-17 要的，取代天上随机出现的那两样）
+  return '<i class="sun-halo" aria-hidden="true"></i><div class="sun" role="button" tabindex="0" aria-label="Your day on a clock — drag up or press Enter">' +
     '<svg viewBox="-120 -120 240 240" aria-hidden="true">' +
     "<defs>" + chrome("day") + chrome("night") +
     '<mask id="sun-cut" maskUnits="userSpaceOnUse" x="-120" y="-120" width="240" height="240"><rect x="-120" y="-120" width="240" height="240" fill="#fff"/><rect x="-120" y="-1.7" width="120" height="3.4" fill="#000"/></mask></defs>' +

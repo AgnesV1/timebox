@@ -1,4 +1,4 @@
-// 底图上偶尔经过的小东西的排班（js/sky.js）：飞机 3–5 分钟一趟，潮水 6–10 分钟一次，少见的那样 10–15 分钟一次，更少见的天象（彩虹 / 极光）15–30 分钟一次；
+// 底图上偶尔经过的小东西的排班（js/sky.js）：飞机 3–5 分钟一趟，潮水 6–10 分钟一次，少见的那样 10–15 分钟一次；
 // 各管各的，撞上了就一起出现（2026-10-17 起，之前是一次只放一样）
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -6,7 +6,7 @@ import * as K from "../js/sky.js";
 
 // 固定的随机数：同一个种子每次跑出来一样
 const seeded = (seed) => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
-const LASTS = { plane: 30000, tide: 15000, rare: 26000, sky: 38000 };   // 每样大概要放多久
+const LASTS = { plane: 30000, tide: 15000, rare: 26000 };   // 每样大概要放多久
 
 // 照页面里的走法跑一遍（到点 → 问 turn → 到点的都放 → 等到最近的那一样）；返回放过的 [{ kind, at, end }]
 function run(hours, seed, can = K.ORDER) {
@@ -28,16 +28,14 @@ const gaps = (list) => list.slice(1).map((x, i) => (x.at - list[i].at) / 1000);
 test("the first plane comes within a minute and the first tide within three; then each keeps exactly its own pace", () => {
   for (const seed of [1, 7, 42, 2026]) {
     const shown = run(12, seed);
-    const planes = of(shown, "plane"), tides = of(shown, "tide"), rares = of(shown, "rare"), skies = of(shown, "sky");
+    const planes = of(shown, "plane"), tides = of(shown, "tide"), rares = of(shown, "rare");
     assert.ok(planes[0].at >= 20000 && planes[0].at <= 60000, "first plane at " + planes[0].at);
     assert.ok(tides[0].at >= 60000 && tides[0].at <= 180000, "first tide at " + tides[0].at);
     assert.ok(rares[0].at >= 600000, "nothing rare in the first ten minutes");
-    assert.ok(skies[0].at >= 900000, "no rainbow or aurora in the first quarter hour");
     // 不再给别的让路：每样的间隔正好落在自己那一档里
-    for (const [kind, list] of [["plane", planes], ["tide", tides], ["rare", rares], ["sky", skies]]) {
+    for (const [kind, list] of [["plane", planes], ["tide", tides], ["rare", rares]]) {
       for (const g of gaps(list)) assert.ok(g >= K.GAPS[kind][0] && g <= K.GAPS[kind][1], kind + " gap " + g);
     }
-    assert.ok(skies.length >= 12 * 60 / 30 && skies.length <= 12 * 60 / 15 + 1, skies.length + " rainbows / auroras in 12 hours");
   }
 });
 
@@ -50,15 +48,14 @@ test("they don't wait for each other: over a day some of them overlap", () => {
 });
 
 test("everything due at once goes out together, each booked for its own next turn", () => {
-  const due = { plane: 1000, tide: 950, rare: 900, sky: 5000 }, mid = () => 0.5;
+  const due = { plane: 1000, tide: 950, rare: 5000 }, mid = () => 0.5;
   const a = K.turn(2000, due, mid);
-  assert.deepEqual(a.kinds, ["rare", "tide", "plane"]);
-  assert.equal(a.due.rare, 2000 + 750000);
+  assert.deepEqual(a.kinds, ["tide", "plane"]);
   assert.equal(a.due.tide, 2000 + 480000);
   assert.equal(a.due.plane, 2000 + 240000);
-  assert.equal(a.due.sky, 5000, "not due yet: left alone");
+  assert.equal(a.due.rare, 5000, "not due yet: left alone");
   assert.equal(a.wait, 3000, "then wait for the nearest one");
-  assert.deepEqual(K.turn(500, due), { kinds: [], due, wait: 400 }, "nothing due yet: wait for the nearest one");
+  assert.deepEqual(K.turn(500, due), { kinds: [], due, wait: 450 }, "nothing due yet: wait for the nearest one");
 });
 
 test("on the phone only the tide comes, at its own pace", () => {
@@ -67,7 +64,7 @@ test("on the phone only the tide comes, at its own pace", () => {
     assert.ok(shown.length >= 8 * 60 / 10.5 && shown.every((x) => x.kind === "tide"), shown.length + " tides, nothing else");
     for (const g of gaps(shown)) assert.ok(g >= 360 && g <= 600, "tide gap " + g);
   }
-  const due = { plane: 0, tide: 5000, rare: 0, sky: 0 };
+  const due = { plane: 0, tide: 5000, rare: 0 };
   assert.deepEqual(K.turn(1000, due, Math.random, ["tide"]), { kinds: [], due, wait: 4000 }, "the others being long overdue changes nothing");
   assert.deepEqual(K.turn(1000, due, Math.random, []), { kinds: [], due, wait: 60000 });
 });

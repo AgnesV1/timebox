@@ -126,16 +126,18 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 @keyframes twinkle { 50% { opacity: .1; } }
 #sky.still :is(i, b) { animation: none; }
 /* 地平线（她挑的）：只在有任务正在计时（body.timing）时慢慢浮出来，停了就淡掉，平时没有；要淡（2026-10-17 她说的）。
-   白天 = 底边正中一片往远处收窄的横线地面：玫红、电光蓝两道错开（和太阳身上的横纹一套，丝网印错版），往两边淡掉，和角落里的彩虹错开
-   （先试过网点，她说太密有点密集恐怖）；夜里 = 底边一层霓虹网格地面。两样计时时都往前走。手机上更淡、更矮 */
+   白天 = 底边一片往远处收窄的横线地面：玫红、电光蓝两道错开（和太阳身上的横纹一套，丝网印错版；先试过网点，她说太密有点密集恐怖）；
+   夜里 = 底边一层霓虹网格地面。两样都铺满整个屏宽、往两边淡掉，消失点在屏幕正中——和计时浮条、时间饼图同一条中轴（她点名要对齐）。
+   计时时都往前走。手机上更淡、更矮 */
 #sky .hz-lines, #sky .hz-grid { opacity: 0; transition: opacity 1.6s ease; }
-#sky .hz-lines { inset: auto 0 0 var(--side-w, 196px); height: 34vh; overflow: hidden; perspective: 220px; perspective-origin: 50% 0;
+#sky .hz-lines { inset: auto 0 0 0; height: 34vh; overflow: hidden; perspective: 220px; perspective-origin: 50% 0;
   -webkit-mask: radial-gradient(48% 120% at 50% 100%, #000 35%, transparent 75%), linear-gradient(transparent, #000 40%); -webkit-mask-composite: source-in;
   mask: radial-gradient(48% 120% at 50% 100%, #000 35%, transparent 75%) intersect, linear-gradient(transparent, #000 40%); }
 #sky .hz-lines b { position: absolute; left: -60%; right: -60%; top: 0; height: 300%; transform-origin: 50% 0; transform: rotateX(62deg); will-change: transform;
   background: linear-gradient(rgba(255, 62, 165, .55) 0 3px, transparent 3px) 0 0 / 100% 16px, linear-gradient(rgba(47, 91, 255, .4) 0 3px, transparent 3px) 0 3px / 100% 16px; }
-#sky .hz-grid { inset: auto 0 0 var(--side-w, 196px); height: 34vh; overflow: hidden; perspective: 220px; perspective-origin: 50% 0;
-  -webkit-mask: linear-gradient(transparent, #000 75%); mask: linear-gradient(transparent, #000 75%); }
+#sky .hz-grid { inset: auto 0 0 0; height: 34vh; overflow: hidden; perspective: 220px; perspective-origin: 50% 0;
+  -webkit-mask: radial-gradient(56% 120% at 50% 100%, #000 40%, transparent 80%), linear-gradient(transparent, #000 75%); -webkit-mask-composite: source-in;
+  mask: radial-gradient(56% 120% at 50% 100%, #000 40%, transparent 80%) intersect, linear-gradient(transparent, #000 75%); }
 #sky .hz-grid b { position: absolute; left: -40%; right: -40%; top: 0; height: 260%; transform-origin: 50% 0; transform: rotateX(64deg); will-change: transform;
   background: linear-gradient(rgba(204, 255, 0, .16) 1px, transparent 1px) 0 0 / 100% 22px, linear-gradient(90deg, rgba(204, 255, 0, .12) 1px, transparent 1px) 50% 0 / 26px 100%; }
 body.timing #sky .hz-lines { opacity: .42; }
@@ -144,7 +146,7 @@ body.timing #sky .hz-lines b { animation: lines-run 1.8s linear infinite; }
 body.timing #sky .hz-grid b { animation: grid-run 1.4s linear infinite; }
 @keyframes lines-run { to { transform: rotateX(62deg) translateY(16px); } }
 @keyframes grid-run { to { transform: rotateX(64deg) translateY(22px); } }
-body.phone #sky :is(.hz-lines, .hz-grid) { left: 0; height: 24vh; }
+body.phone #sky :is(.hz-lines, .hz-grid) { height: 24vh; }
 body.phone.timing #sky .hz-lines { opacity: .26; }
 body.phone.timing #sky .hz-grid { opacity: .35; }
 /* 手机：最顶上那一截和灵动岛那条同色（白天纯白、夜里 --bg），往下才是跟着钟点的天 */
@@ -169,11 +171,6 @@ body.phone.timing #sky .hz-grid { opacity: .35; }
 body.phone.has-dock .sky-tide { bottom: calc(var(--dock-h, 0px) - 16px + env(safe-area-inset-bottom)); }
 .sky-meteor { height: 1.3px; border-radius: 2px; background: linear-gradient(to right, rgba(190, 244, 255, 0), rgba(233, 251, 255, .95)); transform-origin: 100% 50%; }
 @keyframes sky-blink { 0%, 16% { opacity: 1; } 17%, 100% { opacity: .12; } }
-/* 彩虹（白天）、极光（夜里）：只占一个角、淡淡的（她 2026-10-17 挑的「角落」版），位置每次随机，脚本给位置和彩虹的那几道颜色 */
-.sky-bow { will-change: opacity; filter: blur(1.4px); -webkit-mask: linear-gradient(to top, transparent 4%, #000 50%); mask: linear-gradient(to top, transparent 4%, #000 50%); }
-.sky-aurora { will-change: opacity; mix-blend-mode: screen; -webkit-mask: radial-gradient(60% 100% at 50% 0, #000 35%, transparent 78%); mask: radial-gradient(60% 100% at 50% 0, #000 35%, transparent 78%); }
-#sky .sky-aurora i { inset: 0 auto auto; border-radius: 45%; filter: blur(2.5px);
-  background: linear-gradient(to bottom, transparent 0, rgba(255, 43, 214, .2) 18%, rgba(0, 229, 255, .34) 45%, rgba(110, 255, 150, .55) 74%, rgba(204, 255, 0, .9) 91%, transparent); }
 
 /* ---------- 整体布局 ---------- */
 .app { display: grid; grid-template-columns: var(--side-w, 196px) minmax(0, 1fr) auto; min-height: 100vh; }
@@ -1162,6 +1159,19 @@ body.phone .reading { padding: 0 2px 90px; }
   box-shadow: 0 0 0 1px rgba(255, 255, 255, calc(.55 * var(--p))), 0 0 28px 8px rgba(228, 233, 244, calc(.85 * var(--p))), 0 0 84px 26px rgba(188, 198, 222, calc(.42 * var(--p))), 0 20px 60px rgba(0, 0, 0, calc(.25 * var(--p)));
   opacity: calc(.55 + .45 * var(--p)); pointer-events: none; touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; }
 .sun.dragging { cursor: grabbing; }
+/* 圆盘升起来时，后面浮现一大片很虚的（她 2026-10-17 要的，取代天上随机的彩虹 / 极光）：跟着升起的程度 --p 淡入，收下去就没了。
+   白天 = 绕着圆盘的一大圈彩虹（像太阳的日晕，下半截淡掉，看着是一道拱）；夜里 = 圆盘上方横着一大片极光（青柠在下、往上变青变紫），慢慢飘。
+   都和圆盘同一个圆心 / 同一条中轴，糊得很开，只看得出颜色 */
+.sun-halo { position: absolute; left: 50%; top: 50%; pointer-events: none; will-change: opacity; opacity: calc(var(--p, 0) * .75); }
+[data-theme="light"] .sun-halo { --H: calc(min(360px, 88vw, 70vh) * 2.5); width: var(--H); height: var(--H); margin: calc(var(--H) / -2) 0 0 calc(var(--H) / -2); filter: blur(18px);
+  background: radial-gradient(closest-side, transparent 0 74%, rgba(255, 255, 255, .5) 77%, rgba(47, 91, 255, .5) 80%, rgba(0, 190, 255, .5) 83%, rgba(198, 255, 0, .7) 86.5%, rgba(255, 206, 0, .55) 90%, rgba(255, 62, 165, .55) 93.5%, transparent 97%);
+  -webkit-mask: linear-gradient(#000 40%, transparent 72%); mask: linear-gradient(#000 40%, transparent 72%); }
+[data-theme="dark"] .sun-halo { width: 150vw; height: 62vh; margin: -62vh 0 0 -75vw; filter: blur(26px); mix-blend-mode: screen;
+  background: radial-gradient(22% 34% at 30% 78%, rgba(204, 255, 0, .7), transparent 70%), radial-gradient(26% 30% at 52% 70%, rgba(110, 255, 150, .55), transparent 70%), radial-gradient(22% 34% at 72% 76%, rgba(204, 255, 0, .6), transparent 70%),
+    radial-gradient(30% 40% at 40% 42%, rgba(0, 229, 255, .45), transparent 72%), radial-gradient(30% 40% at 64% 38%, rgba(255, 43, 214, .35), transparent 72%);
+  animation: halo-drift 14s ease-in-out infinite alternate; }
+@keyframes halo-drift { to { transform: translateX(4vw) skewX(-6deg); } }
+#sun:not(.up) .sun-halo { animation-play-state: paused; }
 #sun.up .sun, .sun.dragging { pointer-events: auto; }
 .sun .trk, .sun .arc { pointer-events: stroke; }
 #sun.over:not(.up) .sun { opacity: calc(.3 + .7 * var(--p)); }

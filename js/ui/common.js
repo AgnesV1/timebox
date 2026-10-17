@@ -110,7 +110,7 @@ export function heroHTML(c, d) {
     const scale = Math.max(day.cap, day.planned, day.done, 60);
     return '<section class="hero free">' +
       '<div class="hero-k">' + (isToday ? "Today" : "This day") + "</div>" +
-      '<div class="nums"><span class="big">' + Math.round(day.done) + '</span><span class="of">/ ' + day.planned + ' min</span><span class="state quiet">No project line</span></div>' +
+      '<div class="nums"><span class="big" data-roll="hero-' + d + '">' + Math.round(day.done) + '</span><span class="of">/ ' + day.planned + ' min</span><span class="state quiet">No project line</span></div>' +
       '<div class="meter"><div class="fill" style="width:' + pct(day.done, scale) + '"></div></div>' +
       '<div class="meta"><span>Nothing due from projects</span></div></section>';
   }
@@ -126,7 +126,7 @@ export function heroHTML(c, d) {
   }).join("");
   return '<section class="hero' + (held ? " held" : "") + '">' +
     '<div class="hero-k">' + (isToday ? "Today's line" : d < c.today ? "That day's line" : "Planned line") + "</div>" +
-    '<div class="nums"><span class="big">' + done + '</span><span class="of">/ ' + line + ' min</span><span class="state">' + state + "</span></div>" +
+    '<div class="nums"><span class="big" data-roll="hero-' + d + '">' + done + '</span><span class="of">/ ' + line + ' min</span><span class="state">' + state + "</span></div>" +
     '<div class="meter"><div class="fill" style="width:' + pct(done, scale) + '"></div><i class="tick" style="left:' + pct(line, scale) + '"></i></div>' +
     (chips ? '<div class="shares">' + chips + "</div>" : "") +
     (ahead ? '<div class="meta"><span></span><span>Ahead ' + fmtMin(ahead.extra) + " · " + perDay(ahead.lessPerDay) + " less a day for " + ahead.days + "d</span></div>" : "") + "</section>";
@@ -177,12 +177,18 @@ export function toast(msg, undoFn) {
   if (!box) return;
   box.innerHTML = "<span>" + esc(msg) + "</span>" + (undoFn ? '<button type="button">Undo</button>' : "");
   box.hidden = false;
-  box.classList.remove("show");
+  box.classList.remove("show", "out");
   void box.offsetWidth;
   box.classList.add("show");
   const btn = box.querySelector("button");
   if (btn) btn.onclick = () => { undoFn(); hide(); };
   clearTimeout(toastTimer);
   toastTimer = setTimeout(hide, 6000);
-  function hide() { box.classList.remove("show"); box.hidden = true; }
+  // 走的时候往下沉着淡掉（css 的 #toast.out，0.2 秒）；系统要求减少动态就直接收
+  function hide() {
+    box.classList.remove("show");
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { box.hidden = true; return; }
+    box.classList.add("out");
+    setTimeout(() => { if (box.classList.contains("out")) { box.classList.remove("out"); box.hidden = true; } }, 200);
+  }
 }

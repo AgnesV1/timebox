@@ -46,8 +46,12 @@ function place() {
   m.style.minWidth = Math.max(150, r.width) + "px";
   const w = m.offsetWidth, h = m.offsetHeight;
   const below = r.bottom + 4 + h <= innerHeight - 8 || r.top < h + 12;
-  m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + "px";
+  const left = Math.max(8, Math.min(innerWidth - w - 8, r.left));
+  m.style.left = left + "px";
   m.style.top = Math.max(8, below ? Math.min(r.bottom + 4, innerHeight - h - 8) : r.top - h - 4) + "px";
+  // 从按钮那里长出来：往下开从上沿、往上开从下沿，横着对准按钮左边进来一点（css 的 menu-in）
+  m.style.setProperty("--mo", Math.max(0, r.left - left + 14).toFixed(0) + "px " + (below ? "0" : "100%"));
+  m.style.setProperty("--my0", below ? "-6px" : "6px");
 }
 
 function open(sel) {
@@ -81,7 +85,10 @@ export function close() {
   if (!cur) return;
   cur.watch?.disconnect();
   cur.sel.classList.remove("open");
-  cur.el.remove();
+  // 收的时候缩一点淡掉（0.13 秒）再拿掉；系统要求减少动态就直接拿掉
+  const el = cur.el;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) el.remove();
+  else { el.classList.add("out"); setTimeout(() => el.remove(), 130); }
   cur = null;
 }
 

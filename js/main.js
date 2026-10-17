@@ -7,7 +7,7 @@ import * as reading from "./reading.js";
 import * as Meal from "./meals.js";
 import { esc, on, icon, initDateTyping } from "./dom.js";
 import { paintPatterns } from "./patterns.js";
-import { initFx, setFx, confetti, refreshFxColors } from "./fx.js";
+import { initFx, setFx, confetti, refreshFxColors, tintSky } from "./fx.js";
 import { toast, lineInfo, ballHTML } from "./ui/common.js";
 import { initModal, closeModal } from "./ui/modal.js";
 import { initSelect } from "./ui/select.js";
@@ -27,7 +27,7 @@ import { readingHTML, initReading } from "./ui/reading.js";
 import { mealsHTML, shopHTML, initMeals, refreshMealEditor, mealDrop } from "./ui/meals.js";
 import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/friends.js";
 import { renderSun, initSun } from "./ui/sun.js";
-import { animateNext, takeTransition, nameParts, dusk } from "./motion.js";
+import { animateNext, animateSoft, takeTransition, nameParts, dusk, measurePills, placePills, glidePills, rollNumbers, titleIn, initEdgeGlow } from "./motion.js";
 import { lookAt, nextTurn } from "./day.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
@@ -71,18 +71,21 @@ function applyTheme() {
 function sidebarHTML(c, view) {
   const todayOpen = c.tasks.filter((t) => t.date === c.today && !t.status).length;
   const deals = Meal.toCheck(store.meals(), c.today).length;   // 这一轮还没看的打折
-  // 四段，各管各的事：排时间的那四页 / 备餐 / 阅读 / 人。每段一层自己的淡底色（css 里 .sblock），不写标题
-  const blocks = [["todo", [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", projectAlerts(c) || ""], ["stats", "Stats", ""]]],
-    ["meals", [["meals", "Meals", deals || ""]]], ["read", [["reading", "Reading", ""]]], ["friends", [["friends", "Friends", friendsDue(c.today) || ""]]]];
-  const link = ([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '" title="' + t + '">' + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>";
+  // 四段，各管各的事：排时间的那四页 / 备餐 / 阅读 / 人。不写标题、不铺底色，只靠段和段之间的空隙分开；
+  // 每段的图标是那个大类的油画色（排时间 = Build、备餐 = Chores、阅读 = Leisure、人 = Friends），大类改了颜色这里跟着变
+  const tint = (name, fallback) => store.groups().find((g) => g.name === name)?.color || fallback;
+  const blocks = [["todo", "Build", "#3E8E6E", [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", projectAlerts(c) || ""], ["stats", "Stats", ""]]],
+    ["meals", "Chores", "#9A5A36", [["meals", "Meals", deals || ""]]], ["read", "Leisure", "#E07A2B", [["reading", "Reading", ""]]], ["friends", "Friends", "#8B62AE", [["friends", "Friends", friendsDue(c.today) || ""]]]];
+  // 当前页那一项底下垫一块青柠（.snav-pill）：换页时它从旧的那项滑到新的那项（换页过渡里有名字，css 里 snav-pill）
+  const link = ([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '" title="' + t + '">' + (view === v ? '<i class="snav-pill" aria-hidden="true"></i>' : "") + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>";
   const st = sync.getStatus();
   // 收起来只剩一列图标（记在这台设备上）：名字放进 title，角标缩成一个点
   const min = Boolean(store.local().sideMin);
   return '<div class="brand">' + ballHTML() + "<h1>苦昼短</h1>" +
     '<button type="button" class="icon-btn side-tog" data-act="side-toggle" aria-expanded="' + !min + '" aria-label="' + (min ? "Show" : "Hide") + ' the sidebar labels" title="' + (min ? "Expand" : "Collapse") + '">' + icon(min ? "right" : "left") + "</button></div>" +
-    '<nav class="snav">' + blocks.map(([b, links]) => '<div class="sblock" data-b="' + b + '">' + links.map(link).join("") + "</div>").join("") + "</nav>" +
+    '<nav class="snav">' + blocks.map(([b, g, fallback, links]) => '<div class="sblock" data-b="' + b + '" style="--tint:' + esc(tint(g, fallback)) + '">' + links.map(link).join("") + "</div>").join("") + "</nav>" +
     '<div class="sbot"><nav class="snav">' + link(["settings", "Settings", ""]) + "</nav>" +
-    '<footer class="sfoot"><button type="button" class="sync-pill' + (st.bad ? " bad" : "") + '" data-act="sync" title="Sync now">' + icon("sync") + '<span data-sync-status>' + esc(st.text) + "</span></button></footer></div>";
+    '<footer class="sfoot"><button type="button" class="sync-pill' + (st.bad ? " bad" : "") + '" data-act="sync" title="Sync now">' + icon("sync") + '<i class="sync-ld" aria-hidden="true">' + "<i></i>".repeat(9) + "</i>" + '<span data-sync-status>' + esc(st.text) + "</span></button></footer></div>";
 }
 
 // ---------- 整页重画（正在打字的输入框，值、光标都留住） ----------
@@ -131,10 +134,13 @@ function frame() {
   const html = document.documentElement, rows = kind === "on";
   html.dataset.vt = kind;
   if (!rows) nameParts(main, false);
+  const before = measurePills();
   const vt = document.startViewTransition(() => {
     draw();
     if (!rows) nameParts(main, false);
     if (kind === "theme") dusk(html.dataset.theme === "dark");
+    glidePills(before, kind);
+    if (kind === "page" || kind === "next" || kind === "prev") titleIn();
   });
   vt.ready.catch(() => {});   // 页面在后台时过渡会被取消，不算错
   vt.finished.finally(() => {
@@ -154,7 +160,9 @@ function draw() {
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
   main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : view === "ideas" ? ideasPhoneHTML(c) : view === "friends" ? friendsHTML(c) : todayHTML(c, phone);
+  placePills();
   if (document.startViewTransition) nameParts(main, true);
+  rollNumbers();
   // 打开阅读页：同步时顺便拉一次阅读表格的列表（查重用）
   reading.want(view === "reading");
   if (view === "reading" && lastView !== "reading" && sync.configured()) sync.sync();
@@ -165,7 +173,10 @@ function draw() {
   const hadDock = document.body.classList.contains("has-dock");
   dock.innerHTML = dockHTML(c, view === "today" && shownDate() === c.today && (!phone || Boolean(store.local().url)), (t) => (store.isChore(t) ? choreDockHTML() : null));
   document.body.classList.toggle("has-dock", Boolean(dock.innerHTML));
+  document.body.classList.toggle("timing", Boolean(store.timer()));   // 地平线（白天的网点、夜里的霓虹网格地面）只在有任务正在计时的时候出现
   if (!hadDock) dock.firstElementChild?.classList.add("enter");   // 只在浮条刚出现时滑上来，重画时不闪
+  // 计时中边上那道光：重画一次浮条就是新的元素，按钟表接着原来的位置跑，不从头来（css 的 .dock.run::after，一圈 3.2 秒）
+  dock.firstElementChild?.style.setProperty("--trail-at", (-(performance.now() / 1000) % 3.2).toFixed(2) + "s");
   // 圆盘落着的时候坐在浮条上面
   document.body.style.setProperty("--dock-h", dock.firstElementChild ? dock.firstElementChild.offsetHeight + 22 + "px" : "0px");
   renderSun(c, view === "today" && (!phone || store.local().url) ? shownDate() : "");
@@ -194,8 +205,13 @@ function paintSync() {
     else el.textContent = text;
     el.closest(".sync-pill")?.setAttribute("title", text ? text + " — click to sync" : "Sync now");   // 侧栏收起时只剩图标，状态看这里
     el.closest(".sync-pill, .sync-status")?.classList.toggle("bad", bad);
+    // 正在同步：图标换成转着的小图（白天网点、夜里雷达），字上扫一道光；刚变成出错：整颗抖一下
+    const pill = el.closest(".sync-pill");
+    if (pill) { pill.classList.toggle("busy", text === "Syncing…"); if (bad && !wasBad) pill.classList.add("shk"); }
   });
+  wasBad = bad;
 }
+let wasBad = false;
 
 // 守住今天的线：一天只庆祝一次
 function celebrate(c, view) {
@@ -280,7 +296,7 @@ document.addEventListener("visibilitychange", () => {
 });
 addEventListener("online", () => syncThenLog());
 setInterval(() => { if (document.visibilityState === "visible") syncThenLog(); }, 120000);
-setInterval(tickDay, 60000);
+setInterval(() => { tickDay(); tintSky(); }, 60000);   // 天色跟着钟点慢慢变（js/day.js 的 skyAt）
 
 // 侧栏的 Today 永远是今天：日历里点过某一天、或在今天页往前翻过，从这里回来都从今天看起（已经在今天页上也照样翻回今天）
 on(document, "click", '#side a[href="#today"]', () => { showDate(store.today()); render(); });
@@ -294,6 +310,9 @@ on(document, "click", "[data-act=theme-flip]", () => {
   store.setLocal({ themeHold: { v: document.documentElement.dataset.theme === "dark" ? "light" : "dark", until: nextTurn() } });
   applyTheme();
 });
+// 点分段开关：这次重画算用户点的（选中的那块滑过去）；那个开关自己已经要了别的过渡的，不改它
+on(document, "click", "#main .seg > button", () => animateSoft());
+initEdgeGlow();
 on(document, "click", "[data-act=side-toggle]", () => store.setLocal({ sideMin: !store.local().sideMin }));
 
 // 装到主屏后没网也能打开（只在 https 上，也就是 GitHub Pages）

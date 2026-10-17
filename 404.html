@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>苦昼短 · 404</title>
+<meta name="theme-color" content="#FFFFFF">
+<script>
+// 第一笔就把白天 / 夜里画对，不等模块加载：夜里打开不闪一下白，手机顶上那一条取到的颜色也从一开始就对。
+// 规则同 js/day.js 的 lookAt（点过日月的管到下一个六点，别的看钟点：6 点到 18 点是白天），改那边要一起改
+(function () {
+  var now = new Date(), h = now.getHours(), look = h >= 6 && h < 18 ? "light" : "dark";
+  try {
+    var hold = ((JSON.parse(localStorage.getItem("kuzhouduan-v1")) || {}).local || {}).themeHold;
+    if (hold && (hold.v === "light" || hold.v === "dark") && now.getTime() < Number(hold.until)) look = hold.v;
+  } catch (e) { /* 存的东西读不出来：照钟点 */ }
+  document.documentElement.setAttribute("data-theme", look);
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", look === "dark" ? "#0C0C13" : "#FFFFFF");
+})();
+</script>
+<script>
+// 找不到的网址可能在好几层目录下面（/timebox/a/b）：所有相对地址都从应用的根算起
+(function () {
+  var b = document.createElement("base");
+  b.href = location.pathname.indexOf("/timebox/") === 0 ? "/timebox/" : "/";
+  document.head.appendChild(b);
+})();
+</script>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="css/app.css">
+<!-- 找不到页面（她 2026-10-17 挑的「飞光」丙一）：404 中间那个 0 就是应用里那颗日月，白天太阳、夜里月亮，照样两种转法、轻轻上下浮；
+     一句李贺《苦昼短》开头的「飞光飞光」，一个回今天的按钮。底图是同一片天（云 / 星星），颜色跟着钟点 -->
+<style>
+.nf { position: relative; min-height: 100vh; min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px 16px; text-align: center; }
+.nf-code { display: flex; align-items: center; gap: .06em; margin: 0 0 6px; font: 900 clamp(76px, 17vw, 136px)/1 var(--display); letter-spacing: -.03em; color: var(--ink); }
+[data-theme="dark"] .nf-code { font-family: var(--num); font-weight: 800; color: var(--accent); text-shadow: 0 0 22px rgba(204, 255, 0, .55); }
+/* 外面一层按字的实际高低挪正（脚本量出来的 --dy、--z），里面那颗自己上下浮 */
+.nf-o { display: block; width: var(--z, .72em); height: var(--z, .72em); transform: translateY(var(--dy, 0)); }
+.nf-o .ball { display: block; width: 100%; height: 100%; animation: nf-bob 3.6s ease-in-out infinite; }
+@keyframes nf-bob { 50% { transform: translateY(-.04em); } }
+.nf p { margin: 0; max-width: 34ch; font-size: 16px; font-weight: 600; line-height: 1.4; text-wrap: balance; }
+.nf small { color: var(--muted); font-size: 13px; }
+.nf .btn { margin-top: 6px; padding: 9px 18px; font-size: 14px; }
+</style>
+</head>
+<body>
+<main class="nf">
+  <h1 class="nf-code" aria-label="404"><span aria-hidden="true">4</span><span class="nf-o" aria-hidden="true"><span class="ball" id="nf-ball"></span></span><span aria-hidden="true">4</span></h1>
+  <p>Flying light, flying light — this page flew off.</p>
+  <small>after Li He, “The Bitter Shortness of Days”</small>
+  <a class="btn primary" href="./#today">Back to today</a>
+</main>
+<script type="module">
+import { skyAt } from "./js/day.js";
+const dark = document.documentElement.dataset.theme === "dark", R = Math.random;
+
+// 那颗日月：同 js/ui/common.js 的 BALL（镜面球的细格：纬线不动，经线一条条扫过去）
+const RAD = Math.PI / 180;
+document.getElementById("nf-ball").innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true"><g class="ball-grid">' +
+  [-67.5, -45, -22.5, 0, 22.5, 45, 67.5].map((f) => { const y = 50 + 50 * Math.sin(f * RAD), w = 50 * Math.cos(f * RAD); return '<path d="M' + (50 - w).toFixed(1) + " " + y.toFixed(1) + "H" + (50 + w).toFixed(1) + '"/>'; }).join("") +
+  Array.from({ length: 8 }, (_, k) => -90 + k * 22.5).map((t) => '<path class="ball-lon" style="--a:' + Math.sin(t * RAD).toFixed(3) + ";--b:" + Math.sin((t + 22.5) * RAD).toFixed(3) + '" d="M50 0A50 50 0 0 1 50 100"/>').join("") +
+  '</g><circle class="ball-shine" cx="33" cy="30" r="9"/></svg>';
+
+// 同一片天：白天的云是 css 画的，夜里撒一把星星；颜色跟着钟点
+const sky = document.createElement("div");
+sky.id = "sky";
+sky.setAttribute("aria-hidden", "true");
+let near = "";
+for (let i = 0; i < 40; i++) { const z = (0.9 + R() * 0.5).toFixed(2); near += '<b style="left:' + (R() * 100).toFixed(2) + "%;top:" + (R() * 96).toFixed(2) + "%;width:" + z + "px;height:" + z + "px;--d:" + (3 + R() * 6).toFixed(1) + "s;--dl:-" + (R() * 9).toFixed(1) + 's"></b>'; }
+sky.innerHTML = '<i class="cloud"></i><i class="st-near">' + near + "</i>";
+document.body.prepend(sky);
+const t = skyAt(dark);
+for (const [k, v] of [["top", t.top], ["mid", t.mid], ["hor", t.hor], ["pk", t.pink], ["bl", t.blue], ["stars", t.stars]]) sky.style.setProperty("--sk-" + k, v);
+
+// 对齐：那颗球要和两边的 4 一样高、上下居中。字在框里的位置每种字体不一样，用 canvas 量出「4」实际画出来的上下边，
+// 球的大小 = 字的高度，再把它挪到字的正中（字体还没到就先用默认的 0.72em）
+const align = () => {
+  const four = document.querySelector(".nf-code span"), cs = getComputedStyle(four), size = parseFloat(cs.fontSize);
+  const c = document.createElement("canvas").getContext("2d");
+  c.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+  const m = c.measureText("4"), fa = m.fontBoundingBoxAscent, fd = m.fontBoundingBoxDescent, aa = m.actualBoundingBoxAscent, ad = m.actualBoundingBoxDescent;
+  if (!fa || !aa) return;
+  const glyphMid = (size - (fa + fd)) / 2 + fa - (aa - ad) / 2;   // 行高 1：基线在 半行距 + 字体上沿 处
+  const o = document.querySelector(".nf-o");
+  o.style.setProperty("--z", (aa + ad).toFixed(1) + "px");
+  o.style.setProperty("--dy", (glyphMid - size / 2).toFixed(1) + "px");
+};
+align();
+document.fonts?.ready.then(align);
+addEventListener("resize", align);
+</script>
+</body>
+</html>

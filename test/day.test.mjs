@@ -187,3 +187,24 @@ test("the first-paint script in index.html follows the same rule", async () => {
   assert.equal(run(null, at(21), "not json"), "dark #0C0C13", "unreadable storage falls back to the clock");
   assert.equal(run(null, at(9), null), "light #FFFFFF", "nothing saved yet");
 });
+
+test("the 404 page paints day or night with the very same first-paint script", async () => {
+  const fs = await import("node:fs");
+  const first = (f) => fs.readFileSync(new URL("../" + f, import.meta.url), "utf8").match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(first("404.html"), "the 404 page has the script");
+  assert.equal(first("404.html"), first("index.html"));
+});
+
+test("the sky's colour follows the clock: warm mornings, pink evenings, a purple dusk, the deepest dark after midnight, teal before dawn", () => {
+  assert.deepEqual(D.skyAt(false, at(12)), { top: "#E9F3FF", mid: "#FAFCFF", hor: "#EEFFB8", pink: 0.2, blue: 0.15, stars: 0 }, "midday is the usual sky");
+  assert.equal(D.skyAt(false, at(6)).top, "#FFE6D8", "six in the morning: apricot");
+  const half = D.skyAt(false, at(7, 30));
+  assert.ok(half.top !== "#FFE6D8" && half.top !== "#E9F3FF" && /^#[0-9A-F]{6}$/.test(half.top), "between dawn and nine it's in between: " + half.top);
+  assert.equal(D.skyAt(false, at(17, 59)).pink > 0.35, true, "late afternoon is pinker");
+  assert.deepEqual(D.skyAt(true, at(18)), { top: "#121130", mid: "#19103A", hor: "#3A1244", pink: 0, blue: 0, stars: 0.25 }, "dusk: purple, a rose horizon, few stars yet");
+  assert.equal(D.skyAt(true, at(1)).top, "#07070B", "after midnight: as dark as it gets");
+  assert.equal(D.skyAt(true, at(1)).stars, 1);
+  assert.equal(D.skyAt(true, at(5)).hor, "#123040", "five in the morning: the horizon turns teal");
+  assert.equal(D.skyAt(false, at(22)).top, "#E9F3FF", "flipped to day at night: the midday sky");
+  assert.equal(D.skyAt(true, at(10)).top, "#07070B", "flipped to night in the day: the deep night sky");
+});

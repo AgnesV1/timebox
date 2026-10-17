@@ -2,32 +2,29 @@
 //   飞机，3–5 分钟一趟：白天是高空的一个小点拖两道长尾迹；夜里是红眼航班——一闪一闪的红灯加一颗小白灯
 //   潮水，6–10 分钟一次：又宽又矮的一片水贴着底边从右下角斜着滑进来、再退回去，一次两道；夜里是荧光海
 //   少见的那样，10–15 分钟一次：白天按季节飘东西（春嫩叶、夏康乃馨、秋枫叶、冬雪花，有风时一两片会打个小旋）；夜里一阵流星雨
-// 一次只放一样：轮到时还有东西没走完，就等它走完再隔一分钟。
-// 平时只挂一个定时器，没有常驻的动画；东西只动 transform / opacity，放完就拿掉。
+//   更少见的天象，15–30 分钟一次：白天一小段彩虹从底边的左下或右下角立起来，夜里一小片极光从顶边垂下来——位置、大小每次都随机
+// 各管各的（2026-10-17 她说的「随机性的美」）：每样按自己的节奏来，撞上了就一起出现，不再一次只放一样。
+// 平时只挂一个定时器，没有常驻的动画；东西只动 transform / opacity，放完就拿掉（极光那一会儿用 rAF 让光帘起伏，放完就停）。
 // 不放：页面在后台、系统要求减少动态、设置里关了动效。手机上只有潮水（手机的任务是直接铺在底色上的，天上那几样会搅在字里）。
 
 // ---------- 排班（只算数，test/sky.test.mjs） ----------
 
-export const GAPS = { plane: [180, 300], tide: [360, 600], rare: [600, 900] };   // 两趟之间隔多久（秒）
-export const FIRST = { plane: [20, 60], tide: [60, 180] };                        // 刚打开时第一趟来得早一点：看一两分钟就走的人也见得到
-export const QUIET = 60;
-export const ORDER = ["rare", "tide", "plane"];   // 几样同时到点：少见的先放
+export const GAPS = { plane: [180, 300], tide: [360, 600], rare: [600, 900], sky: [900, 1800] };   // 两趟之间隔多久（秒）
+// 刚打开时第一趟来得早一点：看一两分钟就走的人也见得到飞机和潮水；少见的、更少见的照常排
+export const FIRST = { plane: [20, 60], tide: [60, 180], rare: GAPS.rare, sky: GAPS.sky };
+export const ORDER = ["sky", "rare", "tide", "plane"];
 const between = ([a, b], rnd) => (a + (b - a) * rnd()) * 1000;
 
-export const firstDue = (now, rnd = Math.random) => ({ plane: now + between(FIRST.plane, rnd), tide: now + between(FIRST.tide, rnd), rare: now + between(GAPS.rare, rnd) });
+export const firstDue = (now, rnd = Math.random) => Object.fromEntries(ORDER.map((k) => [k, now + between(FIRST[k], rnd)]));
 
-// 现在该不该放、放哪样 → { kind: "plane" | "tide" | "rare" | "", due, wait }
-//   kind 为空 = 现在不放，wait 毫秒后再来看；放了哪样，返回的 due 里那样已经排到下一趟
-//   clearAt = 上一样什么时候走完（没有 = 0）：没走完、或走完还不到一分钟，都先等
+// 现在到点了哪几样 → { kinds, due, wait }：到点的全放（撞在一起就一起出现），各自排到下一趟；wait = 离最近的那一样还有多久
 //   can = 现在能放的那几样（手机上只有潮水）：不在里面的不放、也不动它排的时间
-export function turn(now, due, clearAt, rnd = Math.random, can = ORDER) {
-  const kinds = ORDER.filter((k) => can.includes(k));
-  if (!kinds.length) return { kind: "", due, wait: 60000 };
-  const kind = kinds.find((k) => due[k] <= now);
-  if (!kind) return { kind: "", due, wait: Math.min(...kinds.map((k) => due[k])) - now };
-  const free = clearAt ? clearAt + QUIET * 1000 : 0;
-  if (now < free) return { kind: "", due, wait: free - now };
-  return { kind, due: { ...due, [kind]: now + between(GAPS[kind], rnd) }, wait: 0 };
+export function turn(now, due, rnd = Math.random, can = ORDER) {
+  const live = ORDER.filter((k) => can.includes(k));
+  if (!live.length) return { kinds: [], due, wait: 60000 };
+  const kinds = live.filter((k) => due[k] <= now), next = { ...due };
+  for (const k of kinds) next[k] = now + between(GAPS[k], rnd);
+  return { kinds, due: next, wait: Math.min(...live.map((k) => next[k])) - now };
 }
 
 // 几月飘什么（月份 1–12，用这台设备的当地日期）
@@ -38,11 +35,11 @@ export const seasonOf = (month) => (month >= 3 && month <= 4 ? "spring" : month 
 const reduce = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
 const R = Math.random;
 const pick = ([a, b]) => a + (b - a) * R();
-let host = null, timer = 0, due = null, clearAt = 0, enabled = true, serial = 0;
+let host = null, timer = 0, due = null, enabled = true, serial = 0;
 
 const night = () => document.documentElement.dataset.theme === "dark";
 const phone = () => document.body.classList.contains("phone");
-const can = () => (phone() ? ["tide"] : ORDER);
+const can = () => (phone() ? ["tide"] : ORDER);   // 手机上只有潮水（任务行直接铺在底图上，别的会搅在字里）
 const allowed = () => enabled && !reduce.matches && document.visibilityState === "visible";
 const nextIn = () => Math.min(...can().map((k) => due[k])) - Date.now();
 
@@ -184,21 +181,78 @@ function tide(dark) {
   return wash(dark, 76, h * 0.78, 5600);
 }
 
+// ---------- 彩虹（白天）、极光（夜里）：只占一个角，淡淡的，位置每次随机 ----------
+// 看得见的那片天 = 侧栏右边到屏幕右边（侧栏是半透明的，铺到它后面会搅在字里）
+const skyLeft = () => (document.body.classList.contains("side-min") ? 54 : 196);
+
+// 彩虹：总是从底边立起来，只露出一小段——随机在左下或右下角，弧的大小、圆心往屏幕外偏多少都随机（有时只露一条腿，有时露出弧顶）。
+// 颜色是青柠粉蓝那一套：最里蓝、往外青、青柠、黄、最外玫红，虹里面的天亮一点；藏在云后面（插在云那层之前）。约 35 秒：慢慢浮出来、待一会儿、慢慢淡掉
+function bow() {
+  const W = innerWidth, H = innerHeight, L = skyLeft(), r = Math.max(180, Math.min(380, H * (0.3 + R() * 0.15))), right = R() < 0.5;
+  // 圆心放在角落附近：弧顶落在看得见的那片天里，靠边的那条腿出了屏幕（或藏到侧栏后面）；从底边露出来的大概是屏高的两三成
+  const cx = right ? W - r * (0.1 + R() * 0.4) : L + r * (0.35 + R() * 0.4), cy = H + r * (0.2 + R() * 0.25), out = r + 8;
+  const el = document.createElement("span");
+  el.className = "sky-ev sky-bow";
+  const top = cy - out, h = H - top, u = r * 0.14 / 33, at = (k) => (r - k * u).toFixed(0) + "px";   // 七道颜色的宽窄跟着弧的大小
+  el.style.cssText = "left:" + (cx - out).toFixed(0) + "px;top:" + top.toFixed(0) + "px;width:" + (2 * out).toFixed(0) + "px;height:" + h.toFixed(0) + "px;" +
+    "background:radial-gradient(circle at 50% " + out.toFixed(0) + "px,transparent 0 " + at(33) + ",rgba(255,255,255,.22) " + at(30) + " " + at(21) + "," +
+    "rgba(47,91,255,.26) " + at(18) + ",rgba(0,190,255,.26) " + at(15) + ",rgba(198,255,0,.46) " + at(11) + ",rgba(255,206,0,.34) " + at(7) + ",rgba(255,62,165,.32) " + at(3) + ",rgba(255,62,165,0) " + at(-2) + ")";
+  host.insertBefore(el, host.firstChild);
+  const ms = 35000;
+  el.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }], { duration: ms, easing: "ease-in-out" }).onfinish = () => el.remove();
+  return ms;
+}
+
+// 极光：总是从顶边垂下来一小片光帘——沿着顶边随机放在某处，宽度是那片天的四分之一到三分之一。一根根竖着的光，下沿青柠最亮、往上变青变紫；
+// 光帘整条慢慢起伏、每根各自忽明忽暗（rAF，放完就停）。约 40 秒
+function aurora() {
+  const W = innerWidth, H = innerHeight, L = skyLeft(), w = (W - L) * (0.25 + R() * 0.1), x = L + R() * (W - L - w), h = Math.min(260, H * 0.34);
+  const el = document.createElement("span");
+  el.className = "sky-ev sky-aurora";
+  el.style.cssText = "left:" + x.toFixed(0) + "px;top:0;width:" + w.toFixed(0) + "px;height:" + h.toFixed(0) + "px";
+  const rays = [];
+  // 前后两排：前排亮、长，后排淡、短一点、挂得低一点，叠出层次
+  [[34, 1, 2.6, 0.55], [26, 0.5, 2, 0.4]].forEach(([n, op, width, tall], back) => {
+    for (let i = 0; i < n; i++) {
+      const ray = document.createElement("i"), at = i / n;
+      ray.style.cssText = "left:" + (at * 100 - 2).toFixed(1) + "%;width:" + width + "%;height:" + (h * (tall + R() * 0.28)).toFixed(0) + "px";
+      el.appendChild(ray);
+      rays.push({ ray, at, op, back, ph: R() * 6.28, top: back ? h * 0.1 : -h * 0.03 });
+    }
+  });
+  host.appendChild(el);
+  const ms = 40000, t0 = performance.now();
+  const wave = (now) => {
+    if (!el.isConnected) return;
+    const t = (now - t0) / 1000;
+    for (const o of rays) {
+      const y = o.top + 12 * Math.sin(o.at * 4 + t * 0.35 + o.back) + 5 * Math.sin(o.at * 9 - t * 0.6);
+      o.ray.style.transform = "translateY(" + y.toFixed(1) + "px)";
+      o.ray.style.opacity = (o.op * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(o.at * 16 + t * 1.5 + o.ph)))).toFixed(2);
+    }
+    requestAnimationFrame(wave);
+  };
+  requestAnimationFrame(wave);
+  el.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 1, offset: 0.72 }, { opacity: 0 }], { duration: ms, easing: "ease-in-out" }).onfinish = () => el.remove();
+  return ms;
+}
+
 const SHOWS = {
   plane: () => cross("sky-plane", '<span class="sky-trails"><b></b><b></b></span><span class="sky-dot"></span>', 45),
   redeye: () => cross("sky-redeye", '<span class="sky-red"></span><span class="sky-white"></span>', 38),
-  fall, meteors,
+  fall, meteors, bow, aurora,
   tide: (how) => tide(how ? how === "night" : night())
 };
 
 // 放一样，返回要多久。平时由下面的 tick 挑；预览里也可以手动叫它看样子：
-//   show("plane") / show("redeye") / show("meteors") / show("fall", "spring" | "summer" | "autumn" | "winter") / show("tide", "day" | "night")
+//   show("plane") / show("redeye") / show("meteors") / show("fall", "spring" | "summer" | "autumn" | "winter") / show("tide", "day" | "night") / show("bow") / show("aurora")
 export function show(kind, how) {
   if (!host || !SHOWS[kind]) return 0;
-  const ms = SHOWS[kind](how);
-  clearAt = Date.now() + ms;
-  return ms;
+  return SHOWS[kind](how);
 }
+
+// 排班里的四样 → 这会儿该放的那一个（白天夜里不一样）
+const SHOW_OF = { plane: () => (night() ? "redeye" : "plane"), tide: () => "tide", rare: () => (night() ? "meteors" : "fall"), sky: () => (night() ? "aurora" : "bow") };
 
 function arm(ms) {
   clearTimeout(timer);
@@ -207,17 +261,16 @@ function arm(ms) {
 
 function tick() {
   if (!allowed()) { if (enabled && document.visibilityState === "visible") arm(60000); return; }   // 系统要求减少动态：一分钟后再看一眼
-  const t = turn(Date.now(), due, clearAt, R, can());
+  const t = turn(Date.now(), due, R, can());
   due = t.due;
-  if (t.kind) show(t.kind === "tide" ? "tide" : t.kind === "plane" ? (night() ? "redeye" : "plane") : night() ? "meteors" : "fall");
-  arm(t.kind ? nextIn() : t.wait);
+  for (const k of t.kinds) show(SHOW_OF[k]());
+  arm(t.wait);
 }
 
 // 正在放的那样直接拿掉（换了白天 / 夜里、关了动效）
 export function clearSky() {
   if (!host) return;
   host.querySelectorAll(".sky-ev").forEach((el) => el.remove());
-  if (clearAt > Date.now()) clearAt = Date.now();
 }
 
 // 设置里的 Sparkles and confetti：关了就不放，正在放的也拿掉

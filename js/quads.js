@@ -1,6 +1,6 @@
 // 今天页的四象限便签（电脑）：只算数，不碰页面和存储（存储在 js/store/quads.js，页面在 js/ui/quads.js）。
 // 四格：do = 紧急又重要（左上）、plan = 重要不紧急（右上）、quick = 紧急不重要（左下）、drop = 都不紧急也不重要（右下）。
-// 一张便签 = { id, text, q, order, done }：order 只在同一格里比大小；done = 打勾那天的日期，第二天起不显示，之后删掉。
+// 一张便签 = { id, text, q, order, done }：order 只在同一格里比大小；done = 打过勾（划掉，一直留着）。
 
 export const QS = ["do", "plan", "quick", "drop"];
 export const MAX = 120;   // 一张最多几个字
@@ -11,16 +11,13 @@ export const clean = (text) => String(text || "").replace(/\s+/g, " ").trim().sl
 const num = (n) => Number(n.order) || 0;
 const byOrder = (a, b) => num(a) - num(b) || String(a.id).localeCompare(String(b.id));
 
-// 四格各自排好的便签；今天以前打过勾的不算
-export function board(list, today) {
+// 四格各自排好的便签
+export function board(list) {
   const out = Object.fromEntries(QS.map((q) => [q, []]));
-  for (const n of list) if (!n.done || n.done >= today) out[qOf(n.q)].push(n);
+  for (const n of list) out[qOf(n.q)].push(n);
   for (const q of QS) out[q].sort(byOrder);
   return out;
 }
-
-// 打勾满一天的：可以删了
-export const stale = (list, today) => list.filter((n) => n.done && n.done < today);
 
 // 把 id 放进这一格、排在 before 前面（before 空 = 放到最后）→ 要改哪几张的 order：[{ id, order }]。
 // 一般只改它自己（取前后两张中间的数，同步时只推这一行）；前后两张挨得分不开了，就整格重新编号

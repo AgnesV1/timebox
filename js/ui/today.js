@@ -305,7 +305,7 @@ export function todayHTML(c, phone) {
   return '<div class="dayview" data-date="' + d + '">' +
     '<header class="page-head"><div><h2>' + fmtDay(d) + " <small>" + (isToday ? "Today" : d < store.today() ? "Looking back" : "Looking ahead") + "</small></h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="day-prev" aria-label="Previous day">' + icon("left") + '</button><button type="button" class="nav" data-act="day-today">Today</button><button type="button" class="nav" data-act="day-next" aria-label="Next day">' + icon("right") + "</button></div></header>" +
-    '<div class="today-grid"><div class="today-col"><div class="today-main">' + x.strip + x.list + x.add + "</div>" + (isToday ? quadHTML() : "") + "</div>" +
+    '<div class="today-grid"><div class="today-col"><div class="today-main">' + x.strip + x.list + x.add + "</div>" + quadHTML() + "</div>" +
     '<div class="today-side">' + x.hero + x.bill + x.notices + x.overdue + "</div>" + x.score + "</div></div>";
 }
 

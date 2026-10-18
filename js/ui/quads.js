@@ -1,7 +1,7 @@
-// 今天页的四象限便签（电脑，只在看今天的时候；画在左边任务卡片下面，见 js/ui/today.js）：
+// 今天页的四象限便签（电脑；画在左边任务卡片下面，翻到哪天都是同一块，见 js/ui/today.js）：
 // 紧急 / 不紧急 × 重要 / 不重要，四格里贴几张便签，拖来拖去。样子和日历的便签一样（纸、顶上一道胶条），只用一种纸色；
-// 字跟着格子变（css 里按 data-q）：左上粗体、右上正常、左下细体、右下斜体。数据在 js/store/quads.js。
-// 拖、写、打勾、删：这里先把页面挪好再存（store 那边不整页重画），动画才接得上——
+// 字跟着格子变（css 里按 data-q）：左上粗体、右上正常、左下细体、右下斜体。数据只存在这台电脑上（js/store/quads.js）。
+// 拖、写、打勾、删：这里先把页面挪好再存（存的时候不整页重画），动画才接得上——
 //   拿起：原位留一个虚线空位，纸浮起来跟着鼠标，有一点弹簧的滞后，往哪边甩就往哪边歪；
 //   经过的那一格亮起来，空位挪到要落的地方，别的纸让开；松手：纸飞进空位、摆正，胶条按一下；拖到窗外松手 = 飞回原处。
 // 点一下便签 = 改字（回车存、Esc 不改），右边出现 ✓ 和删除；每格底下的 + 新写一张，回车接着写下一张，Esc 收起。
@@ -10,6 +10,7 @@
 import * as store from "../store.js";
 import * as Q from "../quads.js";
 import { esc, on, icon } from "../dom.js";
+import { toast } from "./common.js";
 
 const SPRING = "linear(0, .035, .121, .233, .354, .473, .582, .679, .761, .829, .883, .924, .956, .979, .994, 1.005, 1.011, 1.014, 1.015, 1.015, 1.014, 1.012, 1.01, 1.008, 1.007, 1.005, 1.004, 1.003, 1)";   // 同 css 的 --spring
 const POP = "linear(0, .053, .183, .351, .527, .693, .833, .944, 1.024, 1.074, 1.101, 1.108, 1.103, 1.089, 1.071, 1.051, 1.033, 1.018, 1.006, .998, .992, .989, .988, .989, .99, .992, .994, .996, 1)";   // 同 css 的 --spring-pop
@@ -21,6 +22,7 @@ let adding = "";    // 哪一格开着「新写一张」
 let editing = "";   // 正在改字的那一张
 let hold = null;    // 正拖着 / 正落下的那张 { id, h }：重画时画成一样高的空位
 let drag = null;
+let rerender = () => {};
 
 const root = () => document.querySelector("#main .qd");
 const cellOf = (q) => root()?.querySelector('.qd-q[data-q="' + q + '"]') || null;
@@ -290,7 +292,8 @@ function remove(id) {
   el.style.width = r.width + "px";
   el.style.translate = r.left + "px " + r.top + "px";
   flip(snap);
-  store.deleteQuad(id);
+  const gone = store.deleteQuad(id);
+  toast("Note removed", () => { store.restoreQuad(gone); rerender(); });
   const fall = el.animate([{ opacity: 1, rotate: "0deg", translate: r.left + "px " + r.top + "px" }, { opacity: 0, rotate: "9deg", translate: r.left + 10 + "px " + (r.top + 28) + "px" }],
     { duration: reduce.matches ? 1 : 340, easing: "cubic-bezier(.5, 0, .8, .3)" });
   fall.onfinish = () => el.remove();
@@ -325,7 +328,8 @@ function closeAdd() {
 
 // ---------- 接上 ----------
 
-export function initQuads() {
+export function initQuads(render) {
+  rerender = render;
   document.addEventListener("pointerdown", (e) => {
     const el = e.target.closest?.(".qd .qd-note");
     if (!el || e.button > 0 || e.pointerType === "touch" || drag || hold || el.classList.contains("open") || e.target.closest("button, textarea, input")) return;

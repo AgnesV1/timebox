@@ -264,10 +264,10 @@ body.side-min .sync-pill span { display: none; }
 /* 每天的打分（js/ui/scores.js）：电脑上排在右栏、汇总那块下面；窄了（右栏挪到最上面）就排到清单后面。不套框，靠留白分组：
    一块 = 上面名字、意思、只有下划线的数字格（灰字是平常的范围），下面几档（只有字，选中的铺青柠）；底下一格 note */
 .today-grid { grid-template-rows: auto 1fr; }
-.today-main { grid-column: 1; grid-row: 1 / span 2; }
+.today-col { grid-column: 1; grid-row: 1 / span 2; display: grid; gap: 18px; align-content: start; min-width: 0; }
 .today-side { grid-column: 2; grid-row: 1; }
 .dsc { grid-column: 2; grid-row: 2; display: grid; gap: 1px; align-content: start; }
-@media (max-width: 1100px) { .today-grid { grid-template-rows: none; } .today-main, .today-side, .dsc { grid-column: auto; grid-row: auto; } }
+@media (max-width: 1100px) { .today-grid { grid-template-rows: none; } .today-col, .today-side, .dsc { grid-column: auto; grid-row: auto; } }
 .dsc-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .dsc-head b { font-size: 13px; letter-spacing: 0; color: var(--ink); }
 [data-theme="dark"] .dsc-head b { color: var(--accent); text-shadow: var(--glow); }
@@ -295,6 +295,65 @@ body.side-min .sync-pill span { display: none; }
 .dsc-sum i { font-style: normal; color: var(--muted); }
 .dsc-sumnote { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
 .dsc .link { justify-self: start; margin-top: 6px; font-size: 12.5px; }
+
+/* ---------- 今天页的四象限便签（js/ui/quads.js；只电脑、只在看今天的时候，在任务卡片正下方） ----------
+   一块软底（和 Stats 的软板一样，不描边不投影），一道细十字分四格：左右 = 紧急 / 不紧急，上下 = 重要 / 不重要。
+   格子里的便签和日历的一个样子（纸、顶上胶条、纸边的影子），只用一种纸色（赭黄，和按项目上色的任务分开）。
+   字跟着格子变（她挑的）：左上粗体、右上正常、左下细体（急但不值得多花注意力）、右下斜体。 */
+@property --qd-glue { syntax: "<percentage>"; inherits: true; initial-value: 75%; }
+.qd { --qd-line: rgba(11, 11, 11, .12); display: grid; grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(104px, 1fr) minmax(104px, 1fr);
+  padding: 10px 10px 10px 4px; border-radius: var(--r); background: var(--card); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); }
+[data-theme="dark"] .qd { --qd-line: var(--edge); }
+.qd-ax { padding: 0 0 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; text-align: center; white-space: nowrap; color: var(--muted); }
+.qd-v { padding: 0 0 0 6px; writing-mode: vertical-rl; rotate: 180deg; }
+.qd-q { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); align-content: start; gap: 5px; min-width: 0; padding: 8px 8px 32px; }
+.qd-q[data-q="do"], .qd-q[data-q="quick"] { border-right: 1px solid var(--qd-line); }
+.qd-q[data-q="do"], .qd-q[data-q="plan"] { border-bottom: 1px solid var(--qd-line); }
+/* 拖着经过的那一格亮起来（和日历格子接得住时一样：白天青柠淡底 + 黑边，夜里青柠淡底 + 霓虹边） */
+.qd-q::before { content: ""; position: absolute; inset: 3px; border-radius: 10px; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.qd-q.on::before { opacity: 1; background: #F4FFD6; box-shadow: inset 0 0 0 2px var(--edge); }
+[data-theme="dark"] .qd-q.on::before { background: rgba(204, 255, 0, .08); box-shadow: inset 0 0 0 1px var(--accent), 0 0 18px rgba(204, 255, 0, .12); }
+.qd-q > * { position: relative; }
+/* 每格底下的 +：和日历格子的一样，鼠标移上来才出现；空着的格子淡淡露着 */
+.qd-q > .qd-plus { position: absolute; left: 8px; right: 8px; bottom: 6px; display: grid; place-items: center; height: 20px; padding: 0; border: 1px dashed transparent; border-radius: 8px;
+  background: none; color: var(--muted); opacity: 0; transition: opacity .15s; }
+.qd-q:not(:has(> .qd-note)) > .qd-plus { opacity: .45; }
+.qd-q:hover > .qd-plus, .qd-q > .qd-plus:focus-visible { opacity: 1; border-color: var(--line); }
+.qd-q.adding > .qd-plus, body.dragging .qd-plus { visibility: hidden; }
+.qd-plus .ic { width: 14px; height: 14px; }
+.qd-addf { grid-column: 1 / -1; }
+.qd-addf input { width: 100%; padding: 5px 7px; font-size: 12px; border: var(--b-ctl); border-radius: 8px; }
+.qd-ph { border: 1.5px dashed rgba(11, 11, 11, .3); background: rgba(11, 11, 11, .03); }
+[data-theme="dark"] .qd-ph { border-color: rgba(204, 255, 0, .45); background: rgba(204, 255, 0, .04); }
+/* 便签：拿起来（.lift）放大一点，白天一道硬投影、夜里按纸色发光；落下时胶条深一下（.press）；打勾 = 一道横线从左往右划过去、纸淡下去 */
+.qd-note { --c: #D2A52E; --paper: #FFFEF2; position: relative; display: flex; align-items: flex-start; gap: 4px; min-width: 0; padding: 6px 6px 4px;
+  background: color-mix(in srgb, var(--c) 28%, var(--paper));
+  box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) var(--qd-glue), var(--paper)), 0 1px 1px rgba(11, 11, 11, .06), 0 5px 6px -5px rgba(11, 11, 11, .35);
+  font-size: 11.5px; line-height: 1.3; cursor: grab; transform-origin: 50% 0; transition: --qd-glue .25s, box-shadow .2s, opacity .3s, scale .32s var(--spring-pop), font-weight .25s; }
+.qd-note:hover { background: color-mix(in srgb, var(--c) 38%, var(--paper)); }
+[data-theme="dark"] .qd-note { --paper: #0C0C13; background: color-mix(in srgb, var(--c) 22%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) var(--qd-glue), var(--paper)); }
+[data-theme="dark"] .qd-note:hover { background: color-mix(in srgb, var(--c) 32%, var(--paper)); }
+.qd-note[data-q="do"] { font-weight: 700; }
+.qd-note[data-q="quick"] { font-weight: 300; }
+.qd-note[data-q="drop"] { font-style: italic; }
+.qd-t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.qd-tx { background: linear-gradient(currentColor, currentColor) 0 62% / 0 1.2px no-repeat; -webkit-box-decoration-break: clone; box-decoration-break: clone; transition: background-size .38s cubic-bezier(.6, 0, .3, 1); }
+.qd-note.done { opacity: .5; }
+.qd-note.done .qd-tx { background-size: 100% 1.2px; }
+.qd-note.qd-fly { position: fixed; top: 0; left: 0; z-index: 100; margin: 0; pointer-events: none; }
+.qd-note.lift { scale: 1.06; box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) var(--qd-glue), var(--paper)), 3px 3px 0 var(--edge); }
+[data-theme="dark"] .qd-note.lift { box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) var(--qd-glue), var(--paper)), 0 0 0 1px color-mix(in srgb, var(--c) 70%, #fff), 0 0 22px color-mix(in srgb, var(--c) 50%, transparent); }
+.qd-note.press { --qd-glue: 100%; }
+[data-theme="dark"] .qd-note.press { box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) var(--qd-glue), var(--paper)), 0 0 0 1px color-mix(in srgb, var(--c) 70%, #fff), 0 0 14px color-mix(in srgb, var(--c) 45%, transparent); }
+/* 点开改字：一圈边（白天墨色、夜里青柠），右边 ✓ 和删除 */
+.qd-note.open { cursor: text; box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) var(--qd-glue), var(--paper)), 0 0 0 1.5px var(--edge); }
+[data-theme="dark"] .qd-note.open { box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) var(--qd-glue), var(--paper)), 0 0 0 1px var(--accent); }
+.qd-note .qd-edit { flex: 1; min-width: 0; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; line-height: inherit; color: inherit; resize: none; overflow: hidden; field-sizing: content; }
+.qd-note .qd-edit:focus { box-shadow: none; }
+.qd-acts { display: flex; gap: 1px; margin: -3px -4px -2px 0; }
+.qd-acts button { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: none; color: inherit; }
+.qd-acts button:hover { background: var(--tonal); }
+.qd-acts .ic { width: 14px; height: 14px; }
 
 /* 手机顶栏：吸顶毛玻璃，底下一条豹纹胶带。
    状态栏 / 灵动岛底下那一截（页面画到屏幕最顶上时才有，高 = --top）是实心的背景色，不透、不叠纹理：那一条要和背景完全一个颜色 */
@@ -494,13 +553,13 @@ body.side-min .sync-pill span { display: none; }
 .load i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--hot)); }
 [data-theme="dark"] .load i { background: linear-gradient(90deg, #00E5FF, #CCFF00); }
 .ln { font-size: 10.5px; font-weight: 600; color: var(--muted); }
-/* 日历上的任务 = 一张张便利贴：直角，纸按项目的颜色染淡，顶上一道深一点的同色胶条（分得清上一张下一张），
+/* 日历上的任务 = 一张张便利贴：直角，纸按项目的颜色染淡，顶上一道细细的、深一点的同色胶条（1.5px，分得清上一张下一张），
    底边一点点纸的阴影（夜里是染了色的暗纸，只留胶条不要阴影）；不写时长（一天合计多少在格子头上） */
-.ev { --paper: #FFFEF2; position: relative; display: flex; align-items: flex-start; gap: 4px; padding: 6px 6px 4px; border-radius: 0; background: color-mix(in srgb, var(--c) 28%, var(--paper)); box-shadow: inset 0 3px 0 color-mix(in srgb, var(--c) 75%, var(--paper)), 0 1px 1px rgba(11, 11, 11, .06), 0 5px 6px -5px rgba(11, 11, 11, .35); font-size: 11.5px; line-height: 1.3; cursor: grab; }
+.ev { --paper: #FFFEF2; position: relative; display: flex; align-items: flex-start; gap: 4px; padding: 6px 6px 4px; border-radius: 0; background: color-mix(in srgb, var(--c) 28%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) 75%, var(--paper)), 0 1px 1px rgba(11, 11, 11, .06), 0 5px 6px -5px rgba(11, 11, 11, .35); font-size: 11.5px; line-height: 1.3; cursor: grab; }
 .ev .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .ev .m { display: none; }
 .ev:hover { background: color-mix(in srgb, var(--c) 38%, var(--paper)); }
-[data-theme="dark"] .ev { --paper: #0C0C13; background: color-mix(in srgb, var(--c) 22%, var(--paper)); box-shadow: inset 0 3px 0 color-mix(in srgb, var(--c) 75%, var(--paper)); }
+[data-theme="dark"] .ev { --paper: #0C0C13; background: color-mix(in srgb, var(--c) 22%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) 75%, var(--paper)); }
 [data-theme="dark"] .ev:hover { background: color-mix(in srgb, var(--c) 32%, var(--paper)); }
 .ev.st-done { opacity: .5; }
 .ev.st-done .t, .ev.st-drop .t { text-decoration: line-through; }

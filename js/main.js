@@ -23,6 +23,7 @@ import { statsHTML, initStats } from "./ui/stats.js";
 import { dockHTML, initTimer, tick } from "./ui/timer.js";
 import { choreDockHTML, initChores } from "./ui/chores.js";
 import { initScores } from "./ui/scores.js";
+import { initQuads } from "./ui/quads.js";
 import { readingHTML, initReading } from "./ui/reading.js";
 import { mealsHTML, shopHTML, initMeals, refreshMealEditor, mealDrop } from "./ui/meals.js";
 import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/friends.js";
@@ -270,13 +271,14 @@ initStats(render);
 initTimer(render);
 initChores(render);
 initScores(render);
+initQuads();
 initReading(render);
 initMeals(render);
 initFriends(render);
 initSun();
 
 store.subscribe((meta) => {
-  if (meta.pulled) { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); }
+  if (meta.pulled) { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); store.settleQuads(); }
   if (meta.local) setFx(store.local().fx !== false);
   if (!meta.quiet) render();
   else paintSync();
@@ -321,5 +323,5 @@ if ("serviceWorker" in navigator && location.protocol === "https:") navigator.se
 render();
 // 早上的线要等表格里的数据拉下来再拍；连不上就 6 秒后用本机的
 if (sync.configured()) await Promise.race([syncThenLog(), new Promise((r) => setTimeout(r, 6000))]);
-else { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); }
+else { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); store.settleQuads(); }
 store.ensureTodayLog();

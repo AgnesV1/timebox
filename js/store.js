@@ -19,6 +19,7 @@ import goalStore from "./store/goals.js";
 import mealStore from "./store/meals.js";
 import ideaStore from "./store/ideas.js";
 import scoreStore from "./store/scores.js";
+import quadStore from "./store/quads.js";
 
 const KEY = "kuzhouduan-v1";
 const OLD_KEY = "timebox-v1";
@@ -862,6 +863,8 @@ export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, repla
 const { setRule } = series;
 
 export const { scores, scoreOf, scoreSetup, scoreCells, setScore, setScoreNote } = scoreStore(core);
+
+export const { quads, quadOf, quadBoard, addQuad, moveQuad, editQuad, doneQuad, deleteQuad, settleQuads } = quadStore(core);
 
 export const { goals, saveGoal, deleteGoal } = goalStore(core);
 export const { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples, addDishes, dishToBox } = mealStore(core);

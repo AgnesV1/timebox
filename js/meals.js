@@ -397,6 +397,78 @@ export function coming(D, today, months = 3, tag = "") {
   return out;
 }
 
+// ---------- 贵重的东西（Restock 页右边）：花了多少、用了几天、一天合多少 ----------
+// 一样：{ name, cat 类目, cur 用什么钱买的（cny / cad）, price, bought 哪天买的, retired 哪天不用了（可以不填） }
+// 另一种钱按汇率换（rate = 1 加币合几块人民币，在 meal-prefs 里，随时能改）；一天合多少按买的那种钱算，
+// 还在用的、一天不到 0.5 加币 / 2 块的，提示可以换新了
+
+export const GEAR_RATE = 5;
+export const GEAR_LOW = { cad: 0.5, cny: 2 };
+export const GEAR_CATS = ["Camera", "Computer", "Phone", "Tablet", "Audio", "Wearable"];
+export const gearRate = (pr) => (Number(pr?.rate) > 0 ? Number(pr.rate) : GEAR_RATE);
+export const gearCur = (g) => (g?.cur === "cad" ? "cad" : "cny");
+
+// 一样东西算出来的：两种钱各多少、用了几天（不用了就算到那天）、一天合多少（买的那种钱）、该不该换新
+export function gearRow(g, today, rate = GEAR_RATE) {
+  const cur = gearCur(g), price = Math.max(0, Number(g.price) || 0);
+  const retired = !!(g.retired && g.retired <= today);
+  const days = g.bought && g.bought <= today ? Math.max(1, diffDays(g.bought, retired ? g.retired : today)) : 0;
+  const perDay = days ? price / days : 0;
+  // 近三年买的标颜色：12 个月内 year（亮），三年内 three（暗），再早的不标
+  const age = !g.bought || g.bought > today ? "" : g.bought > plusMonths(today, -12) ? "year" : g.bought > plusMonths(today, -36) ? "three" : "";
+  return { g, cur, price, cad: cur === "cad" ? price : price / rate, cny: cur === "cny" ? price : price * rate,
+    days, perDay, retired, age, cheap: !retired && days > 0 && price > 0 && perDay < GEAR_LOW[cur] };
+}
+
+// 列表：还在用的在前（一天合得多的在前，按加币比），不用了的放后面（最近不用的在前）
+export function gearList(D, today, rate = GEAR_RATE) {
+  const rows = Object.values(D.gear || {}).map((g) => gearRow(g, today, rate));
+  const toCad = (r) => (r.cur === "cad" ? r.perDay : r.perDay / rate);
+  const live = rows.filter((r) => !r.retired).sort((a, b) => toCad(b) - toCad(a) || byName(a.g, b.g));
+  const gone = rows.filter((r) => r.retired).sort((a, b) => String(b.g.retired).localeCompare(String(a.g.retired)) || byName(a.g, b.g));
+  return { live, gone, cad: live.reduce((a, r) => a + r.cad, 0), perDay: live.reduce((a, r) => a + toCad(r), 0) };
+}
+
+// 从表格里贴过来的几行：有表头就按表头认列（Name / Category / Currency / CAD / Price 或 RMB / Purchase / Retired），
+// 没有表头就当是 Name、CAD、Duration、Price、Purchase 那样排的。没写 Currency 的算人民币；只有 CAD 一列的算加币
+const GEAR_COLS = { name: /^(name|item|名)/, cat: /^(cat|type|类)/, cur: /^(cur|币)/, cad: /^cad/, cny: /^(price|rmb|cny|人民币|价)/,
+  bought: /^(purchase|bought|date|买)/, retired: /^(retire|退)/ };
+const toDate = (s) => { const m = /^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})/.exec(String(s || "").trim()); return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : ""; };
+
+export function parseGear(text) {
+  const lines = String(text || "").split(/\r?\n/).map((l) => l.split(/\t| {2,}/).map((x) => x.trim())).filter((c) => c.some(Boolean));
+  if (!lines.length) return [];
+  let cols = { name: 0, cad: 1, cny: 3, bought: 4 };
+  if (lines[0].some((h) => GEAR_COLS.name.test(h.toLowerCase()))) {
+    cols = {};
+    lines.shift().forEach((h, i) => { const k = Object.keys(GEAR_COLS).find((k) => GEAR_COLS[k].test(h.toLowerCase())); if (k && cols[k] === undefined) cols[k] = i; });
+  }
+  const at = (c, k) => (cols[k] === undefined ? "" : c[cols[k]] || "");
+  const num = (s) => Number(String(s).replace(/[^\d.]/g, "")) || 0;
+  const out = [];
+  for (const c of lines) {
+    const name = at(c, "name");
+    if (!name) continue;
+    const said = at(c, "cur").toLowerCase();
+    const cur = /cad|加/.test(said) || (!said && !num(at(c, "cny")) && num(at(c, "cad"))) ? "cad" : "cny";
+    // 加币的先看 CAD 那列，人民币的先看 Price / RMB 那列；只有一列价钱的就用那一列
+    const col = cur === "cad" ? (cols.cad !== undefined ? "cad" : "cny") : (cols.cny !== undefined ? "cny" : "cad");
+    out.push({ name, cat: at(c, "cat"), cur, price: num(at(c, col)), bought: toDate(at(c, "bought")), retired: toDate(at(c, "retired")) });
+  }
+  return out;
+}
+
+// 贴进来的按名字对：已经有的更新（贴的里面空着的那几格不动），没有的新加
+export function importGear(D, rows, newId) {
+  const names = new Map(Object.values(D.gear || {}).map((g) => [norm(g.name), g]));
+  return rows.map((r) => {
+    const old = names.get(norm(r.name)), patch = Object.fromEntries(Object.entries(r).filter(([, v]) => v !== "" && v !== 0));
+    const row = { name: "", cat: "", cur: "cny", price: 0, bought: "", retired: "", ...(old || {}), ...patch, id: old?.id || newId() };
+    names.set(norm(r.name), row);
+    return row;
+  });
+}
+
 // ---------- 导入一份清单（核对表里整理好的）：按名字对，已经有的更新、没有的新加；Box 里的东西也按名字找 ----------
 
 const ING_FIELDS = ["store", "price", "lasts", "level", "cat", "keep", "staple", "every", "from", "checked", "sale"];

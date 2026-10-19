@@ -340,3 +340,52 @@ test("from Friday the plan starts at next week", () => {
   assert.equal(M.planStart("2026-10-10", "sunday"), "2026-10-11");
   assert.equal(M.planStart("2026-10-11", "sunday"), "2026-10-11");
 });
+
+// Big buys：一天合多少按买的那种钱算；用到今天，或者用到退役那天
+const SHEET = ["Name\tCategory\tCurrency\tPrice\tPurchase\tRetired",
+  "Sony A7M4\tCamera\tRMB\t21400\t2023/05/31\t", "Iphone 15\tPhone\tCAD\t1670\t2023/11/21\t", "Airpods Pro\tAudio\t\t500\t2023/08/01\t",
+  "B&O A1\tAudio\tRMB\t1000\t2019/11/11\t2024/01/01"].join("\n");
+
+test("big buys: days, per day in what you paid with, the other currency at the rate", () => {
+  const T = "2026-10-19";
+  const rows = M.parseGear(SHEET);
+  assert.deepEqual(rows[0], { name: "Sony A7M4", cat: "Camera", cur: "cny", price: 21400, bought: "2023-05-31", retired: "" });
+  assert.equal(rows[1].cur, "cad");
+  assert.equal(rows[2].cur, "cny", "no currency: RMB");
+  const sony = M.gearRow(rows[0], T, 5), phone = M.gearRow(rows[1], T, 5);
+  assert.equal(sony.days, 1237);
+  assert.equal(sony.perDay.toFixed(1), "17.3");
+  close(sony.cad, 4280);
+  assert.equal(phone.days, 1063);
+  close(phone.cny, 8350);
+  assert.equal(M.gearRow(rows[1], T, 5.2).cny, 1670 * 5.2, "rate is live");
+  const pods = M.gearRow(rows[2], T, 5);
+  assert.ok(pods.cheap, "¥500 over 1175 days < ¥2 a day");
+  assert.ok(!sony.cheap && !phone.cheap);
+  assert.ok(M.gearRow({ cur: "cad", price: 100, bought: "2026-01-01" }, T, 5).cheap, "under $0.5 a day");
+  const bo = M.gearRow(rows[3], T, 5);
+  assert.ok(bo.retired && !bo.cheap, "retired: no hint");
+  assert.equal(bo.days, 1512, "counted up to the day it was retired");
+  assert.equal(phone.age, "three", "Nov 2023: within three years");
+  assert.equal(sony.age, "", "May 2023: older than three years");
+  assert.equal(M.gearRow({ bought: "2025-10-20" }, T).age, "year");
+  assert.equal(M.gearRow({ bought: "2025-10-19" }, T).age, "three", "exactly 12 months ago: the dim one");
+  const L = M.gearList({ gear: Object.fromEntries(rows.map((r, i) => [i, { ...r, id: String(i) }])) }, T, 5);
+  assert.deepEqual(L.live.map((r) => r.g.name), ["Sony A7M4", "Iphone 15", "Airpods Pro"]);
+  assert.deepEqual(L.gone.map((r) => r.g.name), ["B&O A1"]);
+});
+
+test("big buys: rows without a header read like the old sheet; pasting again updates by name", () => {
+  const rows = M.parseGear("Sony A7M4\t4280\t1237\t21400\t2023/05/31\t17\nIpad Air5\t665\t847\t3325\t2024/06/24\t3");
+  assert.deepEqual(rows.map((r) => [r.name, r.cur, r.price, r.bought]), [["Sony A7M4", "cny", 21400, "2023-05-31"], ["Ipad Air5", "cny", 3325, "2024-06-24"]]);
+  const D = { gear: { a: { id: "a", name: "Sony A7M4", cat: "Camera", cur: "cny", price: 21400, bought: "2023-05-31", retired: "" } } };
+  const out = M.importGear(D, [{ name: "sony a7m4", cat: "", cur: "cny", price: 0, bought: "", retired: "2026-10-01" }, { name: "Kindle", cat: "", cur: "cad", price: 140, bought: "2025-01-02", retired: "" }], () => "new");
+  assert.deepEqual(out.map((r) => [r.id, r.cat, r.price, r.retired]), [["a", "Camera", 21400, "2026-10-01"], ["new", "", 140, ""]]);
+  assert.deepEqual(M.parseGear(""), []);
+});
+
+test("big buys live in Settings rows like the rest of Meals", () => {
+  store.importMeals({ gear: [{ id: "g1", name: "Sony A7M4", cat: "Camera", cur: "cny", price: 21400, bought: "2023-05-31", retired: "" }] });
+  assert.ok(store.get("settings", "meal-gear:g1"));
+  assert.equal(store.meals().gear.g1.name, "Sony A7M4");
+});

@@ -3,6 +3,7 @@
 //   meal-ing:<id> 常买的东西 / meal-box:<id> 一顿 / meal-week:<这周第一天> 这周：days（日期 → {boxes} / {off}）、
 //   粗排 rough（[{box, n}]）、买了没有 got、手动加的 extra、shopped、skip、note / meal-prefs 目标
 //   meal-sup:<id> 规律要换 / 要补的东西（Restock：价格、每隔多久、下次哪天）；这周的行里还有 notes（采购单上写的备注）
+//   meal-gear:<id> 贵重的东西（Restock 页右边）：类目、什么钱买的、价钱、哪天买的、哪天不用了
 //   meal-dish:<id> To try 里的一道菜（在外面吃过、想自己做的）：name、note、kind（box 打算做成 Box / once 只试一次）；
 //     从任务那边记的还带着 from（在哪吃的）、date、taskId——只是抄下来的字，任务以后删了改了都不管它
 //   （meal-pack:<id> 是 10-08 那版的 Day pack，现在只在读旧数据时展开成 Box）
@@ -11,13 +12,13 @@
 export default function (core) {
   const { entries, put, drop, change, memo, newId, today, setting } = core;
 
-  const MEAL_RE = /^meal-(ing|box|pack|week|sup|dish):(.+)$/;
+  const MEAL_RE = /^meal-(ing|box|pack|week|sup|dish|gear):(.+)$/;
   const mealKey = (kind, id) => "meal-" + kind + ":" + id;
   const OLD_UNIT = { g: "g", kg: "g", oz: "g", lb: "g", ml: "ml", L: "ml", "fl oz": "ml", gal: "ml" };
 
   const meals = () => memo("meals", readMeals);
   function readMeals() {
-    const D = { ing: {}, box: {}, pack: {}, week: {}, sup: {}, dish: {}, days: {} };
+    const D = { ing: {}, box: {}, pack: {}, week: {}, sup: {}, dish: {}, gear: {}, days: {} };
     for (const [key, r] of entries("settings")) {
       const m = MEAL_RE.exec(key);
       if (m && r.value && typeof r.value === "object") D[m[1]][m[2]] = { ...r.value, id: m[2] };
@@ -129,9 +130,9 @@ export default function (core) {
   }
 
   function importMeals(rows) {
-    const n = (rows.ing || []).length, b = (rows.box || []).length, s = (rows.sup || []).length;
-    change(() => { for (const kind of ["ing", "box", "sup"]) for (const r of rows[kind] || []) putMeal(kind, r.id, r); },
-      "Imported " + n + (n === 1 ? " grocery" : " groceries") + " · " + b + (b === 1 ? " box" : " boxes") + (s ? " · " + s + " to restock" : ""));
+    const count = (k, one, many) => { const n = (rows[k] || []).length; return n ? n + " " + (n === 1 ? one : many) : ""; };
+    change(() => { for (const kind of ["ing", "box", "sup", "gear"]) for (const r of rows[kind] || []) putMeal(kind, r.id, r); },
+      "Imported " + ([count("ing", "grocery", "groceries"), count("box", "box", "boxes"), count("sup", "to restock", "to restock"), count("gear", "item", "items")].filter(Boolean).join(" · ") || "nothing"));
   }
 
   const shortId = () => newId().replace(/-/g, "").slice(0, 10);

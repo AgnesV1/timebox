@@ -371,7 +371,12 @@ test("big buys: days, per day in what you paid with, the other currency at the r
   assert.equal(M.gearRow({ bought: "2025-10-20" }, T).age, "year");
   assert.equal(M.gearRow({ bought: "2025-10-19" }, T).age, "three", "exactly 12 months ago: the dim one");
   const L = M.gearList({ gear: Object.fromEntries(rows.map((r, i) => [i, { ...r, id: String(i) }])) }, T, 5);
-  assert.deepEqual(L.live.map((r) => r.g.name), ["Sony A7M4", "Iphone 15", "Airpods Pro"]);
+  assert.deepEqual(L.live.map((r) => r.g.name), ["Sony A7M4", "Iphone 15", "Airpods Pro"], "most expensive first");
+  assert.equal(M.gearEmoji(rows[0]), "📷", "category from the sheet, by name");
+  assert.equal(M.gearTag({ cat: "phone" }), "phone");
+  assert.equal(M.gearEmoji({ cat: "Tablet" }), "💻");
+  assert.equal(M.gearEmoji({ cat: "beauty" }), "💅");
+  assert.equal(M.gearEmoji({ cat: "Drone" }), "🪐", "unknown: other");
   assert.deepEqual(L.gone.map((r) => r.g.name), ["B&O A1"]);
 });
 

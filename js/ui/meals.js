@@ -8,7 +8,7 @@
 //     直接在这里写（粘几行 = 几道），或者在今天页一条做完的 Leisure / Friends 任务底下记；Make a box = 建一个同名的 Box、从这里拿掉
 //   Restock（#meals/restock）：规律要换 / 要补的非食物：价格、每隔多久、下次哪天；每样一个 emoji 记号，顶上一排能筛（连 Coming up 一起）；最上面按月列接下来三个月要花的；
 //     底下一块 Buy once = 只买一次的（一条裙子）：价钱、可以不填的日子，买了点 Bought
-//     右边一栏 Big buys = 贵重的东西（相机、电脑）：类目、什么钱买的、哪天买的、哪天不用了，算一天合多少；汇率在栏里改；能从表格贴进来
+//     右边一栏 Big buys = 贵重的东西（相机、电脑）：emoji 类目、什么钱买的、哪天买的、哪天不用了，算一天合多少，越贵的越靠前；汇率在栏里改；能从表格贴进来
 // 「下次采购」手机上也有：顶栏的 🛒 进 #shop，只列要买的东西（不写价钱和说明），在超市里打勾，单子下面是这次采购的备注（只看）；下面挤着一张「Coming up」。
 
 import * as store from "../store.js";
@@ -25,7 +25,7 @@ const TABS = [["plan", "Plan", "#meals"], ["boxes", "Boxes", "#meals/boxes"], ["
 const tabOf = () => { const t = location.hash.split("/")[1] || "plan"; return TABS.some(([k]) => k === t) ? t : "plan"; };
 const money = (v) => "$" + (Number(v) || 0).toFixed(2);
 const money0 = (v) => "$" + Math.round(Number(v) || 0);
-const fmtDue = (d, T) => fmtDay(d) + (d.slice(0, 4) === T.slice(0, 4) ? "" : ", " + d.slice(0, 4));
+const fmtDue = (d, T) => fmtShort(d) + (d.slice(0, 4) === T.slice(0, 4) ? "" : ", " + d.slice(0, 4));
 const dueText = (d, T) => { const n = diffDays(T, d); return n > 1 ? "in " + n + " days" : n === 1 ? "tomorrow" : n === 0 ? "today" : -n + (n === -1 ? " day late" : " days late"); };
 const slotName = (s) => (M.SLOTS.find(([k]) => k === s) || ["", "Any"])[1];
 const weekOf = (date) => startOfWeek(date, store.prefs().weekStartsOn);
@@ -382,35 +382,32 @@ let showRetired = false;
 
 function gearHTML(D, c) {
   const rate = M.gearRate(store.mealPrefs()), L = M.gearList(D, c.today, rate);
-  const row = (r) => '<tr data-act="edit-gear" data-id="' + esc(r.g.id) + '" tabindex="0"' + (r.retired ? ' class="retired"' : "") + ">" +
-    '<td><span class="gcat' + (r.age ? " g-" + r.age : "") + '"' + (r.age ? ' title="Bought in the last ' + (r.age === "year" ? "12 months" : "3 years") + '"' : "") + ">" + esc(r.g.cat || "—") + "</span></td>" +
-    "<td><b>" + esc(r.g.name || "Untitled") + "</b><small>" + (r.g.bought ? fmtDue(r.g.bought, c.today) : "no date") + (r.retired ? " → " + fmtDue(r.g.retired, c.today) : "") + "</small></td>" +
-    '<td class="r num">' + cash(r.cad, "cad") + "<small>" + cash(r.cny, "cny") + "</small></td>" +
-    '<td class="r num">' + (r.days || "—") + "</td>" +
-    '<td class="r num"><b class="' + (r.cheap ? "gcheap" : "") + '">' + (r.days ? perDay(r.perDay, r.cur) : "—") + "</b>" +
-    (r.cheap ? '<small class="gcheap" title="Under ' + perDay(M.GEAR_LOW[r.cur], r.cur) + ' a day">ok to replace</small>' : "") + "</td></tr>";
+  const tagName = (g) => M.GEAR_TAGS.find(([k]) => k === M.gearTag(g))[2];
+  const row = (r) => '<li data-act="edit-gear" data-id="' + esc(r.g.id) + '" tabindex="0" role="button"' + (r.retired ? ' class="retired"' : "") + ">" +
+    '<span class="gem' + (r.age ? " g-" + r.age : "") + '" title="' + esc(tagName(r.g)) + (r.age ? " · bought in the last " + (r.age === "year" ? "12 months" : "3 years") : "") + '">' + M.gearEmoji(r.g) + "</span>" +
+    '<span class="gname"><b>' + esc(r.g.name || "Untitled") + "</b><small>" + cash(r.cad, "cad") + " · " + cash(r.cny, "cny") + "</small>" +
+    "<small>" + (r.g.bought ? fmtDue(r.g.bought, c.today) : "no date") + (r.retired ? " → " + fmtDue(r.g.retired, c.today) : "") + (r.days ? " · " + r.days + "d" : "") + "</small></span>" +
+    '<span class="gday num"><b class="' + (r.cheap ? "gcheap" : "") + '">' + (r.days ? perDay(r.perDay, r.cur) : "—") + "</b>" +
+    (r.cheap ? '<small class="gcheap" title="Under ' + perDay(M.GEAR_LOW[r.cur], r.cur) + ' a day">replace</small>' : "<small>/ day</small>") + "</span></li>";
   const n = L.live.length;
   const body = n || L.gone.length
-    ? '<table class="mtable gtable"><thead><tr><th></th><th>Item</th><th class="r">Price</th><th class="r">Days</th><th class="r">/ day</th></tr></thead><tbody>' +
-      L.live.map(row).join("") + (showRetired ? L.gone.map(row).join("") : "") + "</tbody></table>" +
+    ? '<ul class="glist">' + L.live.map(row).join("") + (showRetired ? L.gone.map(row).join("") : "") + "</ul>" +
       (L.gone.length ? '<button type="button" class="link mbought" data-act="gear-retired" aria-expanded="' + showRetired + '">Retired (' + L.gone.length + ")</button>" : "")
     : '<p class="empty">Nothing yet. Add what you paid a lot for — a camera, a laptop — and see what it costs per day of use. Or paste rows from your sheet.</p>';
   return '<aside class="restock-gear mcard"><header><h3>Big buys</h3>' +
-    (n ? '<span class="msub">' + n + " in use · " + cash(L.cad, "cad") + " · " + perDay(L.perDay, "cad") + " a day</span>" : "") +
     '<span class="tools"><button type="button" class="btn" data-act="gear-paste">Paste</button><button type="button" class="btn cta" data-act="new-gear">' + icon("plus") + " Item</button></span></header>" +
+    (n ? '<p class="msub gsum">' + n + " in use · " + cash(L.cad, "cad") + " · " + perDay(L.perDay, "cad") + " a day</p>" : "") +
     '<label class="grate">1 CAD = <input class="num" type="number" min="0.01" step="0.01" data-act="gear-rate" value="' + esc(rate) + '" aria-label="RMB per CAD"> RMB</label>' +
-    body + '<p class="msub gnote">Per day is in what you paid with. Under ' + perDay(M.GEAR_LOW.cad, "cad") + " or " + perDay(M.GEAR_LOW.cny, "cny") + " a day: it has paid for itself. " +
-    '<span class="gcat g-year">12 mo</span> <span class="gcat g-three">3 yrs</span> = bought in the last 12 months / 3 years.</p></aside>';
+    body + '<p class="msub gnote">Most expensive first. Per day is in what you paid with; under ' + perDay(M.GEAR_LOW.cad, "cad") + " or " + perDay(M.GEAR_LOW.cny, "cny") + " a day it has paid for itself. " +
+    '<span class="gem g-year">12 mo</span> <span class="gem g-three">3 yrs</span> = bought in the last 12 months / 3 years.</p></aside>';
 }
 
 function gearEditor(D, row) {
   const T = store.today(), rate = M.gearRate(store.mealPrefs()), r = M.gearRow(row, T, rate), cur = M.gearCur(row);
-  const cats = [...new Set([...M.GEAR_CATS, ...Object.values(D.gear).map((g) => String(g.cat || "").trim()).filter(Boolean)])];
   const other = cur === "cad" ? "cny" : "cad";
   return '<h3 class="sheet-title">' + (editing.id ? esc(row.name || "Untitled") : "Big buy") + "</h3>" +
-    '<div class="field-row"><label class="field"><span>Name</span><input data-f="name" data-k="name" value="' + esc(row.name || "") + '" placeholder="Sony A7M4" autocomplete="off"></label>' +
-    '<label class="field"><span>Category</span><input data-f="cat" data-k="cat" list="gear-cats" value="' + esc(row.cat || "") + '" placeholder="Camera" autocomplete="off"></label></div>' +
-    '<datalist id="gear-cats">' + cats.map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist>" +
+    '<label class="field"><span>Name</span><input data-f="name" data-k="name" value="' + esc(row.name || "") + '" placeholder="Sony A7M4" autocomplete="off"></label>' +
+    '<div class="field"><span>Kind</span>' + emojiPickHTML("gear-tag", M.GEAR_TAGS, M.gearTag(row)) + "</div>" +
     '<div class="field-row"><div class="field"><span>Paid in</span>' + segHTML("gear-cur", [["cny", "RMB ¥"], ["cad", "CAD $"]], cur) + "</div>" +
     '<label class="field"><span>Price (' + CUR[cur][1] + ')</span><input data-f="price" data-k="price" class="num" type="number" step="0.01" min="0" value="' + esc(row.price || "") + '" placeholder="0"></label></div>' +
     '<div class="field-row"><label class="field"><span>Bought on</span><input data-f="bought" data-k="bought" type="date" value="' + esc(row.bought || "") + '"></label>' +
@@ -769,6 +766,7 @@ export function initMeals(rerender) {
     }
     else if (act === "dish-set-kind") update({ kind: el.dataset.v === "box" ? "box" : "once" });
     else if (act === "sup-tag") update({ tag: el.dataset.v });
+    else if (act === "gear-tag") update({ cat: el.dataset.v });
     else if (act === "gear-cur") update({ cur: el.dataset.v === "cad" ? "cad" : "cny" });
     else if (act === "gear-import") {
       const sheet = el.closest(".meal-editor");
@@ -804,7 +802,7 @@ export function initMeals(rerender) {
     if (el.type === "date" && v && v < "1000") return;   // 年份还没打完（0002-…）
     if (f === "price") v = Math.max(0, Number(v) || 0);
     if (f === "lasts" || f === "n") v = Math.max(0, Math.round(Number(v) || 0)) || "";
-    if (f === "name" || f === "store" || f === "cat") v = String(v).trim();
+    if (f === "name" || f === "store") v = String(v).trim();
     if (f === "every") {
       v = Number(v) || 0;
       update({ every: v, from: v && !row.from ? store.today() : row.from });

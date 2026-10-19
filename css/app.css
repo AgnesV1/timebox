@@ -296,7 +296,7 @@ body.side-min .sync-pill span { display: none; }
 .dsc-sumnote { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
 .dsc .link { justify-self: start; margin-top: 6px; font-size: 12.5px; }
 
-/* ---------- 今天页的四象限便签（js/ui/quads.js；只电脑，在任务卡片正下方，翻到哪天都是同一块） ----------
+/* ---------- 今天页的四象限便签（js/ui/quads.js；只电脑、只在看今天时，在任务卡片正下方；内容跨天不变） ----------
    一块软底（和 Stats 的软板一样，不描边不投影），一道细十字分四格：左右 = 紧急 / 不紧急，上下 = 重要 / 不重要。
    格子里的便签和日历的一个样子（纸、顶上胶条、纸边的影子），只用一种纸色（赭黄，和按项目上色的任务分开）。
    字跟着格子变（她挑的）：左上粗体、右上正常、左下细体（急但不值得多花注意力）、右下斜体。 */

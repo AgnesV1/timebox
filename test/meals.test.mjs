@@ -366,6 +366,10 @@ test("big buys: days, per day in what you paid with, the other currency at the r
   const bo = M.gearRow(rows[3], T, 5);
   assert.ok(bo.retired && !bo.cheap, "retired: no hint");
   assert.equal(bo.days, 1512, "counted up to the day it was retired");
+  assert.equal(phone.age, "three", "Nov 2023: within three years");
+  assert.equal(sony.age, "", "May 2023: older than three years");
+  assert.equal(M.gearRow({ bought: "2025-10-20" }, T).age, "year");
+  assert.equal(M.gearRow({ bought: "2025-10-19" }, T).age, "three", "exactly 12 months ago: the dim one");
   const L = M.gearList({ gear: Object.fromEntries(rows.map((r, i) => [i, { ...r, id: String(i) }])) }, T, 5);
   assert.deepEqual(L.live.map((r) => r.g.name), ["Sony A7M4", "Iphone 15", "Airpods Pro"]);
   assert.deepEqual(L.gone.map((r) => r.g.name), ["B&O A1"]);

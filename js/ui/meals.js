@@ -383,7 +383,7 @@ let showRetired = false;
 function gearHTML(D, c) {
   const rate = M.gearRate(store.mealPrefs()), L = M.gearList(D, c.today, rate);
   const row = (r) => '<tr data-act="edit-gear" data-id="' + esc(r.g.id) + '" tabindex="0"' + (r.retired ? ' class="retired"' : "") + ">" +
-    '<td><span class="gcat">' + esc(r.g.cat || "—") + "</span></td>" +
+    '<td><span class="gcat' + (r.age ? " g-" + r.age : "") + '"' + (r.age ? ' title="Bought in the last ' + (r.age === "year" ? "12 months" : "3 years") + '"' : "") + ">" + esc(r.g.cat || "—") + "</span></td>" +
     "<td><b>" + esc(r.g.name || "Untitled") + "</b><small>" + (r.g.bought ? fmtDue(r.g.bought, c.today) : "no date") + (r.retired ? " → " + fmtDue(r.g.retired, c.today) : "") + "</small></td>" +
     '<td class="r num">' + cash(r.cad, "cad") + "<small>" + cash(r.cny, "cny") + "</small></td>" +
     '<td class="r num">' + (r.days || "—") + "</td>" +
@@ -399,7 +399,8 @@ function gearHTML(D, c) {
     (n ? '<span class="msub">' + n + " in use · " + cash(L.cad, "cad") + " · " + perDay(L.perDay, "cad") + " a day</span>" : "") +
     '<span class="tools"><button type="button" class="btn" data-act="gear-paste">Paste</button><button type="button" class="btn cta" data-act="new-gear">' + icon("plus") + " Item</button></span></header>" +
     '<label class="grate">1 CAD = <input class="num" type="number" min="0.01" step="0.01" data-act="gear-rate" value="' + esc(rate) + '" aria-label="RMB per CAD"> RMB</label>' +
-    body + '<p class="msub gnote">Per day is in what you paid with. Under ' + perDay(M.GEAR_LOW.cad, "cad") + " or " + perDay(M.GEAR_LOW.cny, "cny") + " a day: it has paid for itself.</p></aside>";
+    body + '<p class="msub gnote">Per day is in what you paid with. Under ' + perDay(M.GEAR_LOW.cad, "cad") + " or " + perDay(M.GEAR_LOW.cny, "cny") + " a day: it has paid for itself. " +
+    '<span class="gcat g-year">12 mo</span> <span class="gcat g-three">3 yrs</span> = bought in the last 12 months / 3 years.</p></aside>';
 }
 
 function gearEditor(D, row) {

@@ -414,8 +414,10 @@ export function gearRow(g, today, rate = GEAR_RATE) {
   const retired = !!(g.retired && g.retired <= today);
   const days = g.bought && g.bought <= today ? Math.max(1, diffDays(g.bought, retired ? g.retired : today)) : 0;
   const perDay = days ? price / days : 0;
+  // 近三年买的标颜色：12 个月内 year（亮），三年内 three（暗），再早的不标
+  const age = !g.bought || g.bought > today ? "" : g.bought > plusMonths(today, -12) ? "year" : g.bought > plusMonths(today, -36) ? "three" : "";
   return { g, cur, price, cad: cur === "cad" ? price : price / rate, cny: cur === "cny" ? price : price * rate,
-    days, perDay, retired, cheap: !retired && days > 0 && price > 0 && perDay < GEAR_LOW[cur] };
+    days, perDay, retired, age, cheap: !retired && days > 0 && price > 0 && perDay < GEAR_LOW[cur] };
 }
 
 // 列表：还在用的在前（一天合得多的在前，按加币比），不用了的放后面（最近不用的在前）

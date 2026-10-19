@@ -405,8 +405,8 @@ export function coming(D, today, months = 3, tag = "") {
 export const GEAR_RATE = 5;
 export const GEAR_LOW = { cad: 0.5, cny: 2 };
 // 类目用 emoji 表示；存的是 key，从表格贴进来的英文名（Camera…）也认，认不出的算 🪐
-export const GEAR_TAGS = [["camera", "📷", "Camera"], ["computer", "💻", "Computer"], ["phone", "📱", "Phone"], ["tablet", "📓", "Tablet"],
-  ["audio", "🎧", "Audio"], ["wearable", "⌚", "Wearable"], ["other", "🪐", "Other"]];
+export const GEAR_TAGS = [["camera", "📷", "Camera"], ["computer", "🖥️", "Computer"], ["tablet", "💻", "Tablet"], ["phone", "📱", "Phone"],
+  ["audio", "🎧", "Audio"], ["wearable", "⌚", "Wearable"], ["beauty", "💅", "Beauty"], ["other", "🪐", "Other"]];
 export function gearTag(g) {
   const c = String(g?.cat || "").trim().toLowerCase();
   return (GEAR_TAGS.find(([k, e, name]) => c === k || c === e || c === name.toLowerCase()) || GEAR_TAGS[GEAR_TAGS.length - 1])[0];

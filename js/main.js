@@ -1,9 +1,10 @@
-// 苦昼短：入口。管页面切换（#today / #calendar / #projects / #stats / #meals / #shop / #reading / #friends / #settings）、主题、同步时机、整页重画。
+// 苦昼短：入口。管页面切换（#today / #calendar / #projects / #stats / #meals / #shop / #reading / #friends / #spending / #settings）、主题、同步时机、整页重画。
 // 手机（≤760px）只有「今天」、下次采购的单子、阅读和设置；电脑有侧栏、日历和任务池、项目、统计、备餐。两边底部都有计时浮条。
 
 import * as store from "./store.js";
 import * as sync from "./sync.js";
 import * as reading from "./reading.js";
+import * as spend from "./spend.js";
 import * as Meal from "./meals.js";
 import { esc, on, icon, initDateTyping } from "./dom.js";
 import { paintPatterns } from "./patterns.js";
@@ -28,11 +29,13 @@ import { readingHTML, initReading } from "./ui/reading.js";
 import { mealsHTML, shopHTML, initMeals, refreshMealEditor, mealDrop } from "./ui/meals.js";
 import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/friends.js";
 import { renderSun, initSun } from "./ui/sun.js";
+import { createView as moneyView } from "./ui/money.js";
+import { initIsland, refreshIsland, closeIsland } from "./ui/island.js";
 import { animateNext, animateSoft, takeTransition, nameParts, dusk, measurePills, placePills, glidePills, rollNumbers, titleIn, initEdgeGlow } from "./motion.js";
 import { lookAt, nextTurn } from "./day.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
-const VIEWS = ["today", "calendar", "projects", "stats", "meals", "shop", "reading", "ideas", "friends", "settings"];
+const VIEWS = ["today", "calendar", "projects", "stats", "meals", "shop", "reading", "ideas", "friends", "spending", "settings"];
 const side = document.getElementById("side");
 const main = document.getElementById("main");
 const pool = document.getElementById("pool");
@@ -76,7 +79,8 @@ function sidebarHTML(c, view) {
   // 每段的图标是那个大类的油画色（排时间 = Build、备餐 = Chores、阅读 = Leisure、人 = Friends），大类改了颜色这里跟着变
   const tint = (name, fallback) => store.groups().find((g) => g.name === name)?.color || fallback;
   const blocks = [["todo", "Build", "#3E8E6E", [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", projectAlerts(c) || ""], ["stats", "Stats", ""]]],
-    ["meals", "Chores", "#9A5A36", [["meals", "Meals", deals || ""]]], ["read", "Leisure", "#E07A2B", [["reading", "Reading", ""]]], ["friends", "Friends", "#8B62AE", [["friends", "Friends", friendsDue(c.today) || ""]]]];
+    ["meals", "Chores", "#9A5A36", [["meals", "Meals", deals || ""]]], ["read", "Leisure", "#E07A2B", [["reading", "Reading", ""]]], ["friends", "Friends", "#8B62AE", [["friends", "Friends", friendsDue(c.today) || ""]]],
+    ["money", "", "#3F62B5", [["spending", "Spending", ""]]]];   // 记账：不是大类，用油画的那个蓝
   // 当前页那一项底下垫一块青柠（.snav-pill）：换页时它从旧的那项滑到新的那项（换页过渡里有名字，css 里 snav-pill）
   const link = ([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '" title="' + t + '">' + (view === v ? '<i class="snav-pill" aria-hidden="true"></i>' : "") + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>";
   const st = sync.getStatus();
@@ -87,6 +91,14 @@ function sidebarHTML(c, view) {
     '<nav class="snav">' + blocks.map(([b, g, fallback, links]) => '<div class="sblock" data-b="' + b + '" style="--tint:' + esc(tint(g, fallback)) + '">' + links.map(link).join("") + "</div>").join("") + "</nav>" +
     '<div class="sbot"><nav class="snav">' + link(["settings", "Settings", ""]) + "</nav>" +
     '<footer class="sfoot"><button type="button" class="sync-pill' + (st.bad ? " bad" : "") + '" data-act="sync" title="Sync now">' + icon("sync") + '<i class="sync-ld" aria-hidden="true">' + "<i></i>".repeat(9) + "</i>" + '<span data-sync-status>' + esc(st.text) + "</span></button></footer></div>";
+}
+
+// ---------- 记账（电脑上的 Spending 页；手机上是从顶上拉出来的面板，见 js/ui/island.js） ----------
+// 那一页自己管自己（时间轴滚到哪、图表点到哪都留着），整页重画时不重新生成：已经挂在 #main 上就不动它
+let desk = null;
+function showDesk() {
+  if (!desk) desk = moneyView("desk");
+  if (desk.el.parentNode !== main || main.children.length !== 1) { main.replaceChildren(desk.el); desk.show(); }
 }
 
 // ---------- 整页重画（正在打字的输入框，值、光标都留住） ----------
@@ -160,7 +172,8 @@ function draw() {
   document.body.classList.toggle("side-min", !phone && Boolean(store.local().sideMin));
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
-  main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : view === "ideas" ? ideasPhoneHTML(c) : view === "friends" ? friendsHTML(c) : todayHTML(c, phone);
+  if (view === "spending") showDesk();
+  else main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : view === "ideas" ? ideasPhoneHTML(c) : view === "friends" ? friendsHTML(c) : todayHTML(c, phone);
   placePills();
   if (document.startViewTransition) nameParts(main, true);
   rollNumbers();
@@ -286,12 +299,26 @@ store.subscribe((meta) => {
 });
 store.onUndo((label, before) => toast(label, () => store.undo(before)));
 reading.subscribe(() => { if (route() === "reading") render(); });
+// 记账：本机改了就同步；两边的界面各自刷新
+spend.subscribe((meta) => {
+  if (meta.dirty || meta.again) sync.queue();
+  if (desk && desk.el.isConnected) desk.refresh();
+  refreshIsland();
+});
+initIsland({ isPhone: () => phoneMQ.matches, onToday: () => route() === "today" && document.getElementById("modal").hidden });
+// 电脑上 Spending 页：按 N 记一笔（正在打字的时候不算）
+addEventListener("keydown", (e) => {
+  if (e.key !== "n" || e.metaKey || e.ctrlKey || e.altKey || phoneMQ.matches || route() !== "spending" || !desk) return;
+  if (e.target.closest?.("input, textarea, select, [contenteditable]") || !document.getElementById("modal").hidden) return;
+  e.preventDefault();
+  desk.startNew();
+});
 sync.onStatus(paintSync);
 
 addEventListener("hashchange", () => { closeModal(); animateNext("page"); render(); scrollTo(0, 0); });
 // 弹层里的日期框填完、离开了：填的时候没重画的编辑框（js/ui/modal.js 的 fillingDate）这时补画一次
 on(document, "focusout", "#modal input[type=date]", () => setTimeout(render, 0));
-phoneMQ.addEventListener("change", render);
+phoneMQ.addEventListener("change", () => { closeIsland(); render(); });
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") sync.beacon();
   else { tickDay(); syncThenLog(); }

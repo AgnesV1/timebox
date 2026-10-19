@@ -1141,10 +1141,168 @@ function archive_(before, now) {
   return { moved: moved.length };
 }
 
+// ================= 记账：单独一个表格（链接存在 Settings 的 spend） =================
+// 四页（没有就建）：Transactions 一行一笔（Date / Kind / Category / Note / Amount，后面藏着 ID / Updated / Synced）、
+// Budgets（From 哪个月起 / Amount 每月多少）、Categories（Kind / Name / Budget：Base = 预算的底座、Not counted = 不算进预算 / Hidden）、
+// Deleted（藏起来：删掉的那几笔，给别的设备看）。表格里可以直接改、直接加行（没有 ID 的行脚本会补上）。
+// 网页发来 { since, put: [{id, d, v, c, n, u}], del: [{id, u}], budgets?, cats? }：v 是分，负的 = 支出；u 是改的时间，同一笔后改的算数。
+// 回 { now, rows: since 之后变过的那几笔（since = 0 就是全部）, dels, budgets, cats }
+var SPEND = {
+  tx: { sheet: 'Transactions', head: ['Date', 'Kind', 'Category', 'Note', 'Amount', 'ID', 'Updated', 'Synced'], hide: ['ID', 'Updated', 'Synced'] },
+  budgets: { sheet: 'Budgets', head: ['From', 'Amount'] },
+  cats: { sheet: 'Categories', head: ['Kind', 'Name', 'Budget', 'Hidden'] },
+  dead: { sheet: 'Deleted', head: ['ID', 'At'] }
+};
+var SPEND_ROLE_OUT = { base: 'Base', outside: 'Not counted' };
+
+function spendBook_() {
+  var row = readAll_('settings').filter(function (r) { return r.id === 'spend'; })[0];
+  var url = row && row.value && String(row.value.url || '').trim();
+  if (!url) return null;
+  var id = (/\/d\/([a-zA-Z0-9_-]{20,})/.exec(url) || [])[1];
+  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.openByUrl(url);
+}
+
+// 那一页（没有就建好表头、格式、藏好辅助列）和它的表头位置 { 表头: 第几列（从 0 起） }
+function spendTab_(book, k) {
+  var t = SPEND[k], sh = book.getSheetByName(t.sheet), made = false;
+  if (!sh) {
+    // 新建的空表格只有一页「Sheet1 / 工作表1」：第一页拿来当 Transactions
+    var first = book.getSheets()[0];
+    if (k === 'tx' && first && book.getSheets().length === 1 && first.getLastRow() === 0) sh = first.setName(t.sheet);
+    else sh = book.insertSheet(t.sheet);
+    made = true;
+  }
+  var names = head_(sh);
+  t.head.forEach(function (h) {
+    if (names.indexOf(h) >= 0) return;
+    if (sh.getMaxColumns() < names.length + 1) sh.insertColumnAfter(sh.getMaxColumns());
+    sh.getRange(1, names.length + 1).setValue(h);
+    names.push(h);
+    made = true;
+  });
+  if (made) {
+    sh.setFrozenRows(1);
+    var rows = Math.max(sh.getMaxRows() - 1, 1);
+    names.forEach(function (h, i) {
+      var r = sh.getRange(2, i + 1, rows, 1);
+      if (h === 'Date') r.setNumberFormat('yyyy-mm-dd');
+      else if (h === 'Amount') r.setNumberFormat('0.00');
+      else if (h !== 'Updated' && h !== 'Synced' && h !== 'At') r.setNumberFormat('@');
+      if ((t.hide || []).indexOf(h) >= 0) sh.hideColumns(i + 1);
+    });
+    if (k === 'dead') sh.hideSheet();
+  }
+  var col = {};
+  names.forEach(function (h, i) { col[h] = i; });
+  return { sh: sh, col: col, width: names.length };
+}
+
+function spendData_(tab) {
+  var last = tab.sh.getLastRow();
+  return last < 2 ? [] : tab.sh.getRange(2, 1, last - 1, tab.width).getValues();
+}
+
+function spendCats_(book) {
+  var tab = spendTab_(book, 'cats'), c = tab.col;
+  return spendData_(tab).filter(function (r) { return String(r[c.Name]).trim(); }).map(function (r) {
+    var role = String(r[c.Budget] || '').trim().toLowerCase();
+    return { name: String(r[c.Name]).trim(), kind: /^inc/i.test(String(r[c.Kind] || '')) ? 'in' : 'out', role: role === 'base' ? 'base' : /not|out|no/.test(role) ? 'outside' : '',
+      hidden: r[c.Hidden] === true || /^(true|yes|y|1|✓|x)$/i.test(String(r[c.Hidden] || '').trim()) };
+  });
+}
+
+function spendBudgets_(book) {
+  var tab = spendTab_(book, 'budgets'), c = tab.col, tz = book.getSpreadsheetTimeZone();
+  return spendData_(tab).map(function (r) {
+    var f = r[c.From], from = Object.prototype.toString.call(f) === '[object Date]' ? Utilities.formatDate(f, tz, 'yyyy-MM-dd').slice(0, 7) : String(f || '').trim().slice(0, 7);
+    var v = Math.round(Number(String(r[c.Amount]).replace(/[^\d.]/g, '')) * 100);
+    return /^\d{4}-\d{2}$/.test(from) && v > 0 ? { from: from, v: v } : null;
+  }).filter(Boolean).sort(function (a, b) { return a.from < b.from ? -1 : a.from > b.from ? 1 : 0; });
+}
+
+// 整页重写一张小清单（预算、类别）：先清掉旧的几行，再写新的
+function spendWrite_(tab, rows) {
+  var last = tab.sh.getLastRow();
+  if (last > 1) tab.sh.getRange(2, 1, last - 1, tab.width).setValues(spendData_(tab).map(function (r) { return r.map(function () { return ''; }); }));
+  if (rows.length) tab.sh.getRange(2, 1, rows.length, tab.width).setValues(rows);
+}
+
+function spend_(req) {
+  var book = spendBook_();
+  if (!book) return { error: 'no sheet' };
+  var now = Date.now(), tz = book.getSpreadsheetTimeZone(), since = Number(req.since) || 0;
+  var tx = spendTab_(book, 'tx'), dead = spendTab_(book, 'dead'), c = tx.col;
+  var cats = spendCats_(book), inc = {};
+  (req.cats || cats).forEach(function (x) { if (x.kind === 'in') inc[x.name] = true; });
+  var data = spendData_(tx), at = {}, fixed = [];
+  data.forEach(function (r, i) {
+    var id = String(r[c.ID] || '').trim();
+    // 表格里手加的行（有日期、有金额、没有 ID）：补上 ID 和时间
+    if (!id && r[c.Date] !== '' && String(r[c.Amount]).trim() !== '') { id = r[c.ID] = Utilities.getUuid(); r[c.Updated] = now; r[c.Synced] = now; fixed.push(i); }
+    if (id) at[id] = i;
+  });
+  fixed.forEach(function (i) { tx.sh.getRange(i + 2, 1, 1, tx.width).setValues([data[i]]); });
+  var cell = function (x) {
+    var row = data.length && at[x.id] !== undefined ? data[at[x.id]].slice() : Array(tx.width).fill('');
+    row[c.Date] = String(x.d || ''); row[c.Kind] = x.v > 0 ? 'Income' : 'Expense'; row[c.Category] = toCell_('text', x.c || '');
+    row[c.Note] = toCell_('text', x.n || ''); row[c.Amount] = Math.abs(Number(x.v) || 0) / 100;
+    row[c.ID] = x.id; row[c.Updated] = Number(x.u) || now; row[c.Synced] = now;
+    return row;
+  };
+  // 写：表格里那一笔比发来的新（别的设备后改的）就不动
+  (req.put || []).forEach(function (x) {
+    if (!x || !x.id || !/^\d{4}-\d{2}-\d{2}$/.test(String(x.d))) return;
+    var i = at[x.id];
+    if (i !== undefined) {
+      if (Number(data[i][c.Updated]) > Number(x.u)) return;
+      data[i] = cell(x);
+      tx.sh.getRange(i + 2, 1, 1, tx.width).setValues([data[i]]);
+    } else {
+      var r = cell(x);
+      data.push(r);
+      at[x.id] = data.length - 1;
+      tx.sh.getRange(data.length + 1, 1, 1, tx.width).setValues([r]);
+    }
+  });
+  // 删：从下往上删（行号不乱），每一笔记进 Deleted
+  var gone = [], log = [];
+  (req.del || []).forEach(function (x) {
+    if (!x || !x.id) return;
+    var i = at[x.id];
+    if (i !== undefined && Number(data[i][c.Updated]) > Number(x.u)) return;   // 别的设备删之后又改过：留着
+    if (i !== undefined) gone.push(i);
+    log.push([x.id, now]);
+  });
+  gone.sort(function (a, b) { return b - a; }).forEach(function (i) { tx.sh.deleteRow(i + 2); });
+  if (log.length) dead.sh.getRange(dead.sh.getLastRow() + 1, 1, log.length, 2).setValues(log);
+  if (gone.length) data = spendData_(tx);
+  // 清单：发来了就整张换掉
+  if (Array.isArray(req.budgets)) spendWrite_(spendTab_(book, 'budgets'), req.budgets.map(function (b) { return [String(b.from), Number(b.v) / 100]; }));
+  if (Array.isArray(req.cats)) {
+    spendWrite_(spendTab_(book, 'cats'), req.cats.map(function (x) { return [x.kind === 'in' ? 'Income' : 'Expense', toCell_('text', x.name), SPEND_ROLE_OUT[x.role] || '', x.hidden ? 'yes' : '']; }));
+    cats = spendCats_(book);
+  }
+  // 拉：since 之后写过的（since = 0 就是全部）。同一毫秒写的也算上（多发几行没关系，漏了就找不回来）
+  var rows = [];
+  data.forEach(function (r) {
+    var id = String(r[c.ID] || '').trim(), d = day_(r[c.Date], tz);
+    if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(d) || (since && !(Number(r[c.Synced]) >= since))) return;
+    var v = Math.round(Number(String(r[c.Amount]).replace(/[^\d.]/g, '')) * 100) || 0, cat = String(r[c.Category] || '').trim();
+    var isIn = /^inc/i.test(String(r[c.Kind] || '')) || (!String(r[c.Kind] || '').trim() && inc[cat]);
+    rows.push({ id: id, d: d, v: isIn ? v : -v, c: cat, n: String(r[c.Note] || ''), u: Number(r[c.Updated]) || 0 });
+  });
+  var dels = since ? spendData_(dead).filter(function (r) { return Number(r[1]) >= since; }).map(function (r) { return String(r[0]); }) : [];
+  // 删除记录只留 14 天
+  var keep = spendData_(dead).filter(function (r) { return now - Number(r[1]) < KEEP_DELETED_DAYS * 864e5; });
+  if (keep.length < spendData_(dead).length) spendWrite_(dead, keep);
+  return { ok: true, now: now, rows: rows, dels: dels, budgets: spendBudgets_(book), cats: cats };
+}
+
 // ================= 网页接口 =================
 // App 只发 POST：{ secret, version, push: { rows: { tasks: [...] }, deletes: [{table, id, at}] }, pull: true, since }
 // 返回 { ok, now, pull: { tables, deleted } }。所有请求排队执行，所以 since 不会漏掉数据。
-// 还可以带：tidy（清过期的删除记录）、quarter（季度表那一天的几格）、archive（{before}，旧任务搬进 Archive 页）、reading（阅读表格）
+// 还可以带：tidy（清过期的删除记录）、quarter（季度表那一天的几格）、archive（{before}，旧任务搬进 Archive 页）、reading（阅读表格）、spend（记账表格）
 
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
@@ -1189,6 +1347,9 @@ function doPost(e) {
     }
     if (body.reading) {
       try { out.reading = reading_(body.reading); } catch (err) { out.reading = { error: String(err.message || err) }; }   // 阅读表格出问题不影响同步
+    }
+    if (body.spend) {
+      try { out.spend = spend_(body.spend); } catch (err) { out.spend = { error: String(err.message || err) }; }   // 记账表格出问题不影响同步
     }
     out.now = Date.now();
     out.version = VERSION;

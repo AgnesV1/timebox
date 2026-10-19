@@ -44,6 +44,11 @@ export function settingsHTML(phone) {
     '<label class="field"><span>Link to your reading Sheet</span><input data-reading-url value="' + esc(store.setting("reading")?.url || "") + '" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false"></label>' +
     '<p class="hint">New entries from the Reading page go to a <b>Want</b> tab in that Sheet (made if it isn\'t there). Search looks through every tab — wherever a row says Name. The Sheet can stay private: it only has to be editable by the Google account your 苦昼短 Sheet belongs to.</p></section>';
 
+  // 记账：单独一张 Google 表格（js/spend.js）。新建一个空白的、把链接贴进来；第一次同步时脚本自己建好几页
+  const spendCard = '<section class="card"><h3>Spending</h3>' +
+    '<label class="field"><span>Link to your spending Sheet</span><input data-spend-url value="' + esc(store.setting("spend")?.url || "") + '" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false"></label>' +
+    '<p class="hint">Make a blank Google Sheet and paste its link here. The first sync sets up <b>Transactions</b>, <b>Budgets</b> and <b>Categories</b> tabs — you can edit them there too. Same as reading: it can stay private, as long as the account your 苦昼短 Sheet belongs to can edit it.</p></section>';
+
   const backup = '<section class="card"><h3>Backup</h3><p class="hint">Everything is in your Sheet already. This saves a copy of this device\'s data as a file.</p>' +
     '<button type="button" class="btn" data-act="export">Export JSON</button></section>';
 
@@ -92,7 +97,7 @@ export function settingsHTML(phone) {
     return '<div class="settings phone-settings"><header class="phead"><div class="l"><a class="nav" href="#today">‹ Today</a></div></header>' +
       '<header class="page-head"><div><h2>Settings</h2></div></header>' + look + sheet + "</div>";
   }
-  return '<div class="settings"><header class="page-head"><div><h2>Settings</h2></div></header>' + sheet + time + groups + quarter + read + look + storage + backup + "</div>";
+  return '<div class="settings"><header class="page-head"><div><h2>Settings</h2></div></header>' + sheet + time + groups + quarter + read + spendCard + look + storage + backup + "</div>";
 }
 
 // 每周那一排：全空 = 每天都用默认值；填了几个就只改那几天
@@ -100,6 +105,16 @@ function weeklyFromInputs(root, def) {
   const vals = Array(7).fill(null);
   root.querySelectorAll("[data-week]").forEach((i) => { vals[Number(i.dataset.week)] = i.value.trim() === "" ? null : Math.max(0, Number(i.value) || 0); });
   return vals.every((v) => v === null) ? null : vals.map((v) => (v === null ? def : v));
+}
+
+function saveSpendLink(value) {
+  const url = String(value || "").trim();
+  if (url === (store.setting("spend")?.url || "")) return false;
+  if (url && !looksLikeSheet(url)) return false;
+  store.setSetting("spend", url ? { url } : null);
+  if (url) toast("Spending Sheet linked");
+  sync.sync();
+  return true;
 }
 
 export function initSettings() {
@@ -111,6 +126,9 @@ export function initSettings() {
   // 阅读表格链接：贴进来就存；清空也算（不再连）
   on(document, "input", ".settings [data-reading-url]", (e, el) => { if (looksLikeSheet(el.value)) saveReadingLink(el.value); });
   on(document, "change", ".settings [data-reading-url]", (e, el) => saveReadingLink(el.value));
+  // 记账表格链接：一样
+  on(document, "input", ".settings [data-spend-url]", (e, el) => { if (looksLikeSheet(el.value)) saveSpendLink(el.value); });
+  on(document, "change", ".settings [data-spend-url]", (e, el) => { if (!saveSpendLink(el.value) && el.value.trim() && !looksLikeSheet(el.value)) toast("That doesn't look like a Google Sheets link"); });
   on(document, "change", ".settings [data-cap], .settings [data-week]", (e, el) => {
     const root = el.closest(".settings");
     const def = Math.max(0, Number(root.querySelector('[data-cap="default"]').value) || 0);

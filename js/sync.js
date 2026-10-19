@@ -2,9 +2,11 @@
 // 改完 2.5 秒推一次（连着点几下只发一次）；页面切走时用 sendBeacon 补发；回到页面、联网时再同步。
 // 表格里的 Code.gs 和页面要是同一版（VERSION）：不知道表格是哪版时先问一句，旧版就先不推，改动都留在本机。
 // 同步完顺手做的：季度表里这几天的两格和自己打的分（设了链接才发，值变了才发）；每天让表格清一次过期的删除记录。
+// 阅读表格、记账表格搭同一趟车（各自设了链接才带）。
 
 import * as store from "./store.js";
 import * as reading from "./reading.js";
+import * as spend from "./spend.js";
 import * as S from "./stats.js";
 import * as SC from "./scores.js";
 import { debounce } from "./dom.js";
@@ -75,12 +77,16 @@ export async function sync({ full = false, archive = null } = {}) {
     const out = store.outgoing();
     // 阅读表格：设了链接才带（要追加的、要不要列表）
     const rq = store.setting("reading")?.url ? reading.request() : null;
+    // 记账表格：一样，设了链接才带（js/spend.js）
+    spend.link(Boolean(store.setting("spend")?.url));
+    const sq = store.setting("spend")?.url ? spend.request() : null;
     const day = store.today(), tidy = store.local().tidied !== day;
     const data = await post(url, { secret, pull: true, since: full ? 0 : store.cursor(), push: { rows: out.rows, deletes: out.deletes },
-      ...(rq ? { reading: rq } : {}), ...(tidy ? { tidy: true } : {}), ...(archive ? { archive } : {}) });
+      ...(rq ? { reading: rq } : {}), ...(sq ? { spend: sq } : {}), ...(tidy ? { tidy: true } : {}), ...(archive ? { archive } : {}) });
     store.pushed(out, data.tables || store.TABLES);
     store.applyPull(data.pull, data.now, { full });
     if (rq) reading.apply(data.reading, rq);
+    if (sq) spend.apply(data.spend, sq);
     if (tidy) store.setLocal({ tidied: day });
     if (archive) { store.forgetStorage(); store.setLocal({ archived: data.archive?.moved ?? 0 }); }
     await quarter(url, secret);

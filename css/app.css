@@ -1903,6 +1903,20 @@ select.open { border-color: var(--edge); }
 .monce .msub b { font-weight: 600; color: var(--ink); white-space: nowrap; }
 .mtable tr.bought td b { font-weight: 500; color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .mbought { display: inline-block; margin-top: 8px; font-size: 12.5px; }
+/* Restock 页右边一栏 Big buys（贵重的东西一天合多少）：窄了就落到底下 */
+.restock-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); gap: 0 40px; align-items: start; }
+.restock-main { min-width: 0; }
+@media (max-width: 1100px) { .restock-cols { grid-template-columns: minmax(0, 1fr); } }
+.restock-gear > header .tools { margin-left: auto; }
+.grate { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
+.grate input { width: 64px; padding: 3px 6px; border: var(--b-soft); border-radius: 8px; background: transparent; font: inherit; color: var(--ink); }
+.gtable td { vertical-align: top; }
+.gtable td small { display: block; font-size: 11px; white-space: nowrap; }
+.gtable td:first-child { width: 1px; padding-right: 0; }
+.gcat { display: inline-block; padding: 1px 7px; border-radius: 999px; background: var(--tonal); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--muted); white-space: nowrap; }
+.gtable .gcheap { color: var(--c-Chore); }
+.gtable tr.retired td { opacity: .55; }
+.gnote { margin-top: 10px; font-size: 11.5px; }
 
 /* ---------- To try（Meals → Boxes 页底下）：在外面吃过、想自己做的菜；今天页做完的任务底下记吃了什么（.dish-had）。这一段的类名都以 dish- 开头 ---------- */
 .dish-try { margin-top: 22px; }

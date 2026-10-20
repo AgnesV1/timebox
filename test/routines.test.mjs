@@ -71,7 +71,7 @@ test("regular time takes room before totals are spread; it doesn't count toward 
   const c = ctxOf();
   assert.equal(E.fixedOn(c, "2026-10-07"), 60);
   assert.equal(E.needOn(c, gym, "2026-10-07"), 0);
-  const c2 = ctxOf({ tasks: [{ id: "rt:g:2026-10-05", date: TODAY, est: 60, status: "done", projectId: "g" }, { id: "t", date: TODAY, est: 30, status: "done", projectId: "b2" }] });
+  const c2 = ctxOf({ tasks: [{ id: "rt:g:2026-10-05", date: TODAY, est: 60, actual: 60, status: "done", projectId: "g" }, { id: "t", date: TODAY, est: 30, actual: 30, status: "done", projectId: "b2" }] });
   assert.equal(E.doneOn(c2, TODAY), 30);
 });
 

@@ -1,5 +1,5 @@
 // 计时：在今天的列表里点一个任务选中它，底部浮条点 Start；计时中浮条显示走着的时间和 Stop，
-// 停下后浮条上可以顺手标 Done / Partial。手机和电脑一样；开着的计时器跟着表格同步，哪台设备都能停。
+// 停下后浮条上可以顺手标 Done / Delay。手机和电脑一样；开着的计时器跟着表格同步，哪台设备都能停。
 // 忘了按 / 停晚了：计时中点「Since 09:10」改开始的钟点；Stop 旁边的 ⏱ = 按某个钟点停。浮条底下多一行小框，填完点按钮才算（钟点框边打边发 change，不能一改就停）。
 
 import * as store from "../store.js";
@@ -10,12 +10,12 @@ import { animateNext } from "../motion.js";
 import { cheer } from "../fx.js";
 
 let picked = "";     // 这台设备上选中的任务
-let stopped = null;  // 刚停下的那段 {taskId, min}：浮条上给 Done / Partial
+let stopped = null;  // 刚停下的那段 {taskId, min}：浮条上给 Done / Delay
 let atEdit = "";     // 浮条上正在改的钟点：since = 其实几点开始的 / stop = 其实几点就停了
 const TITLE = document.title;
 
-// 能计时的：今天的、还没做完的（Partial 可以接着做）
-export const timeable = (t, today) => Boolean(t) && t.date === today && (!t.status || t.status === "partial");
+// 能计时的：今天的、还没做完的（Delay 的也可以接着做）
+export const timeable = (t, today) => Boolean(t) && t.date === today && (!t.status || t.status === "delay");
 
 // 选中的任务；没手动选过（或者选的那个已经做完了）：正在计时的那个，再不然今天第一个没做的（先挑不是 Optional 的）
 export function pickedId(c) {
@@ -41,7 +41,7 @@ const titleOf = (t) => '<b class="dk-title">' + esc(t.title) + "</b>";
 // ◆：这个任务是不是深度（要专心做的）。按 Start 的时候顺手定，计时中也能改
 const deepBtn = (t) => '<button type="button" class="dk-deep' + (t.deep ? " on" : "") + '" data-act="dock-deep" data-id="' + t.id + '" aria-pressed="' + Boolean(t.deep) + '" title="Deep work">◆<span>Deep</span></button>';
 
-// 浮条：在计时 → 时间 + Stop；刚停下 → Done / Partial；看着今天 → 选中的任务 + Start；别的时候不出现
+// 浮条：在计时 → 时间 + Stop；刚停下 → Done / Delay；看着今天 → 选中的任务 + Start；别的时候不出现
 // 浮条底下那一行：一个钟点框 + 按钮
 function atForm(kind, value) {
   return '<form class="dk-at" data-at="' + kind + '" autocomplete="off"><span>' + (kind === "since" ? "Started at" : "Stopped at") + "</span>" +
@@ -71,7 +71,7 @@ export function dockHTML(c, onToday, extra = () => null) {
     return '<div class="dock logged" style="--bar:' + colorOf(st) + '">' +
       '<div class="dk-main"><span class="dk-k">Logged ' + fmtMin(stopped.min) + "</span>" + titleOf(st) + "</div>" +
       '<button type="button" class="dk-btn" data-act="dock-status" data-s="done">Done</button>' +
-      '<button type="button" class="dk-btn ghost" data-act="dock-status" data-s="partial">Partial</button>' +
+      '<button type="button" class="dk-btn ghost" data-act="dock-status" data-s="delay">Delay</button>' +
       '<button type="button" class="icon-btn dk-x" data-act="dock-close" aria-label="Close">×</button></div>';
   }
   if (!onToday) return "";

@@ -90,14 +90,18 @@ test("friends: the record a task carries follows the task", () => {
   store.setTaskMeet(t, { note: "caught up" });
   assert.deepEqual([store.meetOfTask(t).friends, store.meetOfTask(t).note, store.meetOfTask(t).date], [[ana, bo], "caught up", T]);
   assert.deepEqual(store.lastContact(), { [ana]: T, [bo]: T });
-  // Later：这次没见成，不算；挪到明天的那条带着这条记录
-  store.toTomorrow(t);
-  assert.equal(store.meetOfTask(t), null);
-  const copy = store.all("tasks").find((x) => x.title === "Coffee" && x.id !== t);
-  assert.deepEqual([store.meetOfTask(copy.id).friends, store.meetOfTask(copy.id).date], [[ana, bo], copy.date]);
+  // Delay：这次没见成，不算见过；记录还挂在这条任务上（要另约就自己再开一条）
+  store.setStatus(t, "delay");
+  assert.deepEqual(store.meetOfTask(t).friends, [ana, bo]);
+  assert.deepEqual(store.lastContact(), {}, "a delayed catch-up didn't happen");
+  store.setStatus(t, "delay");
+  const next = new Date(Date.UTC(...T.split("-").map((v, i) => Number(v) - (i === 1 ? 1 : 0)))); next.setUTCDate(next.getUTCDate() + 1);
+  store.moveTask(t, next.toISOString().slice(0, 10));
+  assert.equal(store.meetOfTask(t).date, next.toISOString().slice(0, 10), "moving the task moves the record");
   assert.deepEqual(store.lastContact(), {}, "tomorrow hasn't happened");
-  store.moveTask(copy.id, T);
-  assert.equal(store.meetOfTask(copy.id).date, T, "moving the task moves the record");
+  store.moveTask(t, T);
+  const copy = store.get("tasks", t);
+  assert.equal(store.meetOfTask(copy.id).date, T);
   // 做完了该做的事：记一条、清掉
   store.saveFriend({ id: ana, next: "send the notes", nextDate: "2026-01-01" });
   assert.equal(F.todo(store.friends(), T).due, 1);

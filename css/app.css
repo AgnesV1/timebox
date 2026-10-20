@@ -472,9 +472,10 @@ body.side-min .sync-pill span { display: none; }
 .line { display: flex; align-items: flex-start; gap: 8px; }
 .task { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 500; line-height: 1.35; cursor: pointer; overflow-wrap: anywhere; }
 .task .more { color: var(--muted); }
-.st-done .task { color: var(--muted); }
-.st-drop .task { color: var(--muted); text-decoration: line-through; }
-.st-later .task { color: var(--muted); }
+/* 状态怎么画（和日历一个说法）：Done = 灰 + 划掉，Delay = 只划掉，Drop = 只灰 */
+.st-done .task { color: var(--muted); text-decoration: line-through; }
+.st-delay .task { text-decoration: line-through; }
+.st-drop .task { color: var(--muted); }
 .pj { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; vertical-align: 1px; }
 .pj::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pc); }
 .tag { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px; background: var(--ink); color: var(--accent); font: 700 10.5px/16px var(--body); letter-spacing: .05em; text-transform: uppercase; vertical-align: 1px; }
@@ -561,12 +562,9 @@ body.side-min .sync-pill span { display: none; }
 .ev:hover { background: color-mix(in srgb, var(--c) 38%, var(--paper)); }
 [data-theme="dark"] .ev { --paper: #0C0C13; background: color-mix(in srgb, var(--c) 22%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) 75%, var(--paper)); }
 [data-theme="dark"] .ev:hover { background: color-mix(in srgb, var(--c) 32%, var(--paper)); }
-.ev.st-done { opacity: .5; }
-.ev.st-done .t, .ev.st-drop .t { text-decoration: line-through; }
-.ev.st-drop { opacity: .35; }
-.ev.st-later { opacity: .55; background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
-.ev.st-partial { padding-right: 14px; }
-.ev.st-partial::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 8px; background: var(--leo-dark) 0 0/24px 24px, var(--c); }
+/* 日历上的状态：Done = 灰掉 + 划掉，Delay = 只划掉，Drop = 只灰掉 */
+.ev.st-done, .ev.st-drop { opacity: .45; }
+.ev.st-done .t, .ev.st-delay .t { text-decoration: line-through; }
 .ev.opt { background: var(--leo-tex) 0 0/60px 60px, color-mix(in srgb, var(--c) 28%, var(--paper)); background-blend-mode: soft-light; }
 .cell-add { position: absolute; left: 7px; right: 7px; bottom: 6px; display: grid; place-items: center; height: 20px; padding: 0; border: 1px dashed transparent; border-radius: 8px; background: none; color: var(--muted); opacity: 0; transition: opacity .15s; }
 .cell:hover .cell-add { opacity: 1; border-color: var(--line); }
@@ -1097,13 +1095,13 @@ body:has(#main :is(input, textarea, select):focus) #toast { bottom: calc(22px + 
 .rside { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; margin-top: 2px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .stw { font-weight: 600; }
 .st-done .stw { color: var(--ok); }
-.st-partial .stw { color: var(--ink); }
+.st-delay .stw { color: var(--ink); }
 .why { margin: 2px 0 0; overflow: hidden; font-size: 12.5px; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
 .dp { margin-left: 4px; font-size: 11.5px; font-weight: 700; white-space: nowrap; vertical-align: 1px; }
 .chips.hov { display: none; }
 /* 电脑上鼠标移上去，状态按钮浮在这一行右边。按钮底下不铺底色（卡片是半透明的，铺了就是一块实心的方块），
    而是让同一行的字在按钮那一段淡掉：--chips-w = 几个按钮加起来大概多宽，右边 44px 留给 ⋯ */
-.line { --chips-w: 224px; }
+.line { --chips-w: 168px; }
 @media (hover: hover) {
   .row:hover > .body > .chips.hov { position: absolute; top: 4px; right: 44px; display: flex; margin: 0; }
   .row:hover > .body:has(> .chips.hov) > .line {
@@ -1111,7 +1109,8 @@ body:has(#main :is(input, textarea, select):focus) #toast { bottom: calc(22px + 
     mask-image: linear-gradient(to left, #000 44px, transparent 44px, transparent calc(44px + var(--chips-w)), #000 calc(68px + var(--chips-w))); }
   .row:hover > .body:has(> .chips.hov) > .line > .rside { visibility: hidden; }   /* 右边那个状态字被按钮换掉了 */
 }
-body.phone .row.open .chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+body.phone .row.open .chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+body.phone .row.open .chips > .ghost { grid-column: 1 / -1; min-height: 32px; }
 body.phone .row.open .chip { min-height: 40px; padding: 0 4px; font-size: 14px; }
 body.phone .tm { padding-top: 0; padding-bottom: 0; }
 body.phone .tm-x { width: 32px; height: 32px; font-size: 17px; }

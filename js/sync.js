@@ -12,7 +12,7 @@ import * as SC from "./scores.js";
 import { debounce } from "./dom.js";
 import { quarterOf } from "./dates.js";
 
-export const VERSION = 5;
+export const VERSION = 6;
 const KEEP_DELETED_DAYS = 14;   // 表格里的删除记录只留这么久：更久没同步的设备整表重拉一次
 
 let busy = false, again = false;

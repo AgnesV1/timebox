@@ -5,11 +5,11 @@
 export const meetId = (taskId) => "mt:" + taskId;
 const low = (s) => String(s ?? "").trim().toLowerCase();
 
-// 算不算已经见过：日期不晚于今天，而且它连着的任务没有标 Later / Drop
+// 算不算已经见过：日期不晚于今天，而且它连着的任务没有标 Delay / Drop
 export function happened(meet, today, statusOf = () => "") {
   if (!meet?.date || meet.date > today) return false;
   const st = meet.taskId ? statusOf(meet.taskId) : "";
-  return st !== "later" && st !== "drop";
+  return st !== "delay" && st !== "drop";
 }
 
 // 每个人上次联系的日子：{ id: "2026-10-01" }

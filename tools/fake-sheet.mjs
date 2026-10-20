@@ -80,7 +80,8 @@ if (process.env.FAKE_WORST) {
     "Gym", "Read 30 pages", "Laundry", "Call mom", "Fix the flaky test in the sync code", "Grocery run", "Plan the trip"
   ];
   const tasks = titles.map((title, i) => ({ id: "worst-" + i, date: T, title, est: [90, 45, 30, 5, 25, 40, 30, 20, 15, 60, 30, 45][i], order: i + 1,
-    status: ["", "done", "", "drop", "", "done", "", "", "done", "", "", ""][i], group: ["Build", "Chores", "Work", "Friends", "Work", "Fitness", "Leisure", "Chores", "Friends", "Build", "Chores", "Leisure"][i], updated: 10 }));
+    status: ["", "done", "delay", "drop", "", "done", "", "", "done", "", "", ""][i], actual: [0, 45, 10, 0, 0, 0, 12, 0, 15, 0, 0, 0][i] || null,
+    times: [0, 45, 10, 0, 0, 0, 12, 0, 15, 0, 0, 0][i] ? [0, 45, 10, 0, 0, 0, 12, 0, 15, 0, 0, 0][i] + "m" : "", reason: i === 2 ? "waiting on the data" : "", group: ["Build", "Chores", "Work", "Friends", "Work", "Fitness", "Leisure", "Chores", "Friends", "Build", "Chores", "Leisure"][i], updated: 10 }));
   g.post({ secret: "CHANGE_ME", push: { rows: { tasks } } });
   console.log("worst-case data:", tasks.length, "tasks on", T);
 }

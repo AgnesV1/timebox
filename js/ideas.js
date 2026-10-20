@@ -22,9 +22,9 @@ export function kindCounts(ideas, taskOf, today) {
 const low = (s) => String(s ?? "").trim().toLowerCase();
 export const sameText = (a, b) => low(a) === low(b);
 
-// 挂着的那条任务还算不算数：在，而且没标 Later / Drop
-const live = (task) => Boolean(task) && task.status !== "later" && task.status !== "drop";
-const fin = (task) => task.status === "done" || task.status === "partial";
+// 挂着的那条任务还算不算数：在，而且没标 Delay / Drop
+const live = (task) => Boolean(task) && task.status !== "delay" && task.status !== "drop";
+const fin = (task) => task.status === "done";
 
 // "done" 去过了（不再显示）/ "planned" 排进某天了 / "missed" 有日子、已经过了、没排 / "open" 在池子里
 export function stateOf(idea, taskOf, today) {

@@ -6,7 +6,7 @@ import { esc } from "../dom.js";
 import { fmtMin } from "../dates.js";
 import { zebraFor } from "../patterns.js";
 
-export const STATUS = [["done", "Done"], ["partial", "Partial"], ["later", "Later"], ["drop", "Drop"]];
+export const STATUS = [["done", "Done"], ["delay", "Delay"], ["drop", "Drop"]];
 
 // 侧栏左上 / 手机顶栏的那颗日月：白天是太阳、夜里是月亮（颜色在 css 的 .ball），点一下换白天 / 夜里（js/main.js）。
 // 上面一层镜面球的细格：纬线不动，八条经线各自走到下一条的位置（--a → --b 是这一格起止的 sin 值），首尾相接，看着就是球绕着竖轴在转
@@ -73,14 +73,16 @@ export function zebraOf(t) {
   return c ? zebraFor(c) : "var(--zebra-None)";
 }
 
-// 做完 = 纯色；部分完成 = 豹纹；还没做 = 斑马纹；Later 只剩描边；Drop 淡掉
-export function segStyle(t) {
-  const c = colorOf(t);
-  if (t.status === "done") return "background:" + c;
-  if (t.status === "partial") return "background:var(--leo-dark) 0 0/30px 30px," + c;
-  if (t.status === "drop") return "background:var(--track);opacity:.4";
-  if (t.status === "later") return "background:var(--track);box-shadow:inset 0 0 0 1.5px " + c;
-  return "background:" + zebraOf(t) + " 0 0/22px 22px,var(--track)";
+// 今天那条轴上的一段，只看记下的时间：
+//   还没标的：长度 = 预计（记下的超过预计就按记下的），实心 = 记下的那截，剩下的斑马纹 = 还没做
+//   标过的（Done / Delay / Drop）：不再占这一天的计划，只剩记下的那截实心；一点没记的不画
+export function segHTML(t) {
+  const est = Number(t.est) || 0, got = E.spentMin(t), open = E.isOpen(t);
+  const len = open ? Math.max(est, got) : got;
+  if (!(len > 0) && !open) return "";
+  const c = colorOf(t), fill = len > 0 ? Math.min(100, (got / len) * 100) : 0;
+  const bg = open ? "linear-gradient(90deg," + c + " " + fill.toFixed(1) + "%,transparent 0)," + zebraOf(t) + " 0 0/22px 22px,var(--track)" : c;
+  return '<i title="' + esc(t.title) + " · " + (got ? fmtMin(got) + " of " : "") + est + ' min" style="flex-grow:' + Math.max(5, len) + ";background:" + bg + '"></i>';
 }
 
 const perDay = (v) => (v < 1 ? "<1m" : fmtMin(v));
@@ -135,7 +137,7 @@ export function heroHTML(c, d) {
 export function stripHTML(c, d, tasks) {
   const day = E.daySummary(c, d);
   const over = day.cap > 0 && day.planned > day.cap;
-  return '<div class="strip">' + tasks.map((t) => '<i title="' + esc(t.title) + " · " + t.est + ' min" style="flex-grow:' + Math.max(5, Number(t.est) || 0) + ";" + segStyle(t) + '"></i>').join("") + "</div>" +
+  return '<div class="strip">' + tasks.map(segHTML).join("") + "</div>" +
     '<div class="stripmeta' + (over ? " over" : "") + '"><span>' + day.planned + " / " + (day.cap || "—") + " min planned" + (over ? " · over" : "") + "</span><span>" + Math.round(day.done) + " min done</span></div>";
 }
 

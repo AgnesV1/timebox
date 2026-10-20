@@ -25,8 +25,8 @@ test("summary: time, completion, line held, accuracy, projects, reasons", () => 
     log: { "2026-10-01": { need: 60, projects: { p: 60 } }, "2026-10-02": { need: 60, projects: { p: 60 } } },
     tasks: [
       t("a", "2026-10-01", 60, "done", { actual: 75, projectId: "p", category: "Main" }),
-      t("b", "2026-10-01", 30, "partial", { actual: 10, category: "Work", reason: "Meetings " }),
-      t("c", "2026-10-02", 40, "later", { category: "Work", reason: "meetings" }),
+      t("b", "2026-10-01", 30, "delay", { actual: 10, category: "Work", reason: "Meetings " }),
+      t("c", "2026-10-02", 40, "delay", { category: "Work", reason: "meetings" }),
       t("d", "2026-10-02", 20, "drop", { reason: "Too tired" }),
       t("e", "2026-10-02", 30, "", { optional: true }),
       t("f", "2026-10-06", 45, "")   // 明天的，不算
@@ -41,7 +41,7 @@ test("summary: time, completion, line held, accuracy, projects, reasons", () => 
   assert.equal(s.lineDays, 2);
   assert.equal(s.accuracy, 1.25);
   assert.equal(s.active, 1);
-  assert.deepEqual(s.status, { partial: 1, later: 1, drop: 1 });
+  assert.deepEqual(s.status, { delay: 2, drop: 1 });
   assert.equal(s.reasons[0].count, 2, "same reason, different case and spaces");
   assert.equal(s.reasons[0].text, "Meetings");
   assert.equal(s.byProject[0].name, "Main - French");
@@ -78,8 +78,9 @@ const deepCtx = (over = {}) => {
     ],
     tasks: [
       t("a", "2026-10-02", 60, { actual: 90, projectId: "r", deep: true }),    // 周五
-      t("b", "2026-10-03", 30, { projectId: "l", deep: true }),               // 周六：没填实际，按估的算
-      t("c", "2026-10-03", 20, { projectId: "c" }),
+      t("b", "2026-10-03", 30, { actual: 30, projectId: "l", deep: true }),   // 周六
+      t("c", "2026-10-03", 20, { actual: 20, projectId: "c" }),
+      t("g", "2026-10-03", 50, { projectId: "c" }),                           // 标了 Done 但一点没记：时间里不算
       t("d", "2026-10-05", 45, { actual: 40 }),                               // 没挂计划
       t("e", "2026-10-05", 60, { status: "", actual: 15, projectId: "r", deep: true })   // 还没标，记了 15 分钟
     ],

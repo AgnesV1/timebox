@@ -1898,21 +1898,32 @@ select.open { border-color: var(--edge); }
 .rfin .vibe { width: 34px; height: 28px; font-size: 16px; }
 .rfin .link { margin-left: 4px; font-size: 12.5px; }
 /* Restock 页底下的 Buy once（只买一次的）：区头、买过的行、底下那句 Bought (n) */
-.monce { margin-top: 22px; align-items: flex-end; }
-.monce .msub-h { margin: 0 0 4px; padding-top: 0; border-top: 0; }
 .monce .msub b { font-weight: 600; color: var(--ink); white-space: nowrap; }
 .mtable tr.bought td b { font-weight: 500; color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .mbought { display: inline-block; margin-top: 8px; font-size: 12.5px; }
-/* Restock 页右边一栏 Big buys（贵重的东西一天合多少）：窄窄一条，每样一行往下排；窗口窄了就落到底下 */
-.restock-cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0 36px; align-items: start; }
+/* Restock 页：左边主区，每块一个头（标题 + 小 + Item，说明在下一行）；
+   右边一栏 Big buys 是次要的：铺一块淡底的面板、字小一号、按钮不发光；窄窄一条，每样一行往下排；窗口窄了就落到底下 */
+.restock-cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0 32px; align-items: start; }
 .restock-main { min-width: 0; }
-@media (max-width: 1100px) { .restock-cols { grid-template-columns: minmax(0, 1fr); } .restock-gear { max-width: 420px; } }
-.restock-gear > header .tools { margin-left: auto; }
+@media (max-width: 1100px) { .restock-cols { grid-template-columns: minmax(0, 1fr); } .restock-gear { max-width: 420px; margin-top: 8px; } }
+.rs-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 6px 0 10px; }
+.rs-head h3 { margin: 0; font: 700 15px var(--display); }
+.rs-head .msub { flex-basis: 100%; }
+.rs-head.monce { margin-top: 30px; }
+.btn.sm { padding: 4px 10px; font-size: 12px; }
+.btn.sm svg { width: 13px; height: 13px; }
+.restock-gear { margin-bottom: 24px; padding: 14px 14px 12px; border-radius: 16px; background: var(--surface); }
+.restock-gear > header { gap: 4px 8px; }
+.restock-gear h3 { font-size: 13px; color: var(--muted); letter-spacing: .02em; }
+.restock-gear > header .tools { margin-left: auto; gap: 10px; }
+.restock-gear .link { font-size: 12px; }
+.restock-gear .glist li:hover { background: var(--surface2); }
 .gsum { margin: 0 0 4px; font-size: 12px; }
 .grate { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
 .grate input { width: 60px; padding: 3px 6px; border: var(--b-soft); border-radius: 8px; background: transparent; font: inherit; color: var(--ink); }
 .glist { margin: 0; padding: 0; list-style: none; }
 .glist li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 6px; border-top: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.restock-gear .glist li { border-top-color: var(--surface2); }
 .glist li:hover { background: var(--surface); }
 .glist li.retired { opacity: .55; }
 .gname b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

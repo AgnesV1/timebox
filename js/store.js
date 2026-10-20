@@ -315,8 +315,9 @@ export function pushed(out, known = TABLES) {
   persist();
 }
 
-// 状态只有 "" / done / delay / drop；以前的 Partial、Later 都读成 Delay
-export const statusIn = (s) => (s === "partial" || s === "later" ? "delay" : s || "");
+// 状态只有 "" / done / delay / drop；以前的 Partial、Later 都读成 Delay。
+// 写成 function（会提前生效）：文件一开头的 load() → upgrade() 就要用它，写成 const 那时还没定义，整个网页起不来
+export function statusIn(s) { return s === "partial" || s === "later" ? "delay" : s || ""; }
 
 function normalize(t, raw) {
   const r = { ...raw };

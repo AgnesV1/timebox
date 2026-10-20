@@ -79,7 +79,7 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
     spentBy[t.date] = (spentBy[t.date] || 0) + E.spentMin(t);
     if (E.spentMin(t)) { const n = rowOf(ctx, t, by).name; (wdBy[n] = wdBy[n] || Array(7).fill(0))[weekday(t.date)] += E.spentMin(t); }
     if (t.deep) deepBy[t.date] = (deepBy[t.date] || 0) + E.spentMin(t);
-    if (t.status !== "drop" && t.status !== "later") plannedBy[t.date] = (plannedBy[t.date] || 0) + num(t.est);
+    if (E.isPlanned(t)) plannedBy[t.date] = (plannedBy[t.date] || 0) + num(t.est);
   }
   const spent = days.reduce((a, d) => a + (spentBy[d] || 0), 0);
   const planned = days.reduce((a, d) => a + (plannedBy[d] || 0), 0);
@@ -123,7 +123,7 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
     return { wd, avg: ds.length ? total / ds.length : 0, days: ds.length, parts };
   });
 
-  const status = { partial: 0, later: 0, drop: 0 };
+  const status = { delay: 0, drop: 0 };
   const groups = new Map();
   for (const t of tasks) {
     if (!(t.status in status)) continue;
@@ -145,7 +145,7 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
     avgPlanned: days.length ? planned / days.length : 0,
     avgSpent: days.length ? spent / days.length : 0,
     avgCap: caps.length ? caps.reduce((a, v) => a + v, 0) / caps.length : 0,
-    byProject, byWeekday, status, reasons, withoutReason: status.partial + status.later + status.drop - withReason,
+    byProject, byWeekday, status, reasons, withoutReason: status.delay + status.drop - withReason,
     daily: range(from, to).map((d) => ({ date: d, spent: spentBy[d] || 0, deep: deepBy[d] || 0, planned: plannedBy[d] || 0, line: num(ctx.log?.[d]?.need), goal: goalOn(d), future: d > ctx.today }))
   };
 }
@@ -232,13 +232,13 @@ export function groupHealth(ctx, g, { weekly = {}, lastContact = "" } = {}) {
 }
 
 // 这个大类最近 n 天（到今天为止，从旧到新）每天一格：[{ date, state }]。
-//   "done" 那天在这个大类里做了事（标了 Done / Partial，或记了时间）；extra 里的日子也算（Friends 记下的 catch-up）
+//   "done" 那天在这个大类里做了事（标了 Done，或记了时间）；extra 里的日子也算（Friends 记下的 catch-up）
 //   "open" 那天有安排，还没做（过去的 = 没标；今天的 = 还没轮到）        "" 那天没有
 export function groupDays(ctx, g, n = 14, extra = []) {
   const from = addDays(ctx.today, -(n - 1)), also = new Set(extra), state = {};
   for (const t of ctx.tasks) {
     if (!t.date || t.date < from || t.date > ctx.today || rowOf(ctx, t, "group").name !== g.name) continue;
-    if (t.status === "done" || t.status === "partial" || E.spentMin(t) > 0) state[t.date] = "done";
+    if (t.status === "done" || E.spentMin(t) > 0) state[t.date] = "done";
     else if (!t.status && !state[t.date]) state[t.date] = "open";
   }
   return Array.from({ length: n }, (_, i) => { const date = addDays(from, i); return { date, state: also.has(date) ? "done" : state[date] || "" }; });

@@ -225,8 +225,8 @@ const paint = (x) => esc(x.color || "var(--c-None)");
 // ---------- 没做完的原因 ----------
 
 function reasonsHTML(s) {
-  const total = s.status.partial + s.status.later + s.status.drop;
-  const head = '<div class="statuses"><span><b class="num">' + s.status.partial + '</b> ◐ Partial</span><span><b class="num">' + s.status.later + '</b> → Later</span><span><b class="num">' + s.status.drop + "</b> × Drop</span></div>";
+  const total = s.status.delay + s.status.drop;
+  const head = '<div class="statuses"><span><b class="num">' + s.status.delay + '</b> ◐ Delay</span><span><b class="num">' + s.status.drop + "</b> × Drop</span></div>";
   if (!total) return '<section class="card"><h3>Why things slipped</h3>' + head + '<p class="empty">Nothing slipped in this period.</p></section>';
   const list = s.reasons.slice(0, 8);
   const max = Math.max(1, ...list.map((g) => g.count));

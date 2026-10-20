@@ -7,7 +7,8 @@
 //              place: auto（自动排到每天）/ pool（进任务池自己拖）；early = 想提前几天完成
 //   - item:    {id, projectId, module, title, est, origEst}  任务池里的计划条目，est 是总分钟
 //   - task:    {id, date, title, est, actual, status, projectId, itemId, optional}
-//              status: "" 待做 / done / partial / later / drop
+//              status: "" 待做 / done / delay / drop。状态只管「做完没有」：日历怎么画、完成率、Delay / Drop 的分析；
+//              花了多少时间只看记下的（actual = Times 加起来），和状态无关
 //   - log:     {date: {need, projects: {projectId: 分钟}}}   每天第一次打开时拍的安全线快照
 //
 // 计算链：任务完成 → 条目进度 → 项目剩余 → 按可用天数摊成每日需求（多个项目一起平摊）
@@ -29,21 +30,17 @@ const round5 = (v) => Math.round(v / 5) * 5;
 
 // ---------- 单个任务 ----------
 
-// 实际花掉的时间：填了 Actual 按实际；没填的 Done 按预计；Partial 没填算 0；
-// 还没标状态但计过时的，按计的时间算；Later / Drop 不算
-export function spentMin(t) {
-  const a = num(t.actual);
-  if (t.status === "done") return a > 0 ? a : num(t.est);
-  if (t.status === "partial" || !t.status) return a;
-  return 0;
-}
+// 实际花掉的时间：只看记下的（计时器、补记的那几段加起来），标没标、标的什么都一样
+export const spentMin = (t) => num(t.actual);
 
-// 推进了多少计划：Done 算满预计；Partial 按实际算但不超过预计
+// 推进了多少计划：标了 Done 的算整条做完（满预计，做得比预计快也能结掉）；没标 Done 的按记下的时间算，不超过预计
 export function planMin(t) {
   if (t.status === "done") return num(t.est);
-  if (t.status === "partial") return Math.min(num(t.actual), num(t.est));
-  return 0;
+  return Math.min(num(t.actual), num(t.est));
 }
+
+// 还算不算那天的计划：Delay、Drop 的不算（记下的时间照样算花了）
+export const isPlanned = (t) => t.status !== "delay" && t.status !== "drop";
 
 export const isOpen = (t) => !t.status;
 // 规律计划那天的那一次
@@ -110,7 +107,7 @@ export function itemState(ctx, item) {
   let progress = 0, scheduled = 0;
   for (const t of tasksOfItem(ctx, item.id)) {
     progress += planMin(t);
-    if (isOpen(t)) scheduled += num(t.est);
+    if (isOpen(t)) scheduled += num(t.est) - planMin(t);
   }
   progress = Math.min(progress, est);
   const remaining = Math.max(est - progress, 0);
@@ -448,8 +445,7 @@ export function planOverdue(ctx) {
 
 export function daySummary(ctx, d) {
   const ts = tasksOn(ctx, d);
-  const live = ts.filter((t) => t.status !== "drop" && t.status !== "later");
-  return { planned: sum(live, (t) => num(t.est)), done: sum(ts, spentMin), cap: capacityFor(ctx.capacity, d), rest: !isWorkDay(ctx.capacity, d), count: ts.length };
+  return { planned: sum(ts.filter(isPlanned), (t) => num(t.est)), done: sum(ts, spentMin), cap: capacityFor(ctx.capacity, d), rest: !isWorkDay(ctx.capacity, d), count: ts.length };
 }
 
 // 任务池：放在池里的整块计划还没排进日历的条目（自动排的不进池）
@@ -463,8 +459,6 @@ export function poolItems(ctx) {
 // ---------- 自动排：今天落成任务、以后画预览 ----------
 
 const round5u = (v) => Math.round(v / 5) * 5;
-const live = (t) => t.status !== "drop" && t.status !== "later";
-
 // 整块计划（Auto）今天的份额拆成任务：按条目顺序，一条一段，ID = au:<条目>:<日期>。
 // shares = 今天早上的快照；pids = 要排的计划；那天已经手动排了的先扣掉
 export function autoChunks(ctx, shares, pids) {
@@ -473,7 +467,7 @@ export function autoChunks(ctx, shares, pids) {
     if (!pids.includes(p.id) || !isActive(p) || isRegular(p) || !isAuto(p)) continue;
     const today = tasksOn(ctx, ctx.today).filter((t) => t.projectId === p.id);
     if (today.some((t) => String(t.id).startsWith("au:"))) continue;
-    let need = round5u(num(shares[p.id]) - sum(today.filter(live), (t) => num(t.est)));
+    let need = round5u(num(shares[p.id]) - sum(today.filter(isPlanned), (t) => num(t.est)));
     for (const item of itemsOf(ctx, p.id)) {
       if (need < 5) break;
       const left = itemState(ctx, item).unscheduled;
@@ -508,8 +502,8 @@ export function regularWeek(ctx, p, d = ctx.today) {
   const ws = startOfWeek(d, ctx.weekStartsOn || "monday"), we = addDays(ws, 6), r = ruleOf(p);
   const ts = tasksOfProject(ctx, p.id).filter((t) => t.date >= ws && t.date <= we);
   const target = isAuto(p) ? range(ws, we).filter((x) => dueOn(r, x)).length : (inRange(r, we) || inRange(r, ws) ? num(r.perWeek) : 0);
-  const placed = ts.filter(live).length;
-  return { target, placed, done: ts.filter((t) => t.status === "done" || t.status === "partial").length, left: Math.max(0, target - placed) };
+  const placed = ts.filter(isPlanned).length;
+  return { target, placed, done: ts.filter((t) => t.status === "done").length, left: Math.max(0, target - placed) };
 }
 
 // 任务池里的规律计划（Pool）：这周还剩几次没排

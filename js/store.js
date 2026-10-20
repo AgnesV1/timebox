@@ -23,7 +23,7 @@ import quadStore from "./store/quads.js";
 
 const KEY = "kuzhouduan-v1";
 const OLD_KEY = "timebox-v1";
-const SCHEMA = 3;   // 和表格的 Code.gs 版本对应（见 sync.js）
+const SCHEMA = 4;   // 和表格的 Code.gs 版本对应（见 sync.js）
 export const TABLES = ["tasks", "projects", "items", "log", "settings", "friends", "meets"];
 const KEYED = { log: "date", settings: "key" };
 
@@ -144,6 +144,11 @@ function upgrade(s) {
     delete pend["settings:routines"];
   }
   for (const t of Object.values(d.tasks || {})) { delete t.category; delete t.doneOrder; }
+  // 4：Partial / Later 并成 Delay；时间只看记下的，以前没计时就标了 Done 的补一段记录（= 预计），以前的统计数字不变。表格那边 setup 做同一件事
+  for (const t of Object.values(d.tasks || {})) {
+    t.status = statusIn(t.status);
+    if (t.status === "done" && !(Number(t.actual) > 0) && !t.times && Number(t.est) > 0 && !E.isChore(t)) { t.actual = Number(t.est); t.times = formatTimes([{ from: "", to: "", min: Number(t.est) }]); }
+  }
   for (const gone of ["time", "capacity", "notes"]) {
     delete d[gone];
     for (const k of Object.keys(pend)) if (k.startsWith(gone + ":")) delete pend[k];
@@ -310,11 +315,14 @@ export function pushed(out, known = TABLES) {
   persist();
 }
 
+// 状态只有 "" / done / delay / drop；以前的 Partial、Later 都读成 Delay
+export const statusIn = (s) => (s === "partial" || s === "later" ? "delay" : s || "");
+
 function normalize(t, raw) {
   const r = { ...raw };
   r.id = String(KEYED[t] ? raw[KEYED[t]] : raw.id);
   if (t === "tasks") {
-    r.status = r.status || "";
+    r.status = statusIn(r.status);
     r.est = Number(r.est) || 0;
     r.optional = Boolean(r.optional);
     r.deep = Boolean(r.deep);
@@ -416,18 +424,12 @@ export function updateTask(id, patch, label, opts) {
   change(() => put("tasks", { ...t, ...patch }), label, opts);
 }
 
-// 和旧版一样：再点一次同一个就取消。
-// 实际分钟：有计时记录就是记录加起来，取消 / Later / Drop 也不清掉（时间是真花了的）
+// 和旧版一样：再点一次同一个就取消。只改状态，记下的时间不动（时间是真花了的，和标什么无关）
 export function setStatus(id, s) {
   const t = get("tasks", id);
   if (!t) return;
   const off = t.status === s;
-  const fin = s === "done" || s === "partial";
-  updateTask(id, {
-    status: off ? "" : s,
-    reason: s === "done" && !off ? "" : t.reason,
-    actual: !off && fin ? t.actual : timeTotal(id) || null
-  });
+  updateTask(id, { status: off ? "" : s, reason: s === "done" && !off ? "" : t.reason });
 }
 
 export function moveTask(id, date) {
@@ -474,20 +476,6 @@ export function deleteTask(id) {
     const p = rt && routineOf(id);
     if (p && !(p.rule?.skip || []).includes(rt.date)) setRule(p, { skip: [...(p.rule?.skip || []), rt.date] });
   }, "Deleted");
-}
-
-// Later → 原来那条留着（原因还在），在明天放一条新的
-export function toTomorrow(id) {
-  const t = get("tasks", id);
-  if (!t) return;
-  const date = addDays(t.date < today() ? today() : t.date, 1);
-  change(() => {
-    if (t.status !== "later") put("tasks", { ...t, status: "later" });
-    const nid = newId();
-    put("tasks", { ...t, id: nid, date, status: "", actual: null, times: "", reason: "", order: nextOrder(date) });
-    moveMeet(id, nid, date);
-    moveIdea(id, nid);
-  }, "Moved to tomorrow");
 }
 
 // 从任务池拖到某天：小条目整块排进去；大块的（比如 600 分钟的总任务）按每天该做的量切一块
@@ -587,6 +575,7 @@ export function deleteProject(id) {
     const group = groupFor(id);   // 留下来的任务还算在原来那个大类里
     all("tasks").filter((t) => t.projectId === id).forEach((t) => (E.isAutoTask(t) && !started(t) ? dropTask(t.id) : put("tasks", { ...t, projectId: "", itemId: "", group })));
     drop("projects", id);
+    renameGoalRef("p:" + id, "");   // 目标上连着它的那一条也拿掉
   }, "Deleted plan");
 }
 
@@ -801,6 +790,7 @@ export function renameGroup(from, to) {
     putGroups(merge ? list.filter((g) => g.name !== from) : list.map((g) => (g.name === from ? { ...g, name } : g)));
     all("projects").filter((p) => (p.group || "") === from).forEach((p) => put("projects", { ...p, group: name }));
     all("tasks").filter((t) => !t.projectId && (t.group || "") === from).forEach((t) => put("tasks", { ...t, group: name }));
+    renameGoalRef("g:" + from, "g:" + name);   // 为哪些目标服务，跟着新名字走
   }, merge ? "Moved " + from + " into " + name : "Renamed project");
 }
 
@@ -866,5 +856,5 @@ export const { scores, scoreOf, scoreSetup, scoreCells, setScore, setScoreNote }
 
 export const { quads, quadOf, quadBoard, addQuad, moveQuad, editQuad, doneQuad, deleteQuad, restoreQuad, adoptQuads } = quadStore(core);
 
-export const { goals, saveGoal, deleteGoal } = goalStore(core);
+export const { goals, saveGoal, deleteGoal, setParent, linkGoal, renameGoalRef, ensureNorthStar } = goalStore(core);
 export const { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples, addDishes, dishToBox } = mealStore(core);

@@ -10,12 +10,12 @@ const idea = (x) => ({ id: x.text, kind: "", date: "", by: false, note: "", task
 const tasks = (list) => (id) => list.find((t) => t.id === id) || null;
 
 test("state: in the pool, planned, done, missed", () => {
-  const of = tasks([{ id: "a", date: "2026-10-17", status: "" }, { id: "b", date: "2026-10-10", status: "done" }, { id: "c", date: "2026-10-11", status: "drop" }, { id: "d", date: "2026-10-11", status: "later" }]);
+  const of = tasks([{ id: "a", date: "2026-10-17", status: "" }, { id: "b", date: "2026-10-10", status: "done" }, { id: "c", date: "2026-10-11", status: "drop" }, { id: "d", date: "2026-10-11", status: "delay" }]);
   assert.equal(I.stateOf(idea({ text: "x" }), of, T), "open");
   assert.equal(I.stateOf(idea({ text: "x", taskId: "a" }), of, T), "planned");
   assert.equal(I.stateOf(idea({ text: "x", taskId: "b" }), of, T), "done");
   assert.equal(I.stateOf(idea({ text: "x", taskId: "c" }), of, T), "open", "a dropped task puts it back");
-  assert.equal(I.stateOf(idea({ text: "x", taskId: "d" }), of, T), "open", "so does Later");
+  assert.equal(I.stateOf(idea({ text: "x", taskId: "d" }), of, T), "open", "so does Delay");
   assert.equal(I.stateOf(idea({ text: "x", taskId: "gone" }), of, T), "open", "and a deleted task");
   assert.equal(I.stateOf(idea({ text: "x", date: "2026-10-11" }), of, T), "missed");
   assert.equal(I.stateOf(idea({ text: "x", date: T }), of, T), "open", "today isn't missed yet");
@@ -58,10 +58,10 @@ test("kinds: emoji, the old Outing, and how many are left under each", () => {
 
 test("stale: done for a week, ready to delete", () => {
   const now = Date.parse("2026-10-12T12:00:00Z");
-  const of = tasks([{ id: "old", status: "done", updated: now - 8 * DAY }, { id: "new", status: "done", updated: now - 2 * DAY }, { id: "part", status: "partial", updated: now - 30 * DAY },
+  const of = tasks([{ id: "old", status: "done", updated: now - 8 * DAY }, { id: "new", status: "done", updated: now - 2 * DAY }, { id: "part", status: "delay", updated: now - 30 * DAY },
     { id: "open", status: "", updated: now - 30 * DAY }, { id: "drop", status: "drop", updated: now - 30 * DAY }]);
   const list = [idea({ text: "a", taskId: "old" }), idea({ text: "b", taskId: "new" }), idea({ text: "c", taskId: "part" }), idea({ text: "d", taskId: "open" }), idea({ text: "e", taskId: "drop" }), idea({ text: "f", taskId: "gone" }), idea({ text: "g" })];
-  assert.deepEqual(I.stale(list, of, now).map((i) => i.text), ["a", "c"]);
+  assert.deepEqual(I.stale(list, of, now).map((i) => i.text), ["a"], "only Done counts as having gone; a delayed one is still to do");
 });
 
 test("soon: dated, within a week, not planned yet", () => {
@@ -137,11 +137,11 @@ test("store: picked, done, dropped, deleted, moved, undone", async () => {
   assert.equal(state(a), "open", "dropped: back in the pool");
   store.setStatus(t, "drop");
 
-  store.toTomorrow(t);
-  const moved = store.ideaOf(a).taskId;
-  assert.notEqual(moved, t, "follows the task to tomorrow");
-  assert.equal(of(moved).status, "");
+  store.setStatus(t, "delay");
+  assert.equal(state(a), "open", "delayed: back in the pool, to be planned again");
+  store.setStatus(t, "delay");
   assert.equal(state(a), "planned");
+  const moved = t;
 
   store.deleteTask(moved);
   assert.equal(store.ideaOf(a).taskId, "", "deleted: back in the pool");

@@ -1,12 +1,13 @@
 // 几个页面都用得到的小块：颜色、安全线卡片、进度条、拖延账单、健康标签、提示条
 
 import * as E from "../engine.js";
+import * as G from "../goals.js";
 import * as store from "../store.js";
 import { esc } from "../dom.js";
 import { fmtMin } from "../dates.js";
 import { zebraFor } from "../patterns.js";
 
-export const STATUS = [["done", "Done"], ["partial", "Partial"], ["later", "Later"], ["drop", "Drop"]];
+export const STATUS = [["done", "Done"], ["delay", "Delay"], ["drop", "Drop"]];
 
 // 侧栏左上 / 手机顶栏的那颗日月：白天是太阳、夜里是月亮（颜色在 css 的 .ball），点一下换白天 / 夜里（js/main.js）。
 // 上面一层镜面球的细格：纬线不动，八条经线各自走到下一条的位置（--a → --b 是这一格起止的 sin 值），首尾相接，看着就是球绕着竖轴在转
@@ -68,19 +69,38 @@ export function badgeOf(t) {
   return p ? { name: p.name || "", color: p.color || "" } : t.group ? { name: t.group, color: store.groupByName(t.group)?.color || "" } : null;
 }
 
+// 「For B2 exam → Mock exam → Pass B2 → … → ✦ North star 里那条」：这件事是为了什么。
+// 第一个是它的计划（没有计划、或者是循环小事的，是项目），带那个颜色；后面是它服务的目标，一层层往上（计划自己没连目标的，用它所在项目连着的，见 js/goals.js）。
+// 连着几个目标就几行，最多 max 行，多的写「+N more」。fold：一条链超过这么多个目标时，只留前面几个和最后一个，中间折成「⋯」（手机上省地方，点了展开）
+export function chainHTML({ planId = "", group = "", head = null, max = 2, fold = 0 } = {}) {
+  const goals = store.goals();
+  const chains = goals.length && head?.name ? G.chainsFor(goals, G.goalsFor(goals, { planId, group })) : [];
+  if (!chains.length) return "";
+  const step = (g) => '<i aria-hidden="true">→</i><span' + (g.span === "north" ? ' class="ch-star"' : "") + ' title="' + esc(g.text) + '">' + esc(g.text) + "</span>";
+  const line = (ch) => '<p class="chain"><span class="ch-for">For</span><b style="--pc:' + esc(head.color || "var(--c-None)") + '">' + esc(head.name) + "</b>" +
+    (fold && ch.length > fold ? ch.slice(0, fold - 1).map(step).join("") + '<i aria-hidden="true">→</i><button type="button" class="ch-fold" data-act="chain-all" title="' + esc(ch.slice(fold - 1, -1).map((g) => g.text).join(" → ")) + '" aria-label="Show the whole chain">⋯</button>' + step(ch[ch.length - 1])
+      : ch.map(step).join("")) + "</p>";
+  const rest = chains.slice(max);
+  return '<div class="chains">' + chains.slice(0, max).map(line).join("") +
+    (rest.length ? '<p class="chain ch-more" title="' + esc(rest.map((ch) => ch.map((g) => g.text).join(" → ")).join("\n")) + '">+' + rest.length + " more</p>" : "") + "</div>";
+}
+export const taskChainHTML = (t, max = 2, fold = 0) => chainHTML({ planId: t.projectId || "", group: store.groupOf(t), head: badgeOf(t), max, fold });
+
 export function zebraOf(t) {
   const c = projectOf(t)?.color || store.groupByName(t.group)?.color;
   return c ? zebraFor(c) : "var(--zebra-None)";
 }
 
-// 做完 = 纯色；部分完成 = 豹纹；还没做 = 斑马纹；Later 只剩描边；Drop 淡掉
-export function segStyle(t) {
-  const c = colorOf(t);
-  if (t.status === "done") return "background:" + c;
-  if (t.status === "partial") return "background:var(--leo-dark) 0 0/30px 30px," + c;
-  if (t.status === "drop") return "background:var(--track);opacity:.4";
-  if (t.status === "later") return "background:var(--track);box-shadow:inset 0 0 0 1.5px " + c;
-  return "background:" + zebraOf(t) + " 0 0/22px 22px,var(--track)";
+// 今天那条轴上的一段，只看记下的时间：
+//   还没标的：长度 = 预计（记下的超过预计就按记下的），实心 = 记下的那截，剩下的斑马纹 = 还没做
+//   标过的（Done / Delay / Drop）：不再占这一天的计划，只剩记下的那截实心；一点没记的不画
+export function segHTML(t) {
+  const est = Number(t.est) || 0, got = E.spentMin(t), open = E.isOpen(t);
+  const len = open ? Math.max(est, got) : got;
+  if (!(len > 0) && !open) return "";
+  const c = colorOf(t), fill = len > 0 ? Math.min(100, (got / len) * 100) : 0;
+  const bg = open ? "linear-gradient(90deg," + c + " " + fill.toFixed(1) + "%,transparent 0)," + zebraOf(t) + " 0 0/22px 22px,var(--track)" : c;
+  return '<i title="' + esc(t.title) + " · " + (got ? fmtMin(got) + " of " : "") + est + ' min" style="flex-grow:' + Math.max(5, len) + ";background:" + bg + '"></i>';
 }
 
 const perDay = (v) => (v < 1 ? "<1m" : fmtMin(v));
@@ -135,7 +155,7 @@ export function heroHTML(c, d) {
 export function stripHTML(c, d, tasks) {
   const day = E.daySummary(c, d);
   const over = day.cap > 0 && day.planned > day.cap;
-  return '<div class="strip">' + tasks.map((t) => '<i title="' + esc(t.title) + " · " + t.est + ' min" style="flex-grow:' + Math.max(5, Number(t.est) || 0) + ";" + segStyle(t) + '"></i>').join("") + "</div>" +
+  return '<div class="strip">' + tasks.map(segHTML).join("") + "</div>" +
     '<div class="stripmeta' + (over ? " over" : "") + '"><span>' + day.planned + " / " + (day.cap || "—") + " min planned" + (over ? " · over" : "") + "</span><span>" + Math.round(day.done) + " min done</span></div>";
 }
 

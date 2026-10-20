@@ -18,9 +18,10 @@ import * as E from "../engine.js";
 import * as R from "../routines.js";
 import * as S from "../stats.js";
 import * as GR from "../groups.js";
+import * as G from "../goals.js";
 import { esc, on, icon } from "../dom.js";
 import { addDays, diffDays, fmtShort, fmtMin, WEEKDAYS } from "../dates.js";
-import { healthPill, groupsOf } from "./common.js";
+import { healthPill, groupsOf, chainHTML } from "./common.js";
 import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
 import { goalsHTML } from "./goals.js";
 import { ideasHTML } from "./ideas.js";
@@ -29,6 +30,7 @@ let editing = "";
 let draft = null;      // 新建时还没存的：{kind, place, 各个框的值}
 const openArchived = new Set();   // 哪些大类的归档展开着（大类的名字）
 let renaming = null;   // 正在改名的项目（group 名字）
+let serveMore = false; // 编辑框的 Serves 里，之后几年和 North star 的目标也列出来
 
 function timeline(c, p, plan) {
   if (!p.deadline) return "";
@@ -251,6 +253,23 @@ function totalFields(p, isNew) {
       : '<p class="hint">' + (E.isAuto(p) ? "Add a deadline so its time can be spread over your days." : "Without a deadline it still collects time, but it won't add to your daily line.") + "</p>");
 }
 
+// 为哪些目标服务（目标板那边的连线也能拖着连，见 js/ui/links.js）：近期的目标（这个月、这个季度、下个季度、今年）做成小签，点一下连上 / 断开；
+// 「More goals」再列出之后几年和 North star 的（已经连着的一直在）。下面一行是现在的链条——计划自己一个都没连的，用它所在项目连着的
+function servesHTML(p) {
+  const goals = store.goals();
+  if (!goals.length) return "";
+  const ref = G.planRef(p.id), cols = G.board(goals, store.today()).cols;
+  const linked = (g) => Array.isArray(g.by) && g.by.includes(ref);
+  const list = cols.flatMap((col) => col.items.filter((x) => (!x.done && (!col.far || serveMore)) || linked(x.goal)).map((x) => x.goal));
+  const more = cols.some((col) => col.far && col.items.some((x) => !x.done && !linked(x.goal)));
+  const own = goals.some(linked), heir = !own && p.group ? G.servedBy(goals, G.groupRef(p.group)) : [];
+  return '<div class="field serves"><span>Serves</span><div class="chips schips">' +
+    list.map((g) => '<button type="button" class="chip' + (linked(g) ? " on" : "") + '" data-act="serve" data-goal="' + esc(g.id) + '" aria-pressed="' + linked(g) + '" title="' + esc(g.text) + '">' + (g.span === "north" ? "✦ " : "") + esc(g.text) + "</button>").join("") +
+    (more || serveMore ? '<button type="button" class="chip ghost" data-act="serve-more">' + (serveMore ? "Fewer" : "More goals") + "</button>" : "") + "</div>" +
+    (heir.length ? '<p class="hint">None picked, so it serves what <b>' + esc(p.group) + "</b> serves.</p>" : "") +
+    chainHTML({ planId: p.id, group: p.group, head: { name: p.name || "Untitled", color: p.color }, max: 3 }) + "</div>";
+}
+
 function editorHTML(p) {
   const c = store.ctx();
   const isNew = !p.id;
@@ -269,6 +288,7 @@ function editorHTML(p) {
   if (isNew) {
     return h + '<div class="sheet-foot"><span></span><button type="button" class="btn cta" data-act="create-project">Create</button></div></div>';
   }
+  h += servesHTML(p);
   h += '<div class="field"><span>Status</span><div class="seg">' + [["active", "Active"], ["done", "Done"], ["dropped", "Dropped"]].map(([v, l]) => '<button type="button" data-act="pstatus" data-v="' + v + '"' + ((p.status || "active") === v ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</div></div>";
   if (kind === "total") h += itemsHTML(c, p);
   h += '<div class="sheet-foot"><button type="button" class="btn danger" data-act="del-project">' + icon("trash") + ' Delete plan</button><button type="button" class="btn primary" data-modal-close>Done</button></div></div>';
@@ -393,6 +413,8 @@ export function initProjects(rerender) {
     else if (act === "create-project") {
       if (!editing) createPlan(el.closest(".project-editor"));   // editing 有值 = 已经建过了，别再建一个
     } else if (act === "pstatus") store.saveProject({ id: pid, status: el.dataset.v });
+    else if (act === "serve") store.linkGoal(el.dataset.goal, G.planRef(pid), el.getAttribute("aria-pressed") !== "true");
+    else if (act === "serve-more") { serveMore = !serveMore; refreshProjectEditor(true); }
     else if (act === "del-item") store.deleteItem(el.closest("[data-item]").dataset.item);
     else if (act === "del-project") {
       if (!confirm("Delete this plan and its items? Tasks you've done stay on the calendar.")) return;

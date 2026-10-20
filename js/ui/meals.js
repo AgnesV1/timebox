@@ -13,7 +13,7 @@
 
 import * as store from "../store.js";
 import * as M from "../meals.js";
-import { esc, on, icon } from "../dom.js";
+import { esc, on, icon, onSwipe } from "../dom.js";
 import { addDays, diffDays, fmtDay, fmtShort, startOfWeek, weekday, WEEKDAYS } from "../dates.js";
 import { toast, emojiPickHTML, tagFilterHTML } from "./common.js";
 import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
@@ -770,22 +770,7 @@ export function initMeals(rerender) {
     if (id) store.saveWeek(el.dataset.week, (w) => ({ extra: { ...(w.extra || {}), [id]: (Number(w.extra?.[id]) || 0) + 1 } }));
   });
   // Big buys：手指 / 触控板往右划 = 收起，往左划 = 展开
-  let swipe = null;
-  on(document, "pointerdown", ".restock-gear", (e) => { if (e.pointerType !== "mouse") swipe = { x: e.clientX, y: e.clientY }; });
-  on(document, "pointerup", ".restock-gear", (e) => {
-    if (!swipe) return;
-    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
-    swipe = null;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > 2 * Math.abs(dy)) foldGear(dx > 0);
-  });
-  let wheel = 0, wheelAt = 0;
-  on(document, "wheel", ".restock-gear", (e) => {
-    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
-    if (e.timeStamp - wheelAt > 300) wheel = 0;
-    wheelAt = e.timeStamp;
-    wheel += e.deltaX;
-    if (Math.abs(wheel) > 80) { foldGear(wheel < 0); wheel = 0; wheelAt = e.timeStamp + 600; }   // 一次划只算一下
-  }, { passive: true });
+  onSwipe(document, ".restock-gear", (dir) => foldGear(dir === "right"));
   // 汇率：改了就存（存在 meal-prefs 里，跟着表格走）
   on(document, "change", ".meals input[data-act=gear-rate]", (e, el) => {
     const v = Number(el.value), pr = store.mealPrefs();

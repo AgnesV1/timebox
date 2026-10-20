@@ -48,8 +48,11 @@ test("setup migrates the old sheet in place, with backups, and slims it", () => 
   assert.equal(rows.length, 6);
   assert.ok(rows.every((r) => r.ID && r.Updated && r.Synced));
   const read = rows.find((r) => r.Task === "Read");
-  assert.equal(read.Status, "Partial");
+  assert.equal(read.Status, "Delay", "Partial and Later are one status now");
   assert.equal(read.Reason, "too tired");
+  const gym = rows.find((r) => r.Task === "Gym");
+  assert.deepEqual([gym.Times, gym["Actual min"]], ["40m", 40], "a Done with nothing recorded gets its estimate written down, so old totals stay the same");
+  assert.equal(rows.find((r) => r.Task === "Module #4").Times, "", "one with Actual min already has its time");
   assert.equal(read.Optional, true, "max order of a day with several orders is optional");
   assert.equal(rows.find((r) => r.Task === "Gym").Status, "Done");
   assert.equal(rows.find((r) => r.Task === "Laundry").Description, "- step 1");
@@ -77,6 +80,41 @@ test("setup migrates the old sheet in place, with backups, and slims it", () => 
   assert.equal(g.ss.getSheetByName("Tasks").objects().length, 6);
 });
 
+test("version 6: Partial / Later become Delay, untimed Done gets a record, with a backup, once", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  const sh = g.ss.getSheetByName("Tasks"), head = sh.header();
+  const row = (vals) => head.map((h) => (h in vals ? vals[h] : ""));
+  [
+    { Date: D("2026-10-01"), Task: "A", "Est min": 30, Status: "Partial", ID: "a", Updated: 1 },
+    { Date: D("2026-10-01"), Task: "B", "Est min": 45, Status: "Later｜rain", ID: "b", Updated: 1 },
+    { Date: D("2026-10-02"), Task: "C", "Est min": 50, Status: "Done", ID: "c", Updated: 1 },
+    { Date: D("2026-10-02"), Task: "D", "Est min": 50, "Actual min": 20, Times: "20m", Status: "Done", ID: "d", Updated: 1 },
+    { Date: D("2026-10-02"), Task: "Chores", "Est min": 0, Status: "Done", ID: "chore-2026-10-02", Updated: 1 },
+    { Date: D("2026-10-03"), Task: "E", "Est min": 25, Status: "Drop", ID: "e", Updated: 1 }
+  ].forEach((v, i) => row(v).forEach((x, j) => sh.put(i + 2, j + 1, x)));
+  const tick = () => { const t = Date.now(); while (Date.now() <= t + 1); };   // 拉的时候同一毫秒写的也算，隔开一点
+  g.sandbox.readAll_("tasks", true);   // 当它们是上一版留下的、已经同步过的行
+  tick();
+  const all0 = g.post({ secret: "CHANGE_ME", pull: true, since: 0 });
+  tick();
+  g.sandbox.setup();
+  const rows = sh.objects(), by = (id) => rows.find((r) => r.ID === id);
+  assert.deepEqual([by("a").Status, by("b").Status, by("c").Status, by("e").Status], ["Delay", "Delay｜rain", "Done", "Drop"]);
+  assert.deepEqual([by("c").Times, by("c")["Actual min"]], ["50m", 50]);
+  assert.deepEqual([by("d").Times, by("d")["Actual min"]], ["20m", 20], "recorded time is left alone");
+  assert.equal(by("chore-2026-10-02").Times, "");
+  assert.equal(by("c").Updated, 1, "Updated stays, so a newer edit on a device still wins");
+  assert.ok(g.ss.getSheets().some((s) => s.name.startsWith("Backup Tasks")));
+  const pulled = g.post({ secret: "CHANGE_ME", pull: true, since: all0.now }).pull.tables.tasks;
+  assert.deepEqual(pulled.map((t) => t.id + " " + t.status + " " + (t.actual || 0)).sort(), ["a delay 0", "b delay 0", "c done 50"], "the changed rows come down on the next pull");
+  const backups = g.ss.getSheets().filter((s) => s.name.startsWith("Backup Tasks")).length;
+  g.sandbox.setup();
+  assert.equal(g.ss.getSheets().filter((s) => s.name.startsWith("Backup Tasks")).length, backups, "nothing left to change, no new backup");
+  g.post({ secret: "CHANGE_ME", push: { rows: { tasks: [{ id: "a", status: "delay", updated: Date.now() }] } } });
+  assert.equal(sh.objects().find((r) => r.ID === "a").Status, "Delay");
+});
+
 test("pull, push, LWW, delete and log merge", () => {
   const g = oldSheet();
   g.sandbox.setup();
@@ -84,7 +122,7 @@ test("pull, push, LWW, delete and log merge", () => {
   const raw = (body) => JSON.parse(g.sandbox.doPost({ postData: { contents: JSON.stringify(body) } }).getContent());
   assert.equal(raw({ secret: "CHANGE_ME", pull: true, push: { rows: { tasks: [{ id: "x", title: "old", updated: 9e15 }] } } }).error, "old page", "pages without a version are turned away");
   const hello = g.post({ secret: "CHANGE_ME" });
-  assert.equal(hello.version, 5);
+  assert.equal(hello.version, 6);
   const all = g.post({ secret: "CHANGE_ME", pull: true, since: 0 });
   assert.equal(all.ok, true);
   assert.equal(all.pull.tables.tasks.length, 6);

@@ -20,6 +20,27 @@ export function on(root, type, sel, fn, opts) {
   }, opts);
 }
 
+// 横着划一下：手指（触屏、笔）按下到松开横着走了 50px 以上，或者触控板两指横着划（wheel 的 deltaX 攒够 80）。fn("left" | "right") = 往哪边划；
+// 一次划只算一下。ignore = 从这些元素上开始的不算（它们自己会横着滚：时间轴、一排小方块）
+export function onSwipe(root, sel, fn, ignore = "") {
+  let swipe = null, wheel = 0, wheelAt = 0;
+  const skip = (e) => ignore && e.target.closest?.(ignore);
+  on(root, "pointerdown", sel, (e) => { swipe = e.pointerType !== "mouse" && !skip(e) ? { x: e.clientX, y: e.clientY } : null; });
+  on(root, "pointerup", sel, (e) => {
+    if (!swipe) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > 2 * Math.abs(dy)) fn(dx > 0 ? "right" : "left");
+  });
+  on(root, "wheel", sel, (e) => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || skip(e)) return;
+    if (e.timeStamp - wheelAt > 300) wheel = 0;
+    wheelAt = e.timeStamp;
+    wheel += e.deltaX;
+    if (Math.abs(wheel) > 80) { fn(wheel < 0 ? "right" : "left"); wheel = 0; wheelAt = e.timeStamp + 600; }
+  }, { passive: true });
+}
+
 // 日期框用键盘填的时候，每填完一段（月 / 日 / 年）跳到下一段，浏览器就发一次 change；各处收到就存、就重画，
 // 正在填的那格被换掉，焦点跳回第一段，后面的数字就填错了地方。所以这一格只要动过键盘，它的 change 就先扣下，
 // 等填完了（离开这格 / 回车 / Esc）再补发一次；没碰键盘、从弹出的日历里点的照常马上发。

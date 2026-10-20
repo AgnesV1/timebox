@@ -1,19 +1,20 @@
-// 记账的界面。一份代码两个地方用：手机上是从顶上拉出来的纯黑面板（外壳和下拉手势在 island.js），电脑上是 Spending 页（两栏）。
+// 记账的界面。一份代码两个地方用：手机上是从顶上拉出来的纯黑面板（外壳和下拉手势在 island.js），电脑上是 Spending 页。
 // 主页：Year / Month / Day → 能拖的柱状时间轴（停在中间那格就是选中的；超了橙、正常蓝、有收入底下一个青绿点）→ 类别小标签（点了筛下面的流水）→
 // 流水（点一笔改、往左滑删）→ 推荐 → Add a new transaction。往上拉流水时柱子压成小点。
-// 图表：梯形图（House 是底座、预算是浅天蓝底、实线是花的、虚线是照现在的速度）、五个小方块、两个 Breakdown（点开看那一类的每一笔）。
-// 手机上图表是从底下升上来的一整页；电脑上就在右栏，跟着左边选的那段时间走。
+// 图表（figure）：梯形图（House 是底座、预算是浅天蓝底、实线是花的、虚线是照现在的速度）、五个小方块、两个 Breakdown（点开看那一类的每一笔），
+// 自己一套 Month / Year 和前后翻。手机上图表是从底下升上来的一页；电脑上整页就是图表，主页收在右边的抽屉里（只看某一天、记一笔）：
+// 收着时右边露一条把手（今天花了多少、「+」），点它 / 按 N / 触控板往左划打开，Esc / 往右划 / 点外面收起。
 // 设定：Budget（从某月起每月多少）/ Categories（加、改名、藏、没用过的能删）/ Export（.md）/ Import a month / Currency。
 
 import * as SP from "../spend.js";
 import * as M from "../money.js";
 import * as store from "../store.js";
-import { esc, icon } from "../dom.js";
+import { esc, icon, onSwipe } from "../dom.js";
 
-// 弹簧：慢一点、只冲过头一点点（SOFT 约 3%，GENTLE 约 0.5%），收的时候用 GENTLE
-const POP = "linear(0, .03, .106, .208, .322, .438, .548, .649, .737, .812, .873, .922, .959, .987, 1.007, 1.02, 1.027, 1.031, 1.032, 1.03, 1.028, 1.024, 1.021, 1.017, 1.014, 1.01, 1.008, 1.006, 1.004, 1.002, 1.001, 1, 1)";
+// 小东西（按钮、开关、小签）用的弹簧：只冲过头 0.5%；面板、抽屉、图表页这种大块不冲过头（ENTER / EXIT，见 css/money.css 开头）
 const SPR = "linear(0, .029, .099, .192, .296, .399, .498, .588, .668, .737, .795, .844, .883, .915, .939, .959, .973, .984, .992, .997, 1.001, 1.003, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1)";
-const SHEET = "cubic-bezier(.32, .72, 0, 1)", OUTQ = "cubic-bezier(.22, .9, .28, 1)";
+// 进场：快出来、慢慢停稳（不冲过头）；出场：干脆一点，越走越快
+const ENTER = "cubic-bezier(.16, 1, .3, 1)", EXIT = "cubic-bezier(.4, 0, 1, 1)";
 const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const today = () => store.today();
 const todayP = () => M.parts(today());
@@ -25,19 +26,23 @@ const IX = () => { if (ixVer !== SP.ver() || !ixCache) { ixCache = M.index(SP.en
 const visible = (kind) => SP.cats().filter((c) => c.kind === kind && !c.hidden).map((c) => c.name);
 const isIncomeCat = (name) => M.kindOf(SP.cats(), name) === "in";
 
-// 滚着变的数字：每一位一列 0–9，从旧的那位滚到新的
+// 金额：小数点后那两位小一号、淡一点（「$1,234」后面跟着小的「.56」），大数字好排
+const cents = (s) => { const i = s.lastIndexOf("."); return i < 0 ? esc(s) : esc(s.slice(0, i)) + '<span class="mn-dec">' + esc(s.slice(i)) + "</span>"; };
+
+// 滚着变的数字：每一位一列 0–9，从旧的那位滚到新的。small = 小数那几位小一号（16px 以上的大数字才这样，小字本来就小）
 const DIG = [..."0123456789"].map((d) => "<span>" + d + "</span>").join("");
-function roll(el, s) {
+function roll(el, s, small = false) {
   if (!el) return;
   const was = el.dataset.v;
   el.dataset.v = s;
-  if (was === undefined || quiet()) { el.textContent = s; return; }
+  if (was === undefined || quiet()) { el.innerHTML = '<span class="mn-plainv">' + (small ? cents(s) : esc(s)) + "</span>"; return; }
   if (was === s) return;
-  const pad = s.length - was.length;
+  const pad = s.length - was.length, cut = small ? s.lastIndexOf(".") : -1;
   el.innerHTML = [...s].map((ch, i) => {
-    if (!/\d/.test(ch)) return "<span>" + esc(ch) + "</span>";
+    const dec = cut >= 0 && i >= cut ? " dec" : "";
+    if (!/\d/.test(ch)) return '<span class="' + dec.trim() + '">' + esc(ch) + "</span>";
     const o = was[i - pad], f = /\d/.test(o || "") ? o : "0";
-    return '<span class="dg"><span class="cl" data-d="' + ch + '" style="transform:translateY(calc(-' + f + ' * 1.1em));transition-delay:' + (s.length - i) * 16 + 'ms">' + DIG + "</span></span>";
+    return '<span class="dg' + dec + '"><span class="cl" data-d="' + ch + '" style="transform:translateY(calc(-' + f + ' * 1.1em));transition-delay:' + (s.length - i) * 16 + 'ms">' + DIG + "</span></span>";
   }).join("");
   void el.offsetWidth;
   el.querySelectorAll(".cl").forEach((c) => { c.style.transform = "translateY(calc(-" + c.dataset.d + " * 1.1em))"; });
@@ -60,27 +65,33 @@ export function createView(kind) {
   const desk = kind === "desk";
   const root = document.createElement("div");
   root.className = "mn mn-" + kind;
-  const W = desk ? 480 : 244, H = desk ? 210 : 172;
+  let W = desk ? 720 : 244, H = desk ? 260 : 172;   // 电脑上图表跟着那一栏的宽度量（renderChart），字不跟着缩放
+  const blur = '<div class="mn-pblur" aria-hidden="true"><i></i><i></i><i></i></div>';   // 渐进模糊：三层 1 / 3 / 8px，越靠边越糊
 
+  // 电脑上的抽屉只看某一天：没有 Year / Month / Day，标题旁边多一个日历挑哪天；记一笔的表单在最上面
   const home = '<section class="mn-pg mn-home" data-pg="home">' +
-    '<div class="mn-hdr">' + btn("set", "settings", "Settings") + (desk ? '<span class="mn-status" data-status></span>' : "") + btn("chart", "chart", "Charts", desk ? "mn-dchart" : "") + btn("find", "search", "Search") + "</div>" +
+    '<div class="mn-hdr">' + btn("set", "settings", "Settings") + (desk ? '<span class="mn-status" data-status></span><span class="mn-hgrp">' + btn("find", "search", "Search") + btn("dclose", "close", "Close", "mn-sm") + "</span>" : btn("chart", "chart", "Charts") + btn("find", "search", "Search")) + "</div>" +
+    (desk ? formHTML() : "") +
     '<div class="mn-thead"><div><h2 class="mn-h1" data-title></h2><div class="mn-num mn-13" style="margin-top:3px"><span class="mn-rn" data-to></span><span style="display:inline-block;width:12px"></span><span class="mn-rn" data-ti style="color:var(--mn-green)"></span></div></div>' +
-    '<div class="mn-nav">' + btn("reset", "reset", "Back to today", "mn-sm mn-rst") + btn("prev", "left", "Earlier", "mn-sm") + btn("next", "right", "Later", "mn-sm") + "</div></div>" +
-    '<div class="mn-seg" data-seg="mode" style="margin-top:14px"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button><button type="button" data-v="day">Day</button></div>' +
+    '<div class="mn-nav">' + (desk ? btn("dcal", "calendar", "Pick a day", "mn-sm") : "") + btn("reset", "reset", "Back to today", "mn-sm mn-rst") + btn("prev", "left", "Earlier", "mn-sm") + btn("next", "right", "Later", "mn-sm") + "</div></div>" +
+    (desk ? "" : '<div class="mn-seg" data-seg="mode" style="margin-top:14px"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button><button type="button" data-v="day">Day</button></div>') +
     '<div class="mn-tl"><span class="mn-hl"></span><div class="mn-rw"><div class="mn-rail"></div></div></div>' +
-    '<div class="mn-hs mn-chips"></div>' + (desk ? formHTML() : "") +
-    '<div class="mn-list mn-vs"></div>' +
+    '<div class="mn-hs mn-chips"></div>' +
+    '<div class="mn-lw"><div class="mn-list mn-vs"></div>' + blur.replace("mn-pblur", "mn-pblur top") + blur.replace("mn-pblur", "mn-pblur bot") + "</div>" +
     '<div class="mn-foot"><div class="mn-recw" hidden><span class="mn-meta" style="flex:none">Recommended</span><div class="mn-hs mn-recs"></div></div>' +
     '<button type="button" class="mn-big" data-act="add">Add a new transaction' + (desk ? '<span class="mn-kbd">N</span>' : "") + "</button>" +
     (desk ? "" : '<div class="mn-grab" data-grab aria-label="Close"><span class="mn-grabber"></span></div>') + "</div></section>";
   const pages = '<section class="mn-pg off" data-pg="set"><div class="mn-hdr">' + back + '<span style="font-size:15px;font-weight:500">Settings</span><span style="width:32px"></span></div><div class="mn-vs" data-setb style="flex:1;margin-top:14px"></div></section>' +
     '<section class="mn-pg off" data-pg="sub"><div class="mn-hdr">' + back + '<span data-subt style="font-size:15px;font-weight:500"></span><span style="width:32px"></span></div><div class="mn-vs" data-subb style="flex:1;margin-top:14px"></div></section>' +
     '<section class="mn-pg off" data-pg="find"><div class="mn-hdr" style="gap:6px">' + back + '<input class="mn-tx" data-q placeholder="Search notes, categories, amounts" autocomplete="off" style="flex:1;padding:6px 0;border-bottom:1px solid var(--mn-line)"></div><div class="mn-vs" data-fres style="flex:1;margin-top:8px"></div></section>';
-  // 电脑上窗口窄（右栏放不下）的时候，图表那一栏变成从底下升上来的一整页，顶上一条 + Done
-  const chartInner = (desk ? '<div class="mn-rtop"><span class="mn-grabber"></span><button type="button" class="mn-plain mn-done" data-act="cclose">Done</button></div>' : "") + '<div class="mn-thead"' + (desk ? ' style="margin-top:0"' : "") + '><h2 class="mn-h1" data-ctitle></h2>' +
-    (desk ? '<span class="mn-meta" data-csub style="margin-bottom:4px"></span>' : '<div class="mn-nav">' + btn("creset", "reset", "Back to this month", "mn-sm mn-rst") + btn("cprev", "left", "Earlier", "mn-sm") + btn("cnext", "right", "Later", "mn-sm") + "</div>") + "</div>" +
-    (desk ? "" : '<div class="mn-seg" data-seg="cmode" style="margin-top:14px"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button></div>') +
-    '<div class="mn-cbody mn-vs"><svg class="mn-chart" data-chart viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Spending against the budget"></svg><div class="mn-hs mn-cards"></div><div data-xb></div><div data-ib></div></div>';
+  // 图表：手机上是升上来的那一页的内容；电脑上是整页的主角，顶上一栏是期间、花了 / 收入、Year / Month、前后翻、搜索、设定、记一笔
+  const cseg = '<div class="mn-seg" data-seg="cmode"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button></div>';
+  const cnav = '<div class="mn-nav">' + btn("creset", "reset", "Back to this month", "mn-sm mn-rst") + btn("cprev", "left", "Earlier", "mn-sm") + btn("cnext", "right", "Later", "mn-sm") + "</div>";
+  const chartBody = '<div class="mn-cbody mn-vs"><svg class="mn-chart" data-chart viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Spending against the budget"></svg><div class="' + (desk ? "" : "mn-hs ") + 'mn-cards"></div><div class="mn-bks"><div data-xb></div><div data-ib></div></div></div>';
+  const chartInner = desk
+    ? '<header class="mn-fhead"><div class="mn-ftitle"><h2 class="mn-h1" data-ctitle></h2><div class="mn-ftot"><span><span class="mn-num mn-rn" data-cto></span><span class="mn-meta">spent</span></span><span><span class="mn-num mn-rn" data-cti style="color:var(--mn-green)"></span><span class="mn-meta">in</span></span></div></div>' +
+      '<div class="mn-ftools">' + cseg + cnav + '<span class="mn-hgrp">' + btn("dfind", "search", "Search") + btn("dset", "settings", "Settings") + '</span><button type="button" class="mn-big mn-addb" data-act="add">' + icon("plus") + 'Add<span class="mn-kbd">N</span></button></div>' + blur + "</header>" + chartBody
+    : '<div class="mn-thead"><h2 class="mn-h1" data-ctitle></h2>' + cnav + "</div>" + cseg.replace('class="mn-seg"', 'class="mn-seg" style="margin-top:14px"') + chartBody;
   const sheet = '<div class="mn-scrim" data-act="sclose"></div><section class="mn-sheet" aria-label="Transaction">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;height:30px"><span data-sht style="font-size:15px;font-weight:500"></span><div style="display:flex;align-items:center;gap:6px"><button type="button" class="mn-act warn" data-act="sdel" hidden>Delete</button>' + btn("sclose", "close", "Close", "mn-sm") + "</div></div>" +
     '<div class="mn-seg" data-seg="skind" style="margin-top:8px"><i></i><button type="button" data-v="out">Expense</button><button type="button" data-v="in">Income</button></div>' +
@@ -92,12 +103,17 @@ export function createView(kind) {
   const cal = '<div class="mn-cal" data-cal><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' + btn("calp", "left", "Earlier month", "mn-sm") + '<span data-calt style="font-size:13px;font-weight:500"></span>' + btn("caln", "right", "Later month", "mn-sm") + '</div><div class="mn-cg wd mn-meta"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div><div class="mn-cg" data-calg></div></div>';
   const snackHTML = '<div class="mn-snack" role="status" aria-live="polite"><span data-snt></span><button type="button" class="mn-act" data-act="undo">Undo</button></div>';
   root.innerHTML = desk
-    ? '<div class="mn-cols"><div class="mn-left">' + home + pages + '</div><div class="mn-ddim" data-act="cclose"></div><div class="mn-right">' + chartInner + "</div></div>" + cal + snackHTML
-    : '<div class="mn-inner">' + home + pages + '<div class="mn-cdim" data-act="cclose"></div><section class="mn-csheet" aria-label="Charts"><div class="mn-cgrab" data-cgrab><span class="mn-grabber"></span><button type="button" class="mn-plain mn-done" data-act="cclose">Done</button></div>' + chartInner + "</section>" + sheet + cal + snackHTML + "</div>";
+    ? '<div class="mn-fig">' + chartInner + "</div>" +
+      '<div class="mn-handle"><button type="button" class="mn-hmain" data-act="drawer" aria-label="Open the day\'s spending"><span class="mn-meta">Today</span><span class="mn-num" data-htot></span></button>' +
+      '<button type="button" class="mn-hadd" data-act="add" aria-label="Add a transaction" title="Add a transaction (N)">' + icon("plus") + "</button></div>" +
+      '<div class="mn-dscrim" data-act="dclose"></div><aside class="mn-drawer" aria-label="One day">' + home + pages + "</aside>" + cal + snackHTML
+    // 手机：面板（mn-inner）只有屏幕约 88% 高，底边是一道水面弧线；底下露出来的那条是 mn-veil（压暗的今天页，点了收起，见 island.js）。
+    // 记一笔的面板、日历盖满整屏（数字键盘贴着屏幕底）
+    : '<div class="mn-veil"></div><div class="mn-inner">' + home + pages + '<div class="mn-cdim" data-act="cclose"></div><section class="mn-csheet" aria-label="Charts"><div class="mn-cgrab" data-cgrab><span class="mn-grabber"></span><button type="button" class="mn-plain mn-done" data-act="cclose">Done</button></div>' + chartInner + "</section>" + snackHTML + "</div>" + sheet + cal;
 
   const $ = (s) => root.querySelector(s);
   const homeEl = $('[data-pg="home"]'), rw = $(".mn-rw"), rail = $(".mn-rail"), hl = $(".mn-hl"), tl = $(".mn-tl"), list = $(".mn-list");
-  const V = { mode: "month", cur: todayP(), filt: null, items: [], cw: 40, sel: 0, collapsed: false, stack: [], cmode: "month", cc: todayP(), bk: new Set(), fresh: null, chartOpen: false, sub: "", catKind: "out", budEdit: null, newBud: null, expM: null };
+  const V = { mode: desk ? "day" : "month", cur: todayP(), filt: null, items: [], cw: 40, sel: 0, collapsed: false, stack: [], cmode: "month", cc: todayP(), bk: new Set(), fresh: null, chartOpen: false, drawer: false, sub: "", catKind: "out", budEdit: null, newBud: null, expM: null };
 
   // ---------- 分段开关 ----------
   function seg(name, val) {
@@ -169,7 +185,7 @@ export function createView(kind) {
     V.sel = idxOf(V.cur);
     rw.scrollLeft = V.sel * V.cw;
     paintSel();
-    if (grow && !quiet()) rail.querySelectorAll(".mn-bar").forEach((b, i) => Math.abs(i - V.sel) < 16 && b.animate([{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }], { duration: 760, delay: Math.min(520, Math.abs(i - V.sel) * 34), easing: POP, fill: "backwards" }));
+    if (grow && !quiet()) rail.querySelectorAll(".mn-bar").forEach((b, i) => Math.abs(i - V.sel) < 16 && b.animate([{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }], { duration: 520, delay: Math.min(400, Math.abs(i - V.sel) * 18), easing: ENTER, fill: "backwards" }));
   }
   function repaintBars() {
     measureCap();
@@ -192,7 +208,7 @@ export function createView(kind) {
     paintSel();
     renderTitle();
     clearTimeout(bodyT);
-    bodyT = setTimeout(() => { renderBody(); if (desk) renderChart(false); }, 70);
+    bodyT = setTimeout(renderBody, 70);
   }
   let dragging = false, snapT = 0, rd = null, mo = 0;
   rw.addEventListener("scroll", () => {
@@ -247,6 +263,13 @@ export function createView(kind) {
   function renderList() {
     const rows = SP.entries().filter((e) => inView(e) && (!V.filt || e.c === V.filt)).sort(M.byNewest);
     list.innerHTML = rows.length ? rows.slice(0, 300).map(rowHTML).join("") + (rows.length > 300 ? '<div class="mn-empty">+' + (rows.length - 300) + " more — search finds them all</div>" : "") : '<div class="mn-empty">No transactions</div>';
+    requestAnimationFrame(listEdges);
+  }
+  // 流水上沿 / 下沿的渐进模糊：滚下去了才有上面那条，下面还有没露出来的才有下面那条
+  function listEdges() {
+    const w = list.parentNode;
+    w.classList.toggle("scrolled", list.scrollTop > 2);
+    w.classList.toggle("more", list.scrollTop + list.clientHeight < list.scrollHeight - 2);
   }
   let recList = [];
   function renderRecs() {
@@ -279,7 +302,7 @@ export function createView(kind) {
       lp.ax = Math.abs(dx) > Math.abs(dy) && lp.row ? "x" : "y";
       if (lp.ax === "x" || e.pointerType === "mouse") try { list.setPointerCapture(e.pointerId); } catch { /* 已经松手了 */ }
     }
-    if (lp.ax === "x") { lp.tr.add(e.clientX); lp.dx = dx > 0 ? dx * 0.2 : dx; lp.row.style.transition = "none"; lp.row.style.transform = "translateX(" + lp.dx + "px)"; }
+    if (lp.ax === "x") { lp.tr.add(e.clientX); lp.dx = dx > 0 ? dx * 0.2 : dx; lp.row.parentNode.classList.add("swiping"); lp.row.style.transition = "none"; lp.row.style.transform = "translateX(" + lp.dx + "px)"; }
     else if (lp.ax === "y") { if (e.pointerType !== "touch") list.scrollTop = lp.st - dy; if (dy < -24) setCol(true); else if (dy > 24 && lp.st <= 0) setCol(false); }
   });
   const listUp = (e) => {
@@ -294,11 +317,11 @@ export function createView(kind) {
       r.style.transform = "translateX(-110%)";
       setTimeout(() => { const w = r.parentNode; w.style.height = w.offsetHeight + "px"; void w.offsetHeight; w.style.height = "0px"; }, 200);
       setTimeout(() => removeEntry(r.dataset.id), 450);
-    } else { r.style.transition = "transform .6s " + POP; r.style.transform = ""; }
+    } else { r.style.transition = "transform .28s " + SPR; r.style.transform = ""; setTimeout(() => { if (!r.style.transform) r.parentNode?.classList.remove("swiping"); }, 600); }
   };
   list.addEventListener("pointerup", listUp);
   list.addEventListener("pointercancel", listUp);
-  list.addEventListener("scroll", () => { if (list.scrollTop > 4) setCol(true); else if (list.scrollTop <= 0 && !lp) setCol(false); });
+  list.addEventListener("scroll", () => { listEdges(); if (list.scrollTop > 4) setCol(true); else if (list.scrollTop <= 0 && !lp) setCol(false); });
   list.addEventListener("wheel", (e) => { if (e.deltaY > 0) setCol(true); else if (list.scrollTop <= 0) setCol(false); }, { passive: true });
 
   // ---------- 记一笔 / 改 / 删 ----------
@@ -347,7 +370,14 @@ export function createView(kind) {
   }
   function renderAmt(app) {
     const s = ssum();
-    $("[data-samt]").innerHTML = '<span class="cur">' + (S.kind === "out" ? "−$" : "+$") + "</span>" + (S.ex ? [...S.ex].map((c, i) => (app && i === S.ex.length - 1 ? '<span class="in">' + c + "</span>" : c)).join("") : '<span class="zero">0</span>');
+    // 每个数的小数点和后面两位小一号（「12.50+8」里的「.50」）
+    let dec = false;
+    const typed = [...S.ex].map((c, i) => {
+      if (c === "+") dec = false; else if (c === ".") dec = true;
+      const ch = app && i === S.ex.length - 1 ? '<span class="in">' + c + "</span>" : c;
+      return dec ? '<span class="mn-dec">' + ch + "</span>" : ch;
+    }).join("");
+    $("[data-samt]").innerHTML = '<span class="cur">' + (S.kind === "out" ? "−$" : "+$") + "</span>" + (S.ex ? typed : '<span class="zero">0</span>');
     const eq = $("[data-seq]");
     eq.style.color = "";
     eq.textContent = S.ex.includes("+") && s > 0 ? "= " + s.toFixed(2) : "";
@@ -417,7 +447,7 @@ export function createView(kind) {
     $('[data-act="fdel"]').hidden = !e;
     $("[data-ferr]").textContent = "";
     renderForm();
-    if (!quiet()) f.animate([{ opacity: 0, transform: "translateY(-6px)" }, { opacity: 1, transform: "none" }], { duration: 420, easing: OUTQ });
+    if (!quiet()) f.animate([{ opacity: 0, transform: "translateY(-6px)" }, { opacity: 1, transform: "none" }], { duration: 280, easing: ENTER });
     $("[data-famt]").focus();
   }
   function renderForm() {
@@ -436,8 +466,36 @@ export function createView(kind) {
     if (e) { V.fresh = e.id; SP.update(e.id, { d: S.d, v, c: S.cat, n }); snack("Saved", null); }
     else addEntry({ d: S.d, v, c: S.cat, n });
   }
-  const edit = (e) => { if (!e) return; if (desk) openForm(e); else openSheet(e); };
-  const startNew = () => (desk ? openForm(null) : openSheet(null));
+  const edit = (e) => { if (!e) return; if (desk) { openDrawer(false); openForm(e); } else openSheet(e); };
+  const startNew = () => { if (desk) { openDrawer(true); openForm(null); } else openSheet(null); };
+
+  // ---------- 电脑：右边的抽屉 ----------
+  // 打开：从收着打开的时候回到今天（把手上写的就是今天）；收起：表单、日历、推进去的页都收掉
+  function openDrawer(toToday) {
+    if (!desk || V.drawer) return;
+    V.drawer = true;
+    if (toToday && !M.samePeriod(V.cur, todayP(), "day")) { V.cur = todayP(); buildRail(false); renderTitle(); renderBody(); }
+    root.classList.add("drawer-on");
+    $(".mn-drawer").removeAttribute("inert");
+    if (!quiet()) [...homeEl.children].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateX(18px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: 60 + i * 20, easing: ENTER, fill: "backwards" }));
+  }
+  function closeDrawer() {
+    if (!desk || !V.drawer) return;
+    V.drawer = false;
+    closeForm(); closeCal();
+    while (V.stack.length) pop();
+    root.classList.remove("drawer-on");
+    $(".mn-drawer").setAttribute("inert", "");
+    if (root.contains(document.activeElement)) $('[data-act="drawer"]')?.focus({ preventScroll: true });
+  }
+  // 把手上：今天花了多少。把手只有 64px 宽：放不下的（$1,000 以上）写成「$1.2k」，整数写在悬停的提示里
+  function paintHandle() {
+    const el = desk && $("[data-htot]");
+    if (!el) return;
+    const out = M.sumOf(IX(), todayP(), "day").out, full = "−" + M.money(out);
+    el.innerHTML = full.length <= 8 ? "−" + cents(M.money(out)) : esc(kfmt(-out));
+    el.parentNode.title = "Today " + full;
+  }
 
   // 月历：从日期按钮那里弹出来，哪天都能选
   const C = { y: 2026, m: 1, onPick: null, sel: "" };
@@ -449,7 +507,7 @@ export function createView(kind) {
     for (let d = 1; d <= N; d++) { const k = M.iso(C.y, C.m, d); h += '<button type="button" class="mn-cd' + (k === C.sel ? " sel" : "") + (k === today() ? " today" : "") + '" data-cd="' + k + '">' + d + "</button>"; }
     const g = $("[data-calg]");
     g.innerHTML = h;
-    if (dir && !quiet()) g.animate([{ transform: "translateX(" + dir * 16 + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 420, easing: POP });
+    if (dir && !quiet()) g.animate([{ transform: "translateX(" + dir * 16 + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 280, easing: ENTER });
   }
   function openCal(anchor, sel, onPick) {
     const cal = $("[data-cal]");
@@ -467,12 +525,20 @@ export function createView(kind) {
 
   // ---------- 图表 ----------
   let CS = null, ct = 0, ci = 0, craf = 0;
-  function chartPeriod() { return desk ? { mode: V.mode === "year" ? "year" : "month", p: V.cur } : { mode: V.cmode, p: V.cc }; }
   function renderChart(animate, entering) {
-    const { mode, p } = chartPeriod(), t = todayP();
+    const mode = V.cmode, p = V.cc, t = todayP();
     $("[data-ctitle]").textContent = periodTitle(p, mode);
-    if (desk) $("[data-csub]").textContent = mode === "year" ? "Day by day, House as the base" : "House as the base";
-    else $('[data-act="creset"]').classList.toggle("on", mode === "month" ? !(p.y === t.y && p.m === t.m) : p.y !== t.y);
+    $('[data-act="creset"]').classList.toggle("on", mode === "month" ? !(p.y === t.y && p.m === t.m) : p.y !== t.y);
+    if (desk) {
+      // 电脑：图表按那一栏的实际宽度画（viewBox = 像素），字不跟着放大；高度跟着宽度走，有个上下限
+      const svg0 = $("[data-chart]");
+      W = Math.max(320, Math.round(svg0.clientWidth || W));
+      H = Math.round(Math.max(220, Math.min(340, W * 0.32)));
+      svg0.setAttribute("viewBox", "0 0 " + W + " " + H);
+      const g = M.sumOf(IX(), p, mode);
+      roll($("[data-cto]"), "−" + M.money(g.out), true);
+      roll($("[data-cti]"), "+" + M.money(g.inc), true);
+    }
     const ix = IX(), bud = SP.budgets();
     const c = mode === "month" ? M.monthChart(ix, bud, p.y, p.m, today()) : M.yearChart(ix, bud, p.y, today());
     const X0 = 4, X1 = W - 4, Y0 = H - 22, Y1 = 26;
@@ -496,12 +562,12 @@ export function createView(kind) {
       '<g data-lab style="pointer-events:none"><text data-lt class="mn-ax" y="' + (Y1 - 4) + '" style="font-size:11px;fill:#8C8CA0"></text><text data-lv class="mn-ax" y="' + (Y1 + 12) + '" style="font-size:13px;fill:#F2EEE6"></text></g>';
     const svg = $("[data-chart]");
     svg.innerHTML = h;
-    const d0 = entering ? 0.42 : 0;
+    const d0 = entering ? 0.3 : 0;
     if (animate && !quiet()) {
       svg.querySelectorAll(".ar").forEach((a) => a.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 520, delay: d0 * 1000, fill: "backwards" }));
-      svg.querySelectorAll(".ln").forEach((q) => { q.style.strokeDasharray = 1; q.style.strokeDashoffset = 1; q.getBoundingClientRect(); q.style.transition = "stroke-dashoffset 1.3s cubic-bezier(.3,.7,0,1) " + (d0 + 0.1) + "s"; q.style.strokeDashoffset = 0; });
-      svg.querySelectorAll(".fc").forEach((q) => q.animate([{ opacity: 0 }, { opacity: 0, offset: 0.65 }, { opacity: 1 }], { duration: 1400 + d0 * 1000 }));
-      $("[data-lab]").animate([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 1200 + d0 * 1000 });
+      svg.querySelectorAll(".ln").forEach((q) => { q.style.strokeDasharray = 1; q.style.strokeDashoffset = 1; q.getBoundingClientRect(); q.style.transition = "stroke-dashoffset .9s " + ENTER + " " + (d0 + 0.1) + "s"; q.style.strokeDashoffset = 0; });
+      svg.querySelectorAll(".fc").forEach((q) => q.animate([{ opacity: 0 }, { opacity: 0, offset: 0.65 }, { opacity: 1 }], { duration: 1000 + d0 * 1000 }));
+      $("[data-lab]").animate([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 900 + d0 * 1000 });
     }
     CS = { c, pts, mode, p, W, dateOf: (i) => (mode === "month" ? M.MON[p.m - 1] + " " + (i + 1) : (() => { const q = M.parts(c.dateOf(i + 1)); return M.MON[q.m - 1] + " " + q.d; })()) };
     ct = ci = Math.min(c.n - 1, c.home);
@@ -509,9 +575,9 @@ export function createView(kind) {
     cards(c, mode, p, d0);
     breakdown(mode, p);
     if (animate && !quiet()) {
-      const base = entering ? 320 : 40;
-      [...root.querySelectorAll(desk ? ".mn-right .mn-st" : ".mn-csheet .mn-st")].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "none" }], { duration: 680, delay: base + Math.min(i, 14) * 55, easing: OUTQ, fill: "backwards" }));
-      root.querySelectorAll(".mn-card").forEach((el, i) => el.animate([{ opacity: 0, transform: "translateX(26px)" }, { opacity: 1, transform: "none" }], { duration: 720, delay: base + 140 + i * 70, easing: OUTQ, fill: "backwards" }));
+      const base = entering ? 200 : 30;
+      [...root.querySelectorAll(desk ? ".mn-fig .mn-st" : ".mn-csheet .mn-st")].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: base + Math.min(i, 14) * 30, easing: ENTER, fill: "backwards" }));
+      root.querySelectorAll(".mn-card").forEach((el, i) => el.animate([{ opacity: 0, transform: "translateX(16px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: base + 100 + i * 30, easing: ENTER, fill: "backwards" }));
     }
   }
   function cplace(f) {
@@ -553,10 +619,10 @@ export function createView(kind) {
         bar = '<div class="mn-track mn-range"><b style="left:' + (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + '%"' + (bad ? ' class="over"' : "") + "></b></div>";
         small = kfmt(r[0]) + "–" + kfmt(r[1]);
       }
-      return '<div class="mn-card" title="' + esc(since) + '"><span class="mn-meta">' + label + '</span><span class="mn-num v"' + (col ? ' style="color:' + col + '"' : "") + ">" + value + "</span>" + bar + '<span class="mn-num mn-meta">' + small + "</span></div>";
+      return '<div class="mn-card" title="' + esc(since) + '"><span class="mn-meta">' + label + '</span><span class="mn-num v"' + (col ? ' style="color:' + col + '"' : "") + ">" + cents(value) + "</span>" + bar + '<span class="mn-num mn-meta">' + small + "</span></div>";
     };
     const left = cmp.cur.left, bal = cmp.cur.balance;
-    $(".mn-cards").innerHTML = '<div class="mn-card"><span class="mn-meta">Budget Used</span><span class="mn-num v">' + (B ? (u * 100).toFixed(1) + "%" : "—") + '</span><div class="mn-track"><i data-w="' + Math.min(100, u * 100).toFixed(1) + '"' + (u > 1 ? ' class="over"' : "") + ' style="transition-delay:' + (d0 + 0.15) + 's"></i></div><span class="mn-num mn-meta">' + (B ? M.money(B) : "No budget yet") + "</span></div>" +
+    $(".mn-cards").innerHTML = '<div class="mn-card"><span class="mn-meta">Budget Used</span><span class="mn-num v">' + (B ? cents((u * 100).toFixed(1)) + "%" : "—") + '</span><div class="mn-track"><i data-w="' + Math.min(100, u * 100).toFixed(1) + '"' + (u > 1 ? ' class="over"' : "") + ' style="transition-delay:' + (d0 + 0.15) + 's"></i></div><span class="mn-num mn-meta">' + (B ? M.money(B) : "No budget yet") + "</span></div>" +
       card("Budget Left", B ? (left < 0 ? "−" : "+") + M.money(left) : "—", B && left < 0 ? "var(--mn-orange)" : "", "left", "low") +
       card("Expense", "−" + M.money(g.out), "", "expense", "high") +
       card("Income", "+" + M.money(g.inc), "var(--mn-green)", "income", "low") +
@@ -573,13 +639,13 @@ export function createView(kind) {
         cats.map(([k, x]) => {
           const op = V.bk.has((isIn ? "in:" : "out:") + k), its = x.list.sort(M.byNewest), role = M.roleOf(SP.cats(), k);
           return '<div class="mn-bk mn-st' + (op ? " open" : "") + '" data-bk="' + (isIn ? "in:" : "out:") + esc(k) + '"><div class="mn-brow"><div><div style="font-size:15px">' + esc(k) + (role === "base" ? ' <span class="mn-meta">base</span>' : role === "outside" ? ' <span class="mn-meta">not in budget</span>' : "") + '</div><div class="mn-meta" style="margin-top:3px">' + x.list.length + " transaction" + (x.list.length === 1 ? "" : "s") + "</div></div>" +
-            '<div class="r"><div><div class="mn-num" style="font-size:15px' + (isIn ? ";color:var(--mn-green)" : "") + '">' + (isIn ? "+" : "−") + M.money(x.v) + '</div><div class="mn-meta mn-num" style="margin-top:3px">' + (x.v / total * 100).toFixed(1) + "%</div></div>" + pie(x.v / total, isIn ? "inc" : "") + '<svg class="ic mn-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>' +
+            '<div class="r"><div><div class="mn-num" style="font-size:15px' + (isIn ? ";color:var(--mn-green)" : "") + '">' + (isIn ? "+" : "−") + cents(M.money(x.v)) + '</div><div class="mn-meta mn-num" style="margin-top:3px">' + (x.v / total * 100).toFixed(1) + "%</div></div>" + pie(x.v / total, isIn ? "inc" : "") + '<svg class="ic mn-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>' +
             '<div class="mn-bin" style="height:' + (op ? "auto" : "0px") + '">' + its.slice(0, 60).map((e) => '<div class="mn-irow" data-id="' + esc(e.id) + '"><span class="mn-num mn-meta">' + M.MON[M.parts(e.d).m - 1] + " " + M.parts(e.d).d + '</span><span class="n">' + esc(e.n || "—") + '</span><span class="mn-num">' + M.signed(e.v) + "</span></div>").join("") + (its.length > 60 ? '<div class="mn-meta" style="padding:6px 2px">+' + (its.length - 60) + " more</div>" : "") + "</div></div>";
         }).join("");
     };
     $("[data-xb]").innerHTML = make("Expense Breakdown", false);
     $("[data-ib]").innerHTML = make("Income Breakdown", true);
-    $(desk ? ".mn-right .mn-thead" : ".mn-csheet .mn-thead").classList.add("mn-st");
+    if (!desk) $(".mn-csheet .mn-thead").classList.add("mn-st");
     $("[data-chart]").classList.add("mn-st");
   }
   function toggleBk(el) {
@@ -588,23 +654,33 @@ export function createView(kind) {
     if (open) {
       V.bk.add(k);
       bin.style.height = "0px"; void bin.offsetHeight; bin.style.height = bin.scrollHeight + "px";
-      if (!quiet()) bin.querySelectorAll(".mn-irow").forEach((r, i) => r.animate([{ opacity: 0, transform: "translateY(-5px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: 80 + Math.min(i, 12) * 32, easing: OUTQ, fill: "backwards" }));
+      if (!quiet()) bin.querySelectorAll(".mn-irow").forEach((r, i) => r.animate([{ opacity: 0, transform: "translateY(-5px)" }, { opacity: 1, transform: "none" }], { duration: 280, delay: 40 + Math.min(i, 12) * 20, easing: ENTER, fill: "backwards" }));
       setTimeout(() => { if (el.classList.contains("open")) bin.style.height = "auto"; }, 450);
     } else { V.bk.delete(k); bin.style.height = bin.scrollHeight + "px"; void bin.offsetHeight; bin.style.height = "0px"; }
   }
 
-  // 手机：图表从底下整页升上来，主页往后退一点、变暗；拖顶上那条或点 Done 收回
+  // 手机：图表从底下升上来，先停在半高（上面还看得到期间和时间轴，主页只稍微往后退一点）；拖顶上那条：往上到全高、往下收起；
+  // 点上面变暗的地方、Done 也收起。半高时在图表里往下滚，自己升到全高（下面的方块、Breakdown 才看得到）
   const csheet = $(".mn-csheet"), cdim = $(".mn-cdim");
-  function setUnder(p, dur) {
-    const t = dur ? "transform " + dur + " " + SHEET + ", opacity " + dur + " " + SHEET + ", border-radius " + dur : "none";
+  let detent = "", halfY = 0;   // 停在哪：""（收着）/ "half" / "full"；halfY = 半高时往下挪了多少
+  function setUnder(p, dur, ease = ENTER) {
+    const t = dur ? "transform " + dur + " " + ease + ", border-radius " + dur : "none";
     homeEl.style.transition = t;
-    cdim.style.transition = dur ? "opacity " + dur + " " + SHEET : "none";
-    homeEl.style.transform = p ? "scale(" + (1 - 0.07 * p) + ") translateY(" + 8 * p + "px)" : "";
-    homeEl.style.borderRadius = 22 * p + "px";
-    cdim.style.opacity = (0.55 * p).toFixed(3);
+    cdim.style.transition = dur ? "opacity " + dur + " " + ease : "none";
+    homeEl.style.transform = p ? "scale(" + (1 - 0.05 * p) + ") translateY(" + 6 * p + "px)" : "";
+    homeEl.style.borderRadius = 18 * p + "px";
+    cdim.style.opacity = (0.5 * p).toFixed(3);
+  }
+  const shut = () => csheet.offsetHeight + 24;
+  function sheetTo(where, dur, ease) {
+    detent = where;
+    const y = where === "full" ? 0 : where === "half" ? halfY : shut();
+    csheet.style.transition = dur ? "transform " + dur + " " + ease : "none";
+    csheet.style.transform = "translateY(" + y + "px)";
+    setUnder(where === "full" ? 1 : where === "half" ? 0.45 : 0, dur, ease);
+    cdim.style.pointerEvents = where ? "auto" : "none";
   }
   function openChart() {
-    if (desk) { root.classList.add("chart-on"); V.chartOpen = true; $(".mn-right .mn-cbody").scrollTop = 0; renderChart(true, true); return; }
     if (V.chartOpen) return;
     V.chartOpen = true;
     V.cmode = V.mode === "year" ? "year" : "month";
@@ -612,33 +688,44 @@ export function createView(kind) {
     V.bk = new Set();
     seg("cmode", V.cmode);
     $(".mn-csheet .mn-cbody").scrollTop = 0;
-    csheet.style.transition = "none";
-    csheet.style.transform = "translateY(102%)";
+    halfY = Math.max(0, Math.round(csheet.parentNode.clientHeight * 0.45 - csheet.offsetTop));
+    sheetTo("", 0);
     void csheet.offsetWidth;
-    csheet.style.transition = "transform .72s " + SHEET;
-    csheet.style.transform = "translateY(0)";
-    setUnder(1, ".72s");
-    cdim.style.pointerEvents = "auto";
+    sheetTo("half", quiet() ? "" : ".42s", ENTER);
     requestAnimationFrame(() => seg("cmode", V.cmode));
     renderChart(true, true);
   }
   function closeChart() {
-    if (desk) { root.classList.remove("chart-on"); V.chartOpen = false; return; }
     if (!V.chartOpen) return;
     V.chartOpen = false;
-    csheet.style.transition = "transform .52s " + SHEET;
-    csheet.style.transform = "translateY(102%)";
-    setUnder(0, ".52s");
-    cdim.style.pointerEvents = "none";
+    sheetTo("", quiet() ? "" : ".26s", EXIT);
   }
   if (!desk) {
     let cg = null;
-    const grab = $("[data-cgrab]");
-    grab.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) return; cg = { y: e.clientY, d: 0, tr: tracker() }; cg.tr.add(e.clientY); csheet.style.transition = "none"; grab.setPointerCapture(e.pointerId); });
-    grab.addEventListener("pointermove", (e) => { if (!cg) return; cg.tr.add(e.clientY); let dy = e.clientY - cg.y; if (dy < 0) dy = -6 * Math.log(1 - dy / 6); cg.d = dy; csheet.style.transform = "translateY(" + dy + "px)"; setUnder(Math.max(0, 1 - Math.max(0, dy) / 520), null); });
-    const up = () => { if (!cg) return; const d = cg.d, v = cg.tr.vel(); cg = null; if (d > 130 || (v > 0.5 && d > 16)) closeChart(); else { csheet.style.transition = "transform .45s " + SHEET; csheet.style.transform = "translateY(0)"; setUnder(1, ".45s"); } };
+    const grab = $("[data-cgrab]"), cbody = $(".mn-csheet .mn-cbody");
+    grab.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) return; cg = { y: e.clientY, base: detent === "full" ? 0 : halfY, d: 0, tr: tracker() }; cg.tr.add(e.clientY); csheet.style.transition = "none"; grab.setPointerCapture(e.pointerId); });
+    grab.addEventListener("pointermove", (e) => {
+      if (!cg) return;
+      cg.tr.add(e.clientY);
+      let y = cg.base + e.clientY - cg.y;
+      if (y < 0) y = -6 * Math.log(1 - y / 6);   // 全高再往上：有阻力
+      cg.d = y;
+      csheet.style.transform = "translateY(" + y + "px)";
+      setUnder(Math.max(0, Math.min(1, 1 - Math.max(0, y) / shut() * 1.2)), null);
+    });
+    // 松手：甩一下按方向走一档（全高往下甩 = 半高，半高往下甩 = 收起），不然停到离得最近的那一档
+    const up = () => {
+      if (!cg) return;
+      const y = cg.d, v = cg.tr.vel(), from = cg.base;
+      cg = null;
+      if (v > 0.5) { if (from === 0 && y < halfY + 60) sheetTo("half", ".42s", ENTER); else closeChart(); return; }
+      if (v < -0.5) { sheetTo("full", ".42s", ENTER); return; }
+      const end = shut(), near = [[0, "full"], [halfY, "half"], [end, ""]].sort((a, b) => Math.abs(a[0] - y) - Math.abs(b[0] - y))[0][1];
+      if (near) sheetTo(near, ".42s", ENTER); else closeChart();
+    };
     grab.addEventListener("pointerup", up);
     grab.addEventListener("pointercancel", up);
+    cbody.addEventListener("scroll", () => { if (detent === "half" && cbody.scrollTop > 4) sheetTo("full", ".42s", ENTER); }, { passive: true });
   }
   function cshift(k) {
     let { y, m } = V.cc;
@@ -647,7 +734,7 @@ export function createView(kind) {
     V.cc = { y, m, d: 1 };
     V.bk = new Set();
     renderChart(true);
-    if (!quiet()) $("[data-ctitle]").animate([{ transform: "translateX(" + k * 10 + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 460, easing: POP });
+    if (!quiet()) $("[data-ctitle]").animate([{ transform: "translateX(" + k * 10 + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 280, easing: ENTER });
   }
 
   // ---------- 一页一页推进去 ----------
@@ -699,11 +786,13 @@ export function createView(kind) {
     if (V.sub === "cats") {
       const all = SP.cats(), mine = all.filter((c) => c.kind === V.catKind), cnt = new Map();
       for (const e of SP.entries()) cnt.set(e.c, (cnt.get(e.c) || 0) + 1);
-      const row = (c) => '<div class="mn-li"><input class="mn-tx grow" data-rn="' + esc(c.name) + '" value="' + esc(c.name) + '" aria-label="Rename ' + esc(c.name) + '">' + (c.role === "base" ? '<span class="mn-meta">base</span>' : c.role === "outside" ? '<span class="mn-meta">not in budget</span>' : "") + '<span class="mn-meta mn-num" title="Records using it">' + (cnt.get(c.name) || 0) + "</span>" +
-        (cnt.get(c.name) ? '<button type="button" class="mn-act" data-hide="' + esc(c.name) + '">' + (c.hidden ? "Show" : "Hide") + "</button>" : '<button type="button" class="mn-act warn" data-cdel="' + esc(c.name) + '">Delete</button>') + "</div>";
+      // 一行四格对齐：名字（能改，太长省略）| base / not in budget | 用了几笔 | Hide / Show / Del（固定宽、靠右）
+      const row = (c) => '<div class="mn-li mn-cat"><input class="mn-tx" data-rn="' + esc(c.name) + '" value="' + esc(c.name) + '" aria-label="Rename ' + esc(c.name) + '">' +
+        '<span class="mn-meta">' + (c.role === "base" ? "base" : c.role === "outside" ? "not in budget" : "") + '</span><span class="mn-meta mn-num" title="Records using it">' + (cnt.get(c.name) || 0) + "</span>" +
+        (cnt.get(c.name) ? '<button type="button" class="mn-act" data-hide="' + esc(c.name) + '">' + (c.hidden ? "Show" : "Hide") + "</button>" : '<button type="button" class="mn-act warn" data-cdel="' + esc(c.name) + '" aria-label="Delete ' + esc(c.name) + '">Del</button>') + "</div>";
       const shown = mine.filter((c) => !c.hidden), hidden = mine.filter((c) => c.hidden);
       b.innerHTML = '<div class="mn-seg" data-seg="catk" style="margin-bottom:14px"><i></i><button type="button" data-v="out">Expense</button><button type="button" data-v="in">Income</button></div>' +
-        '<div class="mn-grp">' + shown.map(row).join("") + '<div class="mn-li"><input class="mn-tx grow" data-newcat placeholder="+ Add a category"><button type="button" class="mn-act" data-act="addcat">Add</button></div></div>' +
+        '<div class="mn-grp">' + shown.map(row).join("") + '<div class="mn-li mn-cat add"><input class="mn-tx" data-newcat placeholder="+ Add a category"><button type="button" class="mn-act" data-act="addcat">Add</button></div></div>' +
         (hidden.length ? '<p class="mn-note" style="margin-bottom:8px">Hidden · kept for old records, not offered when adding</p><div class="mn-grp" style="opacity:.6">' + hidden.map(row).join("") + "</div>" : "") +
         '<p class="mn-note">The number is how many records use it. Used ones can be hidden; unused ones can be deleted.</p>';
       requestAnimationFrame(() => seg("catk", V.catKind));
@@ -754,7 +843,6 @@ export function createView(kind) {
         seg("mode", v);
         buildRail(true);
         renderTitle(); renderBody();
-        if (desk) renderChart(true);
       } else if (name === "cmode" && v !== V.cmode) { V.cmode = v; V.bk = new Set(); seg("cmode", v); renderChart(true); }
       else if (name === "skind" && v !== S.kind) { S.kind = v; renderSheet(); }
       else if (name === "fkind" && v !== S.kind) { S.kind = v; renderForm(); }
@@ -805,6 +893,15 @@ export function createView(kind) {
     if (!a) return;
     const act = a.dataset.act, t = todayP();
     if (act === "add") startNew();
+    else if (act === "drawer") openDrawer(true);
+    else if (act === "dclose") closeDrawer();
+    else if (act === "dfind" || act === "dset") {
+      openDrawer(false);
+      while (V.stack.length) pop();
+      if (act === "dset") { renderSet(); push("set"); }
+      else { $("[data-q]").value = ""; renderFind(); push("find"); setTimeout(() => $("[data-q]").focus(), 320); }
+    }
+    else if (act === "dcal") openCal(a, M.iso(V.cur.y, V.cur.m, V.cur.d), (d) => { V.cur = M.parts(d); buildRail(false); renderTitle(); renderBody(); });
     else if (act === "reset") { if (!quiet()) a.querySelector(".ic")?.animate([{ transform: "rotate(0)" }, { transform: "rotate(-360deg)" }], { duration: 520, easing: SPR }); goTo(V.items.findIndex((it) => M.samePeriod(it, t, V.mode))); }
     else if (act === "prev") goTo(V.sel - 1);
     else if (act === "next") goTo(V.sel + 1);
@@ -874,7 +971,9 @@ export function createView(kind) {
     if (e.key === "Enter" && e.target.matches("[data-nbv]")) { e.preventDefault(); root.querySelector('[data-act="nbs"]')?.click(); }
     if (e.key === "Enter" && e.target.matches("[data-bpv]")) { e.preventDefault(); e.target.blur(); }
     if (e.key === "Escape" && desk && !$("[data-form]").hidden) { e.preventDefault(); closeForm(); }
-    else if (e.key === "Escape" && desk && V.chartOpen) { e.preventDefault(); closeChart(); }
+    else if (e.key === "Escape" && desk && $("[data-cal]").classList.contains("on")) { e.preventDefault(); closeCal(); }
+    else if (e.key === "Escape" && desk && V.stack.length) { e.preventDefault(); pop(); }
+    else if (e.key === "Escape" && desk && V.drawer) { e.preventDefault(); closeDrawer(); }
   });
   root.addEventListener("input", (e) => { if (e.target.matches("[data-q]")) renderFind(); if (e.target.matches("[data-famt]")) $("[data-ferr]").textContent = ""; });
   root.addEventListener("submit", (e) => { e.preventDefault(); saveForm(); });
@@ -886,15 +985,22 @@ export function createView(kind) {
     const w = root.clientWidth;
     if (w === lastW) return;
     lastW = w;
-    if (desk) { const narrow = w < 760; root.classList.toggle("narrow", narrow); if (!narrow) closeChart(); }
+    if (desk) root.classList.toggle("narrow", w < 900);
     rail.style.padding = "0 " + Math.max(0, ((rw.clientWidth || 272) - V.cw) / 2) + "px";
     rw.scrollLeft = V.sel * V.cw;
     seg("mode", V.mode);
-    if (!desk) seg("cmode", V.cmode);
+    seg("cmode", V.cmode);
+    listEdges();
     if (V.sub === "cats") seg("catk", V.catKind);
     if (CS) renderChart(false);
   };
   if (typeof ResizeObserver === "function") new ResizeObserver(relayout).observe(root);
+  if (desk) {
+    onSwipe(root, ".mn-fig, .mn-drawer, .mn-handle, .mn-dscrim", (dir) => (dir === "left" ? openDrawer(true) : closeDrawer()), ".mn-rw, .mn-hs, .mn-cards, input, textarea");
+    // 图表往下滚了：顶栏下沿那条渐进模糊才出来（没滚的时候没有东西要糊）
+    const fb = $(".mn-fig .mn-cbody");
+    fb.addEventListener("scroll", () => $(".mn-fig").classList.toggle("scrolled", fb.scrollTop > 2), { passive: true });
+  }
 
   // ---------- 对外 ----------
   let shown = false;
@@ -903,29 +1009,34 @@ export function createView(kind) {
     repaintBars();
     renderTitle();
     renderBody();
-    if ((desk && !root.classList.contains("narrow")) || V.chartOpen) renderChart(false);
+    if (desk || V.chartOpen) renderChart(false);
+    paintHandle();
     if (V.stack.includes("set")) renderSet();
     if (V.stack[V.stack.length - 1] === "sub" && V.sub !== "import") renderSub();
     if (V.stack.includes("find")) renderFind();
     if (desk) { const [st, bad] = statusText(); const el = $("[data-status]"); el.textContent = bad ? st : SP.pendingCount() ? "Syncing…" : ""; el.classList.toggle("bad", bad); }
   }
   // 打开：手机上面板长开以后（柱子从选中那格往两边一根根长出来），电脑上切到 Spending 页
+  // 电脑上每次进 Spending 页：只有图表，抽屉收着
   function show() {
     shown = true;
+    if (desk) { V.drawer = true; closeDrawer(); }
     requestAnimationFrame(() => {
       lastW = root.clientWidth;
-      if (desk) root.classList.toggle("narrow", lastW < 760);
+      if (desk) root.classList.toggle("narrow", lastW < 900);
       seg("mode", V.mode);
-      buildRail(true);
+      seg("cmode", V.cmode);
+      buildRail(!desk);
       if (desk) renderChart(true);
     });
     renderTitle();
     renderBody();
+    paintHandle();
     if (desk) { const [st, bad] = statusText(); const el = $("[data-status]"); el.textContent = bad ? st : ""; el.classList.toggle("bad", bad); }
   }
   function hide() {
     shown = false;
-    closeSheet(); closeChart(); closeCal();
+    closeSheet(); closeChart(); closeCal(); closeDrawer();
     while (V.stack.length) pop();
   }
   // 手机：收起前回到主页最上面；下次打开从今天看起（隔了一会儿才再打开的话）

@@ -15,7 +15,7 @@ import * as reading from "../reading.js";
 import * as Meal from "../meals.js";
 import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
-import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickable, pickTarget, segStyle, lineInfo, toast, STATUS, ballHTML } from "./common.js";
+import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickable, pickTarget, segHTML, lineInfo, toast, STATUS, ballHTML, taskChainHTML } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
 import { animateNext } from "../motion.js";
@@ -28,6 +28,7 @@ import { quadHTML } from "./quads.js";
 
 const openDesc = new Set();
 const logOpen = new Set();   // 已经有计时记录、又点了「+ time」要再补一段的任务
+const chainAll = new Set();  // 手机上点过「⋯」、整条链条都列出来的任务
 const seen = new Set();
 let overdueOpen = false;
 let viewDate = "";
@@ -55,16 +56,16 @@ export function timeRangeHTML(x) {
 function timesHTML(c, t, list, form) {
   const run = store.timer();
   const live = run?.taskId === t.id;
-  const fin = t.status === "done" || t.status === "partial";
+  const canLog = t.status === "done" || t.status === "delay";
   if (!list.length && !live) return "";
   return '<div class="times">' + (live ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : "") +
     list.map((x) => (timeEdit === x.id && x.from ? timeEditHTML(x) : '<span class="tm">' + timeRangeHTML(x) + fmtMin(x.min) +
       '<button type="button" class="tm-x" data-act="time-del" data-tid="' + x.id + '" aria-label="Delete this time">×</button></span>')).join("") +
     (list.length > 1 ? '<span class="tm sum">= ' + fmtMin(store.timeTotal(t.id)) + "</span>" : "") +
-    (fin && !form ? '<button type="button" class="tm more-time" data-act="time-more">+ time</button>' : "") + "</div>";
+    (canLog && !form ? '<button type="button" class="tm more-time" data-act="time-more">+ time</button>' : "") + "</div>";
 }
 
-// 标了 Done / Partial：填「用了几小时几分、几点结束」记一段。没计过时的直接出来；计过的点「+ time」再补
+// 补记用了多久：填「用了几小时几分、几点结束」记一段。标了 Done 还没记过的直接出来（预填预计分钟）；别的点「+ time」才出来
 function logFormHTML(c, t, list) {
   const base = list.length ? 0 : Number(t.actual) > 0 ? Number(t.actual) : t.status === "done" ? Number(t.est) || 0 : 0;
   const k = (f) => 'data-lt="' + f + '" data-keep="lt-' + f + "-" + t.id + '"';
@@ -81,7 +82,7 @@ function openOf(c, d, tasks) {
   return d === c.today ? pickedId(c) : "";
 }
 
-const STATUS_WORD = { done: "Done ✓", partial: "Partial", later: "Later", drop: "Drop" };
+const STATUS_WORD = { done: "Done ✓", delay: "Delay", drop: "Drop" };
 
 // 任务标了 Done，名字又在阅读的 Want 里（或者在某一页里还没写日期）：问一句看完没有（电脑）。
 // 点记号 = 记进它那一页、月份用任务那天的；那一页有小类（Book、Game）就接着在同一行点一下小类。Not yet = 这条任务不再问
@@ -106,20 +107,19 @@ function finishHTML(t, want) {
 function rowHTML(c, t, tasks, phone = false, openId = "") {
   const p = badgeOf(t);
   const open = t.id === openId;
-  const fin = t.status === "done" || t.status === "partial";
-  const why = t.status === "partial" || t.status === "later" || t.status === "drop";
+  const why = t.status === "delay" || t.status === "drop";
   const desc = open && openDesc.has(t.id);
   const fresh = !seen.has(t.id);
   seen.add(t.id);
-  const movedOn = t.status === "later" && c.tasks.some((x) => !x.status && x.date > t.date && x.title === t.title);
   const list = store.timeOf(t.id);
-  const form = open && fin && t.date <= c.today && (!list.length || logOpen.has(t.id));
+  // 补记用了多久：标了 Done、还一点没记的直接出来（预填预计分钟）；Delay 的要点「+ time」才出来；记过的点「+ time」再补一段
+  const form = open && t.date <= c.today && (logOpen.has(t.id) || (t.status === "done" && !list.length));
   const picked = timeable(t, c.today) && pickedId(c) === t.id;
   const run = store.timer();
   const running = run?.taskId === t.id;
   const want = open && !phone ? askFinished(t) : undefined;
   const chips = '<div class="chips' + (open ? "" : " hov") + '">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
-    (open && t.status === "later" && !movedOn && !phone ? '<button type="button" class="chip ghost" data-act="tomorrow">→ Tomorrow</button>' : "") + "</div>";
+    (open && t.status === "delay" && !list.length && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") + "</div>";
   const total = store.timeTotal(t.id);
   const side = open ? "" : '<span class="rside">' +
     (running ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : total ? '<span class="num">' + fmtMin(total) + "</span>" : "") +
@@ -135,7 +135,7 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
     (!open && withText(t.id) ? ' <span class="wth">' + esc(withText(t.id)) + "</span>" : "") +
     (t.desc && !desc ? '<span class="more"> ⋯</span>' : "") + "</div>" + side +
     (phone ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") +
-    "</div>" + (open ? timesHTML(c, t, list, form) : "") +
+    "</div>" + (open ? taskChainHTML(t, 2, phone && !chainAll.has(t.id) ? 3 : 0) + timesHTML(c, t, list, form) : "") +
     (desc ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Details">' + esc(t.desc || "") + "</textarea>" : "") +
     (open || !phone ? chips : "") +
     (open && meetable(t) ? taskMeetHTML(t.id) : "") +
@@ -191,7 +191,7 @@ function noticesHTML(c) {
 // 做完的 Leisure / Friends 任务（能从灵感池里挑的那几个大类）底下：记这一顿吃了什么（电脑）。一家可以记好几道；
 // 记下的进 Meals → Boxes 页的 To try，带着任务的名字和日子（只是抄过去的字，和灵感池、和这条任务以后怎么变都没关系）
 const dishOpen = new Set();   // 点开了「+ What I had」的任务
-const canDish = (t) => (t.status === "done" || t.status === "partial") && GR.ideasOf(store.groupByName(store.groupOf(t)));
+const canDish = (t) => t.status === "done" && GR.ideasOf(store.groupByName(store.groupOf(t)));
 function dishesHTML(t) {
   const list = Meal.dishesOf(store.meals(), t.id), id = esc(t.id);
   if (!list.length && !dishOpen.has(t.id)) return '<button type="button" class="link dish-more" data-act="dish-open">+ What I had</button>';
@@ -287,7 +287,7 @@ function phoneHTML(c) {
   const { line, done } = lineInfo(c, d);
   const lineText = line > 0 ? (done >= line - 1 ? "Line " + fmtMin(line) + " ✓" : "Line " + fmtMin(line) + " · " + fmtMin(line - done) + " to go") : "";
   const meta = '<div class="stripmeta' + (day.cap > 0 && day.planned > day.cap ? " over" : "") + '"><span>' + Math.round(day.done) + " / " + day.planned + " min done</span><span>" + lineText + "</span></div>";
-  const bar = '<div class="strip">' + all.map((t) => '<i style="flex-grow:' + Math.max(5, Number(t.est) || 0) + ";" + segStyle(t) + '"></i>').join("") + "</div>";
+  const bar = '<div class="strip">' + all.map(segHTML).join("") + "</div>";
   const toBuy = shopCount(c);   // 下次采购还剩几样（顶栏的 🛒）
   return '<div class="dayview phone-day" data-date="' + d + '">' +
     '<header class="phead"><div class="l"><h1 data-act="day-today">' + fmtDay(d) + "</h1>" + ballHTML() + "</div>" +
@@ -337,8 +337,8 @@ export function initToday(rerender) {
     else if (act === "time-edit") { timeEdit = el.dataset.tid; rerender(); requestAnimationFrame(() => setTimeout(() => document.querySelector(".tm-edit [name=from]")?.focus(), 0)); }
     else if (act === "time-edit-x") { timeEdit = ""; rerender(); }
     else if (act === "time-more") { logOpen.add(id); rerender(); }
+    else if (act === "chain-all") { chainAll.add(id); rerender(); }
     else if (act === "time-log") logFromRow(el.closest(".row"));
-    else if (act === "tomorrow") store.toTomorrow(id);
     else if (act === "dish-open") { dishOpen.add(id); rerender(); requestAnimationFrame(() => setTimeout(() => document.querySelector('.dish-quick[data-task="' + CSS.escape(id) + '"] [name=name]')?.focus(), 0)); }
     else if (act === "dish-x") { const d = store.meals().dish[el.dataset.did]; if (d) store.deleteMeal("dish", d.id, "Removed " + (d.name || "it")); }
     else if (act === "fin-later") { finishing = null; reading.notYet(id); rerender(); }

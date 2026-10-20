@@ -1,4 +1,4 @@
-// 点哪里冒一圈细细的涟漪；标 Done 时在按钮上放一把（白天丝网印纸片、夜里一朵烟花，Partial 小一把），守住安全线时白天满屏纸片、夜里三发烟花。纯装饰，不接收点击。
+// 点哪里冒一圈细细的涟漪；标 Done 时在按钮上放一把（白天丝网印纸片、夜里一朵烟花），守住安全线时白天满屏纸片、夜里三发烟花。纯装饰，不接收点击。
 // 系统开了「减弱动态效果」或设置里关掉时，全都不放。
 // 还有整站的底图（#sky，样子在 css 里）：白天蓝天白云，夜里三层星星；天色跟着钟点走；关掉动效时停住不动。
 // 底图上偶尔经过的飞机、花瓣、流星雨在 js/sky.js。
@@ -190,11 +190,11 @@ export function confetti() {
   }, R() * 1100);
 }
 
-// 标了 Done / Partial：在按的那个按钮上放（Partial 小一把）
+// 标了 Done：在按的那个按钮上放
 export function cheer(el, status) {
-  if (status !== "done" && status !== "partial") return;
+  if (status !== "done") return;
   const b = el.getBoundingClientRect();
-  burst(b.left + b.width / 2, b.top + b.height / 2, status === "done");
+  burst(b.left + b.width / 2, b.top + b.height / 2, true);
 }
 
 export function initFx() {

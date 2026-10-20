@@ -109,7 +109,7 @@ export function load(codePath, ss = new Spreadsheet()) {
   };
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(codePath, "utf8"), sandbox);
-  const post = (body) => JSON.parse(sandbox.doPost({ postData: { contents: JSON.stringify({ version: 5, ...body }) } }).getContent());
+  const post = (body) => JSON.parse(sandbox.doPost({ postData: { contents: JSON.stringify({ version: sandbox.VERSION || 6, ...body }) } }).getContent());
   // 测试用：再开一个表格（比如阅读记录），网页里填它的链接
   const spreadsheet = (url) => (others[url] = others[url] || new Spreadsheet());
   return { ss, sandbox, logs, post, spreadsheet };

@@ -372,15 +372,20 @@ test("big buys: days, per day in what you paid with, the other currency at the r
   assert.equal(M.gearRow({ bought: "2025-10-20" }, T).age, "year");
   assert.equal(M.gearRow({ bought: "2025-10-19" }, T).age, "three", "exactly 12 months ago: the dim one");
   const L = M.gearList({ gear: Object.fromEntries(rows.map((r, i) => [i, { ...r, id: String(i) }])) }, T, 5);
-  assert.deepEqual(L.live.map((r) => r.g.name), ["Sony A7M4", "Iphone 15", "Airpods Pro"], "most expensive first");
-  const cheapFirst = { a: { id: "a", name: "A", cur: "cad", price: 100, bought: "2026-10-01" }, b: { id: "b", name: "B", cur: "cny", price: 21400, bought: "2020-01-01" }, c: { id: "c", name: "C", cur: "cad", price: 1670, bought: "2026-10-18" } };
-  for (const r of [1, 5, 9]) assert.deepEqual(M.gearList({ gear: cheapFirst }, T, r).live.map((x) => x.g.name), ["B", "C", "A"], "by price whatever the per-day or the date");
+  assert.deepEqual(L.live.map((r) => r.g.name), ["Sony A7M4", "Iphone 15", "Airpods Pro"], "highest per day first");
+  // 用户报的两处：Ultherapy $2,500 / 73 天（$34.2）要在 Sony ¥21,400 / 1237 天（¥17.3）上面；
+  // Sennheiser ¥1,000 / 1719 天（¥0.6）要在 B&O ¥1,000 / 2534 天（¥0.4）上面——总价一样，按一天比
+  const mine = { sony: { id: "sony", name: "Sony A7M4", cur: "cny", price: 21400, bought: "2023-05-31" }, ul: { id: "ul", name: "Ultherapy", cur: "cad", price: 2500, bought: "2026-08-07" },
+    bo: { id: "bo", name: "B&O A1", cur: "cny", price: 1000, bought: "2019-11-11" }, se: { id: "se", name: "Sennheiser", cur: "cny", price: 1000, bought: "2022-02-03" },
+    ap: { id: "ap", name: "Airpods Pro", cur: "cny", price: 500, bought: "2023-08-01" } };
+  for (const r of [4.81, 5, 9]) assert.deepEqual(M.gearList({ gear: mine }, T, r).live.map((x) => x.g.name), ["Ultherapy", "Sony A7M4", "Sennheiser", "Airpods Pro", "B&O A1"], "AirPods ¥0.43 vs B&O ¥0.39: both show ¥0.4");
   assert.equal(M.gearEmoji(rows[0]), "📷", "category from the sheet, by name");
   assert.equal(M.gearTag({ cat: "phone" }), "phone");
   assert.equal(M.gearEmoji({ cat: "Tablet" }), "💻", "tablets and computers are one kind");
   assert.equal(M.gearTag({ cat: "tablet" }), "computer");
   assert.equal(M.gearTag({ cat: "Computer" }), "computer");
   assert.equal(M.gearEmoji({ cat: "beauty" }), "💅");
+  assert.equal(M.gearEmoji({ cat: "speaker" }), "🔊");
   assert.equal(M.gearEmoji({ cat: "Drone" }), "🪐", "unknown: other");
   assert.deepEqual(L.gone.map((r) => r.g.name), ["B&O A1"]);
 });

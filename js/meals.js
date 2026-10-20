@@ -409,7 +409,7 @@ export const GEAR_LOW = { cad: 0.5, cny: 2 };
 // 类目用 emoji 表示；存的是 key，从表格贴进来的英文名（Camera…）也认，认不出的算 🪐
 // 电脑和平板算一类（💻）；以前存的 tablet、贴进来的 Tablet / iPad 也归到这里
 export const GEAR_TAGS = [["camera", "📷", "Camera"], ["computer", "💻", "Computer & tablet"], ["phone", "📱", "Phone"],
-  ["audio", "🎧", "Audio"], ["wearable", "⌚", "Wearable"], ["beauty", "💅", "Beauty"], ["other", "🪐", "Other"]];
+  ["audio", "🎧", "Audio"], ["speaker", "🔊", "Speaker"], ["wearable", "⌚", "Wearable"], ["beauty", "💅", "Beauty"], ["other", "🪐", "Other"]];
 const GEAR_ALIAS = { tablet: "computer", ipad: "computer", laptop: "computer", "🖥️": "computer", "📓": "computer" };
 export function gearTag(g) {
   const c = String(g?.cat || "").trim().toLowerCase();
@@ -432,13 +432,14 @@ export function gearRow(g, today, rate = GEAR_RATE) {
     days, perDay, retired, age, cheap: !retired && days > 0 && price > 0 && perDay < GEAR_LOW[cur] };
 }
 
-// 列表：永远是越贵的越靠前（按加币比，汇率怎么改都一样）；不用了的也照这个顺序，只是另列一块、默认收起
+// 列表：永远是一天合得最多的在最上面（右边那个大数字；人民币、加币按汇率换成同一种再比）；
+// 一样多的再看总价。不用了的也照这个顺序，只是另列一块、默认收起
 export function gearList(D, today, rate = GEAR_RATE) {
   const rows = Object.values(D.gear || {}).map((g) => gearRow(g, today, rate));
   const toCad = (r) => (r.cur === "cad" ? r.perDay : r.perDay / rate);
-  const byPrice = (a, b) => b.cad - a.cad || b.cny - a.cny || byName(a.g, b.g);
-  const live = rows.filter((r) => !r.retired).sort(byPrice);
-  const gone = rows.filter((r) => r.retired).sort(byPrice);
+  const byDay = (a, b) => toCad(b) - toCad(a) || b.cad - a.cad || byName(a.g, b.g);
+  const live = rows.filter((r) => !r.retired).sort(byDay);
+  const gone = rows.filter((r) => r.retired).sort(byDay);
   return { live, gone, cad: live.reduce((a, r) => a + r.cad, 0), perDay: live.reduce((a, r) => a + toCad(r), 0) };
 }
 

@@ -85,7 +85,8 @@ console.log("→ current:", g.logs.join(" | "));
   const goal = (id, text, span, due, up, by = [], tag = "") => ({ key: "goal:" + id, value: { text, tag, span, due, done: "", order: id.length + text.length, up, by }, updated: 4 });
   const goals = [
     goal("n1", "A steady, curious life", "north", "", ""),
-    goal("y4", "Live and work in French", "year", ym(y + 4, 12), "n1"),
+    goal("n2", "French as a second home", "north", "", ""),
+    goal("y4", "Live and work in French", "year", ym(y + 4, 12), "n2"),
     goal("y1", "C1 French certificate", "year", ym(y + 1, 12), "y4"),
     goal("y2", "Freelance on the side", "year", ym(y + 2, 12), "n1"),
     goal("t1", "Pass B2 (DELF)", "year", ym(y, 12), "y1", ["p:seed-b2"].concat(m4 ? ["p:" + m4.id] : [])),
@@ -99,7 +100,9 @@ console.log("→ current:", g.logs.join(" | "));
   // 今天页：展开第一条看「For B2 exam → …」；第二条不展开，截悬停的样子用（哪天都有这两条，不管 Gym 那天排没排）
   const tasks = [{ id: "seed-t-b2", date: T, title: "Listening drills", est: 45, order: 0, projectId: "seed-b2", itemId: "seed-b2-i0", updated: 4 },
     { id: "seed-t-mail", date: T, title: "Reply to the landlord", est: 20, order: 1, group: "Chores", updated: 4 }];
-  g.post({ secret: S, push: { rows: { projects: plans.map((p) => p.row), items: plans.flatMap((p) => p.items), settings: goals, tasks } } });
+  // Projects 右栏最上面那一段字：[ ] 里的就是上面那两条 North star
+  const north = { key: "north-star", value: { text: "What I'm steering by: [A steady, curious life] — slow mornings to read and write, work that keeps teaching me something, and [French as a second home]. Money is a tool, not the point." }, updated: 4 };
+  g.post({ secret: S, push: { rows: { projects: plans.map((p) => p.row), items: plans.flatMap((p) => p.items), settings: [...goals, north], tasks } } });
 }
 
 // FAKE_WORST=1（tools/look.mjs --worst）：再造一份极端数据，看名字很长、一天很多条、只有一两个字的时候界面撑不撑得住
@@ -121,6 +124,8 @@ if (process.env.FAKE_WORST) {
   const ym = T.slice(0, 7);
   const goals = Array.from({ length: 12 }, (_, i) => ({ key: "goal:worst-g" + i, value: { text: i === 0 ? "Get the whole literature review, every figure and the appendix the committee asked for, done and sent" : i === 1 ? "把去年所有的报销单据整理完交给会计" : "Small goal number " + (i + 1), tag: i % 3 ? "" : "Build", span: "month", due: ym, done: i === 5 ? ym : "", order: 100 + i, up: i < 4 ? "q1" : "", by: i < 2 ? ["p:seed-port"] : [] }, updated: 10 }));
   goals.push({ key: "goal:worst-north", value: { text: "Live somewhere quiet with time to read, cook slowly, and see the people I love without rushing", tag: "", span: "north", due: "", done: "", order: 200, up: "", by: [] }, updated: 10 });
+  // North star 那一段：很长，一个框跨好几行，还有中文
+  goals.push({ key: "north-star", value: { text: "这几年想清楚的事：[A steady, curious life]，以及 [Live somewhere quiet with time to read, cook slowly, and see the people I love without rushing]。\n\nWork should pay for the life, not eat it. Keep learning things that compound — [French as a second home], writing, cooking — and say no to almost everything else. 每年留出一整个月什么都不安排。" }, updated: 10 });
   g.post({ secret: "CHANGE_ME", push: { rows: { tasks, settings: goals } } });
   console.log("worst-case data:", tasks.length, "tasks,", goals.length, "goals on", T);
 }

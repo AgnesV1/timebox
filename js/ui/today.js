@@ -354,7 +354,7 @@ export function initToday(rerender) {
     }
     else if (act === "od-toggle") { overdueOpen = !overdueOpen; rerender(); }
     else if (act === "week-seen") store.setLocal({ weekSeen: el.dataset.week });
-    else if (act === "open-ideas") { store.setLocal({ projMode: "ideas" }); location.hash = "projects"; }
+    else if (act === "open-ideas") { store.setLocal({ projSide: "ideas" }); location.hash = "projects"; }
     else if (act === "spread") store.spreadOverdue();
     else if (act === "all-today") {
       const c = store.ctx();

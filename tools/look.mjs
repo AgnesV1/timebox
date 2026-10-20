@@ -1,5 +1,5 @@
 // 截图看样子：一条命令起本地网页（tools/serve.mjs）和假表格（tools/fake-sheet.mjs），用 Playwright 按下面 SHOTS 的清单截图，
-// 手机 390×844、电脑 1440×900，白天、夜里各一套；截完打印图在哪、控制台报了什么错、手机上看得见的输入框有没有不到 16px 的（iPhone 一点就放大）。
+// 手机 390×844、电脑 1440×900（再加一个拉窄的 1000×760），白天、夜里各一套；截完打印图在哪、控制台报了什么错、手机上看得见的输入框有没有不到 16px 的（iPhone 一点就放大）。
 //   node tools/look.mjs                     全部
 //   node tools/look.mjs --only today,stats  只截名字里带这几个词的
 //   node tools/look.mjs --worst             假表格里多造一份极端数据（很长的名字、一栏一堆目标、大金额……），见 tools/fake-sheet.mjs
@@ -87,12 +87,46 @@ const SHOTS = [
   { device: "desk", name: "stats", hash: "stats" },
   { device: "desk", name: "spending", hash: "spending" },
   { device: "desk", name: "spending-drawer", hash: "spending", act: tap(".mn-desk [data-act=drawer]") },
-  { device: "desk", name: "settings", hash: "settings" }
+  { device: "desk", name: "spending-add", hash: "spending", act: async (page) => { await tap(".mn-desk .mn-hadd")(page); await page.keyboard.type("12.5+8"); } },
+  { device: "desk", name: "spending-set", hash: "spending", act: async (page) => { await tap(".mn-desk [data-act=dset]")(page); await tap('.mn-desk [data-sub="cats"]')(page); } },
+  { device: "desk", name: "spending-find", hash: "spending", act: async (page) => { await tap(".mn-desk [data-act=dfind]")(page); await page.keyboard.type("coffee"); await page.waitForTimeout(300); } },
+  { device: "desk", name: "spending-year", hash: "spending", act: async (page) => { await tap('.mn-desk [data-seg="cmode"] [data-v="year"]')(page); await page.waitForTimeout(900); } },
+  { device: "desk", name: "settings", hash: "settings" },
+  { device: "small", name: "projects", hash: "projects" },
+  { device: "small", name: "spending", hash: "spending" },
+  { device: "small", name: "spending-drawer", hash: "spending", act: tap(".mn-desk [data-act=drawer]") }
 ];
 const DEVICES = {
   phone: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
-  desk: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 }
+  desk: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },
+  small: { viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1 }   // 窗口拉窄的电脑：看窄的排法
 };
+
+// 记账：最近五个月像样的一份（每天吃饭、隔三岔五的交通咖啡、月初房租、半个月一次工资），加一个预算——记账的数据只在这台设备上（不走假表格），
+// 直接用页面里的 spend.js 记进去。用固定的种子，每次截出来一样
+async function seedSpending(page) {
+  await page.evaluate(async () => {
+    const SP = await import("/js/spend.js"), T = (await import("/js/store.js")).today();
+    const [y, m, d] = T.split("-").map(Number), day = (k) => new Date(Date.UTC(y, m - 1, d - k)).toISOString().slice(0, 10);
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const rows = [];
+    for (let k = 150; k >= 0; k--) {
+      const date = day(k), dd = Number(date.slice(8));
+      if (dd === 1) rows.push({ d: date, v: -145000, c: "House", n: "rent" });
+      if (dd === 1 || dd === 15) rows.push({ d: date, v: 240000, c: "Salary", n: "" });
+      rows.push({ d: date, v: -Math.round(800 + rnd() * 2400), c: "Food", n: ["lunch", "groceries", "dinner", "", "bakery"][Math.floor(rnd() * 5)] });
+      if (rnd() < 0.5) rows.push({ d: date, v: -330, c: "Traffic", n: "presto" });
+      if (rnd() < 0.3) rows.push({ d: date, v: -Math.round(450 + rnd() * 300), c: "Drink", n: "coffee" });
+      if (rnd() < 0.08) rows.push({ d: date, v: -Math.round(2000 + rnd() * 6000), c: "Entertainment", n: "" });
+      if (rnd() < 0.04) rows.push({ d: date, v: -Math.round(3000 + rnd() * 9000), c: "Clothes", n: "" });
+      if (rnd() < 0.03) rows.push({ d: date, v: -Math.round(1500 + rnd() * 4000), c: "Health", n: "pharmacy" });
+      if (rnd() < 0.03) rows.push({ d: date, v: Math.round(5000 + rnd() * 20000), c: "Extra", n: "" });
+    }
+    SP.addMany(rows);
+    SP.setBudgets([{ from: day(150).slice(0, 7), v: 358000 }]);
+  });
+}
 
 // 大金额、很长的分类名：记账的数据只在这台设备上（不走假表格），直接用页面里的 spend.js 记进去
 async function seedWorstSpending(page) {
@@ -120,7 +154,7 @@ async function main() {
   const shots = SHOTS.filter((s) => !only.length || only.some((w) => (s.device + "-" + s.name).includes(w)));
   const made = [], skipped = [], errors = [], small = [];
   for (const theme of ["light", "dark"]) {
-    for (const device of ["phone", "desk"]) {
+    for (const device of ["phone", "desk", "small"]) {
       const mine = shots.filter((s) => s.device === device);
       if (!mine.length) continue;
       const ctx = await browser.newContext(DEVICES[device]);
@@ -134,6 +168,7 @@ async function main() {
         store.setLocal({ url, secret: "CHANGE_ME", serverVersion: 0, themeHold: { v: theme, until: Date.now() + 6 * 3600e3 } });
         await sync.sync({ full: true });
       }, { url: "http://127.0.0.1:" + SHEET + "/exec", theme });
+      await seedSpending(page);
       if (worst) await seedWorstSpending(page);
       for (const s of mine) {
         await page.goto("http://127.0.0.1:" + WEB + "/index.html#" + s.hash);

@@ -54,6 +54,8 @@
 * { box-sizing: border-box; }
 html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.4 var(--body); }
+/* 记账、备餐页上触控板横着划是开抽屉 / 收 Big buys：别让浏览器当成「后退 / 前进」 */
+html:has(> body:is([data-view="spending"], [data-view="meals"])) { overscroll-behavior-x: none; }
 body.phone { background: var(--bg); }
 /* 手机宽度下底色从第一笔就是 --bg，不等脚本加上 body.phone：iPhone 顶上那一条（灵动岛那里）是照页面一打开时的底色取的 */
 @media (max-width: 760px) { body { background: var(--bg); } }
@@ -1606,7 +1608,7 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .goals .gtools .link { font-size: 12px; }
 .goals .hint { margin: 2px 2px 2px; }
 .ggrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px 24px; padding: 5px 0 6px; border-top: 1px solid var(--line); }
-@container (max-width: 720px) { .ggrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 820px) { .ggrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .gcol { min-width: 0; }
 .gcol h4 { display: flex; align-items: center; gap: 6px; height: 21px; margin: 0; font: 700 12px var(--display); white-space: nowrap; }
 .gcol h4 small { font: 600 11px var(--num); color: var(--muted); }
@@ -1643,8 +1645,8 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .gdue { padding: 0 1px; border: 0; background: none; font: 600 11px var(--num); color: var(--muted); white-space: nowrap; }
 .gdue:hover { color: var(--ink); text-decoration: underline; }
 .gl.late .gdue { color: var(--warn); }
-.gdue.dflt { opacity: 0; }
-.gl:hover .gdue.dflt, .gdue.dflt:focus-visible { opacity: 1; }
+.gdue.dflt { max-width: 0; padding: 0; overflow: hidden; opacity: 0; }   /* 平时不占地方，字能多露一点 */
+.gl:hover .gdue.dflt, .gdue.dflt:focus { max-width: 64px; padding: 0 1px; opacity: 1; }
 .gx { width: 14px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; opacity: 0; }
 .gl:hover .gx, .gl.editing .gx, .gx:focus-visible { opacity: 1; }
 .gx:hover { color: var(--warn); }
@@ -1658,7 +1660,7 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .gcol:hover .gplus, .gplus:focus-visible, .gplus[aria-expanded="true"] { opacity: 1; }
 .gplus:hover, .gplus[aria-expanded="true"] { background: var(--surface); color: var(--ink); }
 [data-theme="dark"] .gplus:hover, [data-theme="dark"] .gplus[aria-expanded="true"] { background: var(--surface2); }
-@media (hover: none) { .gplus, .gx, .gdue.dflt, .goals .gtag.none { opacity: 1; } }
+@media (hover: none) { .gplus, .gx, .goals .gtag.none { opacity: 1; } .gdue.dflt { max-width: 64px; opacity: 1; } }
 .gadd input { width: 100%; margin-top: 2px; padding: 2px 6px; border: 1px dashed #CDCDC6; border-radius: 6px; background: transparent; font-size: 12px; }
 .gadd input::placeholder { color: var(--muted); opacity: .7; }
 [data-theme="dark"] .gadd input { border-color: var(--edge); box-shadow: none; }

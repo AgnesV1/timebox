@@ -7,6 +7,7 @@
   --mn-pop: linear(0, .03, .106, .208, .322, .438, .548, .649, .737, .812, .873, .922, .959, .987, 1.007, 1.02, 1.027, 1.031, 1.032, 1.03, 1.028, 1.024, 1.021, 1.017, 1.014, 1.01, 1.008, 1.006, 1.004, 1.002, 1.001, 1, 1);
   --mn-spring: linear(0, .029, .099, .192, .296, .399, .498, .588, .668, .737, .795, .844, .883, .915, .939, .959, .973, .984, .992, .997, 1.001, 1.003, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1);
   --mn-sheet: cubic-bezier(.32, .72, 0, 1);
+  --mn-enter: cubic-bezier(.16, 1, .3, 1); --mn-exit: cubic-bezier(.4, 0, 1, 1);
   color: var(--mn-ink); font: 14px/1.35 "Space Grotesk", -apple-system, "PingFang SC", sans-serif; background: #000; -webkit-tap-highlight-color: transparent; }
 .mn *, .mn *::before, .mn *::after { box-sizing: border-box; }
 .mn button { font: inherit; color: inherit; }
@@ -62,10 +63,21 @@
 .mn .mn-dot { flex: none; width: 4px; height: 4px; margin-bottom: 5px; border-radius: 50%; background: var(--mn-green); opacity: 0; }
 .mn .mn-dot.on { opacity: 1; }
 
-/* 流水：左边类别 + 灰的备注、下面日期，右边金额 */
-.mn .mn-list { flex: 1; min-height: 0; margin-top: 4px; touch-action: pan-y; }   /* 竖着滚交给浏览器，横着滑（删）归页面 */
+/* 流水：左边类别 + 灰的备注、下面日期，右边金额。上下沿各一条渐进模糊，滚上去的那几行慢慢糊掉 */
+.mn .mn-lw { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 4px; }
+.mn .mn-list { flex: 1; min-height: 0; touch-action: pan-y; }   /* 竖着滚交给浏览器，横着滑（删）归页面 */
+.mn .mn-pblur { position: absolute; left: 0; right: 0; z-index: 3; height: 40px; pointer-events: none; }
+.mn .mn-pblur > i { position: absolute; inset: 0; }
+.mn .mn-pblur > i:nth-child(1) { -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); -webkit-mask-image: linear-gradient(var(--to, 180deg), #000, transparent); mask-image: linear-gradient(var(--to, 180deg), #000, transparent); }
+.mn .mn-pblur > i:nth-child(2) { -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); -webkit-mask-image: linear-gradient(var(--to, 180deg), #000, transparent 66%); mask-image: linear-gradient(var(--to, 180deg), #000, transparent 66%); }
+.mn .mn-pblur > i:nth-child(3) { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); -webkit-mask-image: linear-gradient(var(--to, 180deg), #000, transparent 33%); mask-image: linear-gradient(var(--to, 180deg), #000, transparent 33%); }
+.mn .mn-lw .mn-pblur { height: 26px; opacity: 0; transition: opacity .2s; }
+.mn .mn-lw .mn-pblur.top { top: 0; }
+.mn .mn-lw .mn-pblur.bot { bottom: 0; --to: 0deg; }
+.mn .mn-lw.scrolled .mn-pblur.top, .mn .mn-lw.more .mn-pblur.bot { opacity: 1; }
 .mn .mn-rw2 { position: relative; overflow: hidden; transition: height .25s; }
-.mn .mn-del { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; color: #E8674A; font-size: 12px; }
+.mn .mn-del { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; color: #E8674A; font-size: 12px; opacity: 0; }
+.mn .mn-rw2.swiping .mn-del { opacity: 1; }
 .mn .mn-row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--mn-line); background: #000; cursor: pointer; }
 .mn .mn-row .mn-r1 { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mn .mn-row .mn-nt { margin-left: 6px; font-size: 13px; color: var(--mn-mute); }
@@ -80,9 +92,12 @@
 .mn .mn-big { all: unset; display: block; width: 100%; height: 44px; border-radius: 13px; background: var(--mn-pri); color: var(--mn-pri-ink); text-align: center; line-height: 44px; font-size: 15px; font-weight: 500; cursor: pointer; transition: transform .42s var(--mn-pop); }
 .mn .mn-big:active { transform: scale(.97); }
 
-/* 滚着变的数字（每一位一列 0–9） */
-.mn .mn-rn { display: inline-flex; height: 1.1em; line-height: 1.1em; overflow: hidden; vertical-align: bottom; }
+/* 滚着变的数字（每一位一列 0–9）；小数那几位（.dec）小一号、淡一点，底对齐再垫一点，和整数的基线对上 */
+.mn .mn-rn { display: inline-flex; align-items: flex-end; height: 1.1em; line-height: 1.1em; overflow: hidden; vertical-align: bottom; }
 .mn .mn-rn > span { display: inline-block; height: 1.1em; }
+.mn .mn-rn > .dec { height: 1.1em; font-size: .62em; line-height: 1.1em; margin-bottom: .15em; opacity: .72; }
+.mn .mn-plainv { white-space: nowrap; }
+.mn .mn-dec { font-size: .62em; opacity: .72; }
 .mn .mn-rn .dg { overflow: hidden; }
 .mn .mn-rn .cl { display: flex; flex-direction: column; transition: transform .7s var(--mn-spring); }
 .mn .mn-rn .cl > span { height: 1.1em; line-height: 1.1em; }
@@ -133,6 +148,7 @@
 .mn .mn-fld { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 40px; border-bottom: 1px solid var(--mn-line); }
 .mn .mn-tx { all: unset; min-width: 0; font: 14px "Space Grotesk", sans-serif; color: var(--mn-ink); }
 .mn .mn-tx::placeholder { color: #55556A; }
+.mn .mn-tx:focus { box-shadow: none; }   /* 记账有自己的一套颜色：不要苦昼短夜里那圈青柠光 */
 .mn .mn-amt { font-size: 30px; font-weight: 500; line-height: 36px; }
 .mn .mn-amt .cur { margin-right: 3px; font-size: 17px; font-weight: 400; color: var(--mn-mute); }
 .mn .mn-amt .zero { color: #3A3A48; }
@@ -157,13 +173,19 @@
 
 /* 设定：分组的入口，点进去是子页 */
 .mn .mn-grp { flex: none; margin-bottom: 14px; border-radius: 14px; background: var(--mn-fill); overflow: hidden; }
-.mn .mn-li { all: unset; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 46px; padding: 0 12px 0 14px; border-bottom: 1px solid var(--mn-line); font-size: 14px; cursor: pointer; }
+.mn .mn-li { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 46px; padding: 0 12px 0 14px; border-bottom: 1px solid var(--mn-line); font-size: 14px; cursor: pointer; }   /* all: unset 会把 border-box 也去掉：宽 100% 再加内边距就撑出去，右边的按钮被切掉 */
+/* 分类：四格对齐（名字 | base 小字 | 用了几笔 | 操作），操作那格固定宽、靠右 */
+.mn .mn-cat { display: grid; grid-template-columns: minmax(0, 1fr) auto 2.6em 3.2em; gap: 10px; cursor: default; }
+.mn .mn-cat > .mn-tx { width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.mn .mn-cat > .mn-num { text-align: right; }
+.mn .mn-cat > .mn-act { justify-self: end; }
+.mn .mn-cat.add { grid-template-columns: minmax(0, 1fr) 3.2em; }
 .mn .mn-li:last-child { border-bottom: 0; }
 .mn .mn-li > .grow { flex: 1; min-width: 0; }
 .mn .mn-li.dim { cursor: default; opacity: .55; }
 .mn .mn-li.act { color: var(--mn-blue); }
 .mn .mn-cr { flex: none; width: 15px; height: 15px; color: #55556A; }
-.mn .mn-note { margin: 0 4px 12px; font-size: 11px; line-height: 1.6; color: var(--mn-mute); }
+.mn .mn-note { margin: 0 14px 12px; font-size: 11px; line-height: 1.6; color: var(--mn-mute); }   /* 左右和分组里的字对齐（分组的内边距也是 14） */
 .mn textarea.mn-tx { display: block; width: 100%; min-height: 140px; padding: 10px 12px; border-radius: 12px; background: var(--mn-fill); font: 12px/1.5 "JetBrains Mono", monospace; white-space: pre; }
 .mn pre.mn-md { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--mn-fill); font: 11px/1.5 "JetBrains Mono", monospace; color: #B9B5AC; white-space: pre-wrap; }
 
@@ -199,43 +221,73 @@
 #mn-live .ok { stroke-dasharray: 10; stroke-dashoffset: 10; transition: stroke-dashoffset .3s .1s; }
 @keyframes mn-spin { to { transform: rotate(360deg); } }
 
-/* ---------- 电脑：Spending 页，两栏 ---------- */
-.mn-desk { position: relative; min-height: calc(100vh - 56px); margin: -4px 0 0; border-radius: 22px; overflow: hidden; }
-.mn-desk .mn-cols { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(360px, 1.15fr); grid-template-rows: minmax(0, 1fr); gap: 0; height: calc(100vh - 56px); min-height: 560px; }
-.mn-desk .mn-left { position: relative; min-width: 0; min-height: 0; border-right: 1px solid var(--mn-line); }
-.mn-desk .mn-left > .mn-pg { padding: 18px 22px 18px; }
-.mn-desk .mn-right { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 18px 26px 0; }
-.mn-desk .mn-right .mn-cbody { margin: 12px -26px 0; padding: 0 26px 28px; }
-.mn-desk .mn-tl { margin: 12px -22px 0; }
-.mn-desk .mn-cards { margin: 14px -26px 0; padding: 0 26px; }
-.mn-desk .mn-hs { margin-left: -22px; margin-right: -22px; padding: 0 22px; }
-.mn-desk .mn-cards.mn-hs { margin-left: -26px; margin-right: -26px; padding: 0 26px; }
-.mn-desk .mn-snack { left: auto; right: 22px; bottom: 22px; width: 320px; }
-.mn-desk .mn-row:hover { background: #0B0B10; }
+/* ---------- 电脑：Spending 页。整页是图表（figure）；主页收在右边的抽屉里（某一天的流水、记一笔） ---------- */
+/* 底色是黑，角上两团很淡的钴蓝、青绿光（静态）；浮起来的抽屉、日历、提示条是磨砂的 */
+.mn-desk { position: relative; height: calc(100vh - 56px); min-height: 560px; margin: -4px 0 0; border-radius: 22px; overflow: hidden; isolation: isolate;
+  background: radial-gradient(70% 55% at 12% -10%, rgba(76, 114, 216, .16), transparent 70%), radial-gradient(55% 45% at 105% 105%, rgba(79, 179, 169, .12), transparent 70%), #000; }
+.mn-desk .mn-fig { position: absolute; inset: 0 64px 0 0; display: flex; flex-direction: column; min-width: 0; }
+.mn-desk .mn-fhead { position: relative; z-index: 2; flex: none; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px 24px; padding: 22px 28px 14px; }
+.mn-desk .mn-fhead .mn-pblur { top: 100%; height: 32px; opacity: 0; transition: opacity .2s; }
+.mn-desk .mn-fig.scrolled .mn-fhead .mn-pblur { opacity: 1; }
+.mn-desk .mn-ftot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 22px; margin-top: 6px; }
+.mn-desk .mn-ftot > span { display: inline-flex; align-items: baseline; gap: 7px; }
+.mn-desk .mn-ftot .mn-rn { font-size: 22px; font-weight: 500; }
+.mn-desk .mn-ftools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.mn-desk .mn-ftools .mn-seg { width: 168px; }
+.mn-desk .mn-ftools .mn-nav { margin: 0; }
+.mn-desk .mn-hgrp { display: flex; align-items: center; gap: 2px; }
+.mn-desk .mn-addb { display: inline-flex; align-items: center; gap: 6px; width: auto; height: 36px; padding: 0 12px 0 10px; line-height: 36px; font-size: 14px; }
+.mn-desk .mn-addb .ic { width: 16px; height: 16px; }
+.mn-desk .mn-fig .mn-cbody { flex: 1; min-height: 0; margin: 0; padding: 14px 28px 36px; }
+.mn-desk .mn-cards { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; padding: 0; }
+.mn-desk .mn-bks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 36px; }
+.mn-desk.narrow .mn-bks { grid-template-columns: minmax(0, 1fr); }
+.mn-desk .mn-row:hover { background: rgba(255, 255, 255, .03); }
 .mn-desk .mn-li:hover, .mn-desk .mn-brow:hover { background: rgba(255, 255, 255, .025); }
-/* 电脑上记一笔：流水顶上展开一行，直接打字 */
-.mn-desk .mn-form { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: center; margin: 8px 0 4px; padding: 12px 14px; border-radius: 14px; background: var(--mn-fill); }
+.mn-desk .mn-snack { left: 28px; right: auto; bottom: 22px; width: 320px; }
+.mn-desk .mn-kbd { margin-left: 6px; padding: 1px 5px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 5px; font: 11px "JetBrains Mono", monospace; color: inherit; opacity: .7; }
+
+/* 收着的抽屉：右边一条把手，写着今天花了多少，底下一个「+」 */
+.mn-desk .mn-handle { position: absolute; top: 0; right: 0; bottom: 0; z-index: 3; width: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  border-left: 1px solid rgba(255, 255, 255, .06); background: rgba(255, 255, 255, .025); }
+.mn-desk .mn-hmain { all: unset; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: 12px; cursor: pointer; transition: background .2s, transform .12s; }
+.mn-desk .mn-hmain:hover { background: rgba(255, 255, 255, .05); }
+.mn-desk .mn-hmain:active { transform: scale(.96); }
+.mn-desk .mn-hmain .mn-num { font-size: 13px; white-space: nowrap; }
+.mn-desk .mn-hadd { all: unset; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--mn-pri); color: var(--mn-pri-ink); cursor: pointer; transition: transform .28s var(--mn-enter); }
+.mn-desk .mn-hadd:hover { transform: scale(1.06); }
+.mn-desk .mn-hadd:active { transform: scale(.94); transition-duration: .12s; }
+.mn-desk .mn-hadd .ic { width: 17px; height: 17px; }
+.mn-desk :is(.mn-hmain, .mn-hadd):focus-visible { outline: 1.5px solid var(--mn-blue); outline-offset: 2px; }
+
+/* 抽屉：从右边滑出来，磨砂玻璃；点外面（变暗的图表）收起 */
+.mn-desk .mn-dscrim { position: absolute; inset: 0; z-index: 4; background: rgba(0, 0, 0, .38); opacity: 0; pointer-events: none; transition: opacity .26s var(--mn-exit); }
+.mn-desk.drawer-on .mn-dscrim { opacity: 1; pointer-events: auto; transition: opacity .42s var(--mn-enter); }
+.mn-desk .mn-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(392px, 100%); overflow: hidden; transform: translateX(104%);
+  border-left: 1px solid rgba(255, 255, 255, .08); background: rgba(12, 12, 17, .74); -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: -30px 0 60px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .06); transition: transform .26s var(--mn-exit), visibility 0s .26s; visibility: hidden; }
+.mn-desk.drawer-on .mn-drawer { transform: none; visibility: visible; transition: transform .42s var(--mn-enter); }
+.mn-desk .mn-drawer > .mn-pg { padding: 16px 20px 18px; }
+.mn-desk .mn-drawer > .mn-home { background: transparent; }
+.mn-desk .mn-drawer > .mn-pg:not(.mn-home) { background: #0C0C11; }
+.mn-desk .mn-drawer .mn-tl { margin: 12px -20px 0; }
+.mn-desk .mn-drawer .mn-hs { margin-left: -20px; margin-right: -20px; padding: 0 20px; }
+.mn-desk .mn-drawer .mn-row { background: transparent; }
+.mn-desk .mn-drawer .mn-foot { border-top-color: rgba(255, 255, 255, .07); }
+.mn-desk.narrow .mn-fig { right: 0; padding-bottom: 76px; }
+.mn-desk.narrow .mn-handle { top: auto; left: 0; height: 64px; width: auto; flex-direction: row; gap: 14px; border-left: 0; border-top: 1px solid rgba(255, 255, 255, .06); }
+.mn-desk.narrow .mn-hmain { flex-direction: row; gap: 10px; }
+.mn-desk.narrow .mn-drawer { width: 100%; background: rgba(10, 10, 14, .94); }   /* 盖满的时候底下的图表别透上来 */
+/* 电脑上记一笔：抽屉最上面展开一块，直接打字 */
+.mn-desk .mn-form { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: center; margin: 8px 0 6px; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); }
 .mn-desk .mn-form[hidden] { display: none; }
 .mn-desk .mn-form .full { grid-column: 1 / -1; }
 .mn-desk .mn-form .mn-cats { margin-top: 0; }
-.mn-desk .mn-form input.mn-tx { padding: 6px 0; border-bottom: 1px solid #26262F; }
+.mn-desk .mn-form input.mn-tx { padding: 6px 0; border-bottom: 1px solid #26262F; transition: border-color .2s; }
+.mn-desk .mn-form input.mn-tx:focus { border-bottom-color: var(--mn-blue); }
 .mn-desk .mn-form .amt { font: 500 22px "JetBrains Mono", monospace; text-align: right; }
 .mn-desk .mn-form .btns { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
 .mn-desk .mn-form .mn-big { width: auto; height: 36px; line-height: 36px; padding: 0 18px; font-size: 14px; }
-.mn-desk .mn-kbd { margin-left: 6px; padding: 1px 5px; border: 1px solid #2A2A36; border-radius: 5px; font: 11px "JetBrains Mono", monospace; color: var(--mn-mute); }
-/* 窗口窄（这一块不到 760px 宽）：只留左栏，图表点顶上的图标从底下升上来 */
-.mn-desk .mn-dchart, .mn-desk .mn-rtop { display: none; }
-.mn-desk .mn-ddim { display: none; }
-.mn-desk.narrow .mn-dchart { display: flex; }
-.mn-desk.narrow .mn-cols { grid-template-columns: minmax(0, 1fr); }
-.mn-desk.narrow .mn-left { border-right: 0; }
-.mn-desk.narrow .mn-ddim { display: block; position: absolute; inset: 0; z-index: 29; background: #000; opacity: 0; pointer-events: none; transition: opacity .72s var(--mn-sheet); }
-.mn-desk.narrow.chart-on .mn-ddim { opacity: .55; pointer-events: auto; }
-.mn-desk.narrow .mn-right { position: absolute; left: 0; right: 0; bottom: 0; top: 34px; z-index: 30; padding-top: 0; border-radius: 22px 22px 0 0; background: #08080B; box-shadow: 0 -1px 0 rgba(255, 255, 255, .08); transform: translateY(102%); transition: transform .5s var(--mn-sheet); }
-.mn-desk.narrow.chart-on .mn-right { transform: none; transition: transform .72s var(--mn-sheet); }
-.mn-desk.narrow .mn-rtop { position: relative; flex: none; display: flex; align-items: center; justify-content: center; height: 34px; }
-.mn-desk.narrow .mn-left { transition: transform .72s var(--mn-sheet), opacity .72s var(--mn-sheet); }
-.mn-desk.narrow.chart-on .mn-left { transform: scale(.96) translateY(6px); opacity: .6; }
 
 @media (prefers-reduced-motion: reduce) {
   .mn *, .mn-phone, #mn-live { transition-duration: .01s !important; animation-duration: .01s !important; }

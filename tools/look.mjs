@@ -67,10 +67,22 @@ async function pullLedger(page) {
   await page.mouse.up();
   await page.waitForTimeout(1400);
 }
+// 拉到一半停住（不松手）截拉的样子；release = 松手后等 wait 毫秒再截（截落下来那一下）
+const pullTo = (dy, release = false, wait = 0) => async (page) => {
+  await page.mouse.move(195, 140);
+  await page.mouse.down();
+  for (let y = 150; y <= 140 + dy; y += 10) { await page.mouse.move(195, y); await page.waitForTimeout(16); }
+  await page.waitForTimeout(250);
+  if (release) { await page.mouse.up(); await page.waitForTimeout(wait); }
+};
 const SHOTS = [
   { device: "phone", name: "today", hash: "today" },
   { device: "phone", name: "today-open", hash: "today", act: tap(".row .task") },
+  { device: "phone", name: "pull-short", hash: "today", act: pullTo(50) },
+  { device: "phone", name: "pull-armed", hash: "today", act: pullTo(115) },
+  { device: "phone", name: "pull-falling", hash: "today", act: pullTo(115, true, 150) },
   { device: "phone", name: "ledger", hash: "today", act: pullLedger },
+  { device: "phone", name: "ledger-add", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="add"]')(page); for (const k of ["1", "2", ".", "5", "+", "8"]) await tap('.mn-phone [data-k="' + k + '"]')(page); } },
   { device: "phone", name: "ledger-chart", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="chart"]')(page); await page.waitForTimeout(600); } },
   { device: "phone", name: "ledger-cats", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="set"]')(page); await tap('.mn-phone [data-sub="cats"]')(page); } },
   { device: "desk", name: "today", hash: "today" },

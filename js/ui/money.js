@@ -11,10 +11,8 @@ import * as M from "../money.js";
 import * as store from "../store.js";
 import { esc, icon, onSwipe } from "../dom.js";
 
-// 弹簧：慢一点、只冲过头一点点（SOFT 约 3%，GENTLE 约 0.5%），收的时候用 GENTLE
-const POP = "linear(0, .03, .106, .208, .322, .438, .548, .649, .737, .812, .873, .922, .959, .987, 1.007, 1.02, 1.027, 1.031, 1.032, 1.03, 1.028, 1.024, 1.021, 1.017, 1.014, 1.01, 1.008, 1.006, 1.004, 1.002, 1.001, 1, 1)";
+// 小东西（按钮、开关、小签）用的弹簧：只冲过头 0.5%；面板、抽屉、图表页这种大块不冲过头（ENTER / EXIT，见 css/money.css 开头）
 const SPR = "linear(0, .029, .099, .192, .296, .399, .498, .588, .668, .737, .795, .844, .883, .915, .939, .959, .973, .984, .992, .997, 1.001, 1.003, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1)";
-const SHEET = "cubic-bezier(.32, .72, 0, 1)", OUTQ = "cubic-bezier(.22, .9, .28, 1)";
 // 进场：快出来、慢慢停稳（不冲过头）；出场：干脆一点，越走越快
 const ENTER = "cubic-bezier(.16, 1, .3, 1)", EXIT = "cubic-bezier(.4, 0, 1, 1)";
 const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -109,7 +107,9 @@ export function createView(kind) {
       '<div class="mn-handle"><button type="button" class="mn-hmain" data-act="drawer" aria-label="Open the day\'s spending"><span class="mn-meta">Today</span><span class="mn-num" data-htot></span></button>' +
       '<button type="button" class="mn-hadd" data-act="add" aria-label="Add a transaction" title="Add a transaction (N)">' + icon("plus") + "</button></div>" +
       '<div class="mn-dscrim" data-act="dclose"></div><aside class="mn-drawer" aria-label="One day">' + home + pages + "</aside>" + cal + snackHTML
-    : '<div class="mn-inner">' + home + pages + '<div class="mn-cdim" data-act="cclose"></div><section class="mn-csheet" aria-label="Charts"><div class="mn-cgrab" data-cgrab><span class="mn-grabber"></span><button type="button" class="mn-plain mn-done" data-act="cclose">Done</button></div>' + chartInner + "</section>" + sheet + cal + snackHTML + "</div>";
+    // 手机：面板（mn-inner）只有屏幕约 88% 高，底边是一道水面弧线；底下露出来的那条是 mn-veil（压暗的今天页，点了收起，见 island.js）。
+    // 记一笔的面板、日历盖满整屏（数字键盘贴着屏幕底）
+    : '<div class="mn-veil"></div><div class="mn-inner">' + home + pages + '<div class="mn-cdim" data-act="cclose"></div><section class="mn-csheet" aria-label="Charts"><div class="mn-cgrab" data-cgrab><span class="mn-grabber"></span><button type="button" class="mn-plain mn-done" data-act="cclose">Done</button></div>' + chartInner + "</section>" + snackHTML + "</div>" + sheet + cal;
 
   const $ = (s) => root.querySelector(s);
   const homeEl = $('[data-pg="home"]'), rw = $(".mn-rw"), rail = $(".mn-rail"), hl = $(".mn-hl"), tl = $(".mn-tl"), list = $(".mn-list");
@@ -185,7 +185,7 @@ export function createView(kind) {
     V.sel = idxOf(V.cur);
     rw.scrollLeft = V.sel * V.cw;
     paintSel();
-    if (grow && !quiet()) rail.querySelectorAll(".mn-bar").forEach((b, i) => Math.abs(i - V.sel) < 16 && b.animate([{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }], { duration: 760, delay: Math.min(520, Math.abs(i - V.sel) * 34), easing: POP, fill: "backwards" }));
+    if (grow && !quiet()) rail.querySelectorAll(".mn-bar").forEach((b, i) => Math.abs(i - V.sel) < 16 && b.animate([{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }], { duration: 520, delay: Math.min(400, Math.abs(i - V.sel) * 18), easing: ENTER, fill: "backwards" }));
   }
   function repaintBars() {
     measureCap();
@@ -317,7 +317,7 @@ export function createView(kind) {
       r.style.transform = "translateX(-110%)";
       setTimeout(() => { const w = r.parentNode; w.style.height = w.offsetHeight + "px"; void w.offsetHeight; w.style.height = "0px"; }, 200);
       setTimeout(() => removeEntry(r.dataset.id), 450);
-    } else { r.style.transition = "transform .6s " + POP; r.style.transform = ""; setTimeout(() => { if (!r.style.transform) r.parentNode?.classList.remove("swiping"); }, 600); }
+    } else { r.style.transition = "transform .28s " + SPR; r.style.transform = ""; setTimeout(() => { if (!r.style.transform) r.parentNode?.classList.remove("swiping"); }, 600); }
   };
   list.addEventListener("pointerup", listUp);
   list.addEventListener("pointercancel", listUp);
@@ -370,7 +370,14 @@ export function createView(kind) {
   }
   function renderAmt(app) {
     const s = ssum();
-    $("[data-samt]").innerHTML = '<span class="cur">' + (S.kind === "out" ? "−$" : "+$") + "</span>" + (S.ex ? [...S.ex].map((c, i) => (app && i === S.ex.length - 1 ? '<span class="in">' + c + "</span>" : c)).join("") : '<span class="zero">0</span>');
+    // 每个数的小数点和后面两位小一号（「12.50+8」里的「.50」）
+    let dec = false;
+    const typed = [...S.ex].map((c, i) => {
+      if (c === "+") dec = false; else if (c === ".") dec = true;
+      const ch = app && i === S.ex.length - 1 ? '<span class="in">' + c + "</span>" : c;
+      return dec ? '<span class="mn-dec">' + ch + "</span>" : ch;
+    }).join("");
+    $("[data-samt]").innerHTML = '<span class="cur">' + (S.kind === "out" ? "−$" : "+$") + "</span>" + (S.ex ? typed : '<span class="zero">0</span>');
     const eq = $("[data-seq]");
     eq.style.color = "";
     eq.textContent = S.ex.includes("+") && s > 0 ? "= " + s.toFixed(2) : "";
@@ -440,7 +447,7 @@ export function createView(kind) {
     $('[data-act="fdel"]').hidden = !e;
     $("[data-ferr]").textContent = "";
     renderForm();
-    if (!quiet()) f.animate([{ opacity: 0, transform: "translateY(-6px)" }, { opacity: 1, transform: "none" }], { duration: 420, easing: OUTQ });
+    if (!quiet()) f.animate([{ opacity: 0, transform: "translateY(-6px)" }, { opacity: 1, transform: "none" }], { duration: 280, easing: ENTER });
     $("[data-famt]").focus();
   }
   function renderForm() {
@@ -497,7 +504,7 @@ export function createView(kind) {
     for (let d = 1; d <= N; d++) { const k = M.iso(C.y, C.m, d); h += '<button type="button" class="mn-cd' + (k === C.sel ? " sel" : "") + (k === today() ? " today" : "") + '" data-cd="' + k + '">' + d + "</button>"; }
     const g = $("[data-calg]");
     g.innerHTML = h;
-    if (dir && !quiet()) g.animate([{ transform: "translateX(" + dir * 16 + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 420, easing: POP });
+    if (dir && !quiet()) g.animate([{ transform: "translateX(" + dir * 16 + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 280, easing: ENTER });
   }
   function openCal(anchor, sel, onPick) {
     const cal = $("[data-cal]");
@@ -552,12 +559,12 @@ export function createView(kind) {
       '<g data-lab style="pointer-events:none"><text data-lt class="mn-ax" y="' + (Y1 - 4) + '" style="font-size:11px;fill:#8C8CA0"></text><text data-lv class="mn-ax" y="' + (Y1 + 12) + '" style="font-size:13px;fill:#F2EEE6"></text></g>';
     const svg = $("[data-chart]");
     svg.innerHTML = h;
-    const d0 = entering ? 0.42 : 0;
+    const d0 = entering ? 0.3 : 0;
     if (animate && !quiet()) {
       svg.querySelectorAll(".ar").forEach((a) => a.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 520, delay: d0 * 1000, fill: "backwards" }));
-      svg.querySelectorAll(".ln").forEach((q) => { q.style.strokeDasharray = 1; q.style.strokeDashoffset = 1; q.getBoundingClientRect(); q.style.transition = "stroke-dashoffset 1.3s cubic-bezier(.3,.7,0,1) " + (d0 + 0.1) + "s"; q.style.strokeDashoffset = 0; });
-      svg.querySelectorAll(".fc").forEach((q) => q.animate([{ opacity: 0 }, { opacity: 0, offset: 0.65 }, { opacity: 1 }], { duration: 1400 + d0 * 1000 }));
-      $("[data-lab]").animate([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 1200 + d0 * 1000 });
+      svg.querySelectorAll(".ln").forEach((q) => { q.style.strokeDasharray = 1; q.style.strokeDashoffset = 1; q.getBoundingClientRect(); q.style.transition = "stroke-dashoffset .9s " + ENTER + " " + (d0 + 0.1) + "s"; q.style.strokeDashoffset = 0; });
+      svg.querySelectorAll(".fc").forEach((q) => q.animate([{ opacity: 0 }, { opacity: 0, offset: 0.65 }, { opacity: 1 }], { duration: 1000 + d0 * 1000 }));
+      $("[data-lab]").animate([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 900 + d0 * 1000 });
     }
     CS = { c, pts, mode, p, W, dateOf: (i) => (mode === "month" ? M.MON[p.m - 1] + " " + (i + 1) : (() => { const q = M.parts(c.dateOf(i + 1)); return M.MON[q.m - 1] + " " + q.d; })()) };
     ct = ci = Math.min(c.n - 1, c.home);
@@ -565,9 +572,9 @@ export function createView(kind) {
     cards(c, mode, p, d0);
     breakdown(mode, p);
     if (animate && !quiet()) {
-      const base = entering ? 320 : 40;
-      [...root.querySelectorAll(desk ? ".mn-fig .mn-st" : ".mn-csheet .mn-st")].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "none" }], { duration: 680, delay: base + Math.min(i, 14) * 55, easing: OUTQ, fill: "backwards" }));
-      root.querySelectorAll(".mn-card").forEach((el, i) => el.animate([{ opacity: 0, transform: "translateX(26px)" }, { opacity: 1, transform: "none" }], { duration: 720, delay: base + 140 + i * 70, easing: OUTQ, fill: "backwards" }));
+      const base = entering ? 200 : 30;
+      [...root.querySelectorAll(desk ? ".mn-fig .mn-st" : ".mn-csheet .mn-st")].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: base + Math.min(i, 14) * 30, easing: ENTER, fill: "backwards" }));
+      root.querySelectorAll(".mn-card").forEach((el, i) => el.animate([{ opacity: 0, transform: "translateX(16px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: base + 100 + i * 30, easing: ENTER, fill: "backwards" }));
     }
   }
   function cplace(f) {
@@ -644,20 +651,31 @@ export function createView(kind) {
     if (open) {
       V.bk.add(k);
       bin.style.height = "0px"; void bin.offsetHeight; bin.style.height = bin.scrollHeight + "px";
-      if (!quiet()) bin.querySelectorAll(".mn-irow").forEach((r, i) => r.animate([{ opacity: 0, transform: "translateY(-5px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: 80 + Math.min(i, 12) * 32, easing: OUTQ, fill: "backwards" }));
+      if (!quiet()) bin.querySelectorAll(".mn-irow").forEach((r, i) => r.animate([{ opacity: 0, transform: "translateY(-5px)" }, { opacity: 1, transform: "none" }], { duration: 280, delay: 40 + Math.min(i, 12) * 20, easing: ENTER, fill: "backwards" }));
       setTimeout(() => { if (el.classList.contains("open")) bin.style.height = "auto"; }, 450);
     } else { V.bk.delete(k); bin.style.height = bin.scrollHeight + "px"; void bin.offsetHeight; bin.style.height = "0px"; }
   }
 
-  // 手机：图表从底下整页升上来，主页往后退一点、变暗；拖顶上那条或点 Done 收回
+  // 手机：图表从底下升上来，先停在半高（上面还看得到期间和时间轴，主页只稍微往后退一点）；拖顶上那条：往上到全高、往下收起；
+  // 点上面变暗的地方、Done 也收起。半高时在图表里往下滚，自己升到全高（下面的方块、Breakdown 才看得到）
   const csheet = $(".mn-csheet"), cdim = $(".mn-cdim");
-  function setUnder(p, dur) {
-    const t = dur ? "transform " + dur + " " + SHEET + ", opacity " + dur + " " + SHEET + ", border-radius " + dur : "none";
+  let detent = "", halfY = 0;   // 停在哪：""（收着）/ "half" / "full"；halfY = 半高时往下挪了多少
+  function setUnder(p, dur, ease = ENTER) {
+    const t = dur ? "transform " + dur + " " + ease + ", border-radius " + dur : "none";
     homeEl.style.transition = t;
-    cdim.style.transition = dur ? "opacity " + dur + " " + SHEET : "none";
-    homeEl.style.transform = p ? "scale(" + (1 - 0.07 * p) + ") translateY(" + 8 * p + "px)" : "";
-    homeEl.style.borderRadius = 22 * p + "px";
-    cdim.style.opacity = (0.55 * p).toFixed(3);
+    cdim.style.transition = dur ? "opacity " + dur + " " + ease : "none";
+    homeEl.style.transform = p ? "scale(" + (1 - 0.05 * p) + ") translateY(" + 6 * p + "px)" : "";
+    homeEl.style.borderRadius = 18 * p + "px";
+    cdim.style.opacity = (0.5 * p).toFixed(3);
+  }
+  const shut = () => csheet.offsetHeight + 24;
+  function sheetTo(where, dur, ease) {
+    detent = where;
+    const y = where === "full" ? 0 : where === "half" ? halfY : shut();
+    csheet.style.transition = dur ? "transform " + dur + " " + ease : "none";
+    csheet.style.transform = "translateY(" + y + "px)";
+    setUnder(where === "full" ? 1 : where === "half" ? 0.45 : 0, dur, ease);
+    cdim.style.pointerEvents = where ? "auto" : "none";
   }
   function openChart() {
     if (V.chartOpen) return;
@@ -667,32 +685,44 @@ export function createView(kind) {
     V.bk = new Set();
     seg("cmode", V.cmode);
     $(".mn-csheet .mn-cbody").scrollTop = 0;
-    csheet.style.transition = "none";
-    csheet.style.transform = "translateY(102%)";
+    halfY = Math.max(0, Math.round(csheet.parentNode.clientHeight * 0.45 - csheet.offsetTop));
+    sheetTo("", 0);
     void csheet.offsetWidth;
-    csheet.style.transition = "transform .72s " + SHEET;
-    csheet.style.transform = "translateY(0)";
-    setUnder(1, ".72s");
-    cdim.style.pointerEvents = "auto";
+    sheetTo("half", quiet() ? "" : ".42s", ENTER);
     requestAnimationFrame(() => seg("cmode", V.cmode));
     renderChart(true, true);
   }
   function closeChart() {
     if (!V.chartOpen) return;
     V.chartOpen = false;
-    csheet.style.transition = "transform .52s " + SHEET;
-    csheet.style.transform = "translateY(102%)";
-    setUnder(0, ".52s");
-    cdim.style.pointerEvents = "none";
+    sheetTo("", quiet() ? "" : ".26s", EXIT);
   }
   if (!desk) {
     let cg = null;
-    const grab = $("[data-cgrab]");
-    grab.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) return; cg = { y: e.clientY, d: 0, tr: tracker() }; cg.tr.add(e.clientY); csheet.style.transition = "none"; grab.setPointerCapture(e.pointerId); });
-    grab.addEventListener("pointermove", (e) => { if (!cg) return; cg.tr.add(e.clientY); let dy = e.clientY - cg.y; if (dy < 0) dy = -6 * Math.log(1 - dy / 6); cg.d = dy; csheet.style.transform = "translateY(" + dy + "px)"; setUnder(Math.max(0, 1 - Math.max(0, dy) / 520), null); });
-    const up = () => { if (!cg) return; const d = cg.d, v = cg.tr.vel(); cg = null; if (d > 130 || (v > 0.5 && d > 16)) closeChart(); else { csheet.style.transition = "transform .45s " + SHEET; csheet.style.transform = "translateY(0)"; setUnder(1, ".45s"); } };
+    const grab = $("[data-cgrab]"), cbody = $(".mn-csheet .mn-cbody");
+    grab.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) return; cg = { y: e.clientY, base: detent === "full" ? 0 : halfY, d: 0, tr: tracker() }; cg.tr.add(e.clientY); csheet.style.transition = "none"; grab.setPointerCapture(e.pointerId); });
+    grab.addEventListener("pointermove", (e) => {
+      if (!cg) return;
+      cg.tr.add(e.clientY);
+      let y = cg.base + e.clientY - cg.y;
+      if (y < 0) y = -6 * Math.log(1 - y / 6);   // 全高再往上：有阻力
+      cg.d = y;
+      csheet.style.transform = "translateY(" + y + "px)";
+      setUnder(Math.max(0, Math.min(1, 1 - Math.max(0, y) / shut() * 1.2)), null);
+    });
+    // 松手：甩一下按方向走一档（全高往下甩 = 半高，半高往下甩 = 收起），不然停到离得最近的那一档
+    const up = () => {
+      if (!cg) return;
+      const y = cg.d, v = cg.tr.vel(), from = cg.base;
+      cg = null;
+      if (v > 0.5) { if (from === 0 && y < halfY + 60) sheetTo("half", ".42s", ENTER); else closeChart(); return; }
+      if (v < -0.5) { sheetTo("full", ".42s", ENTER); return; }
+      const end = shut(), near = [[0, "full"], [halfY, "half"], [end, ""]].sort((a, b) => Math.abs(a[0] - y) - Math.abs(b[0] - y))[0][1];
+      if (near) sheetTo(near, ".42s", ENTER); else closeChart();
+    };
     grab.addEventListener("pointerup", up);
     grab.addEventListener("pointercancel", up);
+    cbody.addEventListener("scroll", () => { if (detent === "half" && cbody.scrollTop > 4) sheetTo("full", ".42s", ENTER); }, { passive: true });
   }
   function cshift(k) {
     let { y, m } = V.cc;
@@ -701,7 +731,7 @@ export function createView(kind) {
     V.cc = { y, m, d: 1 };
     V.bk = new Set();
     renderChart(true);
-    if (!quiet()) $("[data-ctitle]").animate([{ transform: "translateX(" + k * 10 + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 460, easing: POP });
+    if (!quiet()) $("[data-ctitle]").animate([{ transform: "translateX(" + k * 10 + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 280, easing: ENTER });
   }
 
   // ---------- 一页一页推进去 ----------

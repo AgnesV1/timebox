@@ -1,27 +1,34 @@
 // Projects 页（电脑）上「谁为谁服务」的连线。页面上盖一层 SVG，鼠标点得穿；只在悬停、拖的时候画。
-// 悬停一条目标 / 一个项目的头 / 一张计划卡（停一下，路过不算）：跟它有关的线一条条从它这儿飞出去（每条隔 40ms），
-//   画完以后虚线一直慢慢朝「为了谁」流：计划 / 项目 → 目标 → 上级 → … → North star。没关系的目标、卡片淡下去。
+// 悬停一条目标 / North star 里框出来的词 / 一个项目的头 / 一张计划卡（停一下，路过不算）：跟它有关的线一条条从它这儿飞出去（每条隔 40ms），
+//   画完以后，线上一道流光一直朝「为了谁」那头跑：计划 / 项目 → 目标 → 上级 → … → North star。没关系的目标、卡片淡下去。
 //   目标：往上一路到顶，往下是挂在它下面的（一层层）和为它们服务的项目、计划；
 //   计划：它连着的目标（自己没连的，看它所在的项目连着的），再一路往上；项目：它连着的，加上它下面自己连了目标的计划。
-// 线像地铁线路图那样走：只走缝——栏和栏之间的空隙、两排之间那条边线、目标板和项目之间的空白、页面左边和两栏之间的空白，
-//   拐弯是小圆角，不压着字。几条走同一条缝的错开 3px 并排走。目标从左边（勾的前面）进出；计划卡、项目头从左边出去。
-// 白天：墨色虚线，粉、蓝两版错开一点（丝网印套色，和换页的标题一个路子），为谁服务那头一个小圆点；夜里：项目的霓虹色加一圈光。
+// 线就是两头直接连的一条三次贝塞尔，斜着飞过去，压着字也没关系（只在鼠标停着的时候有）：
+//   左边的计划卡 → 右栏的目标：从朝着对方的那一边出去，两头水平，中间一道斜的 S；
+//   都在右栏里的（目标 → 上级、→ North star 里的词）：两头都从左边进出，往左鼓成一个 C，不压目标的字；
+//   右栏里滚走了、看不见的那头：压到能看见的那一截的边上，那头的小圆点画成空心的。
+// 每条线：一条很淡的细虚线当轨迹，上面一小截亮的（流光）沿着线跑到头，停一下，再从头出来；跑到「为了谁」那头时小圆点跳一下。
+//   白天墨色，粉、蓝两版错开一点（丝网印套色，和换页的标题一个路子）；夜里项目的霓虹色，底下一条宽的淡的当光（不用滤镜）。
+//   流光的长短、一圈多久按线的长度算，长线短线跑得一样快。同时最多 STREAKS 条带流光，多的只画轨迹。
+//   系统要求减少动态、或者 Settings 里关了 Sparkles：不跑流光，轨迹画成实线。
 // 鼠标顺着线走，线一直在；走到线旁边，线的中间出一个「×」，点了就断开（从中间断，两头缩回去）。
-// 拖一下建链接：悬停时旁边出一个小圆圈，从它拖出去，一条虚线跟着鼠标飞；能连的地方亮着，经过时吸过去，松手就连上。
+// 拖一下建链接：悬停时旁边出一个小圆圈，从它拖出去，一条线跟着鼠标飞；能连的地方亮着，经过时吸过去，松手就连上。拖到右栏的上下沿，右栏自己滚。
 //   目标拖到目标 = 设成它的上级（一条只有一个上级，会换掉原来的；会连成环的不亮）；目标 ↔ 计划 / 项目 = 这个计划 / 项目为这条目标服务。
 //   不拖也能连：计划编辑框里的 Serves（js/ui/projects.js），改目标文字时的 Part of（js/ui/goals.js）。
-// 位置只在悬停、拖、窗口变了、页面重画了的时候量；线用页面坐标，滚动不用重量。只动 stroke-dashoffset 和透明度。
+// 位置只在悬停、拖、窗口变了、页面重画了、滚动了（右栏贴着顶，会挪）的时候量，每帧最多一次。只动 stroke-dashoffset、透明度和 transform。
 
 import * as store from "../store.js";
 import * as G from "../goals.js";
 import * as GR from "../groups.js";
 import * as E from "../engine.js";
 
-const NODE = ".goals .gl[data-goal], .pgroup[data-group] > .pg-top:not(.editing), .pcard[data-project], .g-rep[data-project]";
+const NODE = ".goals .gl[data-goal], .goals .ns-g[data-goal], .pgroup[data-group] > .pg-top:not(.editing), .pcard[data-project], .g-rep[data-project]";
 const fine = matchMedia("(hover: hover) and (pointer: fine)");
 const still = matchMedia("(prefers-reduced-motion: reduce)");
 const NS = "http://www.w3.org/2000/svg";
-const DWELL = 110, GRACE = 280, STAGGER = 40, NEAR = 12, ROUND = 6, LANE = 3;
+const DWELL = 110, GRACE = 280, STAGGER = 40, NEAR = 12;
+// 流光：一圈 = 从起点外面滑进来、跑过整条线（pathLength 1）、再停一下；dash 的周期固定是 RUN（css 的 lk-run 从 .3 推到 -1.1，正好一个周期）
+const RUN = 1.4, SPEED = 260, STREAKS = 24;
 
 let layer = null, svg = null, handle = null, cutX = null, dragSvg = null;
 const edges = new Map();   // 画着的线：id → { e, g, pts, mask, gone, cutting }
@@ -43,14 +50,15 @@ function keyOf(el) {
   return el.dataset.project ? G.planRef(el.dataset.project) : "";
 }
 
-// 页面上代表它的元素。目标折在「+N more」里：用那个按钮代替；整块收起来了、做完的没列出来：用「Goals」标题代替
+// 页面上代表它的元素。目标折在「+N more」里：用那个按钮代替；做完的没列出来：用那一段的标题；切到了 Ideas：用「Goals」那个按钮
 function elOf(key, cols) {
   const root = page();
   if (!root) return null;
   const q = (sel) => root.querySelector(sel);
   if (key.startsWith("goal:")) {
-    const id = key.slice(5);
-    return q('.goals .gl[data-goal="' + CSS.escape(id) + '"]') || (cols.has(id) && q('.goals [data-col="' + cols.get(id) + '"] .gmore')) || q(".goals > header h3");
+    const id = CSS.escape(key.slice(5)), col = cols.get(key.slice(5));
+    return q('.goals .gl[data-goal="' + id + '"]') || q('.goals .ns-g[data-goal="' + id + '"]') ||
+      (col && (q('.goals [data-col="' + col + '"] .gmore') || q('.goals [data-col="' + col + '"] h4'))) || q('.goals .rail-tabs [data-v="goals"]');
   }
   if (key.startsWith("g:")) return q('.pgroup[data-group="' + CSS.escape(key.slice(2)) + '"] > .pg-top:not(.editing)');
   const id = CSS.escape(key.slice(2));
@@ -120,36 +128,16 @@ function colorOf(key) {
 }
 const glow = (c) => (c ? GR.neon(c) || c : "");
 
-// ---------- 折线：一串点 { x, y, corner }（corner = 拐角，画成小圆角） ----------
+// ---------- 线：一段三次贝塞尔 { p0, c1, c2, p3 }，另外取一串点（判断鼠标离线多近、中间的 ×、从中间断开、框住多大都用它） ----------
 
 const fmt = (n) => n.toFixed(1);
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
 const toward = (p, q, r) => { const d = dist(p, q) || 1; return { x: p.x + (q.x - p.x) * r / d, y: p.y + (q.y - p.y) * r / d }; };
-
-function dOf(pts) {
-  let d = "M" + fmt(pts[0].x) + " " + fmt(pts[0].y);
-  for (let i = 1; i < pts.length; i++) {
-    const p = pts[i];
-    if (p.corner && i < pts.length - 1) {
-      const r = Math.min(ROUND, dist(pts[i - 1], p) / 2, dist(p, pts[i + 1]) / 2), a = toward(p, pts[i - 1], r), b = toward(p, pts[i + 1], r);
-      d += "L" + fmt(a.x) + " " + fmt(a.y) + "Q" + fmt(p.x) + " " + fmt(p.y) + " " + fmt(b.x) + " " + fmt(b.y);
-    } else d += "L" + fmt(p.x) + " " + fmt(p.y);
-  }
-  return d;
-}
-
-// 去掉挨着重复的点、在一条直线上的中间点
-function tidy(pts) {
-  const out = [];
-  for (const p of pts) {
-    const last = out[out.length - 1];
-    if (last && dist(last, p) < 0.5) continue;
-    const prev = out[out.length - 2];
-    if (last && prev && last.corner && Math.abs((last.x - prev.x) * (p.y - last.y) - (last.y - prev.y) * (p.x - last.x)) < 0.5) out.pop();
-    out.push(p);
-  }
-  return out;
-}
+const P = (p) => fmt(p.x) + " " + fmt(p.y);
+const dOf = (pts) => "M" + pts.map(P).join("L");
+const cOf = (c) => "M" + P(c.p0) + "C" + P(c.c1) + " " + P(c.c2) + " " + P(c.p3);
+const cRev = (c) => cOf({ p0: c.p3, c1: c.c2, c2: c.c1, p3: c.p0 });
 
 // 走到全长的 f 处：{ point, i（在第几段） }
 function walk(pts, f) {
@@ -167,13 +155,12 @@ function halves(pts) {
   return [[...pts.slice(0, i + 1), m], [m, ...pts.slice(i + 1)]];
 }
 const reverse = (pts) => pts.slice().reverse();
+const lengthOf = (pts) => pts.slice(1).reduce((a, p, i) => a + dist(pts[i], p), 0);
 const boundsOf = (pts, pad) => {
   const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
   return { x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + pad * 2 };
 };
-
-// 一段三次贝塞尔取点（拖着的那条线、走不了缝的时候用）
-function bezier(p0, c1, c2, p3, n = 20) {
+function sample({ p0, c1, c2, p3 }, n = 24) {
   const out = [];
   for (let k = 0; k <= n; k++) {
     const t = k / n, u = 1 - t;
@@ -181,15 +168,30 @@ function bezier(p0, c1, c2, p3, n = 20) {
   }
   return out;
 }
-// 两个框之间飞一条弧线：上下隔开的从上沿 / 下沿出去，否则从侧面
-function arc(a, b) {
-  const ax = (a.l + a.r) / 2, ay = (a.t + a.b) / 2, bx = (b.l + b.r) / 2, by = (b.t + b.b) / 2;
-  if (Math.abs(by - ay) > (a.b - a.t + b.b - b.t) / 2 + 8) {
-    const s = Math.sign(by - ay), p0 = { x: ax, y: s < 0 ? a.t : a.b }, p3 = { x: bx, y: s < 0 ? b.b : b.t }, k = Math.min(140, Math.max(20, Math.abs(p3.y - p0.y) * 0.5));
-    return bezier(p0, { x: p0.x, y: p0.y + s * k }, { x: p3.x, y: p3.y - s * k }, p3);
+
+// 两个框之间的一条线（框是 { l, t, r, b }，坐标随意，只要两个一样）。rail = 两头都在右栏里。y0 / y1 = 线头的高度（不给就是正中）
+//   都在右栏里：两头从左边进出，往左鼓成 C；左右隔开：从朝着对方的那一边出去，两头水平，中间一道斜的 S；上下叠着（窗口窄了，右栏挪到上面）：从上下沿出去
+export function curve(A, B, { rail = false, y0, y1 } = {}) {
+  const ya = y0 ?? (A.t + A.b) / 2, yb = y1 ?? (B.t + B.b) / 2;
+  if (rail) {
+    const p0 = { x: A.l - 3, y: ya }, p3 = { x: B.l - 3, y: yb }, k = clamp(Math.abs(p3.y - p0.y) * 0.28, 18, 80);
+    return { p0, c1: { x: p0.x - k, y: p0.y }, c2: { x: p3.x - k, y: p3.y }, p3 };
   }
-  const s = Math.sign(bx - ax) || 1, p0 = { x: s > 0 ? a.r : a.l, y: ay }, p3 = { x: s > 0 ? b.l : b.r, y: by }, k = Math.max(20, Math.abs(p3.x - p0.x) * 0.4);
-  return bezier(p0, { x: p0.x + s * k, y: p0.y }, { x: p3.x - s * k, y: p3.y }, p3);
+  if (A.r < B.l - 8 || B.r < A.l - 8) {
+    const s = B.l + B.r > A.l + A.r ? 1 : -1;
+    const p0 = { x: s > 0 ? A.r + 2 : A.l - 2, y: ya }, p3 = { x: s > 0 ? B.l - 3 : B.r + 3, y: yb }, k = clamp(Math.abs(p3.x - p0.x) * 0.42, 40, 260);
+    return { p0, c1: { x: p0.x + s * k, y: p0.y }, c2: { x: p3.x - s * k, y: p3.y }, p3 };
+  }
+  const s = B.t + B.b > A.t + A.b ? 1 : -1;
+  const p0 = { x: (A.l + A.r) / 2, y: s > 0 ? A.b + 2 : A.t - 2 }, p3 = { x: (B.l + B.r) / 2, y: s > 0 ? B.t - 3 : B.b + 3 }, k = clamp(Math.abs(p3.y - p0.y) * 0.5, 20, 140);
+  return { p0, c1: { x: p0.x, y: p0.y + s * k }, c2: { x: p3.x, y: p3.y - s * k }, p3 };
+}
+
+// 流光多长、一圈多久：按线的长度（像素）算，长线短线跑得一样快。hit = 流光的头跑到那头时是一圈里的第几（css 的 dash 从 .3 推到 -1.1：
+// 头在 1.4t - .3 + sl 处，到 1 的时候 t = (1.3 - sl) / 1.4），小圆点就在那一下跳
+export function streakOf(len) {
+  const sl = clamp(48 / Math.max(1, len), 0.08, 0.3);
+  return { sl, sg: RUN - sl, sd: clamp(RUN * len / SPEED, 1.2, 4.2), hit: (1.3 - sl) / RUN };
 }
 
 // ---------- 量位置、走线 ----------
@@ -209,13 +211,12 @@ function mount() {
 }
 
 // 页面坐标（这一层的左上角 = 页面左上角）
-function rectOf(el) {
-  const o = layer.getBoundingClientRect(), r = el.getBoundingClientRect();
-  return { l: r.left - o.left, t: r.top - o.top, r: r.right - o.left, b: r.bottom - o.top };
-}
-// 目标那一行只算到字的末尾（不然一栏宽的空白也算进去）；项目的头只算名字
+const toPage = (r, o) => ({ l: r.left - o.left, t: r.top - o.top, r: r.right - o.left, b: r.bottom - o.top });
+function rectOf(el) { return toPage(el.getBoundingClientRect(), layer.getBoundingClientRect()); }
+// 目标那一行只算到字的末尾（不然一栏宽的空白也算进去）；项目的头只算名字；框出来的词折行了，算它第一行那一截
 function boxOf(el) {
   if (el.classList.contains("pg-top") && el.querySelector("h3")) return rectOf(el.querySelector("h3"));
+  if (el.classList.contains("ns-g")) { const r = el.getClientRects()[0]; return r ? toPage(r, layer.getBoundingClientRect()) : rectOf(el); }
   const b = rectOf(el), t = el.classList.contains("gl") && !el.classList.contains("editing") && el.querySelector(".gt");
   if (t) {
     const range = document.createRange();
@@ -226,63 +227,43 @@ function boxOf(el) {
   return b;
 }
 
-// 这一页的几条缝：yN = North star 和年份之间那条边，yF = 年份和近期之间那条边，yB = 目标板下面的空白，
-// left = 页面左边的空白，mid = 左右两栏之间的空白，gaps = 年份、近期每一栏左边那条缝的 x
-function layoutOf(root) {
-  const board = root.querySelector(".goals"), far = board?.querySelector(".ggrid.far"), near = board?.querySelector(".ggrid.near");
-  const main = root.querySelector(".pj-main"), side = root.querySelector(".pj-side");
-  const P = rectOf(root);
-  const L = { yN: far ? rectOf(far).t : null, yF: near ? rectOf(near).t : null, yB: board ? rectOf(board).b + 8 : P.t, left: P.l - 10, mid: null, gaps: [] };
-  if (main && side) L.mid = (rectOf(main).r + rectOf(side).l) / 2;
-  if (far) L.gaps = [...far.children].map(gapOf);
-  return L;
-}
-// 一栏左边那条缝：和前一栏中间；一排里的第一栏是目标板的内边距中间
-function gapOf(col) {
-  const r = rectOf(col), prev = col.previousElementSibling, p = prev && rectOf(prev);
-  return p && Math.abs(p.t - r.t) < 2 ? (p.r + r.l) / 2 : r.l - 7;
-}
-
-// 线的一头：目标（goal：从左边进出，x / y 是勾前面那一点，gx 是它左边那条缝，band 是哪一排，top 是这一行的上沿）；
-// 计划卡 / 项目头 / 循环小事（从左边出去，gx 是左边那条大缝）；别的（收起来的「Goals」标题）返回 null，用弧线
-function portOf(el, L) {
-  const b = boxOf(el), y = (b.t + b.b) / 2;
-  if (el.matches(".gl, .gmore")) {
-    const col = el.closest(".gcol");
-    if (!col) return null;
-    const band = col.classList.contains("gnorth") ? "north" : col.closest(".ggrid.far") ? "far" : "near";
-    return { goal: true, band, x: b.l - 3, y, gx: band === "north" ? b.l - 9 : gapOf(col), top: b.t };
+// 线头的高度：计划卡是标题那一行，别的是正中。在右栏里滚走了（或 North star 那段字滚走了）：压到能看见的那一截的边上，clip = 那头画成空心
+function endOf(el) {
+  const b = boxOf(el);
+  let y = el.classList.contains("pcard") ? Math.min((b.t + b.b) / 2, b.t + 14) : (b.t + b.b) / 2, clip = false;
+  const sc = el.closest(".rail-body, .ns-text");
+  if (sc) {
+    const r = rectOf(sc), lo = r.t + 5, hi = r.b - 5;
+    if (y < lo || y > hi) { y = clamp(y, lo, hi); clip = true; }
   }
-  if (el.closest(".goals")) return null;
-  return { goal: false, x: b.l - 2, y: Math.min(y, b.t + 12), gx: el.closest(".pj-side") && L.mid !== null ? L.mid : L.left };
+  return { b, y, clip };
 }
 
-// 走线：先出到左边的缝，竖着走到一条横的缝，横过去，再竖着到目标那一行，往右进去。o = 这条线在缝里错开多少
-function route(A, B, L, o) {
-  const pts = [{ x: A.x, y: A.y }];
-  const P = (x, y) => pts.push({ x, y, corner: true });
-  if (A.goal) {
-    if (A.band === B.band && Math.abs(A.gx - B.gx) < 1) { P(A.gx + o, A.y); P(B.gx + o, B.y); }   // 同一栏：就在左边那条缝里上下
-    else {
-      const lane = A.band === B.band && A.band !== "north" ? Math.min(A.top, B.top) : A.band === "north" || B.band === "north" ? L.yN : L.yF;
-      P(A.gx + o, A.y); P(A.gx + o, lane + o); P(B.gx + o, lane + o); P(B.gx + o, B.y);
-    }
-  } else {
-    P(A.gx + o, A.y); P(A.gx + o, L.yB + o);
-    if (B.band === "north" && L.gaps.length) {   // 到 North star：先从离它最近的那栏的缝穿过年份、近期两排，到它下面那条边，再横过去
-      const g = L.gaps.reduce((a, x) => (Math.abs(x - B.gx) < Math.abs(a - B.gx) ? x : a), L.gaps[0]);
-      P(g + o, L.yB + o); P(g + o, L.yN + o); P(B.gx + o, L.yN + o); P(B.gx + o, B.y);
-    } else { P(B.gx + o, L.yB + o); P(B.gx + o, B.y); }
-  }
-  pts.push({ x: B.x, y: B.y });
-  return tidy(pts);
+// a 为 b 服务：从 a 画到 b
+function geo(a, b) {
+  const A = endOf(a), B = endOf(b);
+  const c = curve(A.b, B.b, { rail: Boolean(a.closest(".pj-rail") && b.closest(".pj-rail")), y0: A.y, y1: B.y });
+  const pts = sample(c);
+  return { c, pts, len: lengthOf(pts), clip: B.clip };
 }
 
-function edgeHTML(id, pts, maskD) {
-  const r = boundsOf(pts, 12), d = dOf(pts), end = pts[pts.length - 1];
-  return '<mask id="' + id + '" maskUnits="userSpaceOnUse" x="' + fmt(r.x) + '" y="' + fmt(r.y) + '" width="' + fmt(r.w) + '" height="' + fmt(r.h) + '"><path class="lk-rev" pathLength="1" d="' + maskD + '"/></mask>' +
-    '<g mask="url(#' + id + ')"><path class="lk-a" d="' + d + '"/><path class="lk-b" d="' + d + '"/><path class="lk-p" d="' + d + '"/></g>' +
-    '<circle class="lk-dot" r="2.6" cx="' + fmt(end.x) + '" cy="' + fmt(end.y) + '"/>';
+function edgeHTML(id, g, rev) {
+  const r = boundsOf(g.pts, 12), d = cOf(g.c), end = g.c.p3;
+  const paths = '<path class="lk-sa" pathLength="1" d="' + d + '"/><path class="lk-sb" pathLength="1" d="' + d + '"/><path class="lk-sp" pathLength="1" d="' + d + '"/>';
+  return '<mask id="' + id + '" maskUnits="userSpaceOnUse" x="' + fmt(r.x) + '" y="' + fmt(r.y) + '" width="' + fmt(r.w) + '" height="' + fmt(r.h) + '"><path class="lk-rev" pathLength="1" d="' + (rev ? cRev(g.c) : d) + '"/></mask>' +
+    '<g mask="url(#' + id + ')"><path class="lk-t" d="' + d + '"/><g class="lk-s">' + paths + "</g></g>" +
+    '<circle class="lk-dot' + (g.clip ? " open" : "") + '" r="2.6" cx="' + fmt(end.x) + '" cy="' + fmt(end.y) + '"/>';
+}
+// 流光的那几个变量：长短、一圈多久、什么时候开始跑（等这条飞完，再错开一点）、小圆点什么时候跳（流光的头到的那一下，提前一点点）
+function setStreak(gEl, len, n) {
+  const k = streakOf(len);
+  if (n !== undefined) gEl.dataset.sdl = Math.min(n * STAGGER, 640) + 420 + (n % 5) * 170;
+  const sdl = Number(gEl.dataset.sdl) || 420;
+  gEl.style.setProperty("--sl", k.sl.toFixed(3));
+  gEl.style.setProperty("--sg", k.sg.toFixed(3));
+  gEl.style.setProperty("--sd", k.sd.toFixed(2) + "s");
+  gEl.style.setProperty("--sdl", sdl + "ms");
+  gEl.style.setProperty("--hd", Math.round(sdl + (k.hit - 0.05) * k.sd * 1000) + "ms");
 }
 
 // 画 key 的那一套：和画着的比，多的飞进来，少的淡掉，都有的原地改位置（不重飞）
@@ -292,36 +273,38 @@ function paint(key, { fly = true } = {}) {
   svg.classList.remove("out");
   const root = page();
   if (!root) return;
-  const goals = store.goals(), L = layoutOf(root);
+  const goals = store.goals();
   const cols = new Map();
   for (const col of G.board(goals, store.today(), { showDone: true }).cols) for (const x of col.items) cols.set(x.goal.id, col.key);
-  const ports = new Map();
-  const port = (el) => { if (!ports.has(el)) ports.set(el, portOf(el, L)); return ports.get(el); };
   const base = colorOf(key);
   const lit = new Set([key]), keep = new Set();
-  let n = 0, lane = 0;
+  let n = 0, streaks = 0;
   for (const e of related(key).sort((a, b) => a.at - b.at)) {
     const a = elOf(e.from, cols), b = elOf(e.to, cols);
     if (!a || !b || a === b) continue;
     lit.add(e.from); lit.add(e.to);
     keep.add(e.id);
-    const A = port(a), B = port(b);
-    const pts = A && B ? route(A, B, L, ((lane++ % 3) - 1) * LANE) : arc(boxOf(a), boxOf(b));
+    const g = geo(a, b);
     const color = glow(colorOf(e.from) || colorOf(e.to) || base) || "var(--accent)";
     const old = edges.get(e.id);
     if (old && !old.gone) {
-      if (!old.cutting) move(old, e, pts);
+      if (!old.cutting) move(old, e, g);
       old.g.style.setProperty("--c", color);
+      streaks += old.g.classList.contains("calm") ? 0 : 1;
       continue;
     }
     const mask = "lkm" + (++seq);
-    const g = document.createElementNS(NS, "g");
-    g.setAttribute("class", "lk" + (fly && !still.matches ? " fly" : ""));
-    g.style.setProperty("--d", Math.min(n++ * STAGGER, 640) + "ms");
-    g.style.setProperty("--c", color);
-    g.innerHTML = edgeHTML(mask, pts, dOf(e.rev ? reverse(pts) : pts));
-    svg.appendChild(g);
-    edges.set(e.id, { e, g, pts, mask, gone: false });
+    const el = document.createElementNS(NS, "g");
+    const calm = streaks >= STREAKS;
+    if (!calm) streaks++;
+    el.setAttribute("class", "lk" + (fly && !still.matches ? " fly" : "") + (calm ? " calm" : ""));
+    el.style.setProperty("--d", Math.min(n * STAGGER, 640) + "ms");
+    el.style.setProperty("--c", color);
+    setStreak(el, g.len, fly ? n : 0);
+    n++;
+    el.innerHTML = edgeHTML(mask, g, e.rev);
+    svg.appendChild(el);
+    edges.set(e.id, { e, g: el, pts: g.pts, len: g.len, mask, gone: false });
   }
   for (const [id, x] of edges) if (!keep.has(id)) drop(id, x);
   fit();
@@ -337,15 +320,17 @@ function paint(key, { fly = true } = {}) {
   root.classList.toggle("lk-dim", Boolean(keep.size));
 }
 
-// 原来就画着的：只挪位置（页面重画、窗口变了），不重飞
-function move(x, e, pts) {
-  x.e = e; x.pts = pts;
-  const m = x.g.querySelector("mask"), r = boundsOf(pts, 12), d = dOf(pts), end = pts[pts.length - 1];
+// 原来就画着的：只挪位置（页面重画、滚动、窗口变了），不重飞。长短变得多了才换流光的节奏（换了会跳一下）
+function move(x, e, g) {
+  x.e = e; x.pts = g.pts;
+  const m = x.g.querySelector("mask"), r = boundsOf(g.pts, 12), d = cOf(g.c), end = g.c.p3;
   m.setAttribute("x", fmt(r.x)); m.setAttribute("y", fmt(r.y)); m.setAttribute("width", fmt(r.w)); m.setAttribute("height", fmt(r.h));
-  m.querySelector(".lk-rev")?.setAttribute("d", dOf(e.rev ? reverse(pts) : pts));
-  x.g.querySelectorAll(".lk-a, .lk-b, .lk-p").forEach((p) => p.setAttribute("d", d));
+  m.querySelector(".lk-rev")?.setAttribute("d", e.rev ? cRev(g.c) : d);
+  x.g.querySelectorAll(".lk-t, .lk-sa, .lk-sb, .lk-sp").forEach((p) => p.setAttribute("d", d));
   const dot = x.g.querySelector(".lk-dot");
   dot.setAttribute("cx", fmt(end.x)); dot.setAttribute("cy", fmt(end.y));
+  dot.classList.toggle("open", g.clip);
+  if (Math.abs(g.len - x.len) > x.len * 0.2) { x.len = g.len; setStreak(x.g, g.len); }
 }
 
 function drop(id, x) {
@@ -372,8 +357,10 @@ function placeHandle(el) {
   if (!el) { handle.classList.remove("on"); return; }
   // 项目的头：名字后面紧跟着一行小字，放在那行字（和风险的点）后面
   const tail = el.classList.contains("pg-top") && [...el.querySelectorAll(":scope > .pg-meta, :scope > .health")].pop();
-  const b = boxOf(el), t = tail ? rectOf(tail) : b;
-  const p = el.classList.contains("pcard") ? { x: (b.l + b.r) / 2, y: b.t } : { x: t.r + 10, y: (b.t + b.b) / 2 };
+  const rects = el.classList.contains("ns-g") ? el.getClientRects() : null;   // 框出来的词折行了：放在最后一截后面
+  const b = boxOf(el), t = tail ? rectOf(tail) : rects?.length ? toPage(rects[rects.length - 1], layer.getBoundingClientRect()) : b;
+  // 计划卡：上沿正中；框出来的词（夹在一段字中间）：右上角，不压后面的字；别的：字后面
+  const p = el.classList.contains("pcard") ? { x: (b.l + b.r) / 2, y: b.t } : rects?.length ? { x: t.r, y: t.t } : { x: t.r + 10, y: (b.t + b.b) / 2 };
   handle.style.left = p.x + "px";
   handle.style.top = p.y + "px";
   handle.classList.add("on");
@@ -499,10 +486,12 @@ function startDrag(e) {
   dragSvg.setAttribute("class", "lk-drag-svg");
   dragSvg.setAttribute("aria-hidden", "true");
   dragSvg.innerHTML = '<g class="lk live"><mask id="lk-dm" maskUnits="userSpaceOnUse" x="-10" y="-10" width="' + (innerWidth + 20) + '" height="' + (innerHeight + 20) + '"><path class="lk-rev" pathLength="1"/></mask>' +
-    '<g mask="url(#lk-dm)"><path class="lk-a"/><path class="lk-b"/><path class="lk-p"/></g><circle class="lk-dot" r="3"/></g>';
-  dragSvg.querySelector(".lk").style.setProperty("--c", glow(colorOf(from)) || "var(--accent)");
+    '<g mask="url(#lk-dm)"><path class="lk-t"/><g class="lk-s"><path class="lk-sa" pathLength="1"/><path class="lk-sb" pathLength="1"/><path class="lk-sp" pathLength="1"/></g></g><circle class="lk-dot" r="3"/></g>';
+  const live = dragSvg.querySelector(".lk");
+  live.style.setProperty("--c", glow(colorOf(from)) || "var(--accent)");
+  live.style.setProperty("--sl", ".22"); live.style.setProperty("--sg", String(RUN - 0.22)); live.style.setProperty("--sd", ".9s"); live.style.setProperty("--sdl", "0s"); live.style.setProperty("--hd", Math.round(((1.3 - 0.22) / RUN - 0.05) * 900) + "ms");
   document.body.appendChild(dragSvg);
-  drag = { from, el, can, target: null, id: e.pointerId };
+  drag = { from, el, can, target: null, id: e.pointerId, x: e.clientX, y: e.clientY, raf: 0 };
   handle.setPointerCapture(e.pointerId);
   handle.addEventListener("pointermove", dragMove);
   handle.addEventListener("pointerup", dragEnd);
@@ -512,20 +501,41 @@ function startDrag(e) {
 
 // 屏幕坐标（这条线画在一层固定的 svg 上）
 function screenBox(el) {
-  const r = (el.classList.contains("pg-top") && el.querySelector("h3") || el).getBoundingClientRect();
+  const r = el.classList.contains("ns-g") ? el.getClientRects()[0] || el.getBoundingClientRect() : (el.classList.contains("pg-top") && el.querySelector("h3") || el).getBoundingClientRect();
   return { l: r.left, t: r.top, r: r.right, b: r.bottom };
 }
 
 function dragMove(e) {
   if (!drag) return;
-  const over = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(NODE);
+  if (e.clientX !== undefined) { drag.x = e.clientX; drag.y = e.clientY; }
+  const over = document.elementFromPoint(drag.x, drag.y)?.closest?.(NODE);
   const t = over && drag.can.has(over) ? over : null;
   if (t !== drag.target) { drag.target?.classList.remove("lk-snap"); t?.classList.add("lk-snap"); drag.target = t; }
-  const pts = arc(screenBox(drag.el), t ? screenBox(t) : { l: e.clientX - 1, t: e.clientY - 1, r: e.clientX + 1, b: e.clientY + 1 }), d = dOf(pts), end = pts[pts.length - 1];
-  dragSvg.querySelectorAll(".lk-a, .lk-b, .lk-p, .lk-rev").forEach((p) => p.setAttribute("d", d));
+  const to = t ? screenBox(t) : { l: drag.x - 1, t: drag.y - 1, r: drag.x + 1, b: drag.y + 1 };
+  const c = curve(screenBox(drag.el), to, { rail: Boolean(t && drag.el.closest(".pj-rail") && t.closest(".pj-rail")) }), d = cOf(c);
+  dragSvg.querySelectorAll(".lk-t, .lk-sa, .lk-sb, .lk-sp, .lk-rev").forEach((p) => p.setAttribute("d", d));
   const dot = dragSvg.querySelector(".lk-dot");
-  dot.setAttribute("cx", fmt(end.x)); dot.setAttribute("cy", fmt(end.y));
+  dot.setAttribute("cx", fmt(c.p3.x)); dot.setAttribute("cy", fmt(c.p3.y));
   dragSvg.classList.toggle("snap", Boolean(t));
+  autoScroll();
+}
+
+// 拖到右栏能滚的那一块的上下沿：它自己往那边滚（每帧一点，越靠边越快），滚着的时候线和吸附跟着重算
+function autoScroll() {
+  if (!drag || drag.raf) return;
+  const body = page()?.querySelector(".goals .rail-body");
+  if (!body) return;
+  const r = body.getBoundingClientRect(), EDGE = 36;
+  if (drag.x < r.left || drag.x > r.right) return;
+  const v = drag.y < r.top + EDGE && drag.y > r.top - EDGE ? -(r.top + EDGE - drag.y) / 3 : drag.y > r.bottom - EDGE && drag.y < r.bottom + EDGE ? (drag.y - (r.bottom - EDGE)) / 3 : 0;
+  if (!v) return;
+  drag.raf = requestAnimationFrame(() => {
+    if (!drag) return;
+    drag.raf = 0;
+    const before = body.scrollTop;
+    body.scrollTop += clamp(v, -12, 12);
+    if (body.scrollTop !== before) dragMove({});
+  });
 }
 
 function dragEnd(e) {
@@ -535,6 +545,7 @@ function dragEnd(e) {
   handle.removeEventListener("pointerup", dragEnd);
   handle.removeEventListener("pointercancel", dragEnd);
   if (handle.hasPointerCapture?.(drag.id)) handle.releasePointerCapture(drag.id);
+  cancelAnimationFrame(drag.raf);
   drag = null;
   for (const n of can.keys()) n.classList.remove("lk-can", "lk-snap");
   el.classList.remove("lk-src");
@@ -561,11 +572,24 @@ function dragEnd(e) {
 
 // ---------- 对外 ----------
 
+// 拖着的时候页面重画了（同步拉下来之类）：元素都换了新的，按 key 重新找、重新标上能连的
+function redrag() {
+  const can = new Map(), keys = new Set(drag.can.values());
+  for (const n of page()?.querySelectorAll(NODE) || []) { const k = keyOf(n); if (keys.has(k)) { can.set(n, k); n.classList.add("lk-can"); } }
+  drag.can = can;
+  drag.target = null;
+  drag.el = elOf(drag.from, new Map()) || drag.el;
+  drag.el.classList.add("lk-src");
+  page()?.classList.add("lk-drag");
+  dragMove({});
+}
+
 // 页面重画完（main.js 的 draw）：悬停中的按新的位置、新的链接再画一次（新连上的飞进来，断开的淡掉）
 export function afterRender() {
   if (!layer && !cur) return;
   if (!onPage()) { close(true); return; }
-  if (drag || !cur) return;
+  if (drag) { if (!drag.el.isConnected) redrag(); return; }
+  if (!cur) return;
   const el = elOf(cur.key, new Map());
   if (!el) { close(true); return; }
   cur.el = el;
@@ -588,6 +612,9 @@ export function initLinks() {
   }, true);
   document.documentElement.addEventListener("mouseleave", () => { if (!drag) close(); });
   addEventListener("hashchange", () => close(true));
+  // 窗口变了、滚动了（页面、右栏、North star 那段字）：每帧最多重算一次位置，不重新飞
   let raf = 0;
-  addEventListener("resize", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { if (cur && !drag) { paint(cur.key, { fly: false }); placeHandle(cur.el); } }); });
+  const again = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { if (cur && !drag && onPage()) { paint(cur.key, { fly: false }); placeHandle(cur.el); cutX?.classList.remove("on"); } }); };
+  addEventListener("resize", again);
+  addEventListener("scroll", () => { if (cur && !drag) again(); }, { passive: true, capture: true });
 }

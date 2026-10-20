@@ -1708,37 +1708,55 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .pj-rail .idea-row:not(:hover, :focus-within, .editing) > .idea-kinds { display: none; }
 
 /* ---------- Projects 页：谁为谁服务的连线（js/ui/links.js） ---------- */
-/* 一层盖在页面上的 svg（页面坐标，鼠标点得穿）。每条线：遮罩里一条实线从一头画到另一头（飞出去），遮着的是三条一样的虚线：
-   白天墨色一条，粉、蓝两条错开一点点（套色没对准）；夜里一条项目的霓虹色，底下一条宽的淡的当光。虚线一直往「为了谁」那头流 */
+/* 一层盖在页面上的 svg（页面坐标，鼠标点得穿）。每条线是两头直接连的一条弧线：遮罩里一条实线从悬停的那头画到另一头（飞出去），
+   遮着的是一条很淡的细虚线（轨迹）和一道流光。流光 = 同一条线上一小截亮的（pathLength 1，dash = --sl（最长 .3），空 = --sg，周期固定 1.4），
+   把 dash 从 .3 推到 -1.1（正好一个周期）：从起点外面滑进来、跑过整条线、停一下、再从头来；一圈多久（--sd）按线的长度算，长线短线跑得一样快。
+   （关键帧里不能用 var()：Chrome 算出来的 stroke-dashoffset 画不出东西，所以关键帧写死，长短只靠 dash。）
+   白天：墨色一截，粉、蓝两截错开一点（套色没对准）；夜里：项目的霓虹色一截，底下一条宽的淡的当光（不用滤镜，动起来不重画模糊）。
+   流光跑到「为了谁」那头时小圆点跳一下（什么时候到是 js 算好的 --hd） */
 .lk-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 30; pointer-events: none; }
 .lk-svg { position: absolute; overflow: visible; pointer-events: none; transition: opacity .12s ease-in; }
 .lk-svg.out { opacity: 0; }
 .lk-drag-svg { position: fixed; inset: 0; z-index: 31; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
 .lk path { fill: none; stroke-linecap: round; }
-.lk .lk-rev { stroke: #fff; stroke-width: 14; stroke-dasharray: 1 1; stroke-dashoffset: 0; }
+.lk .lk-rev { stroke: #fff; stroke-width: 16; stroke-dasharray: 1 1; stroke-dashoffset: 0; }
 .lk.fly .lk-rev { animation: lk-draw .46s cubic-bezier(.16, 1, .3, 1) var(--d, 0s) backwards; }
 @keyframes lk-draw { from { stroke-dashoffset: 1; } }
 .lk .lk-cut { animation: lk-cut .26s cubic-bezier(.5, 0, .9, .5) forwards; }
 @keyframes lk-cut { to { stroke-dashoffset: 1; } }
-.lk-a, .lk-b, .lk-p { stroke-width: 1.5; stroke-dasharray: 5 5; animation: lk-flow 1.1s linear infinite; }
-@keyframes lk-flow { to { stroke-dashoffset: -10; } }
-.lk-p { stroke: var(--ink); }
-.lk-a { stroke: rgba(255, 62, 165, .8); transform: translate(-1.5px, 1px); }
-.lk-b { stroke: rgba(47, 91, 255, .8); transform: translate(1.5px, -1px); }
-.lk-dot { fill: var(--ink); transform-box: fill-box; transform-origin: center; }
-.lk.fly .lk-dot { animation: lk-pop .3s cubic-bezier(.16, 1, .3, 1) calc(var(--d, 0s) + .32s) backwards; }
+/* 轨迹 */
+.lk-t { stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 2 5; opacity: .4; }
+/* 流光 */
+.lk-s path { stroke-width: 2; stroke-dasharray: var(--sl, .2) var(--sg, 1.2); stroke-dashoffset: .3; animation: lk-run var(--sd, 2s) linear var(--sdl, .5s) infinite backwards; }
+@keyframes lk-run { from { stroke-dashoffset: .3; } to { stroke-dashoffset: -1.1; } }
+.lk-sp { stroke: var(--ink); }
+.lk-sa { stroke: rgba(255, 62, 165, .85); transform: translate(-1.4px, 1px); }
+.lk-sb { stroke: rgba(47, 91, 255, .85); transform: translate(1.4px, -1px); }
+.lk.calm .lk-s { display: none; }
+.lk.calm .lk-t { stroke-dasharray: none; opacity: .55; }
+.lk-dot { fill: var(--ink); transform-box: fill-box; transform-origin: center; animation: lk-hit var(--sd, 2s) linear var(--hd, 1s) infinite backwards; }
+.lk-dot.open { fill: var(--bg); stroke: var(--ink); stroke-width: 1.4; }
+.lk.calm .lk-dot { animation: none; }
+@keyframes lk-hit { 0% { transform: none; } 5% { transform: scale(1.75); } 16%, 100% { transform: none; } }
+.lk.fly .lk-dot { animation: lk-pop .3s cubic-bezier(.16, 1, .3, 1) calc(var(--d, 0s) + .32s) backwards, lk-hit var(--sd, 2s) linear var(--hd, 1s) infinite backwards; }
+.lk.calm.fly .lk-dot { animation: lk-pop .3s cubic-bezier(.16, 1, .3, 1) calc(var(--d, 0s) + .32s) backwards; }
 @keyframes lk-pop { from { opacity: 0; transform: scale(0); } }
 .lk.gone, .lk.cutting .lk-dot { opacity: 0; transition: opacity .14s ease-in; }
-[data-theme="dark"] .lk-p { stroke: var(--c, var(--accent)); }
-[data-theme="dark"] .lk-a { stroke: var(--c, var(--accent)); stroke-width: 5; opacity: .22; transform: none; }
-[data-theme="dark"] .lk-b { display: none; }
-[data-theme="dark"] .lk-dot { fill: var(--c, var(--accent)); filter: drop-shadow(0 0 4px var(--c, var(--accent))); }
-/* 拖着的那条：吸到能连的上面时实一点；没连上，缩回去 */
-.lk-drag-svg .lk-p { stroke-width: 1.75; }
-.lk-drag-svg.snap .lk-a, .lk-drag-svg.snap .lk-b, .lk-drag-svg.snap .lk-p { stroke-dasharray: 7 3; }
+[data-theme="dark"] .lk-t { stroke: var(--c, var(--accent)); opacity: .35; }
+[data-theme="dark"] .lk-sp { stroke: color-mix(in srgb, var(--c, var(--accent)) 55%, #fff); }
+[data-theme="dark"] .lk-sa { stroke: var(--c, var(--accent)); stroke-width: 6; opacity: .3; transform: none; }
+[data-theme="dark"] .lk-sb { display: none; }
+[data-theme="dark"] .lk-dot { fill: var(--c, var(--accent)); }
+[data-theme="dark"] .lk-dot.open { fill: var(--bg); stroke: var(--c, var(--accent)); }
+/* 拖着的那条：流光跑得快一点；吸上去了轨迹变实线 */
+.lk-drag-svg .lk-t { opacity: .55; }
+.lk-drag-svg.snap .lk-t { stroke-dasharray: none; opacity: .8; }
 .lk-drag-svg.back .lk-rev { animation: lk-cut .22s cubic-bezier(.5, 0, .9, .5) forwards; }
 .lk-drag-svg.back .lk-dot { opacity: 0; transition: opacity .12s; }
-/* 把手（悬停时出现，从它拖出去）和断开的「×」 */
+/* 系统要求减少动态、关了 Sparkles：不跑流光，轨迹画成实线，直接出现 */
+html.fx-off .lk-s { display: none; }
+html.fx-off .lk-t { stroke-dasharray: none; opacity: .55; }
+html.fx-off .lk-dot { animation: none; }
 .lk-ui { position: absolute; left: 0; top: 0; }
 .lk-h, .lk-x { position: absolute; display: grid; place-items: center; padding: 0; border-radius: 50%; pointer-events: none; opacity: 0; transform: scale(.5); transition: opacity .15s, transform .2s cubic-bezier(.16, 1, .3, 1), background-color .15s; }
 .lk-h { width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; border: 1.5px dashed var(--ink); background: var(--bg); cursor: grab; }
@@ -1755,20 +1773,23 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 @media (hover: hover) { [data-theme="dark"] .lk-h:hover { background: var(--accent); } }
 [data-theme="dark"] .lk-x { border-color: var(--edge); background: var(--surface); }
 /* 悬停时没关系的淡下去；拖的时候能连的亮着（虚线框），吸上去的实线框，连上的闪一下 */
-.projects :is(.goals .gl, .pgroup, .pcard, .g-rep) { transition: opacity .16s; }
-.projects.lk-dim .goals .gl:not(.lk-on), .projects.lk-dim .pgroup:not(.lk-has), .projects.lk-dim .pgroup.lk-has :is(.pcard, .g-rep):not(.lk-on),
-.projects.lk-drag .goals .gl:not(.lk-can, .lk-src), .projects.lk-drag .pcard:not(.lk-can, .lk-src), .projects.lk-drag .g-rep:not(.lk-can, .lk-src),
+.projects :is(.goals .gl, .goals .ns-g, .pgroup, .pcard, .g-rep) { transition: opacity .16s; }
+.projects.lk-dim .goals :is(.gl, .ns-g):not(.lk-on), .projects.lk-dim .pgroup:not(.lk-has), .projects.lk-dim .pgroup.lk-has :is(.pcard, .g-rep):not(.lk-on),
+.projects.lk-drag .goals :is(.gl, .ns-g):not(.lk-can, .lk-src), .projects.lk-drag .pcard:not(.lk-can, .lk-src), .projects.lk-drag .g-rep:not(.lk-can, .lk-src),
 .projects.lk-drag .pg-top:not(.lk-can, .lk-src) h3 { opacity: .35; }
 .lk-can { outline: 1.5px dashed color-mix(in srgb, var(--ink) 45%, transparent); outline-offset: 2px; border-radius: 6px; }
 .pcard.lk-can { outline-offset: 4px; border-radius: 14px; }
 .lk-snap { outline: 2px solid var(--ink); }
-.gl.lk-snap, .g-rep.lk-snap { background-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+.gl.lk-snap, .g-rep.lk-snap, .ns-g.lk-snap { background-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+.ns-g.lk-can { border-radius: 5px; }
 [data-theme="dark"] .lk-can { outline-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 [data-theme="dark"] .lk-snap { outline-color: var(--accent); }
 .lk-landed { animation: lk-landed .6s cubic-bezier(.16, 1, .3, 1); }
 @keyframes lk-landed { 30% { background-color: color-mix(in srgb, var(--accent) 45%, transparent); } }
 @media (prefers-reduced-motion: reduce) {
-  .lk-a, .lk-b, .lk-p, .lk.fly .lk-rev, .lk.fly .lk-dot, .lk-landed { animation: none; }
+  .lk.fly .lk-rev, .lk-dot, .lk.fly .lk-dot, .lk-landed { animation: none; }
+  .lk-s { display: none; }
+  .lk-t { stroke-dasharray: none; opacity: .55; }
 }
 
 /* ---------- 「For 计划 → 目标 → …」：今天页展开的那一行、任务编辑框、计划编辑框（js/ui/common.js 的 chainHTML） ---------- */

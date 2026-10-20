@@ -333,6 +333,8 @@ export function parseDishes(text, have = []) {
 
 export const CYCLES = [["d", "day"], ["w", "week"], ["m", "month"], ["y", "year"]];
 const cycleN = (s) => (s?.once ? 0 : Math.max(0, Math.round(Number(s?.n) || 0)));
+// 表格里用的短写：3m、2y、3d、1w
+export const cycleShort = (s) => (cycleN(s) ? cycleN(s) + ((CYCLES.find(([k]) => k === s?.unit) || CYCLES[2])[0]) : "");
 export function cycleText(s) {
   const n = cycleN(s), unit = (CYCLES.find(([k]) => k === s?.unit) || CYCLES[2])[1];
   return n ? "every " + (n === 1 ? unit : n + " " + unit + "s") : "";
@@ -405,11 +407,14 @@ export function coming(D, today, months = 3, tag = "") {
 export const GEAR_RATE = 5;
 export const GEAR_LOW = { cad: 0.5, cny: 2 };
 // 类目用 emoji 表示；存的是 key，从表格贴进来的英文名（Camera…）也认，认不出的算 🪐
-export const GEAR_TAGS = [["camera", "📷", "Camera"], ["computer", "🖥️", "Computer"], ["tablet", "💻", "Tablet"], ["phone", "📱", "Phone"],
+// 电脑和平板算一类（💻）；以前存的 tablet、贴进来的 Tablet / iPad 也归到这里
+export const GEAR_TAGS = [["camera", "📷", "Camera"], ["computer", "💻", "Computer & tablet"], ["phone", "📱", "Phone"],
   ["audio", "🎧", "Audio"], ["wearable", "⌚", "Wearable"], ["beauty", "💅", "Beauty"], ["other", "🪐", "Other"]];
+const GEAR_ALIAS = { tablet: "computer", ipad: "computer", laptop: "computer", "🖥️": "computer", "📓": "computer" };
 export function gearTag(g) {
   const c = String(g?.cat || "").trim().toLowerCase();
-  return (GEAR_TAGS.find(([k, e, name]) => c === k || c === e || c === name.toLowerCase()) || GEAR_TAGS[GEAR_TAGS.length - 1])[0];
+  if (GEAR_ALIAS[c]) return GEAR_ALIAS[c];
+  return (GEAR_TAGS.find(([k, e, name]) => c === k || c === e || c === name.toLowerCase() || c === name.split(" ")[0].toLowerCase()) || GEAR_TAGS[GEAR_TAGS.length - 1])[0];
 }
 export const gearEmoji = (g) => GEAR_TAGS.find(([k]) => k === gearTag(g))[1];
 export const gearRate = (pr) => (Number(pr?.rate) > 0 ? Number(pr.rate) : GEAR_RATE);
@@ -427,11 +432,11 @@ export function gearRow(g, today, rate = GEAR_RATE) {
     days, perDay, retired, age, cheap: !retired && days > 0 && price > 0 && perDay < GEAR_LOW[cur] };
 }
 
-// 列表：还在用的在前，不用了的放后面；两块里都是越贵的越靠前（按加币比）
+// 列表：永远是越贵的越靠前（按加币比，汇率怎么改都一样）；不用了的也照这个顺序，只是另列一块、默认收起
 export function gearList(D, today, rate = GEAR_RATE) {
   const rows = Object.values(D.gear || {}).map((g) => gearRow(g, today, rate));
   const toCad = (r) => (r.cur === "cad" ? r.perDay : r.perDay / rate);
-  const byPrice = (a, b) => b.cad - a.cad || byName(a.g, b.g);
+  const byPrice = (a, b) => b.cad - a.cad || b.cny - a.cny || byName(a.g, b.g);
   const live = rows.filter((r) => !r.retired).sort(byPrice);
   const gone = rows.filter((r) => r.retired).sort(byPrice);
   return { live, gone, cad: live.reduce((a, r) => a + r.cad, 0), perDay: live.reduce((a, r) => a + toCad(r), 0) };

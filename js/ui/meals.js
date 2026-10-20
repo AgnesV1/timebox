@@ -350,8 +350,10 @@ function restockHTML(D, c) {
   const name = (s) => '<td><span class="sup-em" title="' + esc(M.SUP_TAGS.find(([k]) => k === M.supTag(s))[2]) + '">' + M.supEmoji(s) + "</span><b>" + esc(s.name || "Untitled") + "</b>" + (s.note ? " <small>" + esc(s.note) + "</small>" : "") + "</td><td>" + (s.store ? esc(s.store) : dash) + '</td><td class="r num">' + (Number(s.price) ? money(s.price) : dash) + "</td>";
   const due = (s) => (s.next ? '<span class="num">' + fmtDue(s.next, c.today) + '</span> <span class="dstate ' + (s.next < c.today ? "d-check" : "d-checked") + '">' + dueText(s.next, c.today) + "</span>" : dash);
   const tr = (s, cls = "") => '<tr data-act="edit-sup" data-id="' + esc(s.id) + '" tabindex="0"' + (cls ? ' class="' + cls + '"' : "") + ">";
-  const tools = '<div class="msec-head"><p class="msub">Things you replace or restock on a cycle — vitamins, brush heads, a phone. What it costs, how often, and when it\'s next due.</p>' +
-    '<span class="tools"><button type="button" class="btn cta" data-act="new-sup">' + icon("plus") + " Item</button></span></div>";
+  // 每块一个头：标题，紧跟着一个小小的 + Item，说明在底下一行（左边是主区，按钮跟着标题走，不挤到右边那栏旁边）
+  const head = (title, act, sub, cls = "") => '<div class="rs-head' + cls + '"><h3>' + title + '</h3><button type="button" class="btn sm" data-act="' + act + '">' + icon("plus") + " Item</button>" +
+    '<p class="msub">' + sub + "</p></div>";
+  const tools = head("On a cycle", "new-sup", "Things you replace or restock on a cycle — vitamins, brush heads. What it costs, how often, when it\'s next due.");
   const row = (s) => tr(s) + name(s) + "<td" + (M.cycleText(s) ? ' title="' + M.cycleText(s) + '"' : "") + ">" + (M.cycleShort(s) || dash) + "</td><td>" + due(s) + "</td>" +
     '<td class="r">' + (M.nextAfter(c.today, s) ? '<button type="button" class="chip" data-act="sup-done" data-id="' + esc(s.id) + '" title="Replaced or restocked today: move the next date one cycle on">Replaced</button>' : "") + "</td></tr>";
   const regular = R.regular.length
@@ -363,13 +365,12 @@ function restockHTML(D, c) {
     '<td class="r"><button type="button" class="chip" data-act="once-done" data-id="' + esc(s.id) + '" title="Bought it">Bought</button></td></tr>';
   const boughtRow = (s) => tr(s, "bought") + name(s) + '<td><span class="msub">bought ' + esc(fmtDue(s.bought, c.today)) + "</span></td>" +
     '<td class="r"><button type="button" class="chip" data-act="once-back" data-id="' + esc(s.id) + '" title="Not bought after all">Put back</button></td></tr>';
-  const once = '<div class="msec-head monce"><div><h4 class="msub-h">Buy once</h4><p class="msub">Things you mean to buy one time — a dress, a lamp. A price, and a date if there is one.' +
-    (R.once.length ? " <b>" + R.once.length + " to buy" + (sum ? " · " + money0(sum) : "") + "</b>" : "") + "</p></div>" +
-    '<span class="tools"><button type="button" class="btn" data-act="new-once">' + icon("plus") + " Item</button></span></div>" +
+  const once = head("Buy once", "new-once", "Things you mean to buy one time — a dress, a lamp. A price, and a date if there is one." +
+    (R.once.length ? " <b>" + R.once.length + " to buy" + (sum ? " · " + money0(sum) : "") + "</b>" : ""), " monce") +
     (R.once.length || (showBought && R.bought.length) ? '<table class="mtable"><thead><tr><th>Item</th><th>Where</th><th class="r">Price</th><th>By</th><th></th></tr></thead><tbody>' +
       R.once.map(onceRow).join("") + (showBought ? R.bought.map(boughtRow).join("") : "") + "</tbody></table>" : "") +
     (R.bought.length ? '<button type="button" class="link mbought" data-act="bought-toggle" aria-expanded="' + showBought + '">Bought (' + R.bought.length + ")</button>" : "");
-  return '<div class="restock-cols"><div class="restock-main">' + tools + tagFilterHTML("sup-filter", M.SUP_TAGS, M.supCounts(D), tag) + comingHTML(D, c, tag) + regular + once + "</div>" +
+  return '<div class="restock-cols"><div class="restock-main">' + tagFilterHTML("sup-filter", M.SUP_TAGS, M.supCounts(D), tag) + comingHTML(D, c, tag) + tools + regular + once + "</div>" +
     gearHTML(D, c) + "</div>";
 }
 
@@ -395,7 +396,7 @@ function gearHTML(D, c) {
       (L.gone.length ? '<button type="button" class="link mbought" data-act="gear-retired" aria-expanded="' + showRetired + '">Retired (' + L.gone.length + ")</button>" : "")
     : '<p class="empty">Nothing yet. Add what you paid a lot for — a camera, a laptop — and see what it costs per day of use. Or paste rows from your sheet.</p>';
   return '<aside class="restock-gear mcard"><header><h3>Big buys</h3>' +
-    '<span class="tools"><button type="button" class="btn" data-act="gear-paste">Paste</button><button type="button" class="btn cta" data-act="new-gear">' + icon("plus") + " Item</button></span></header>" +
+    '<span class="tools"><button type="button" class="link" data-act="gear-paste">Paste</button><button type="button" class="btn sm" data-act="new-gear">' + icon("plus") + " Item</button></span></header>" +
     (n ? '<p class="msub gsum">' + n + " in use · " + cash(L.cad, "cad") + " · " + perDay(L.perDay, "cad") + " a day</p>" : "") +
     '<label class="grate">1 CAD = <input class="num" type="number" min="0.01" step="0.01" data-act="gear-rate" value="' + esc(rate) + '" aria-label="RMB per CAD"> RMB</label>' +
     body + '<p class="msub gnote">Most expensive first. Per day is in what you paid with; under ' + perDay(M.GEAR_LOW.cad, "cad") + " or " + perDay(M.GEAR_LOW.cny, "cny") + " a day it has paid for itself. " +

@@ -402,7 +402,7 @@ function gearHTML(D, c) {
     '<span class="tools"><button type="button" class="link" data-act="gear-paste">Paste</button><button type="button" class="btn cta" data-act="new-gear">' + icon("plus") + " Item</button></span></header>" +
     (n ? '<p class="msub gsum">' + n + " in use · " + cash(L.cad, "cad") + " · " + perDay(L.perDay, "cad") + " a day</p>" : "") +
     '<label class="grate">1 CAD = <input class="num" type="number" min="0.01" step="0.01" data-act="gear-rate" value="' + esc(rate) + '" aria-label="RMB per CAD"> RMB</label>' +
-    body + '<p class="msub gnote">Most expensive first. Per day is in what you paid with; under ' + perDay(M.GEAR_LOW.cad, "cad") + " or " + perDay(M.GEAR_LOW.cny, "cny") + " a day it has paid for itself. " +
+    body + '<p class="msub gnote">Highest cost per day first. Per day is in what you paid with; under ' + perDay(M.GEAR_LOW.cad, "cad") + " or " + perDay(M.GEAR_LOW.cny, "cny") + " a day it has paid for itself. " +
     '<span class="gem g-year">12 mo</span> <span class="gem g-three">3 yrs</span> = bought in the last 12 months / 3 years.</p></div></aside>';
 }
 

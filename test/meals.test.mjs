@@ -360,6 +360,16 @@ test("big buys: days, per day in what you paid with, the other currency at the r
   assert.equal(phone.days, 1063);
   close(phone.cny, 8350);
   assert.equal(M.gearRow(rows[1], T, 5.2).cny, 1670 * 5.2, "rate is live");
+  // 汇率对加币、可以是一个数也可以是 { cny }；旧的 rate 一格照样读；显示默认加币
+  assert.deepEqual(M.gearRates({ rate: 4.81 }), { cad: 1, cny: 4.81 });
+  assert.deepEqual(M.gearRates({ rate: 4.81, rates: { cny: 5.1 } }), { cad: 1, cny: 5.1 }, "the new field wins");
+  assert.deepEqual(M.gearRates({}), { cad: 1, cny: 5 });
+  close(M.convert(21400, "cny", "cad", { cny: 5 }), 4280);
+  close(M.convert(1670, "cad", "cny", 5), 8350);
+  assert.equal(M.gearShow({}), "cad");
+  assert.equal(M.gearShow({ gearShow: "cny" }), "cny");
+  assert.equal(M.gearShow({ gearShow: "eur" }), "cad", "unknown: CAD");
+  close(M.gearRow(rows[0], T, { cny: 5 }).perDayCad, 21400 / 5 / 1237);
   const pods = M.gearRow(rows[2], T, 5);
   assert.ok(pods.cheap, "¥500 over 1175 days < ¥2 a day");
   assert.ok(!sony.cheap && !phone.cheap);

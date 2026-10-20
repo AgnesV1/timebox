@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { load } from "../test/mock-gas.mjs";
 
 const repo = fileURLToPath(new URL("..", import.meta.url));
+const PORT = Number(process.env.FAKE_PORT) || 8002;
 const current = fileURLToPath(new URL("../Code.gs", import.meta.url));
 let prevPath = current;
 try {
@@ -66,6 +67,24 @@ Object.assign(g, load(current, g.ss));
 g.sandbox.setup();
 console.log("→ current:", g.logs.join(" | "));
 
+// FAKE_WORST=1（tools/look.mjs --worst）：再造一份极端数据，看名字很长、一天很多条、只有一两个字的时候界面撑不撑得住
+if (process.env.FAKE_WORST) {
+  const now = new Date(); now.setHours(now.getHours() - 4);
+  const T = iso(new Date(now.getTime() - now.getTimezoneOffset() * 60000));
+  const titles = [
+    "Write the literature review for chapter three, including every figure, table and the appendix the committee asked for",
+    "整理去年所有的报销单据、发票和银行流水，然后发给会计核对一遍再提交",
+    "Supercalifragilistic-unbreakable-identifier-without-any-spaces-at-all-2026",
+    "Jo",
+    "Reply to 王老师 about the 课题 proposal（第二版）and attach the revised budget",
+    "Gym", "Read 30 pages", "Laundry", "Call mom", "Fix the flaky test in the sync code", "Grocery run", "Plan the trip"
+  ];
+  const tasks = titles.map((title, i) => ({ id: "worst-" + i, date: T, title, est: [90, 45, 30, 5, 25, 40, 30, 20, 15, 60, 30, 45][i], order: i + 1,
+    status: ["", "done", "", "drop", "", "done", "", "", "done", "", "", ""][i], group: ["Build", "Chores", "Work", "Friends", "Work", "Fitness", "Leisure", "Chores", "Friends", "Build", "Chores", "Leisure"][i], updated: 10 }));
+  g.post({ secret: "CHANGE_ME", push: { rows: { tasks } } });
+  console.log("worst-case data:", tasks.length, "tasks on", T);
+}
+
 let readingBook = null;
 // GET /reading 看它现在的样子。一个假的阅读记录表格（一页一种，表头那行写着 Name）：在页面设置里填 https://docs.google.com/spreadsheets/d/FAKE-READING-0000000000000000/edit
 if (g.spreadsheet) {
@@ -121,7 +140,7 @@ http.createServer((req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.end(out);
   });
-}).listen(8002, "127.0.0.1", () => console.log("fake sheet on http://127.0.0.1:8002/exec"));
+}).listen(PORT, "127.0.0.1", () => console.log("fake sheet on http://127.0.0.1:" + PORT + "/exec"));
 
 // dump the Tasks sheet on demand: GET /dump
 export { g };

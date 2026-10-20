@@ -352,10 +352,10 @@ function restockHTML(D, c) {
   const tr = (s, cls = "") => '<tr data-act="edit-sup" data-id="' + esc(s.id) + '" tabindex="0"' + (cls ? ' class="' + cls + '"' : "") + ">";
   const tools = '<div class="msec-head"><p class="msub">Things you replace or restock on a cycle — vitamins, brush heads, a phone. What it costs, how often, and when it\'s next due.</p>' +
     '<span class="tools"><button type="button" class="btn cta" data-act="new-sup">' + icon("plus") + " Item</button></span></div>";
-  const row = (s) => tr(s) + name(s) + "<td>" + (M.cycleText(s) || dash) + "</td><td>" + due(s) + "</td>" +
+  const row = (s) => tr(s) + name(s) + "<td" + (M.cycleText(s) ? ' title="' + M.cycleText(s) + '"' : "") + ">" + (M.cycleShort(s) || dash) + "</td><td>" + due(s) + "</td>" +
     '<td class="r">' + (M.nextAfter(c.today, s) ? '<button type="button" class="chip" data-act="sup-done" data-id="' + esc(s.id) + '" title="Replaced or restocked today: move the next date one cycle on">Replaced</button>' : "") + "</td></tr>";
   const regular = R.regular.length
-    ? '<table class="mtable"><thead><tr><th>Item</th><th>Where</th><th class="r">Price</th><th>How often</th><th>Next</th><th></th></tr></thead><tbody>' + R.regular.map(row).join("") + "</tbody></table>"
+    ? '<table class="mtable"><thead><tr><th>Item</th><th>Where</th><th class="r">Price</th><th>Every</th><th>Next</th><th></th></tr></thead><tbody>' + R.regular.map(row).join("") + "</tbody></table>"
     : tag ? '<p class="empty">Nothing on a cycle under this one.</p>' : '<p class="empty">Nothing here yet. Add what you replace on a schedule: the next three months of spending show up here, and on your phone under the shopping list.</p>';
   // 只买一次的（一条裙子、一盏灯）：价钱，有打算哪天之前买就填日子（填了算进 Coming up 那个月）；买了点 Bought，收到底下
   const sum = R.once.reduce((a, s) => a + (Number(s.price) || 0), 0);

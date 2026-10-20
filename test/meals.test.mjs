@@ -228,6 +228,7 @@ test("restock: the date one cycle on, and what's coming in the next three months
   assert.equal(M.nextAfter("2026-10-08", { n: "", unit: "m" }), "");
   assert.equal(M.cycleText({ n: 1, unit: "m" }), "every month");
   assert.equal(M.cycleText({ n: 6, unit: "w" }), "every 6 weeks");
+  assert.deepEqual([{ n: 3, unit: "m" }, { n: 2, unit: "y" }, { n: 3, unit: "d" }, { n: 1, unit: "w" }, { n: 4 }, { once: true, n: 3 }].map(M.cycleShort), ["3m", "2y", "3d", "1w", "4m", ""]);
   const D = { sup: {
     vit: { id: "vit", name: "Vitamin D", price: 20, n: 30, unit: "d", next: "2026-10-20" },
     brush: { id: "brush", name: "Brush heads", price: 35, n: 3, unit: "m", next: "2026-09-15" },
@@ -372,9 +373,13 @@ test("big buys: days, per day in what you paid with, the other currency at the r
   assert.equal(M.gearRow({ bought: "2025-10-19" }, T).age, "three", "exactly 12 months ago: the dim one");
   const L = M.gearList({ gear: Object.fromEntries(rows.map((r, i) => [i, { ...r, id: String(i) }])) }, T, 5);
   assert.deepEqual(L.live.map((r) => r.g.name), ["Sony A7M4", "Iphone 15", "Airpods Pro"], "most expensive first");
+  const cheapFirst = { a: { id: "a", name: "A", cur: "cad", price: 100, bought: "2026-10-01" }, b: { id: "b", name: "B", cur: "cny", price: 21400, bought: "2020-01-01" }, c: { id: "c", name: "C", cur: "cad", price: 1670, bought: "2026-10-18" } };
+  for (const r of [1, 5, 9]) assert.deepEqual(M.gearList({ gear: cheapFirst }, T, r).live.map((x) => x.g.name), ["B", "C", "A"], "by price whatever the per-day or the date");
   assert.equal(M.gearEmoji(rows[0]), "📷", "category from the sheet, by name");
   assert.equal(M.gearTag({ cat: "phone" }), "phone");
-  assert.equal(M.gearEmoji({ cat: "Tablet" }), "💻");
+  assert.equal(M.gearEmoji({ cat: "Tablet" }), "💻", "tablets and computers are one kind");
+  assert.equal(M.gearTag({ cat: "tablet" }), "computer");
+  assert.equal(M.gearTag({ cat: "Computer" }), "computer");
   assert.equal(M.gearEmoji({ cat: "beauty" }), "💅");
   assert.equal(M.gearEmoji({ cat: "Drone" }), "🪐", "unknown: other");
   assert.deepEqual(L.gone.map((r) => r.g.name), ["B&O A1"]);

@@ -350,9 +350,9 @@ function restockHTML(D, c) {
   const name = (s) => '<td><span class="sup-em" title="' + esc(M.SUP_TAGS.find(([k]) => k === M.supTag(s))[2]) + '">' + M.supEmoji(s) + "</span><b>" + esc(s.name || "Untitled") + "</b>" + (s.note ? " <small>" + esc(s.note) + "</small>" : "") + "</td><td>" + (s.store ? esc(s.store) : dash) + '</td><td class="r num">' + (Number(s.price) ? money(s.price) : dash) + "</td>";
   const due = (s) => (s.next ? '<span class="num">' + fmtDue(s.next, c.today) + '</span> <span class="dstate ' + (s.next < c.today ? "d-check" : "d-checked") + '">' + dueText(s.next, c.today) + "</span>" : dash);
   const tr = (s, cls = "") => '<tr data-act="edit-sup" data-id="' + esc(s.id) + '" tabindex="0"' + (cls ? ' class="' + cls + '"' : "") + ">";
-  // 每块一个头：标题，紧跟着一个小小的 + Item，说明在底下一行（左边是主区，按钮跟着标题走，不挤到右边那栏旁边）
-  const head = (title, act, sub, cls = "") => '<div class="rs-head' + cls + '"><h3>' + title + '</h3><button type="button" class="btn sm" data-act="' + act + '">' + icon("plus") + " Item</button>" +
-    '<p class="msub">' + sub + "</p></div>";
+  // 每块一个头：左边标题和说明，右上角亮绿的 + Item（三栏都一样）
+  const head = (title, act, sub, cls = "") => '<div class="rs-head' + cls + '"><div><h3>' + title + '</h3><p class="msub">' + sub + "</p></div>" +
+    '<button type="button" class="btn cta" data-act="' + act + '">' + icon("plus") + " Item</button></div>";
   const tools = head("On a cycle", "new-sup", "Things you replace or restock on a cycle — vitamins, brush heads. What it costs, how often, when it\'s next due.");
   const row = (s) => tr(s) + name(s) + "<td" + (M.cycleText(s) ? ' title="' + M.cycleText(s) + '"' : "") + ">" + (M.cycleShort(s) || dash) + "</td><td>" + due(s) + "</td>" +
     '<td class="r">' + (M.nextAfter(c.today, s) ? '<button type="button" class="chip" data-act="sup-done" data-id="' + esc(s.id) + '" title="Replaced or restocked today: move the next date one cycle on">Replaced</button>' : "") + "</td></tr>";
@@ -370,7 +370,7 @@ function restockHTML(D, c) {
     (R.once.length || (showBought && R.bought.length) ? '<table class="mtable"><thead><tr><th>Item</th><th>Where</th><th class="r">Price</th><th>By</th><th></th></tr></thead><tbody>' +
       R.once.map(onceRow).join("") + (showBought ? R.bought.map(boughtRow).join("") : "") + "</tbody></table>" : "") +
     (R.bought.length ? '<button type="button" class="link mbought" data-act="bought-toggle" aria-expanded="' + showBought + '">Bought (' + R.bought.length + ")</button>" : "");
-  return '<div class="restock-cols"><div class="restock-main">' + tagFilterHTML("sup-filter", M.SUP_TAGS, M.supCounts(D), tag) + comingHTML(D, c, tag) + tools + regular + once + "</div>" +
+  return '<div class="restock-cols' + (gearMin() ? " gmin" : "") + '"><div class="restock-main">' + tagFilterHTML("sup-filter", M.SUP_TAGS, M.supCounts(D), tag) + comingHTML(D, c, tag) + tools + regular + once + "</div>" +
     gearHTML(D, c) + "</div>";
 }
 
@@ -395,12 +395,29 @@ function gearHTML(D, c) {
     ? '<ul class="glist">' + L.live.map(row).join("") + (showRetired ? L.gone.map(row).join("") : "") + "</ul>" +
       (L.gone.length ? '<button type="button" class="link mbought" data-act="gear-retired" aria-expanded="' + showRetired + '">Retired (' + L.gone.length + ")</button>" : "")
     : '<p class="empty">Nothing yet. Add what you paid a lot for — a camera, a laptop — and see what it costs per day of use. Or paste rows from your sheet.</p>';
-  return '<aside class="restock-gear mcard"><header><h3>Big buys</h3>' +
-    '<span class="tools"><button type="button" class="link" data-act="gear-paste">Paste</button><button type="button" class="btn sm" data-act="new-gear">' + icon("plus") + " Item</button></span></header>" +
+  const min = gearMin();
+  return '<aside class="restock-gear mcard"><div class="gin"><header>' +
+    '<button type="button" class="icon-btn gtog" data-act="gear-fold" aria-expanded="' + !min + '" aria-label="' + (min ? "Show" : "Hide") + ' Big buys" title="' + (min ? "Show Big buys" : "Slide away (or swipe right)") + '">' + icon(min ? "left" : "right") + "</button>" +
+    "<h3>Big buys</h3>" +
+    '<span class="tools"><button type="button" class="link" data-act="gear-paste">Paste</button><button type="button" class="btn cta" data-act="new-gear">' + icon("plus") + " Item</button></span></header>" +
     (n ? '<p class="msub gsum">' + n + " in use · " + cash(L.cad, "cad") + " · " + perDay(L.perDay, "cad") + " a day</p>" : "") +
     '<label class="grate">1 CAD = <input class="num" type="number" min="0.01" step="0.01" data-act="gear-rate" value="' + esc(rate) + '" aria-label="RMB per CAD"> RMB</label>' +
     body + '<p class="msub gnote">Most expensive first. Per day is in what you paid with; under ' + perDay(M.GEAR_LOW.cad, "cad") + " or " + perDay(M.GEAR_LOW.cny, "cny") + " a day it has paid for itself. " +
-    '<span class="gem g-year">12 mo</span> <span class="gem g-three">3 yrs</span> = bought in the last 12 months / 3 years.</p></aside>';
+    '<span class="gem g-year">12 mo</span> <span class="gem g-three">3 yrs</span> = bought in the last 12 months / 3 years.</p></div></aside>';
+}
+
+// Big buys 收起来（往右滑走，只露出 emoji 那一条）：记在这台设备上。
+// 先在页面上换 class 让它滑过去，滑完再存（存了会整页重画，重画出来的已经是收起的样子）
+const gearMin = () => Boolean(store.local().gearMin);
+let folding = 0;
+function foldGear(min) {
+  const cols = document.querySelector(".restock-cols");
+  if (!cols || cols.classList.contains("gmin") === min) return;
+  cols.classList.toggle("gmin", min);
+  const tog = cols.querySelector(".gtog");
+  if (tog) { tog.innerHTML = icon(min ? "left" : "right"); tog.setAttribute("aria-expanded", String(!min)); }
+  clearTimeout(folding);
+  folding = setTimeout(() => store.setLocal({ gearMin: min }), 520);
 }
 
 function gearEditor(D, row) {
@@ -705,9 +722,12 @@ export function initMeals(rerender) {
     else if (act === "bought-toggle") { showBought = !showBought; rerender(); }
     else if (act === "sup-filter") store.setLocal({ supTag: el.dataset.v });
     else if (act === "new-gear") openEditor({ kind: "gear", id: "", draft: { name: "", cat: "", cur: "cny", price: "", bought: "", retired: "" } });
-    else if (act === "edit-gear") openEditor({ kind: "gear", id });
+    else if (act === "edit-gear" && !document.querySelector(".restock-cols.gmin")) openEditor({ kind: "gear", id });
     else if (act === "gear-paste") openEditor({ kind: "gear-paste" });
     else if (act === "gear-retired") { showRetired = !showRetired; rerender(); }
+    else if (act === "gear-fold") foldGear(!document.querySelector(".restock-cols")?.classList.contains("gmin"));
+    // 收起来的时候点哪一行都是先展开
+    else if (act === "edit-gear" && document.querySelector(".restock-cols.gmin")) foldGear(false);
     else if (act === "sup-done" && D.sup[id]) { const next = M.nextAfter(T, D.sup[id]); store.saveMeal("sup", { ...D.sup[id], next }, D.sup[id].name + ": next " + fmtDue(next, T)); }
   });
   // To try：回车 / Add = 加；粘进来的是好几行就一行一道（输入框自己会把换行吃掉）
@@ -741,6 +761,23 @@ export function initMeals(rerender) {
     const id = el.value;
     if (id) store.saveWeek(el.dataset.week, (w) => ({ extra: { ...(w.extra || {}), [id]: (Number(w.extra?.[id]) || 0) + 1 } }));
   });
+  // Big buys：手指 / 触控板往右划 = 收起，往左划 = 展开
+  let swipe = null;
+  on(document, "pointerdown", ".restock-gear", (e) => { if (e.pointerType !== "mouse") swipe = { x: e.clientX, y: e.clientY }; });
+  on(document, "pointerup", ".restock-gear", (e) => {
+    if (!swipe) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > 2 * Math.abs(dy)) foldGear(dx > 0);
+  });
+  let wheel = 0, wheelAt = 0;
+  on(document, "wheel", ".restock-gear", (e) => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    if (e.timeStamp - wheelAt > 300) wheel = 0;
+    wheelAt = e.timeStamp;
+    wheel += e.deltaX;
+    if (Math.abs(wheel) > 80) { foldGear(wheel < 0); wheel = 0; wheelAt = e.timeStamp + 600; }   // 一次划只算一下
+  }, { passive: true });
   // 汇率：改了就存（存在 meal-prefs 里，跟着表格走）
   on(document, "change", ".meals input[data-act=gear-rate]", (e, el) => {
     const v = Number(el.value);

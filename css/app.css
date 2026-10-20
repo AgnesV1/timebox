@@ -1901,23 +1901,29 @@ select.open { border-color: var(--edge); }
 .monce .msub b { font-weight: 600; color: var(--ink); white-space: nowrap; }
 .mtable tr.bought td b { font-weight: 500; color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .mbought { display: inline-block; margin-top: 8px; font-size: 12.5px; }
-/* Restock 页：左边主区，每块一个头（标题 + 小 + Item，说明在下一行）；
-   右边一栏 Big buys 是次要的：铺一块淡底的面板、字小一号、按钮不发光；窄窄一条，每样一行往下排；窗口窄了就落到底下 */
-.restock-cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0 32px; align-items: start; }
+/* Restock 页：左边主区，每块一个头（标题和说明在左，亮绿的 + Item 在右上角，三栏都一样）；
+   右边一栏 Big buys 是次要的：铺一块淡底的面板、标题小一号；窄窄一条，每样一行往下排；窗口窄了就落到底下。
+   能往右收起来（.gmin）：那一栏缩到只剩 emoji 那一条，面板里面的东西宽度不变、整块往右滑出去，只露出左半边的圆角 */
+.restock-cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0 32px; align-items: start; transition: grid-template-columns .5s var(--ease), column-gap .5s var(--ease); }
+.restock-cols.gmin { grid-template-columns: minmax(0, 1fr) 54px; column-gap: 20px; }
 .restock-main { min-width: 0; }
-@media (max-width: 1100px) { .restock-cols { grid-template-columns: minmax(0, 1fr); } .restock-gear { max-width: 420px; margin-top: 8px; } }
-.rs-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 6px 0 10px; }
-.rs-head h3 { margin: 0; font: 700 15px var(--display); }
-.rs-head .msub { flex-basis: 100%; }
+@media (max-width: 1100px) { .restock-cols, .restock-cols.gmin { grid-template-columns: minmax(0, 1fr); } .restock-gear { max-width: 420px; margin-top: 8px; } }
+.rs-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin: 6px 0 10px; }
+.rs-head h3 { margin: 0 0 3px; font: 700 15px var(--display); }
 .rs-head.monce { margin-top: 30px; }
-.btn.sm { padding: 4px 10px; font-size: 12px; }
-.btn.sm svg { width: 13px; height: 13px; }
-.restock-gear { margin-bottom: 24px; padding: 14px 14px 12px; border-radius: 16px; background: var(--surface); }
-.restock-gear > header { gap: 4px 8px; }
-.restock-gear h3 { font-size: 13px; color: var(--muted); letter-spacing: .02em; }
-.restock-gear > header .tools { margin-left: auto; gap: 10px; }
+.restock-gear { margin-bottom: 24px; overflow: hidden; border-radius: 16px; background: var(--surface); transition: border-radius .5s var(--ease); touch-action: pan-y; }
+.gin { width: 300px; padding: 14px 14px 12px; }
+.restock-gear > .gin > header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.restock-gear h3 { font-size: 13px; color: var(--muted); letter-spacing: .02em; white-space: nowrap; }
+.restock-gear > .gin > header .tools { margin-left: auto; flex-wrap: nowrap; gap: 10px; }
 .restock-gear .link { font-size: 12px; }
+.gtog { flex: none; width: 26px; height: 26px; margin-left: -4px; }
 .restock-gear .glist li:hover { background: var(--surface2); }
+/* 收起来：右边贴着页边、只留左边两个圆角；emoji 以外的字淡出去 */
+.gmin .restock-gear { border-radius: 16px 0 0 16px; margin-right: -18px; }
+.restock-gear :is(h3, .tools, .gsum, .grate, .gname, .gday, .mbought, .gnote, .empty) { transition: opacity .3s var(--ease); }
+.gmin .restock-gear :is(h3, .tools, .gsum, .grate, .gname, .gday, .mbought, .gnote, .empty) { opacity: 0; pointer-events: none; }
+.gmin .restock-gear .glist li { border-top-color: transparent; }
 .gsum { margin: 0 0 4px; font-size: 12px; }
 .grate { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
 .grate input { width: 60px; padding: 3px 6px; border: var(--b-soft); border-radius: 8px; background: transparent; font: inherit; color: var(--ink); }

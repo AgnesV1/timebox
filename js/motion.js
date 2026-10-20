@@ -126,21 +126,28 @@ export function titleIn() {
 }
 
 // ---------- 夜里主卡片的边跟着鼠标亮 ----------
-// 只在电脑（有鼠标悬停）、夜里：鼠标在哪张主卡片上，那张卡离鼠标近的那一段边亮起青柠（css 里 --mx / --my 画的一圈渐变，只露出边框那 1px）
+// 只在电脑（有鼠标悬停）、夜里：鼠标在哪张主卡片上，那张卡离鼠标近的那一段边亮起青柠（css 的 .edge-glow：--mx / --my 画的一圈渐变，只露出边框那 1px）。
+// 光画在卡片里专门的一层上，只改这一层的 --mx / --my——改在卡片上的话，卡片里每一行都得跟着重算样式
 export function initEdgeGlow() {
   if (!matchMedia("(hover: hover)").matches) return;
-  let card = null, x = 0, y = 0, queued = false;
+  let card = null, glow = null, x = 0, y = 0, queued = false;
+  const layer = (c) => {
+    let g = c.querySelector(":scope > .edge-glow");
+    if (!g) { g = document.createElement("i"); g.className = "edge-glow"; g.setAttribute("aria-hidden", "true"); c.appendChild(g); }
+    return g;
+  };
   const paint = () => {
     queued = false;
-    if (!card) return;
+    if (!card?.isConnected) return;
+    glow = layer(card);
     const r = card.getBoundingClientRect();
-    card.style.setProperty("--mx", (x - r.left).toFixed(0) + "px");
-    card.style.setProperty("--my", (y - r.top).toFixed(0) + "px");
+    glow.style.setProperty("--mx", (x - r.left).toFixed(0) + "px");
+    glow.style.setProperty("--my", (y - r.top).toFixed(0) + "px");
   };
   addEventListener("pointermove", (e) => {
     if (document.documentElement.dataset.theme !== "dark" || quiet()) return;
     const c = e.target.closest?.(".today-main, .pcard, .goals") || null;
-    if (card && c !== card) { card.style.removeProperty("--mx"); card.style.removeProperty("--my"); }
+    if (card && c !== card && glow) { glow.style.removeProperty("--mx"); glow.style.removeProperty("--my"); glow = null; }
     card = c; x = e.clientX; y = e.clientY;
     if (card && !queued) { queued = true; requestAnimationFrame(paint); }
   }, { passive: true });

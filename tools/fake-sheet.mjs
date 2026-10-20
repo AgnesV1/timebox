@@ -96,8 +96,10 @@ console.log("→ current:", g.logs.join(" | "));
     goal("m1", "Finish Module #4", "month", ym(y, m), "q1", m4 ? ["p:" + m4.id] : []),
     goal("m2", "See friends every two weeks", "month", ym(y, m), "n1", ["g:Friends"], "Friends")
   ];
-  const task = { id: "seed-t-b2", date: T, title: "Listening drills", est: 45, order: 0, projectId: "seed-b2", itemId: "seed-b2-i0", updated: 4 };   // 今天页展开它，看「For B2 exam → …」
-  g.post({ secret: S, push: { rows: { projects: plans.map((p) => p.row), items: plans.flatMap((p) => p.items), settings: goals, tasks: [task] } } });
+  // 今天页：展开第一条看「For B2 exam → …」；第二条不展开，截悬停的样子用（哪天都有这两条，不管 Gym 那天排没排）
+  const tasks = [{ id: "seed-t-b2", date: T, title: "Listening drills", est: 45, order: 0, projectId: "seed-b2", itemId: "seed-b2-i0", updated: 4 },
+    { id: "seed-t-mail", date: T, title: "Reply to the landlord", est: 20, order: 1, group: "Chores", updated: 4 }];
+  g.post({ secret: S, push: { rows: { projects: plans.map((p) => p.row), items: plans.flatMap((p) => p.items), settings: goals, tasks } } });
 }
 
 // FAKE_WORST=1（tools/look.mjs --worst）：再造一份极端数据，看名字很长、一天很多条、只有一两个字的时候界面撑不撑得住

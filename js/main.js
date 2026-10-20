@@ -250,6 +250,7 @@ function adoptGroups() {
 async function syncThenLog() {
   await sync.sync();
   store.ensureTodayLog();
+  store.ensureNorthStar(store.today());   // 原来最远那一年的目标搬进 North star（只一次；等拉完表格再看，免得漏掉别的设备上的）
 }
 
 let lastToday = store.today();

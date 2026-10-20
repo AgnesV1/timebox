@@ -575,6 +575,7 @@ export function deleteProject(id) {
     const group = groupFor(id);   // 留下来的任务还算在原来那个大类里
     all("tasks").filter((t) => t.projectId === id).forEach((t) => (E.isAutoTask(t) && !started(t) ? dropTask(t.id) : put("tasks", { ...t, projectId: "", itemId: "", group })));
     drop("projects", id);
+    renameGoalRef("p:" + id, "");   // 目标上连着它的那一条也拿掉
   }, "Deleted plan");
 }
 
@@ -789,6 +790,7 @@ export function renameGroup(from, to) {
     putGroups(merge ? list.filter((g) => g.name !== from) : list.map((g) => (g.name === from ? { ...g, name } : g)));
     all("projects").filter((p) => (p.group || "") === from).forEach((p) => put("projects", { ...p, group: name }));
     all("tasks").filter((t) => !t.projectId && (t.group || "") === from).forEach((t) => put("tasks", { ...t, group: name }));
+    renameGoalRef("g:" + from, "g:" + name);   // 为哪些目标服务，跟着新名字走
   }, merge ? "Moved " + from + " into " + name : "Renamed project");
 }
 
@@ -854,5 +856,5 @@ export const { scores, scoreOf, scoreSetup, scoreCells, setScore, setScoreNote }
 
 export const { quads, quadOf, quadBoard, addQuad, moveQuad, editQuad, doneQuad, deleteQuad, restoreQuad, adoptQuads } = quadStore(core);
 
-export const { goals, saveGoal, deleteGoal } = goalStore(core);
+export const { goals, saveGoal, deleteGoal, setParent, linkGoal, renameGoalRef, ensureNorthStar } = goalStore(core);
 export const { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples, addDishes, dishToBox } = mealStore(core);

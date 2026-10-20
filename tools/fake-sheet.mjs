@@ -117,8 +117,12 @@ if (process.env.FAKE_WORST) {
   const tasks = titles.map((title, i) => ({ id: "worst-" + i, date: T, title, est: [90, 45, 30, 5, 25, 40, 30, 20, 15, 60, 30, 45][i], order: i + 1,
     status: ["", "done", "delay", "drop", "", "done", "", "", "done", "", "", ""][i], actual: [0, 45, 10, 0, 0, 0, 12, 0, 15, 0, 0, 0][i] || null,
     times: [0, 45, 10, 0, 0, 0, 12, 0, 15, 0, 0, 0][i] ? [0, 45, 10, 0, 0, 0, 12, 0, 15, 0, 0, 0][i] + "m" : "", reason: i === 2 ? "waiting on the data" : "", group: ["Build", "Chores", "Work", "Friends", "Work", "Fitness", "Leisure", "Chores", "Friends", "Build", "Chores", "Leisure"][i], updated: 10 }));
-  g.post({ secret: "CHANGE_ME", push: { rows: { tasks } } });
-  console.log("worst-case data:", tasks.length, "tasks on", T);
+  // 目标：这个月一栏 12 条（有很长的、中文的），North star 一条很长的
+  const ym = T.slice(0, 7);
+  const goals = Array.from({ length: 12 }, (_, i) => ({ key: "goal:worst-g" + i, value: { text: i === 0 ? "Get the whole literature review, every figure and the appendix the committee asked for, done and sent" : i === 1 ? "把去年所有的报销单据整理完交给会计" : "Small goal number " + (i + 1), tag: i % 3 ? "" : "Build", span: "month", due: ym, done: i === 5 ? ym : "", order: 100 + i, up: i < 4 ? "q1" : "", by: i < 2 ? ["p:seed-port"] : [] }, updated: 10 }));
+  goals.push({ key: "goal:worst-north", value: { text: "Live somewhere quiet with time to read, cook slowly, and see the people I love without rushing", tag: "", span: "north", due: "", done: "", order: 200, up: "", by: [] }, updated: 10 });
+  g.post({ secret: "CHANGE_ME", push: { rows: { tasks, settings: goals } } });
+  console.log("worst-case data:", tasks.length, "tasks,", goals.length, "goals on", T);
 }
 
 let readingBook = null;

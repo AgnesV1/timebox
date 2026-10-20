@@ -200,6 +200,15 @@
 列表里只有点开的那一行带 Done / Delay / Drop 三个按钮（别的行右边只写状态）；Done 下面填用了多久、几点结束，Delay 和 Drop 写原因；
 按住左边的分钟数上下拖，调整顺序；列表最下面可以加任务（「Gym 40」末尾的数字当分钟）。排计划、设置都在电脑上做。
 
+**记账（手机、电脑都有）**：记的存在这台设备上；电脑 Settings 里贴一个记账表格的链接，就和那张表同步，两边都能记、都能改。
+- 手机：在今天页顶上那一截（页面滚在最顶上）往下拉——灵动岛下面长出一颗水滴，拉大约 90px 细颈断开、「+」变蓝，松手面板就像水一样流下来，
+  停在屏幕约 88% 高。点底下露出的那条今天页、或把底边的小横条往上推，就收回去（这次记过的话，岛上停一下今天花了多少）。
+  面板里：Year / Month / Day、能拖的柱状时间轴、类别小标签、流水（点一笔改、往左滑删）、推荐、Add a new transaction（数字键盘，能写 `12.5+8`）。
+  顶上的图表图标：图表从底下升到半高（上面还看得到期间和时间轴），往上拖到全高、往下拖收起。
+- 电脑：Spending 页整页是图表——期间、花了 / 收入、Year / Month、前后翻、搜索、设定、`+ Add`（按 N）；下面五个方块和两个 Breakdown。
+  某一天的流水和记一笔在右边的抽屉里：收着时右边一条写着今天花了多少，点它、按 N、或触控板往左划打开；Esc、往右划、点外面收起。窗口窄了，那一条移到底下，抽屉盖满。
+- 齿轮：Budget（从某月起每月多少）、Categories（加、改名、藏，没用过的能删）、Export（.md）、Import a month。大数字的小数点后两位小一号。
+
 **季度表**：Settings → Quarter sheet 贴你那个表格的链接（每个季度一页，页名 `2026 Q4`）。从贴链接那天起，每天自动填两格（之前的日子不碰）：
 `progress` = 算进 progress 的项目当天实际花的小时 × 10，`focus` = 当天 ◆ Deep 的小时 ÷ 10（四舍五入到整小时）。
 没法自动算的几列（每天自己打的分）在同一张卡片的 Daily scores 里写：一行一列，`表头原名 · 什么意思 · 平常的范围 · 一档一段「数字 + 几个字」`，
@@ -255,5 +264,9 @@ node --test test/*.test.mjs
 想连着一个假的表格试同步：`node tools/fake-sheet.mjs` 会在 http://127.0.0.1:8002/exec 起一个
 （口令 `CHANGE_ME`，先用 main 分支的 `Code.gs` 把旧表升级、造一点上一版的数据，再用现在的 `Code.gs` 跑 setup——
 相当于真的从上一版升级；里面还有一个假的阅读表格（几页、表头高低不一），链接填 `https://docs.google.com/spreadsheets/d/FAKE-READING-0000000000000000/edit`）；`python3 tools/serve.py .`（或 `node tools/serve.mjs .`）起一个不缓存的本地网页（端口 8000）。
+
+截图看样子：`node tools/look.mjs` 自己起网页和假表格，用 Playwright 把常看的几页截下来（手机 390×844、电脑 1440×900、窄电脑 1000×760，白天夜里各一套），
+最后列出控制台报错和手机上小于 16px 的输入框（iPhone 一点就放大）。`--only today,spending` 只截名字里带这几个词的；`--worst` 再造一份极端数据
+（很长的名字、一栏一堆目标、大金额）；`--out 目录` 指定图放哪。要先装 Playwright（`npm i -g playwright`，再 `npx playwright install chromium`）。
 
 字体（Unbounded、Space Grotesk、JetBrains Mono）放在 `fonts/`，SIL Open Font License，许可证在同一个文件夹里。

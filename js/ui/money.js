@@ -488,10 +488,13 @@ export function createView(kind) {
     $(".mn-drawer").setAttribute("inert", "");
     if (root.contains(document.activeElement)) $('[data-act="drawer"]')?.focus({ preventScroll: true });
   }
-  // 把手上：今天花了多少
+  // 把手上：今天花了多少。把手只有 64px 宽：放不下的（$1,000 以上）写成「$1.2k」，整数写在悬停的提示里
   function paintHandle() {
     const el = desk && $("[data-htot]");
-    if (el) el.innerHTML = "−" + cents(M.money(M.sumOf(IX(), todayP(), "day").out));
+    if (!el) return;
+    const out = M.sumOf(IX(), todayP(), "day").out, full = "−" + M.money(out);
+    el.innerHTML = full.length <= 8 ? "−" + cents(M.money(out)) : esc(kfmt(-out));
+    el.parentNode.title = "Today " + full;
   }
 
   // 月历：从日期按钮那里弹出来，哪天都能选

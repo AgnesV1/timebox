@@ -16,6 +16,7 @@ import { todayHTML, initToday, shownDate, showDate } from "./ui/today.js";
 import { calendarHTML, poolHTML, initCalendar, handleDrop } from "./ui/calendar.js";
 import { projectsHTML, initProjects, refreshProjectEditor, projectAlerts } from "./ui/projects.js";
 import { initGoals } from "./ui/goals.js";
+import { initLinks, afterRender as linksAfterRender } from "./ui/links.js";
 import { initIdeas, ideasPhoneHTML } from "./ui/ideas.js";
 import { settingsHTML, initSettings } from "./ui/settings.js";
 import { initEditor, refreshEditor } from "./ui/editor.js";
@@ -199,6 +200,7 @@ function draw() {
   paintSync();
   refreshEditor();
   refreshProjectEditor();
+  linksAfterRender();
   refreshMealEditor();
   refreshFriendEditor();
   restoreKeep(kept);   // 弹层也画完了再放回去
@@ -277,6 +279,7 @@ initToday(render);
 initCalendar(render);
 initProjects(render);
 initGoals(render);
+initLinks();
 initIdeas(render);
 initSettings();
 initEditor();

@@ -67,6 +67,39 @@ Object.assign(g, load(current, g.ss));
 g.sandbox.setup();
 console.log("→ current:", g.logs.join(" | "));
 
+// 几个计划、一串目标：North star ← 2030 ← 2027 ← 今年 ← 这个季度 ← 这个月，近期的有计划 / 项目为它们服务（Projects 页悬停的连线要有东西画）
+{
+  const S = "CHANGE_ME", all = g.post({ secret: S, pull: true, since: 0 }).pull.tables;
+  const now = new Date(); now.setHours(now.getHours() - 4);
+  const T = iso(new Date(now.getTime() - now.getTimezoneOffset() * 60000)), y = Number(T.slice(0, 4)), m = Number(T.slice(5, 7)), q = Math.ceil(m / 3);
+  const add = (n) => { const [a, b, c] = T.split("-").map(Number); return iso(new Date(Date.UTC(a, b - 1, c + n))); };
+  const ym = (yy, mm) => yy + "-" + String(mm).padStart(2, "0");
+  const m4 = (all.projects || []).find((p) => p.name === "Module #4");
+  const plan = (id, name, group, color, deadline, items) => ({ row: { id, name, group, kind: "total", place: "pool", status: "active", deadline, early: 2, color, order: 5, updated: 4 },
+    items: items.map(([title, est], i) => ({ id: id + "-i" + i, projectId: id, title, est, module: "", order: i + 1, updated: 4 })) });
+  const plans = [
+    plan("seed-b2", "B2 exam", "Build", "#2F5BFF", add(70), [["Listening drills", 300], ["Mock paper 1", 120], ["Mock paper 2", 120]]),
+    plan("seed-port", "Portfolio site", "Build", "#FF3EA5", add(40), [["Case study: timebox", 240], ["Landing page", 180]]),
+    plan("seed-q4", "Q4 report", "Work", "#FF8A00", add(25), [["Numbers", 120], ["Deck", 180]])
+  ];
+  const goal = (id, text, span, due, up, by = [], tag = "") => ({ key: "goal:" + id, value: { text, tag, span, due, done: "", order: id.length + text.length, up, by }, updated: 4 });
+  const goals = [
+    goal("n1", "A steady, curious life", "north", "", ""),
+    goal("y4", "Live and work in French", "year", ym(y + 4, 12), "n1"),
+    goal("y1", "C1 French certificate", "year", ym(y + 1, 12), "y4"),
+    goal("y2", "Freelance on the side", "year", ym(y + 2, 12), "n1"),
+    goal("t1", "Pass B2 (DELF)", "year", ym(y, 12), "y1", ["p:seed-b2"].concat(m4 ? ["p:" + m4.id] : [])),
+    goal("t2", "Half marathon under 2h", "year", ym(y, 12), "n1", ["g:Fitness"], "Fitness"),
+    goal("q1", "Mock exam ≥ 70 / 100", "quarter", ym(y, q * 3), "t1", ["p:seed-b2"]),
+    goal("q2", "Ship the Q4 report on time", "quarter", ym(y, q * 3), "", ["p:seed-q4"], "Work"),
+    goal("q3", "Launch the portfolio", "quarter", q === 4 ? ym(y + 1, 3) : ym(y, q * 3 + 3), "y2", ["p:seed-port"], "Build"),
+    goal("m1", "Finish Module #4", "month", ym(y, m), "q1", m4 ? ["p:" + m4.id] : []),
+    goal("m2", "See friends every two weeks", "month", ym(y, m), "n1", ["g:Friends"], "Friends")
+  ];
+  const task = { id: "seed-t-b2", date: T, title: "Listening drills", est: 45, order: 0, projectId: "seed-b2", itemId: "seed-b2-i0", updated: 4 };   // 今天页展开它，看「For B2 exam → …」
+  g.post({ secret: S, push: { rows: { projects: plans.map((p) => p.row), items: plans.flatMap((p) => p.items), settings: goals, tasks: [task] } } });
+}
+
 // FAKE_WORST=1（tools/look.mjs --worst）：再造一份极端数据，看名字很长、一天很多条、只有一两个字的时候界面撑不撑得住
 if (process.env.FAKE_WORST) {
   const now = new Date(); now.setHours(now.getHours() - 4);

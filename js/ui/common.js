@@ -1,6 +1,7 @@
 // 几个页面都用得到的小块：颜色、安全线卡片、进度条、拖延账单、健康标签、提示条
 
 import * as E from "../engine.js";
+import * as G from "../goals.js";
 import * as store from "../store.js";
 import { esc } from "../dom.js";
 import { fmtMin } from "../dates.js";
@@ -67,6 +68,23 @@ export function badgeOf(t) {
   if (p && E.isRepeat(p)) return p.group ? { name: p.group, color: store.groupByName(p.group)?.color || p.color || "" } : null;
   return p ? { name: p.name || "", color: p.color || "" } : t.group ? { name: t.group, color: store.groupByName(t.group)?.color || "" } : null;
 }
+
+// 「For B2 exam → Mock exam → Pass B2 → … → ✦ North star 里那条」：这件事是为了什么。
+// 第一个是它的计划（没有计划、或者是循环小事的，是项目），带那个颜色；后面是它服务的目标，一层层往上（计划自己没连目标的，用它所在项目连着的，见 js/goals.js）。
+// 连着几个目标就几行，最多 max 行，多的写「+N more」。fold：一条链超过这么多个目标时，只留前面几个和最后一个，中间折成「⋯」（手机上省地方，点了展开）
+export function chainHTML({ planId = "", group = "", head = null, max = 2, fold = 0 } = {}) {
+  const goals = store.goals();
+  const chains = goals.length && head?.name ? G.chainsFor(goals, G.goalsFor(goals, { planId, group })) : [];
+  if (!chains.length) return "";
+  const step = (g) => '<i aria-hidden="true">→</i><span' + (g.span === "north" ? ' class="ch-star"' : "") + ' title="' + esc(g.text) + '">' + esc(g.text) + "</span>";
+  const line = (ch) => '<p class="chain"><span class="ch-for">For</span><b style="--pc:' + esc(head.color || "var(--c-None)") + '">' + esc(head.name) + "</b>" +
+    (fold && ch.length > fold ? ch.slice(0, fold - 1).map(step).join("") + '<i aria-hidden="true">→</i><button type="button" class="ch-fold" data-act="chain-all" title="' + esc(ch.slice(fold - 1, -1).map((g) => g.text).join(" → ")) + '" aria-label="Show the whole chain">⋯</button>' + step(ch[ch.length - 1])
+      : ch.map(step).join("")) + "</p>";
+  const rest = chains.slice(max);
+  return '<div class="chains">' + chains.slice(0, max).map(line).join("") +
+    (rest.length ? '<p class="chain ch-more" title="' + esc(rest.map((ch) => ch.map((g) => g.text).join(" → ")).join("\n")) + '">+' + rest.length + " more</p>" : "") + "</div>";
+}
+export const taskChainHTML = (t, max = 2, fold = 0) => chainHTML({ planId: t.projectId || "", group: store.groupOf(t), head: badgeOf(t), max, fold });
 
 export function zebraOf(t) {
   const c = projectOf(t)?.color || store.groupByName(t.group)?.color;

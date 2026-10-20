@@ -48,7 +48,17 @@ process.on("exit", stop);
 // ---------- 截哪些 ----------
 // device: phone / desk；hash: 打开哪一页；act(page)：截之前做点什么（悬停、点开、拉下来）。截不到的（还没这个界面）跳过，最后列出来
 const tap = (sel) => async (page) => { await page.locator(sel).first().click(); await page.waitForTimeout(500); };
-const hover = (sel) => async (page) => { await page.locator(sel).first().hover(); await page.waitForTimeout(700); };
+const hover = (sel, wait = 700) => async (page) => { await page.locator(sel).first().hover(); await page.waitForTimeout(wait); };
+// Projects 页：悬停 from，从冒出来的小圆圈拖到 to 上面（不松手，截的是拖着的样子）
+const dragLink = (from, to) => async (page) => {
+  await page.locator(from).first().hover();
+  await page.waitForTimeout(500);
+  const h = await page.locator(".lk-h.on").boundingBox(), t = await page.locator(to).first().boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) { await page.mouse.move(h.x + (t.x + t.width / 2 - h.x) * i / 12, h.y + (t.y + t.height / 2 - h.y) * i / 12); await page.waitForTimeout(16); }
+  await page.waitForTimeout(300);
+};
 // 手机：从今天页顶上往下拉（island.js 也认鼠标），拉过线松手
 async function pullLedger(page) {
   await page.mouse.move(195, 140);
@@ -65,9 +75,15 @@ const SHOTS = [
   { device: "phone", name: "ledger-cats", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="set"]')(page); await tap('.mn-phone [data-sub="cats"]')(page); } },
   { device: "desk", name: "today", hash: "today" },
   { device: "desk", name: "today-hover", hash: "today", act: hover(".today-main .row:not(.open) .task") },
+  { device: "desk", name: "today-open", hash: "today", act: tap('.today-main .row[data-id="seed-t-b2"] .task') },
   { device: "desk", name: "calendar", hash: "calendar" },
   { device: "desk", name: "projects", hash: "projects" },
-  { device: "desk", name: "projects-hover", hash: "projects", act: hover(".goals .gl .gt") },
+  { device: "desk", name: "projects-hover", hash: "projects", act: hover('.goals .gl[data-goal="t1"] .gt', 1600) },
+  { device: "desk", name: "projects-hover-plan", hash: "projects", act: hover('.pcard[data-project="seed-b2"] .psub', 1600) },
+  { device: "desk", name: "projects-drag", hash: "projects", act: dragLink('.goals .gl[data-goal="m2"] .gt', '.pcard[data-project="seed-port"] .psub') },
+  { device: "desk", name: "projects-edit-goal", hash: "projects", act: tap('.goals .gl[data-goal="q1"] .gt') },
+  { device: "desk", name: "projects-add-goal", hash: "projects", act: async (page) => { await hover('.goals [data-col="next"] h4', 300)(page); await tap('.goals [data-col="next"] .gplus')(page); await page.keyboard.type("Run 10k #Fitness"); } },
+  { device: "desk", name: "plan-editor", hash: "projects", act: tap('.pcard[data-project="seed-b2"] .pname') },
   { device: "desk", name: "stats", hash: "stats" },
   { device: "desk", name: "spending", hash: "spending" },
   { device: "desk", name: "spending-drawer", hash: "spending", act: tap(".mn-desk [data-act=drawer]") },

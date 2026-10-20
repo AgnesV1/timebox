@@ -184,6 +184,7 @@
 .mn-phone .mn-pg { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
 .mn-phone .mn-inner { position: absolute; inset: 0; opacity: 0; }
 .mn-phone.shown .mn-inner { opacity: 1; }
+.mn.mn-phone .mn-tx, .mn.mn-phone textarea.mn-tx { font-size: 16px; }   /* iPhone 点到 16px 以下的输入框会把整页放大 */
 /* 收起来以后岛上停一下：今天的总数 + 转圈变勾 */
 #mn-live { position: fixed; z-index: 91; left: 50%; top: max(8px, calc(env(safe-area-inset-top, 0px) - 34px)); width: 92px; height: 28px; margin-left: -46px; border-radius: 14px; background: #000; overflow: hidden; pointer-events: none; opacity: 0;
   transition: width .7s linear(0, .03, .106, .208, .322, .438, .548, .649, .737, .812, .873, .922, .959, .987, 1.007, 1.02, 1.027, 1.031, 1.032, 1.03, 1.028, 1.024, 1.021, 1.017, 1.014, 1.01, 1.008, 1.006, 1.004, 1.002, 1.001, 1, 1), margin-left .7s linear(0, .03, .106, .208, .322, .438, .548, .649, .737, .812, .873, .922, .959, .987, 1.007, 1.02, 1.027, 1.031, 1.032, 1.03, 1.028, 1.024, 1.021, 1.017, 1.014, 1.01, 1.008, 1.006, 1.004, 1.002, 1.001, 1, 1), opacity .25s; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 14px; color: #F2EEE6; font: 13px "JetBrains Mono", monospace; }

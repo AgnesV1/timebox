@@ -1101,7 +1101,16 @@ body:has(#main :is(input, textarea, select):focus) #toast { bottom: calc(22px + 
 .why { margin: 2px 0 0; overflow: hidden; font-size: 12.5px; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
 .dp { margin-left: 4px; font-size: 11.5px; font-weight: 700; white-space: nowrap; vertical-align: 1px; }
 .chips.hov { display: none; }
-@media (hover: hover) { .row:hover > .body > .chips.hov { position: absolute; top: 4px; right: 44px; display: flex; margin: 0; padding-left: 14px; background: var(--bg); } }
+/* 电脑上鼠标移上去，状态按钮浮在这一行右边。按钮底下不铺底色（卡片是半透明的，铺了就是一块实心的方块），
+   而是让同一行的字在按钮那一段淡掉：--chips-w = 几个按钮加起来大概多宽，右边 44px 留给 ⋯ */
+.line { --chips-w: 224px; }
+@media (hover: hover) {
+  .row:hover > .body > .chips.hov { position: absolute; top: 4px; right: 44px; display: flex; margin: 0; }
+  .row:hover > .body:has(> .chips.hov) > .line {
+    -webkit-mask-image: linear-gradient(to left, #000 44px, transparent 44px, transparent calc(44px + var(--chips-w)), #000 calc(68px + var(--chips-w)));
+    mask-image: linear-gradient(to left, #000 44px, transparent 44px, transparent calc(44px + var(--chips-w)), #000 calc(68px + var(--chips-w))); }
+  .row:hover > .body:has(> .chips.hov) > .line > .rside { visibility: hidden; }   /* 右边那个状态字被按钮换掉了 */
+}
 body.phone .row.open .chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
 body.phone .row.open .chip { min-height: 40px; padding: 0 4px; font-size: 14px; }
 body.phone .tm { padding-top: 0; padding-bottom: 0; }
@@ -1143,7 +1152,7 @@ body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
 .logtime .btn { padding: 6px 14px; font-size: 12.5px; }
 [data-theme="dark"] .logtime input { background: rgba(0, 229, 255, .1); }
 /* iPhone 上小于 16px 的输入框一点就会放大页面 */
-body.phone .logtime input, body.phone .add input, body.phone .add select { font-size: 16px; }
+body.phone .logtime input, body.phone .add input, body.phone .add select, body.phone .reason, body.phone .desc { font-size: 16px; }   /* iPhone 点到 16px 以下的输入框会把整页放大 */
 
 /* ---------- 计划：预览、种类标签、这周几次 ---------- */
 .ev.ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--line); opacity: .6; }   /* 还没落到这天的预览：只有一张纸的轮廓 */

@@ -376,33 +376,39 @@ function restockHTML(D, c) {
 
 // ---------- 贵重的东西（Restock 页右边）：一天合多少钱；左边一个类目，不用了的收在底下 ----------
 
-const CUR = { cad: ["$", "CAD"], cny: ["¥", "RMB"] };
+const CUR = Object.fromEntries(M.GEAR_CURS.map(([k, sym, name]) => [k, [sym, name]]));
 const cash = (v, cur) => CUR[cur][0] + Math.round(v).toLocaleString("en-US");
 const perDay = (v, cur) => CUR[cur][0] + v.toFixed(1);
+let fxOpen = false;   // 右上角那个小小的 $ / ¥ 点开了没有：点开是显示用哪种钱、汇率
 let showRetired = false;
 
 function gearHTML(D, c) {
-  const rate = M.gearRate(store.mealPrefs()), L = M.gearList(D, c.today, rate);
+  const pr = store.mealPrefs(), rates = M.gearRates(pr), show = M.gearShow(pr), L = M.gearList(D, c.today, rates);
+  const inShow = (cad) => M.convert(cad, "cad", show, rates);
   const tagName = (g) => M.GEAR_TAGS.find(([k]) => k === M.gearTag(g))[2];
+  // 价钱、一天多少都换成同一种钱显示（show）；买的不是这种钱的，鼠标停在价钱上看原价
   const row = (r) => '<li data-act="edit-gear" data-id="' + esc(r.g.id) + '" tabindex="0" role="button"' + (r.retired ? ' class="retired"' : "") + ">" +
     '<span class="gem' + (r.age ? " g-" + r.age : "") + '" title="' + esc(tagName(r.g)) + (r.age ? " · bought in the last " + (r.age === "year" ? "12 months" : "3 years") : "") + '">' + M.gearEmoji(r.g) + "</span>" +
-    '<span class="gname"><b>' + esc(r.g.name || "Untitled") + "</b><small>" + cash(r.cad, "cad") + " · " + cash(r.cny, "cny") + "</small>" +
+    '<span class="gname"><b>' + esc(r.g.name || "Untitled") + "</b><small" + (r.cur !== show ? ' title="Paid ' + cash(r.price, r.cur) + '"' : "") + ">" + cash(inShow(r.cad), show) + "</small>" +
     "<small>" + (r.g.bought ? fmtDue(r.g.bought, c.today) : "no date") + (r.retired ? " → " + fmtDue(r.g.retired, c.today) : "") + (r.days ? " · " + r.days + "d" : "") + "</small></span>" +
-    '<span class="gday num"><b class="' + (r.cheap ? "gcheap" : "") + '">' + (r.days ? perDay(r.perDay, r.cur) : "—") + "</b>" +
-    (r.cheap ? '<small class="gcheap" title="Under ' + perDay(M.GEAR_LOW[r.cur], r.cur) + ' a day">replace</small>' : "<small>/ day</small>") + "</span></li>";
+    '<span class="gday num"><b class="' + (r.cheap ? "gcheap" : "") + '">' + (r.days ? perDay(inShow(r.perDayCad), show) : "—") + "</b>" +
+    (r.cheap ? '<small class="gcheap" title="Under ' + perDay(M.GEAR_LOW[r.cur] ?? 0, r.cur) + ' a day">replace</small>' : "<small>/ day</small>") + "</span></li>";
   const n = L.live.length;
   const body = n || L.gone.length
     ? '<ul class="glist">' + L.live.map(row).join("") + (showRetired ? L.gone.map(row).join("") : "") + "</ul>" +
       (L.gone.length ? '<button type="button" class="link mbought" data-act="gear-retired" aria-expanded="' + showRetired + '">Retired (' + L.gone.length + ")</button>" : "")
     : '<p class="empty">Nothing yet. Add what you paid a lot for — a camera, a laptop — and see what it costs per day of use. Or paste rows from your sheet.</p>';
+  // 收着的时候只是标题旁边一个小小的 $；点开：显示用哪种钱 + 每种钱对加币的汇率（手动填）
+  const fx = fxOpen ? '<div class="gfx">' + segHTML("gear-show", M.GEAR_CURS.map(([k, sym, name]) => [k, sym + " " + name]), show) +
+    M.GEAR_CURS.filter(([k]) => k !== "cad").map(([k, , name]) => '<label class="grate">1 CAD = <input class="num" type="number" min="0.0001" step="0.01" data-act="gear-rate" data-cur="' + k + '" value="' + esc(rates[k]) + '" aria-label="' + name + ' per CAD"> ' + name + "</label>").join("") + "</div>" : "";
   const min = gearMin();
   return '<aside class="restock-gear mcard"><div class="gin"><header>' +
     '<button type="button" class="icon-btn gtog" data-act="gear-fold" aria-expanded="' + !min + '" aria-label="' + (min ? "Show" : "Hide") + ' Big buys" title="' + (min ? "Show Big buys" : "Slide away (or swipe right)") + '">' + icon(min ? "left" : "right") + "</button>" +
     "<h3>Big buys</h3>" +
+    '<button type="button" class="gfx-b' + (fxOpen ? " on" : "") + '" data-act="gear-fx" aria-expanded="' + fxOpen + '" title="Shown in ' + CUR[show][1] + ' · currency and rates">' + CUR[show][0] + "</button>" +
     '<span class="tools"><button type="button" class="link" data-act="gear-paste">Paste</button><button type="button" class="btn cta" data-act="new-gear">' + icon("plus") + " Item</button></span></header>" +
-    (n ? '<p class="msub gsum">' + n + " in use · " + cash(L.cad, "cad") + " · " + perDay(L.perDay, "cad") + " a day</p>" : "") +
-    '<label class="grate">1 CAD = <input class="num" type="number" min="0.01" step="0.01" data-act="gear-rate" value="' + esc(rate) + '" aria-label="RMB per CAD"> RMB</label>' +
-    body + '<p class="msub gnote">Highest cost per day first. Per day is in what you paid with; under ' + perDay(M.GEAR_LOW.cad, "cad") + " or " + perDay(M.GEAR_LOW.cny, "cny") + " a day it has paid for itself. " +
+    fx + (n ? '<p class="msub gsum">' + n + " in use · " + cash(inShow(L.cad), show) + " · " + perDay(inShow(L.perDay), show) + " a day</p>" : "") +
+    body + '<p class="msub gnote">Highest cost per day first. Under ' + perDay(M.GEAR_LOW.cad, "cad") + " or " + perDay(M.GEAR_LOW.cny, "cny") + " a day (in what you paid with) it has paid for itself. " +
     '<span class="gem g-year">12 mo</span> <span class="gem g-three">3 yrs</span> = bought in the last 12 months / 3 years.</p></div></aside>';
 }
 
@@ -421,16 +427,16 @@ function foldGear(min) {
 }
 
 function gearEditor(D, row) {
-  const T = store.today(), rate = M.gearRate(store.mealPrefs()), r = M.gearRow(row, T, rate), cur = M.gearCur(row);
-  const other = cur === "cad" ? "cny" : "cad";
+  const T = store.today(), pr = store.mealPrefs(), rates = M.gearRates(pr), show = M.gearShow(pr), r = M.gearRow(row, T, rates), cur = M.gearCur(row);
+  const other = cur === show ? M.GEAR_CURS.find(([k]) => k !== cur)[0] : show;
   return '<h3 class="sheet-title">' + (editing.id ? esc(row.name || "Untitled") : "Big buy") + "</h3>" +
     '<label class="field"><span>Name</span><input data-f="name" data-k="name" value="' + esc(row.name || "") + '" placeholder="Sony A7M4" autocomplete="off"></label>' +
     '<div class="field"><span>Kind</span>' + emojiPickHTML("gear-tag", M.GEAR_TAGS, M.gearTag(row)) + "</div>" +
-    '<div class="field-row"><div class="field"><span>Paid in</span>' + segHTML("gear-cur", [["cny", "RMB ¥"], ["cad", "CAD $"]], cur) + "</div>" +
+    '<div class="field-row"><div class="field"><span>Paid in</span>' + segHTML("gear-cur", M.GEAR_CURS.map(([k, sym, name]) => [k, name + " " + sym]), cur) + "</div>" +
     '<label class="field"><span>Price (' + CUR[cur][1] + ')</span><input data-f="price" data-k="price" class="num" type="number" step="0.01" min="0" value="' + esc(row.price || "") + '" placeholder="0"></label></div>' +
     '<div class="field-row"><label class="field"><span>Bought on</span><input data-f="bought" data-k="bought" type="date" value="' + esc(row.bought || "") + '"></label>' +
     '<label class="field"><span>Retired on (optional)</span><input data-f="retired" data-k="retired" type="date" value="' + esc(row.retired || "") + '"></label></div>' +
-    '<p class="hint">' + (r.price ? "≈ " + cash(r[other], other) + " at 1 CAD = " + rate + " RMB. " : "") +
+    '<p class="hint">' + (r.price ? "≈ " + cash(M.convert(r.price, cur, other, rates), other) + ". " : "") +
     (r.days ? r.days + (r.days === 1 ? " day" : " days") + (r.retired ? " in use" : " so far") + " · " + perDay(r.perDay, cur) + " a day" + (r.cheap ? " — ok to replace." : ".") : "Fill in the price and the day you bought it.") + "</p>" +
     footHTML("item");
 }
@@ -725,6 +731,8 @@ export function initMeals(rerender) {
     else if (act === "edit-gear" && !document.querySelector(".restock-cols.gmin")) openEditor({ kind: "gear", id });
     else if (act === "gear-paste") openEditor({ kind: "gear-paste" });
     else if (act === "gear-retired") { showRetired = !showRetired; rerender(); }
+    else if (act === "gear-fx") { fxOpen = !fxOpen; rerender(); }
+    else if (act === "gear-show") store.setSetting("meal-prefs", { ...store.mealPrefs(), gearShow: el.dataset.v });
     else if (act === "gear-fold") foldGear(!document.querySelector(".restock-cols")?.classList.contains("gmin"));
     // 收起来的时候点哪一行都是先展开
     else if (act === "edit-gear" && document.querySelector(".restock-cols.gmin")) foldGear(false);
@@ -780,8 +788,8 @@ export function initMeals(rerender) {
   }, { passive: true });
   // 汇率：改了就存（存在 meal-prefs 里，跟着表格走）
   on(document, "change", ".meals input[data-act=gear-rate]", (e, el) => {
-    const v = Number(el.value);
-    if (v > 0) store.setSetting("meal-prefs", { ...store.mealPrefs(), rate: v });
+    const v = Number(el.value), pr = store.mealPrefs();
+    if (v > 0) store.setSetting("meal-prefs", { ...pr, rates: { ...M.gearRates(pr), ...(pr.rates || {}), [el.dataset.cur || "cny"]: v } });
   });
   on(document, "change", ".meals select[data-act=rough-add]", (e, el) => { if (el.value) roughAdd(el.dataset.week, el.value); });
   on(document, "input", ".meals textarea[data-act=rough-note]", (e, el) => store.saveWeek(el.dataset.week, { note: el.value }, "", { quiet: true }));
@@ -805,7 +813,7 @@ export function initMeals(rerender) {
     else if (act === "dish-set-kind") update({ kind: el.dataset.v === "box" ? "box" : "once" });
     else if (act === "sup-tag") update({ tag: el.dataset.v });
     else if (act === "gear-tag") update({ cat: el.dataset.v });
-    else if (act === "gear-cur") update({ cur: el.dataset.v === "cad" ? "cad" : "cny" });
+    else if (act === "gear-cur") update({ cur: M.gearCur({ cur: el.dataset.v }) });
     else if (act === "gear-import") {
       const sheet = el.closest(".meal-editor");
       const rows = M.importGear(D, M.parseGear(sheet.querySelector(".mimport").value), () => store.newId().replace(/-/g, "").slice(0, 10));

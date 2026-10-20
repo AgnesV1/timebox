@@ -1918,11 +1918,17 @@ select.open { border-color: var(--edge); }
 .restock-gear > .gin > header .tools { margin-left: auto; flex-wrap: nowrap; gap: 10px; }
 .restock-gear .link { font-size: 12px; }
 .gtog { flex: none; width: 26px; height: 26px; margin-left: -4px; }
+/* 标题旁边小小的 $ / ¥：点开是显示用哪种钱、汇率 */
+.gfx-b { flex: none; min-width: 20px; height: 20px; padding: 0 5px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 11px; font-weight: 700; line-height: 20px; color: var(--muted); }
+.gfx-b:hover, .gfx-b.on { color: var(--ink); }
+.gfx { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 8px; animation: rise .25s var(--ease) backwards; }
+.gfx .seg button { padding: 3px 9px; font-size: 11.5px; }
+.gfx .grate { margin: 0; }
 .restock-gear .glist li:hover { background: var(--surface2); }
 /* 收起来：右边贴着页边、只留左边两个圆角；emoji 以外的字淡出去 */
 .gmin .restock-gear { border-radius: 16px 0 0 16px; margin-right: -18px; }
-.restock-gear :is(h3, .tools, .gsum, .grate, .gname, .gday, .mbought, .gnote, .empty) { transition: opacity .3s var(--ease); }
-.gmin .restock-gear :is(h3, .tools, .gsum, .grate, .gname, .gday, .mbought, .gnote, .empty) { opacity: 0; pointer-events: none; }
+.restock-gear :is(h3, .gfx-b, .gfx, .tools, .gsum, .gname, .gday, .mbought, .gnote, .empty) { transition: opacity .3s var(--ease); }
+.gmin .restock-gear :is(h3, .gfx-b, .gfx, .tools, .gsum, .gname, .gday, .mbought, .gnote, .empty) { opacity: 0; pointer-events: none; }
 .gmin .restock-gear .glist li { border-top-color: transparent; }
 .gsum { margin: 0 0 4px; font-size: 12px; }
 .grate { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }

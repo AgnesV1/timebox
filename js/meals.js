@@ -401,11 +401,27 @@ export function coming(D, today, months = 3, tag = "") {
 
 // ---------- 贵重的东西（Restock 页右边）：花了多少、用了几天、一天合多少 ----------
 // 一样：{ name, cat 类目, cur 用什么钱买的（cny / cad）, price, bought 哪天买的, retired 哪天不用了（可以不填） }
-// 另一种钱按汇率换（rate = 1 加币合几块人民币，在 meal-prefs 里，随时能改）；一天合多少按买的那种钱算，
-// 还在用的、一天不到 0.5 加币 / 2 块的，提示可以换新了
+// 钱：每样按买的那种钱存；页面上统一换成一种显示（默认加币，可以换）。汇率都对加币：rates.cny = 1 加币合几块人民币，
+// 在 meal-prefs 里手动填（旧的 rate 一格当 rates.cny 读）。以后多一种钱就往 GEAR_CURS 里加一行、给个默认汇率。
+// 还在用的、一天不到 0.5 加币 / 2 块（按买的那种钱算）的，提示可以换新了
 
+export const GEAR_CURS = [["cad", "$", "CAD"], ["cny", "¥", "RMB"]];
+const CUR_KEYS = GEAR_CURS.map(([k]) => k);
 export const GEAR_RATE = 5;
+const RATE_DEFAULT = { cad: 1, cny: GEAR_RATE };
 export const GEAR_LOW = { cad: 0.5, cny: 2 };
+// 每种钱对加币的汇率（加币自己是 1）；rates 也可以直接是一个数 = 人民币的
+export function gearRates(pr) {
+  const out = { ...RATE_DEFAULT };
+  for (const k of CUR_KEYS) if (k !== "cad" && Number(pr?.rates?.[k]) > 0) out[k] = Number(pr.rates[k]);
+  if (!(Number(pr?.rates?.cny) > 0) && Number(pr?.rate) > 0) out.cny = Number(pr.rate);
+  return out;
+}
+const ratesOf = (r) => (typeof r === "number" ? { ...RATE_DEFAULT, cny: r } : { ...RATE_DEFAULT, ...(r || {}) });
+// 从一种钱换到另一种
+export const convert = (v, from, to, rates) => { const R = ratesOf(rates); return (v / (R[from] || 1)) * (R[to] || 1); };
+// 页面上用哪种钱显示（默认加币）
+export const gearShow = (pr) => (CUR_KEYS.includes(pr?.gearShow) ? pr.gearShow : "cad");
 // 类目用 emoji 表示；存的是 key，从表格贴进来的英文名（Camera…）也认，认不出的算 🪐
 // 电脑和平板算一类（💻）；以前存的 tablet、贴进来的 Tablet / iPad 也归到这里
 export const GEAR_TAGS = [["camera", "📷", "Camera"], ["computer", "💻", "Computer & tablet"], ["phone", "📱", "Phone"],
@@ -417,30 +433,28 @@ export function gearTag(g) {
   return (GEAR_TAGS.find(([k, e, name]) => c === k || c === e || c === name.toLowerCase() || c === name.split(" ")[0].toLowerCase()) || GEAR_TAGS[GEAR_TAGS.length - 1])[0];
 }
 export const gearEmoji = (g) => GEAR_TAGS.find(([k]) => k === gearTag(g))[1];
-export const gearRate = (pr) => (Number(pr?.rate) > 0 ? Number(pr.rate) : GEAR_RATE);
-export const gearCur = (g) => (g?.cur === "cad" ? "cad" : "cny");
+export const gearCur = (g) => (CUR_KEYS.includes(g?.cur) ? g.cur : "cny");
 
-// 一样东西算出来的：两种钱各多少、用了几天（不用了就算到那天）、一天合多少（买的那种钱）、该不该换新
-export function gearRow(g, today, rate = GEAR_RATE) {
+// 一样东西算出来的：换成加币、人民币各多少、用了几天（不用了就算到那天）、一天合多少（买的那种钱；perDayCad 是换成加币的）、该不该换新
+export function gearRow(g, today, rates = GEAR_RATE) {
   const cur = gearCur(g), price = Math.max(0, Number(g.price) || 0);
   const retired = !!(g.retired && g.retired <= today);
   const days = g.bought && g.bought <= today ? Math.max(1, diffDays(g.bought, retired ? g.retired : today)) : 0;
   const perDay = days ? price / days : 0;
   // 近三年买的标颜色：12 个月内 year（亮），三年内 three（暗），再早的不标
   const age = !g.bought || g.bought > today ? "" : g.bought > plusMonths(today, -12) ? "year" : g.bought > plusMonths(today, -36) ? "three" : "";
-  return { g, cur, price, cad: cur === "cad" ? price : price / rate, cny: cur === "cny" ? price : price * rate,
-    days, perDay, retired, age, cheap: !retired && days > 0 && price > 0 && perDay < GEAR_LOW[cur] };
+  return { g, cur, price, cad: convert(price, cur, "cad", rates), cny: convert(price, cur, "cny", rates), perDayCad: convert(perDay, cur, "cad", rates),
+    days, perDay, retired, age, cheap: !retired && days > 0 && price > 0 && perDay < (GEAR_LOW[cur] ?? convert(GEAR_LOW.cad, "cad", cur, rates)) };
 }
 
 // 列表：永远是一天合得最多的在最上面（右边那个大数字；人民币、加币按汇率换成同一种再比）；
 // 一样多的再看总价。不用了的也照这个顺序，只是另列一块、默认收起
-export function gearList(D, today, rate = GEAR_RATE) {
-  const rows = Object.values(D.gear || {}).map((g) => gearRow(g, today, rate));
-  const toCad = (r) => (r.cur === "cad" ? r.perDay : r.perDay / rate);
-  const byDay = (a, b) => toCad(b) - toCad(a) || b.cad - a.cad || byName(a.g, b.g);
+export function gearList(D, today, rates = GEAR_RATE) {
+  const rows = Object.values(D.gear || {}).map((g) => gearRow(g, today, rates));
+  const byDay = (a, b) => b.perDayCad - a.perDayCad || b.cad - a.cad || byName(a.g, b.g);
   const live = rows.filter((r) => !r.retired).sort(byDay);
   const gone = rows.filter((r) => r.retired).sort(byDay);
-  return { live, gone, cad: live.reduce((a, r) => a + r.cad, 0), perDay: live.reduce((a, r) => a + toCad(r), 0) };
+  return { live, gone, cad: live.reduce((a, r) => a + r.cad, 0), perDay: live.reduce((a, r) => a + r.perDayCad, 0) };
 }
 
 // 从表格里贴过来的几行：有表头就按表头认列（Name / Category / Currency / CAD / Price 或 RMB / Purchase / Retired），

@@ -48,7 +48,18 @@ process.on("exit", stop);
 // ---------- 截哪些 ----------
 // device: phone / desk；hash: 打开哪一页；act(page)：截之前做点什么（悬停、点开、拉下来）。截不到的（还没这个界面）跳过，最后列出来
 const tap = (sel) => async (page) => { await page.locator(sel).first().click(); await page.waitForTimeout(500); };
-const hover = (sel, wait = 700) => async (page) => { await page.locator(sel).first().hover(); await page.waitForTimeout(wait); };
+// 悬停：页面刚重画、换页的过渡还在跑时，第一次 hover 可能不算数（截出来没有线）。先把鼠标挪开再挪回来；
+// Projects 页的连线要等 .lk-svg 里真的有线了（最多 3 秒）才开始算 wait，没等到也照截
+const hover = (sel, wait = 700) => async (page) => {
+  await page.mouse.move(2, 2);
+  await page.waitForTimeout(60);
+  await page.locator(sel).first().hover();
+  if (await page.locator(".projects").count()) {
+    try { await page.waitForSelector(".lk-svg .lk", { timeout: 3000 }); }
+    catch { await page.mouse.move(2, 2); await page.locator(sel).first().hover(); }
+  }
+  await page.waitForTimeout(wait);
+};
 // Projects 页：悬停 from，从冒出来的小圆圈拖到 to 上面（不松手，截的是拖着的样子）
 const dragLink = (from, to) => async (page) => {
   await page.locator(from).first().hover();

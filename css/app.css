@@ -214,9 +214,9 @@ body.side-min .side-tog { margin: 0; }
 body.side-min .snav a { position: relative; justify-content: center; padding: 7px; }
 body.side-min .snav a span { display: none; }
 body.side-min .snav a b { position: absolute; top: 1px; right: 1px; min-width: 0; width: 8px; height: 8px; padding: 0; font-size: 0; line-height: 0; box-shadow: 0 0 0 2px var(--bg); }
-/* 收起来以后，当前页右边贴着侧栏的边线一道竖条：这一段的油画色（和图标一个颜色；Settings 没有段，用青柠），夜里带一点光 */
-body.side-min .snav a.on::after { content: ""; position: absolute; top: 5px; bottom: 5px; right: -10.25px; width: 3px; border-radius: 3px 0 0 3px; background: var(--tint, var(--accent)); }
-[data-theme="dark"] body.side-min .snav a.on::after { box-shadow: 0 0 10px var(--tint, var(--accent)); }
+/* 收起来以后，当前页右边贴着侧栏的边线一道青柠竖条（她从试样里挑的「甲」）：白天描一圈很淡的墨（青柠在白底上不显），夜里带一点光 */
+body.side-min .snav a.on::after { content: ""; position: absolute; top: 5px; bottom: 5px; right: -10.25px; width: 3px; border-radius: 3px 0 0 3px; background: var(--accent); box-shadow: inset 0 0 0 .5px rgba(11, 11, 11, .3); }
+[data-theme="dark"] body.side-min .snav a.on::after { box-shadow: 0 0 10px var(--accent); }
 body.side-min .sfoot { flex-direction: column; }
 body.side-min .sbot { justify-items: center; }
 body.side-min .sbot .snav { padding: 0; }
@@ -1131,11 +1131,12 @@ body:has(#main :is(input, textarea, select):focus) #toast { bottom: calc(22px + 
 .chip.mv:disabled { opacity: .35; cursor: default; }
 [data-theme="light"] .row .chip.mv:not(.on) { background: transparent; }
 @media (hover: hover) { .chip.mv:not(:disabled):hover { background: var(--tonal); color: var(--ink); } }
-/* 手机：展开那一行的 Done / Delay / Drop 小一号：30px 高、宽度跟字、靠左；点的范围往外多 5px，好按；↑ ↓ 靠右 */
-body.phone .row.open .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
-body.phone .row.open .chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 30px; padding: 0 14px; font-size: 13px; }
-body.phone .row.open .chip::after { content: ""; position: absolute; inset: -5px -3px; }
-body.phone .row.open .chip.mv { min-width: 30px; padding: 0 8px; font-size: 15px; }
+/* 手机：展开那一行的 Done / Delay / Drop 是小药丸：26px 高、12px 字、宽度跟字、靠左（她说再小一点、字也小点）；
+   看着小，点的范围往上下各多 7px，还是好按；↑ ↓ 靠右 */
+body.phone .row.open .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 9px; }
+body.phone .row.open .chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 26px; padding: 0 11px; font-size: 12px; }
+body.phone .row.open .chip::after { content: ""; position: absolute; inset: -7px -2px; }
+body.phone .row.open .chip.mv { min-width: 26px; padding: 0 6px; font-size: 14px; }
 body.phone .tm { padding-top: 0; padding-bottom: 0; }
 body.phone .tm-x { width: 32px; height: 32px; font-size: 17px; }
 body.phone .tm.sum, body.phone .tm.more-time { min-height: 32px; }
@@ -1150,31 +1151,22 @@ body.phone .tm.sum, body.phone .tm.more-time { min-height: 32px; }
 body.phone .dk-deep { min-width: 38px; min-height: 38px; justify-content: center; padding: 0 10px; }
 body.phone .dk-deep span { display: none; }
 body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
-/* 手机：加任务时选项目 = 一个淡底小签（和 ◆ Deep 一样），带那个项目的色点；点了从底下升起来一张清单（js/ui/today.js 的 openPicker） */
+/* 手机：加任务时选项目 = 一个淡底小签（和 ◆ Deep 一样），带那个项目的色点；点了从它那里长出一个下拉（js/ui/today.js 的 openPicker） */
 .pj-pick { display: inline-flex; align-items: center; gap: 7px; max-width: 58%; min-height: 38px; padding: 0 10px 0 12px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 700; color: var(--muted); }
 .pj-pick.set { color: var(--ink); }
 .pj-pick span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pj-pick i, .pj-row i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--pc); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
-.pj-pick .ic { width: 14px; height: 14px; flex: none; opacity: .6; }
-.pj-sheet { position: fixed; inset: 0; z-index: 96; }
-.pj-scrim { position: absolute; inset: 0; background: rgba(11, 11, 11, .32); opacity: 0; transition: opacity .28s; }
-.pj-panel { position: absolute; left: 0; right: 0; bottom: 0; max-height: 72vh; display: flex; flex-direction: column; padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px));
-  border-top: var(--b); border-radius: 18px 18px 0 0; background: var(--bg); box-shadow: 0 -3px 0 var(--edge); transform: translateY(100%); transition: transform .34s cubic-bezier(.32, .72, 0, 1); }
-.pj-sheet.on .pj-scrim { opacity: 1; }
-.pj-sheet.on .pj-panel { transform: none; }
-.pj-grip { flex: none; display: flex; justify-content: center; padding: 8px 0 6px; }
-.pj-grip span { width: 36px; height: 4px; border-radius: 2px; background: var(--c-None); }
-.pj-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.pj-row { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; padding: 0 10px 0 26px; border: 0; border-radius: 10px; background: none; text-align: left; font-size: 15px; color: var(--ink); }
-.pj-row.top { padding-left: 10px; font-weight: 700; }
-.pj-row i.none { background: none; box-shadow: inset 0 0 0 1.5px var(--muted); }
-.pj-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pj-row .ic { width: 16px; height: 16px; flex: none; }
-.pj-row.on { background: #EBFFAA; }
-.pj-row:active { background: var(--surface); }
-[data-theme="dark"] .pj-panel { border-top-color: #2C2C3E; box-shadow: 0 -10px 40px rgba(204, 255, 0, .06); }
-[data-theme="dark"] .pj-row.on { background: rgba(204, 255, 0, .08); color: var(--accent); }
-@media (prefers-reduced-motion: reduce) { .pj-panel { transition: none; } }
+.pj-pick i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--pc); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
+.pj-pick .ic { width: 14px; height: 14px; flex: none; opacity: .6; transition: transform .2s; }
+.pj-pick.open .ic { transform: rotate(180deg); }
+/* 手机上的下拉（.menu-touch）：和电脑上的下拉一个样子，只是手指用的——行高 42px、字 15px；浮在上面的东西白天是粗边 + 硬投影，夜里细边 + 光 */
+.menu.menu-touch { min-width: 220px; max-height: min(60vh, 440px); padding: 6px; border: var(--b); border-radius: 14px; box-shadow: var(--hard-lg); font-size: 15px; }
+.menu.menu-touch .mi { min-height: 42px; padding: 0 12px; border-radius: 9px; }
+.menu.menu-touch .mi.in { padding-left: 28px; }
+.menu.menu-touch .mi.top { margin-top: 0; }
+.menu.menu-touch .mi i { width: 10px; height: 10px; }
+.menu.menu-touch .mi.on { background: #EBFFAA; }
+[data-theme="dark"] .menu.menu-touch .mi.on { background: rgba(204, 255, 0, .08); color: var(--accent); }
+.menu.menu-touch .mi:active { background: var(--surface); }
 .deepdef { align-items: flex-start; }
 .deepdef small { display: block; font-size: 12px; color: var(--muted); }
 .times { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }

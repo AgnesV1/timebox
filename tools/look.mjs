@@ -20,10 +20,12 @@ const only = arg("--only").split(",").map((s) => s.trim()).filter(Boolean);
 const out = path.resolve(arg("--out") || fs.mkdtempSync(path.join(os.tmpdir(), "look-")));
 fs.mkdirSync(out, { recursive: true });
 
+// 先用全局装的（npx playwright install 下载的浏览器跟的是它的版本）；没有再找项目里 / 上面几层目录里的
+// （上层目录里别的工具带的 Playwright 版本可能对不上已经下载的浏览器）
 function playwright() {
   const require = createRequire(import.meta.url);
-  try { return require("playwright"); } catch { /* 不在这个项目里：看全局装的 */ }
-  try { return require(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright")); } catch { /* 也没有 */ }
+  try { return require(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright")); } catch { /* 没有全局装 */ }
+  try { return require("playwright"); } catch { /* 也没有 */ }
   console.error("Playwright isn't installed. npm i -g playwright && npx playwright install chromium");
   process.exit(1);
 }
@@ -89,6 +91,8 @@ const pullTo = (dy, release = false, wait = 0) => async (page) => {
 const SHOTS = [
   { device: "phone", name: "today", hash: "today" },
   { device: "phone", name: "today-open", hash: "today", act: tap(".row .task") },
+  // 加任务那一排点「项目」小签：从它那里长出来的下拉
+  { device: "phone", name: "today-pick", hash: "today", act: async (page) => { await page.locator('.dayview form[data-add] input[name="title"]').first().click(); await page.waitForTimeout(300); await tap(".dayview form[data-add] .pj-pick")(page); } },
   { device: "phone", name: "pull-short", hash: "today", act: pullTo(50) },
   { device: "phone", name: "pull-armed", hash: "today", act: pullTo(115) },
   { device: "phone", name: "pull-falling", hash: "today", act: pullTo(115, true, 150) },
@@ -123,6 +127,10 @@ const SHOTS = [
   { device: "desk", name: "reading", hash: "reading", act: seedReading },
   { device: "desk", name: "reading-add", hash: "reading", act: async (page) => { await seedReading(page); await page.locator(".yl-in").click(); await page.waitForTimeout(300); } },
   { device: "desk", name: "settings", hash: "settings" },
+  // 记一笔、回车：那一行收起来（提示条在底下）
+  { device: "desk", name: "spending-added", hash: "spending", act: async (page) => { await page.keyboard.press("n"); await page.waitForTimeout(300); await page.keyboard.type("12.5"); await page.keyboard.press("Enter"); await page.waitForTimeout(600); } },
+  // 侧栏收起来：当前页右边那道青柠竖条。放在电脑这一组最后（收起来是记在这台设备上的，后面的图都会跟着收起）
+  { device: "desk", name: "sidebar-min", hash: "projects", act: async (page) => { await page.evaluate(async () => (await import("/js/store.js")).setLocal({ sideMin: true })); await page.waitForTimeout(600); } },
   { device: "small", name: "projects", hash: "projects" },
   { device: "small", name: "spending", hash: "spending" },
   { device: "small", name: "spending-add", hash: "spending", act: async (page) => { await page.keyboard.press("n"); await page.waitForTimeout(300); await page.keyboard.type("12.5"); } }

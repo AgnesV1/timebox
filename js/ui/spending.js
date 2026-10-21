@@ -4,7 +4,8 @@
 //   一排数：Spent、Income、Balance、Budget used、Budget left，一样宽的五格、竖线隔开；底下一条细线是之前六个月（年 = 之前几年）的范围、这次落在哪儿
 //   左边：图表（梯形图，鼠标移上去看每天的读数）→ 流水表（月 = 按天分组；年、搜索 = 按月分组，多一列日期；金额靠右、等宽；
 //     鼠标移到一行出 Edit / ×，点一行就在原地改）
-//   + Add（按 N）：页头下面展开一行直接打字（不用滚到流水那里）：Tab 跳格、回车存（存完这一行留着，接着记下一笔）、Esc 收起；底下一排推荐，点了直接记上
+//   + Add（按 N）：页头下面展开一行直接打字（不用滚到流水那里）：Tab 跳格、回车存（存完这一行就收起来，要接着记再按 N）、Esc 或点到外面（还没打字的话）收起；
+//     底下一排推荐，点了直接记上
 //   右边（贴着顶）：By category，Expense / Income；每类一行：名字、金额、占比，底下一条按金额长的细线；点一类 = 流水只看这一类，再点取消
 //   齿轮：苦昼短自己的弹窗（Budget | Categories | Currency | Export | Import），功能和手机上的一样
 //   币种：每一笔是记的那种钱（金额那一格照原样写，换算过的小字在下面）；页头的 CAD ▾ = 总数换成哪种看（这台电脑自己的）；记一笔那一行金额后面能换币种，换了就一直用它
@@ -282,19 +283,26 @@ export function createSpending() {
       if (old) toast("Saved " + row.c + " " + M.money(v, F.cur), () => SP.update(id, { d: old.d, v: old.v, c: old.c, n: old.n, cur: M.curOf(old) }));
       return;
     }
-    // 新记的：这一行留着，接着记下一笔（日期、类别不变；金额、备注先清掉，记上以后页面刷新时读回来的就是空的）
-    const bar = $(".sp-addbar");
+    // 新记的：记上以后这一行收起来（她要的：记完自己收回去）；焦点回到 + Add，要接着记再按 N / 回车
     Object.assign(F, { v: "", n: "" });
-    bar?.querySelectorAll('[data-f="v"], [data-f="n"]').forEach((i) => { i.value = ""; });
+    V.edit = null;
+    renderAdd();
     const e = SP.add({ id: SP.newId(), ...row });
     fresh = e.id;
     toast("Added " + e.c + " " + M.money(e.v, M.curOf(e)), () => SP.remove(e.id));
-    focusAmount();
+    $('[data-act="add"]')?.focus({ preventScroll: true });
   }
   function del(id) {
     const e = SP.remove(id);
     if (e) toast("Deleted " + e.c + " " + M.money(e.v, M.curOf(e)), () => { fresh = e.id; SP.restore(e); });
   }
+
+  // 新记一笔那一行开着、还什么都没打：点到它外面就收起来（打了字的留着，免得一下点丢）
+  document.addEventListener("pointerdown", (e) => {
+    if (V.edit !== "new" || !root.isConnected || e.target.closest?.(".sp-addbar, [data-act=add], .menu, #modal, #toast")) return;
+    readForm();
+    if (!String(F.v).trim() && !String(F.n).trim()) closeForm();
+  }, true);
 
   // ---------- 换期间 ----------
   function shift(k) {

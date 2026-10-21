@@ -1,9 +1,9 @@
 // 手机：在今天页顶上往下拉，记账面板像一滴水从灵动岛那里落下来（面板里面是 money.js 的手机版）。
 // 拉：手指落在屏幕上面 40% 里、页面滚在最顶上才算。岛下面长出一颗黑色玻璃水滴（带一点高光），越拉越长，和岛之间连着一截细颈
 //   （SVG 模糊再收边，几块黑融在一起）；拉约 90px 过线：细颈断开、「+」变蓝 = 松手就开；拉着往回推，细颈又连上，松手就缩回去。往下快速一甩也开。
-// 开：水滴往下落，面板像一块幕布从顶上落下来（落到底弹一下，甩开的有惯性），停在屏幕约 94% 高；下沿是一道很浅的弧（下摆，中间垂下来一点、边上一丝反光），
-//   幕布停住时下摆晚一拍，往下坠一下、来回摆两下才稳。底下露出一小条压暗的今天页，点它（或点下摆）就收。里面的东西从上往下淡入，每块隔 20ms。
-// 滑流水、拖底边的小横条时，弧最低的那一点跟着速度往一边摆、垂得深一点，停下以后来回晃两下（一个弹簧，只写在 .mn-hem 上的变量）。
+// 开：水滴往下落，面板像一块幕布从顶上落下来（落到底弹一下，甩开的有惯性），停在屏幕约 94% 高；下沿是几道很缓的波（下摆，波边上一丝反光），
+//   幕布停住时下摆晚一拍，往下坠一下、来回摆两下才稳，波顺势往一边走半个。底下露出一小条压暗的今天页，点它（或点下摆）就收。里面的东西从上往下淡入，每块隔 20ms。
+// 滑流水、拖底边的小横条时，下摆跟着速度斜一点、波拉高一点、波往一边走，停下以后来回晃两下（一个弹簧，只写在 .mn-hem 上的三个变量）。
 // 收：点底下那条，或把底边的小横条往上推 → 幕布往上拉起来，下摆跟在后面先被拉长；这次记过 / 改过的话，岛上停一下「今天花了多少 ✓」，宽度跟着字。
 // 幕布整块只动位置；系统要求减少动态时不弹不摆。灵动岛那一条本身归 iPhone（往下拉会开通知中心），网页收不到——所以要从页面顶上那一块开始拉。
 
@@ -113,10 +113,10 @@ function build() {
 }
 
 // ---------- 帷幕的下摆：一个弹簧 ----------
-// 三个量：sway（斜多少度）、stretch（多拉长多少，0.1 = 10%）、shift（褶子和下沿圆弧横着漂多少像素，26px 一个褶子）。
+// 三个量：sway（斜多少度）、stretch（波拉高多少，0.1 = 10%）、shift（波横着走了多少像素，WAVE 一个波）。
 // hemTo 改目标，hemKick 给一下速度；弹簧（k 120、阻尼 14，会来回晃两下）追过去，停稳了就不再跑 rAF。只写 .mn-hem 上的变量
 const HEM = { x: { sway: 0, stretch: 0, shift: 0 }, v: { sway: 0, stretch: 0, shift: 0 }, to: { sway: 0, stretch: 0, shift: 0 }, raf: 0, at: 0 };
-const KS = 120, CS = 14;
+const KS = 120, CS = 14, WAVE = 110;   // WAVE 和 css/money.css 里下摆那张波的图一样宽
 function hemStep(now) {
   const dt = Math.min(0.032, Math.max(0, (now - HEM.at) / 1000));
   HEM.at = now;
@@ -127,10 +127,9 @@ function hemStep(now) {
     if (Math.abs(HEM.to[k] - HEM.x[k]) > 0.002 || Math.abs(HEM.v[k]) > 0.01) busy = true;
     else { HEM.x[k] = HEM.to[k]; HEM.v[k] = 0; }
   }
-  // 褶子漂远了：整数个褶子（26px）一起减回来，看起来一样
-  if (Math.abs(HEM.x.shift) > 260) { const w = Math.trunc(HEM.x.shift / 26) * 26; HEM.x.shift -= w; HEM.to.shift -= w; }
+  // 波走远了：整数个波一起减回来，看起来一样
+  if (Math.abs(HEM.x.shift) > 4 * WAVE) { const w = Math.trunc(HEM.x.shift / WAVE) * WAVE; HEM.x.shift -= w; HEM.to.shift -= w; }
   hem.style.setProperty("--sway", HEM.x.sway.toFixed(2) + "deg");
-  hem.style.setProperty("--swn", HEM.x.sway.toFixed(2));   // 弧最低那一点横着挪多少（css 里乘 9px）
   hem.style.setProperty("--stretch", Math.max(0.6, 1 + HEM.x.stretch).toFixed(3));
   hem.style.setProperty("--shift", HEM.x.shift.toFixed(1) + "px");
   HEM.raf = busy ? requestAnimationFrame(hemStep) : 0;
@@ -145,7 +144,7 @@ function hemReset() {
   cancelAnimationFrame(HEM.raf);
   HEM.raf = 0;
   for (const k of ["sway", "stretch", "shift"]) { HEM.x[k] = HEM.v[k] = HEM.to[k] = 0; }
-  hem?.style.removeProperty("--sway"); hem?.style.removeProperty("--swn"); hem?.style.removeProperty("--stretch"); hem?.style.removeProperty("--shift");
+  hem?.style.removeProperty("--sway"); hem?.style.removeProperty("--stretch"); hem?.style.removeProperty("--shift");
 }
 
 // ---------- 拉 ----------
@@ -230,7 +229,7 @@ function open() {
     curtain.style.transform = "none";
     // 落的时候下摆被风兜着往上缩一点；落到底（弹簧最低那一下，约 55% 处）下摆接着往下坠、来回摆两下
     hemTo({ stretch: -0.12, sway: 0 });
-    setTimeout(() => { hemTo({ stretch: 0 }); hemKick({ stretch: 2.2, sway: 34 }); }, OPEN_MS * 0.5);
+    setTimeout(() => { hemTo({ stretch: 0, shift: HEM.to.shift + WAVE / 2 }); hemKick({ stretch: 2.2, sway: 34 }); }, OPEN_MS * 0.5);
     veil.style.transition = "opacity " + OPEN_MS + "ms";
     veil.style.opacity = "1";
     [...inner.querySelectorAll(".mn-home > *")].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateY(-8px)" }, { opacity: 1, transform: "none" }], { duration: 360, delay: 160 + i * 20, easing: ENTER, fill: "backwards" }));

@@ -20,6 +20,7 @@ import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
 import { animateNext } from "../motion.js";
 import { cheer } from "../fx.js";
+import { openMenu } from "./select.js";
 import { shopCount } from "./meals.js";
 import { withHTML, taskMeetHTML, withText, takeWith } from "./friends.js";
 import { choreHTML } from "./chores.js";
@@ -244,8 +245,9 @@ function addHTML(c, d, phone = false) {
 }
 
 // ---------- 手机：选项目 ----------
-// 加任务那一排的「项目」：一个和 ◆ Deep 一样的淡底小签（带那个项目的色点）；点了从屏幕底下升起来一张清单——
-// 大类一行（粗体、色点），它的计划缩进列在下面，当前那个打勾；点一行就选上、收起来。值放在一个藏起来的 input 里，表单照旧读
+// 加任务那一排的「项目」：一个和 ◆ Deep 一样的淡底小签（带那个项目的色点）；点了从它那里长出一个下拉（她要的「像正常网站那样、有自己样子的下拉框」）——
+// 和电脑上的下拉同一套（js/ui/select.js 的 openMenu），手机上行高一点、白天粗边硬投影：大类一行粗体带色点，它的计划缩进列在下面，当前那个打勾。
+// 值放在一个藏起来的 input 里，表单照旧读
 function pjTargets(projects) {
   const out = [{ value: "", label: "No project", color: "", top: true }];
   for (const g of groupsOf(projects, { all: true })) {
@@ -257,46 +259,22 @@ function pjTargets(projects) {
 function pjChipHTML(projects, target, d) {
   const hit = pjTargets(projects).find((x) => x.value === target) || { label: "No project", color: "" };
   return '<input type="hidden" name="project" data-keep="add-plan-' + d + '" value="' + esc(target) + '">' +
-    '<button type="button" class="pj-pick' + (target ? " set" : "") + '" data-act="pj-pick" aria-haspopup="dialog" aria-label="Project or plan: ' + esc(hit.label) + '">' +
+    '<button type="button" class="pj-pick' + (target ? " set" : "") + '" data-act="pj-pick" aria-haspopup="listbox" aria-label="Project or plan: ' + esc(hit.label) + '">' +
     (hit.color ? '<i style="--pc:' + esc(hit.color) + '"></i>' : "") + "<span>" + esc(hit.label) + "</span>" + icon("down") + "</button>";
-}
-let pjSheet = null;
-function closePicker() {
-  const s = pjSheet;
-  if (!s) return;
-  pjSheet = null;
-  s.classList.remove("on");
-  setTimeout(() => s.remove(), 320);
 }
 function openPicker(btn, rerender) {
   const form = btn.closest("form[data-add]");
   if (!form) return;
-  closePicker();
   const d = form.dataset.add, cur = form.querySelector("[name=project]")?.value || "";
-  const list = pjTargets(pickable(store.ctx().projects));
-  const el = document.createElement("div");
-  el.className = "pj-sheet";
-  el.innerHTML = '<div class="pj-scrim" data-pj="x"></div><section class="pj-panel" role="dialog" aria-modal="true" aria-label="Project or plan"><div class="pj-grip" data-pj="x"><span></span></div>' +
-    '<div class="pj-list">' + list.map((x, i) => '<button type="button" class="pj-row' + (x.top ? " top" : "") + (x.value === cur ? " on" : "") + '" data-pj="' + i + '" aria-pressed="' + (x.value === cur) + '">' +
-      (x.color ? '<i style="--pc:' + esc(x.color) + '"></i>' : '<i class="none"></i>') + "<span>" + esc(x.label) + "</span>" + (x.value === cur ? icon("check") : "") + "</button>").join("") + "</div></section>";
-  document.body.appendChild(el);
-  pjSheet = el;
-  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("on")));
-  el.querySelector(".pj-row.on")?.scrollIntoView({ block: "center" });
-  el.addEventListener("click", (e) => {
-    const b = e.target.closest("[data-pj]");
-    if (!b) return;
-    const x = list[Number(b.dataset.pj)];
-    if (x) {
-      const live = document.querySelector('form[data-add="' + CSS.escape(d) + '"]');
-      const input = live?.querySelector("[name=project]"), box = live?.querySelector("[name=deep]");
-      if (input) input.value = x.value;
-      if (box) box.checked = store.planDeep(x.value);
-      addTarget[d] = x.value;
-      rerender();
-    }
-    closePicker();
-  });
+  const list = pjTargets(pickable(store.ctx().projects)).map((x) => ({ ...x, indent: !x.top, on: x.value === cur }));
+  openMenu(btn, list, (v) => {
+    const live = document.querySelector('form[data-add="' + CSS.escape(d) + '"]');
+    const input = live?.querySelector("[name=project]"), box = live?.querySelector("[name=deep]");
+    if (input) input.value = v;
+    if (box) box.checked = store.planDeep(v);
+    addTarget[d] = v;
+    rerender();
+  }, { title: "Project or plan", search: false, cls: "menu-touch" });
 }
 
 export function dayParts(c, d) {
@@ -482,7 +460,7 @@ export function initToday(rerender) {
   const addTouched = (e) => {
     const form = e.target.closest?.("form.add[data-add]");
     if (form) setAddOpen(form.dataset.add);
-    else if (addOpen && !e.target.closest?.(".menu, .pj-sheet")) setAddOpen("");
+    else if (addOpen && !e.target.closest?.(".menu")) setAddOpen("");
   };
   document.addEventListener("focusin", addTouched);
   document.addEventListener("pointerdown", addTouched, true);

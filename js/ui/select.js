@@ -31,14 +31,16 @@ function listHTML(sel, q = "") {
   return html || '<div class="mg">Nothing matches</div>';
 }
 
-// openMenu 的清单：[{ label, value, group?, color? }]，同一个 group 的排在一起、上面一行小标题
+// openMenu 的清单：[{ label, value, group?, color?, top?, indent?, on? }]：同一个 group 的排在一起、上面一行小标题；
+// top = 粗体（大类那一行）、indent = 缩进（它下面的计划）、on = 现在选着的（打勾）
 function plainHTML(list, q = "") {
   let html = "", last = null;
   list.forEach((x, i) => {
     if (q && !x.label.toLowerCase().includes(q)) return;
     if (x.group && x.group !== last) html += '<div class="mg">' + esc(x.group) + "</div>";
     last = x.group || null;
-    html += '<div class="mi' + (x.group ? " in" : "") + '" role="option" aria-selected="false" data-i="' + i + '">' + (x.color ? '<i style="--dot:' + esc(x.color) + '"></i>' : "") + "<span>" + esc(x.label) + "</span></div>";
+    html += '<div class="mi' + (x.group || x.indent ? " in" : "") + (x.top ? " top" : "") + (x.on ? " on" : "") + '" role="option" aria-selected="' + Boolean(x.on) + '" data-i="' + i + '">' +
+      (x.color ? '<i style="--dot:' + esc(x.color) + '"></i>' : "") + "<span>" + esc(x.label) + "</span></div>";
   });
   return html || '<div class="mg">Nothing matches</div>';
 }
@@ -57,6 +59,8 @@ function setActive(el, scroll = true) {
 function place() {
   const r = (cur.anchor || cur.sel).getBoundingClientRect(), m = cur.el;
   m.style.minWidth = Math.max(150, r.width) + "px";
+  // openMenu 开的：不盖住点开它的那个——上下哪边地方大就往哪边开，放不下就在里面滚（css 的 max-height 是上限）
+  if (cur.anchor) { m.style.maxHeight = ""; const room = Math.max(innerHeight - r.bottom - 12, r.top - 12); if (m.offsetHeight > room) m.style.maxHeight = Math.max(160, room) + "px"; }
   const w = m.offsetWidth, h = m.offsetHeight;
   const below = r.bottom + 4 + h <= innerHeight - 8 || r.top < h + 12;
   const left = Math.max(8, Math.min(innerWidth - w - 8, r.left));
@@ -113,22 +117,22 @@ function closeTo(sel) {
 }
 
 // 不挂在 <select> 上的小菜单。anchor = 点开它的那个（菜单从它那里长出来，收起时焦点回到它）；
-// list = [{ label, value, group?, color? }]；挑了一项 → pick(value)。再开同一个 = 收起
-export function openMenu(anchor, list, pick, { title = "" } = {}) {
+// list = [{ label, value, group?, color?, top?, indent?, on? }]；挑了一项 → pick(value)。再开同一个 = 收起。
+// search：要不要顶上那格搜索（默认选项多就要；手机上别要，一点就弹键盘）；cls：多加一个 class（手机上的 menu-touch：行高一点、粗边硬投影）
+export function openMenu(anchor, list, pick, { title = "", search = list.length >= SEARCH_FROM, cls = "" } = {}) {
   if (cur?.anchor === anchor) { closeTo(anchor); return; }
   close();
   const el = document.createElement("div");
-  el.className = "menu";
+  el.className = "menu" + (cls ? " " + cls : "");
   el.setAttribute("role", "listbox");
   if (title) el.setAttribute("aria-label", title);
-  const search = list.length >= SEARCH_FROM;
   el.innerHTML = (title ? '<div class="mg">' + esc(title) + "</div>" : "") + (search ? '<input class="ms" type="search" placeholder="Search" aria-label="Search" autocomplete="off" spellcheck="false">' : "") +
     '<div class="ml">' + (list.length ? plainHTML(list) : '<div class="mg">Nowhere to put it on this page</div>') + "</div>";
   document.body.appendChild(el);
-  cur = { el, sel: null, anchor, list, pick, active: null, typed: "", typedAt: 0 };
+  cur = { el, sel: null, anchor, list, pick, active: null, typed: "", typedAt: 0, at: performance.now() };
   anchor.classList.add("open");
   place();
-  setActive(items()[0]);
+  setActive(el.querySelector(".mi.on") || items()[0]);
   if (search) el.querySelector(".ms").focus({ preventScroll: true });
   // 页面重画把点开它的那个换掉了：收起来
   cur.watch = new MutationObserver(() => { if (cur && !cur.anchor.isConnected) close(); });
@@ -216,8 +220,9 @@ export function initSelect() {
     const item = cur && e.target.closest?.(".menu .mi");
     if (item) choose(item);
   });
-  // 页面滚了、窗口变了：位置对不上，收起来（在这块里面滚不算）
-  addEventListener("scroll", (e) => { if (cur && !cur.el.contains(e.target)) close(); }, true);
-  addEventListener("resize", close);
+  // 页面滚了、窗口变了：位置对不上，收起来（在这块里面滚不算）。openMenu 刚开的那一小会儿（手机上收键盘，页面会挪一下、变一下大小）只跟着挪
+  const fresh = () => cur && !cur.sel && performance.now() - cur.at < 450;
+  addEventListener("scroll", (e) => { if (!cur || cur.el.contains(e.target)) return; if (fresh()) place(); else close(); }, true);
+  addEventListener("resize", () => { if (fresh()) place(); else close(); });
   addEventListener("hashchange", close);
 }

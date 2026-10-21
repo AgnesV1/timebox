@@ -29,9 +29,9 @@ export const fmtDate = (d) => { const p = parts(d); return MON[p.m - 1] + " " + 
 export const CURS = [
   { k: "cad", sym: "$", code: "CAD", dec: 2 }, { k: "cny", sym: "¥", code: "RMB", dec: 2 }, { k: "usd", sym: "US$", code: "USD", dec: 2 },
   { k: "eur", sym: "€", code: "EUR", dec: 2 }, { k: "gbp", sym: "£", code: "GBP", dec: 2 }, { k: "jpy", sym: "JP¥", code: "JPY", dec: 0 },
-  { k: "hkd", sym: "HK$", code: "HKD", dec: 2 }
+  { k: "hkd", sym: "HK$", code: "HKD", dec: 2 }, { k: "aud", sym: "A$", code: "AUD", dec: 2 }
 ];
-const ROUGH = { cad: 1, cny: 4.75, usd: 0.71, eur: 0.635, gbp: 0.533, jpy: 112.5, hkd: 5.59 };
+const ROUGH = { cad: 1, cny: 4.75, usd: 0.71, eur: 0.635, gbp: 0.533, jpy: 112.5, hkd: 5.59, aud: 1.09 };
 export const curInfo = (k) => CURS.find((c) => c.k === k) || CURS[0];
 export const isCur = (k) => CURS.some((c) => c.k === k);
 export const curOf = (e) => (e && isCur(e.cur) ? e.cur : "cad");
@@ -295,7 +295,7 @@ export function curFromText(s) {
 }
 
 // 从文字里导入：导出的 .md（只读 Transactions 那张表），或者一行一笔「日期, 类别, 金额, 备注」（日期 2026-10-03 或 Oct 3, 2026；金额可以带币种：¥88、88 RMB）。
-// 收入：类别是收入类，或者金额前面带 +。不认识的类别：带 + 的当新的收入类，别的当新的支出类（cats 里多出来的那几个在 added 里）
+// 收入：金额前面带 +，或者没带符号、类别是收入类（带 − 的一律是支出）。不认识的类别：带 + 的当新的收入类，别的当新的支出类（cats 里多出来的那几个在 added 里）
 export function fromText(text, cats) {
   const rows = [], added = [];
   let bad = 0, inTx = false;
@@ -331,7 +331,9 @@ export function fromText(text, cats) {
     let cat = known.get(c.toLowerCase());
     const plus = /^\s*\+/.test(String(amt));
     if (!cat) { cat = { name: c, kind: plus ? "in" : "out", hidden: false, role: "" }; known.set(c.toLowerCase(), cat); added.push(cat); }
-    rows.push({ d, v: cat.kind === "in" ? v : -v, c: cat.name, n: (note || "").trim(), ...(cur !== "cad" ? { cur } : {}) });
+    // 金额自己带了 − / + 就照它（退款、收到的礼金、收入里冲掉的一笔），没带才看类别是收是支
+    const sign = /^\s*[−-]/.test(String(amt)) ? -1 : plus ? 1 : cat.kind === "in" ? 1 : -1;
+    rows.push({ d, v: sign * v, c: cat.name, n: (note || "").trim(), ...(cur !== "cad" ? { cur } : {}) });
   }
   return { rows, added, bad };
 }

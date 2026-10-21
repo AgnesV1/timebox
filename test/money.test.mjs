@@ -157,3 +157,9 @@ test("currencies survive an .md round trip and one-line imports; recommendations
   const rent = [{ ...e("2026-09-01", -500000, "House"), cur: "cny" }, { ...e("2026-08-01", -500000, "House"), cur: "cny" }, e("2026-08-02", -500000, "House")];
   assert.deepEqual(M.recommend(rent, cats, { y: 2026, m: 10 }, "2026-10-16").map((x) => x.c + " " + x.v + " " + x.cur), ["House -500000 cny"]);
 });
+
+test("import: an amount's own sign wins over the category; AUD is a currency", () => {
+  const r = M.fromText("2019-03-02, Food, +20.00, refund\n2019-03-03, Extra, -50.00, paid back\n2017-12-01, Food, -12.50 AUD, pie\n2019-03-04, Salary, +8000.00 CNY\n2019-03-05, Food, 9", M.DEFAULT_CATS);
+  assert.deepEqual(r.rows.map((x) => [x.c, x.v, x.cur || "cad"]), [["Food", 2000, "cad"], ["Extra", -5000, "cad"], ["Food", -1250, "aud"], ["Salary", 800000, "cny"], ["Food", -900, "cad"]]);
+  assert.equal(r.added.length, 0);
+});

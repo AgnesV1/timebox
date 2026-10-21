@@ -1185,7 +1185,7 @@ var SPEND = {
 };
 var SPEND_ROLE_OUT = { base: 'Base', outside: 'Not counted' };
 // 币种：网页里的代号 ↔ 表格里写的（人民币写 RMB）。表格里手打 CNY、¥、usd 也认；空着 = 加币
-var SPEND_CUR = { cny: 'RMB', usd: 'USD', eur: 'EUR', gbp: 'GBP', jpy: 'JPY', hkd: 'HKD' };
+var SPEND_CUR = { cny: 'RMB', usd: 'USD', eur: 'EUR', gbp: 'GBP', jpy: 'JPY', hkd: 'HKD', aud: 'AUD' };
 function spendCur_(cell) {
   var t = String(cell || '').trim().toUpperCase();
   if (!t || t === 'CAD' || t === '$') return '';
@@ -1281,7 +1281,8 @@ function spend_(req) {
     if (!id && r[c.Date] !== '' && String(r[c.Amount]).trim() !== '') { id = r[c.ID] = Utilities.getUuid(); r[c.Updated] = now; r[c.Synced] = now; fixed.push(i); }
     if (id) at[id] = i;
   });
-  fixed.forEach(function (i) { tx.sh.getRange(i + 2, 1, 1, tx.width).setValues([data[i]]); });
+  // 一次写回（一行一行写，几千行会超时）
+  if (fixed.length) { var lo = Math.min.apply(null, fixed), hi = Math.max.apply(null, fixed); tx.sh.getRange(lo + 2, 1, hi - lo + 1, tx.width).setValues(data.slice(lo, hi + 1)); }
   var cell = function (x) {
     var row = data.length && at[x.id] !== undefined ? data[at[x.id]].slice() : Array(tx.width).fill('');
     row[c.Date] = String(x.d || ''); row[c.Kind] = x.v > 0 ? 'Income' : 'Expense'; row[c.Category] = toCell_('text', x.c || '');
@@ -1289,7 +1290,8 @@ function spend_(req) {
     row[c.ID] = x.id; row[c.Updated] = Number(x.u) || now; row[c.Synced] = now;
     return row;
   };
-  // 写：表格里那一笔比发来的新（别的设备后改的）就不动
+  // 写：表格里那一笔比发来的新（别的设备后改的）就不动。新的几笔攒起来，最后接在表格底下一次写（一次导几千笔也不超时）
+  var fresh = data.length;
   (req.put || []).forEach(function (x) {
     if (!x || !x.id || !/^\d{4}-\d{2}-\d{2}$/.test(String(x.d))) return;
     var i = at[x.id];
@@ -1301,9 +1303,13 @@ function spend_(req) {
       var r = cell(x);
       data.push(r);
       at[x.id] = data.length - 1;
-      tx.sh.getRange(data.length + 1, 1, 1, tx.width).setValues([r]);
     }
   });
+  if (data.length > fresh) {
+    var need = data.length + 1 - tx.sh.getMaxRows();
+    if (need > 0) tx.sh.insertRowsAfter(tx.sh.getMaxRows(), need);
+    tx.sh.getRange(fresh + 2, 1, data.length - fresh, tx.width).setValues(data.slice(fresh));
+  }
   // 删：从下往上删（行号不乱），每一笔记进 Deleted
   var gone = [], log = [];
   (req.del || []).forEach(function (x) {

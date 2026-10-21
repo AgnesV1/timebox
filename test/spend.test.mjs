@@ -163,3 +163,21 @@ test("spend: an old Code.gs (no currencies yet) keeps the RMB record queued and 
   assert.deepEqual(phone.request().put, []);
   assert.equal(phone.get(a.id).cur, "cny");
 });
+
+test("spend: thousands of imported records go to the sheet in one write, signs and currencies kept", async () => {
+  const { book, sync } = sheet();
+  const phone = await device(), mac = await device();
+  const tx = book.getSheetByName("Transactions") || null;
+  phone.addMany(Array.from({ length: 3000 }, (_, i) => ({ d: "2019-0" + (1 + (i % 9)) + "-1" + (i % 10), v: i % 7 ? -(100 + i) : 5000, c: i % 7 ? "Food" : "Gift", ...(i % 3 ? { cur: "aud" } : {}) })));
+  const t0 = Date.now();
+  sync(phone);
+  assert.ok(Date.now() - t0 < 20000);
+  const rows = book.getSheetByName("Transactions").objects();
+  assert.equal(rows.length, 3000);
+  assert.equal(rows.filter((r) => r.Currency === "AUD").length, 2000);
+  assert.equal(rows.filter((r) => r.Kind === "Income" && r.Category === "Gift").length, 429, "a positive Gift stays money in");
+  sync(mac);
+  assert.equal(mac.entries().length, 3000);
+  assert.equal(mac.entries().filter((e) => e.cur === "aud").length, 2000);
+  void tx;
+});

@@ -174,3 +174,16 @@ test("budgets: pasted lines carry their currency forward; each converts on its o
   assert.equal(M.budgetAt(M.budgetsIn(r.list, "cny", R), 2019, 5), 500000, "seen in RMB, an RMB budget is untouched");
   assert.equal(M.budgetAt(inCad, 2026, 11), 358000);
 });
+
+test("budget left as a share: House and Bonds stay out; upcoming records count now and lift the forecast", () => {
+  const cats = M.DEFAULT_CATS, T = "2026-10-10";
+  const e = [{ d: "2026-10-01", v: -150000, c: "House" }, { d: "2026-10-03", v: -20000, c: "Food" }, { d: "2026-10-04", v: -50000, c: "Bonds" }, { d: "2026-10-20", v: -10000, c: "Food" }];
+  const ix = M.index(e, cats), bud = [{ from: "2026-01", v: 250000 }];
+  const cmp = M.compare(ix, bud, { y: 2026, m: 10 }, "month", T);
+  assert.equal(cmp.cur.leftPct, 1 - 30000 / 100000, "food 200 + upcoming 100 out of (2500 − 1500 rent)");
+  assert.equal(cmp.cur.room, 100000);
+  assert.equal(M.metricsOf({ out: 0, inc: 0, base: 0, outside: 0 }, 0).leftPct, null);
+  const c = M.monthChart(ix, bud, 2026, 10, T);
+  assert.equal(c.val(10), 150000 + 20000);
+  assert.equal(Math.round(c.val(20) - c.val(19)), Math.round(10000 + 20000 / 10), "the upcoming 100 lands on the 20th, on top of the usual pace");
+});

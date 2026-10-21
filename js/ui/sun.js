@@ -18,7 +18,7 @@ import * as E from "../engine.js";
 import { lifeOf } from "../stats.js";
 import { parseTimes } from "../times.js";
 import { esc, on } from "../dom.js";
-import { fmtDay, fmtMin } from "../dates.js";
+import { fmtDay, fmtMin, fmtHours } from "../dates.js";
 import { colorOf } from "./common.js";
 import { neon } from "../groups.js";
 
@@ -72,7 +72,7 @@ function deepMin(c, d) {
 
 function deepText(c, d) {
   const min = deepMin(c, d), goal = lifeOf(c).deepGoal;
-  return min > 0 || (goal > 0 && d === c.today) ? "◆ Deep " + fmtMin(min) + (goal > 0 ? " / " + fmtMin(goal) : "") : "";
+  return min > 0 || (goal > 0 && d === c.today) ? "◆ Deep " + fmtHours(min) + (goal > 0 ? " / " + fmtHours(goal) : "") : "";
 }
 
 function centerHTML(c, d) {
@@ -83,7 +83,7 @@ function centerHTML(c, d) {
   }
   const total = store.tasksOn(d).reduce((a, t) => a + parseTimes(t.times).reduce((s, x) => s + x.min, 0), 0);
   const deep = deepText(c, d);
-  return "<b>" + esc(fmtDay(d)) + "</b><span class=\"num\">" + (total ? fmtMin(total) + " timed" : "Nothing timed yet") + "</span>" +
+  return "<b>" + esc(fmtDay(d)) + "</b><span class=\"num\">" + (total ? fmtHours(total) + " timed" : "Nothing timed yet") + "</span>" +
     (deep ? "<span class=\"num\">" + esc(deep) + "</span>" : "") + (store.isCommuteDay(d) ? "<em>Commute day</em>" : "");
 }
 

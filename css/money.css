@@ -124,12 +124,13 @@
 .mn .mn-cards { margin: 14px -16px 0; padding: 0 16px; }
 .mn .mn-card { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 11px 12px; border-radius: 12px; background: var(--mn-fill); box-shadow: var(--mn-hair); }   /* 宽度跟着里面的字走 */
 .mn .mn-card .v { font-size: 16px; font-weight: 500; white-space: nowrap; }
+.mn .mn-up { margin-left: 4px; padding: 0 5px; border-radius: 999px; background: rgba(255, 255, 255, .08); font: 600 9px/1.6 var(--num); letter-spacing: .07em; text-transform: uppercase; }   /* 提前记的、日期还没到（已经算进合计） */
 .mn .mn-track { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; }
 .mn .mn-track > i { display: block; height: 100%; width: 0; background: var(--mn-blue); transition: width .52s var(--mn-enter); }
 .mn .mn-track > i.over { background: var(--mn-orange); }
 /* 之前六个月的范围：整条线 = 最少到最多，点 = 这次在哪儿（比最差的还差 = 橙） */
 .mn .mn-range { position: relative; overflow: visible; background: rgba(255, 255, 255, .14); }
-.mn .mn-range > b { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--mn-blue); box-shadow: 0 0 0 2px #101015; transition: left .52s var(--mn-enter); }
+.mn .mn-range > b { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--mn-blue); box-shadow: 0 0 0 2px #101015; transition: left .62s var(--spring-pop), background-color .3s; }   /* 换期时点弹着滑到新位置（只改 left，元素不重建） */
 .mn .mn-range > b.over { background: var(--mn-orange); }
 .mn .mn-sect { margin-top: 22px; font-size: 15px; font-weight: 500; }
 .mn .mn-bk { border-bottom: 1px solid var(--mn-line); }
@@ -283,6 +284,12 @@
 .spend .sp-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin-bottom: 18px; }
 .spend .sp-title { flex: 1 1 260px; min-width: 0; }
 .spend .sp-title h2 { margin: 0; font: 700 20px/1.2 var(--display); letter-spacing: -.02em; color: var(--mn-ink); }
+/* ‹ 标题 › ·：箭头夹着标题；那颗回到现在的小圆点只在翻到别的时期时出现 */
+.spend .sp-tnav { display: flex; align-items: center; gap: 2px; margin-left: -10px; }
+.spend .sp-tnav h2 { min-width: 0; padding: 0 2px; white-space: nowrap; }
+.spend .sp-tnav .sp-nb { padding: 2px 9px; font-size: 19px; line-height: 1.2; }
+.spend .sp-now[hidden] { display: none; }
+.spend .sp-up { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: rgba(255, 255, 255, .08); font: 600 9.5px/1.5 var(--num); letter-spacing: .07em; text-transform: uppercase; color: var(--mn-mute); vertical-align: 1px; }
 .spend .sp-status { margin: 4px 0 0; font-size: 12px; color: var(--mn-mute); }
 .spend .sp-status.bad { color: var(--mn-orange); }
 .spend .sp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -290,7 +297,6 @@
 .spend .sp-seg > i { position: absolute; top: 2px; bottom: 2px; left: 2px; width: 0; border-radius: 999px; background: var(--mn-pri); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16); transition: left .28s var(--mn-spring), width .28s var(--mn-spring); }
 .spend .sp-seg > button { all: unset; position: relative; z-index: 1; padding: 4px 11px; border-radius: 999px; font: 600 12.5px/1.4 var(--body); color: #B9B5AC; cursor: pointer; transition: color .2s; }
 .spend .sp-seg > button.on { color: var(--mn-pri-ink); }
-.spend .sp-nav { display: inline-flex; align-items: center; }
 .spend .sp-nb { all: unset; padding: 4px 9px; border-radius: 999px; font: 600 13px/1.4 var(--body); color: #D8D4CB; cursor: pointer; transition: background .15s, opacity .15s; }
 .spend .sp-nb:disabled { opacity: .35; cursor: default; }
 /* 回到现在：一个小圆点（在别的时期时是实心青柠，已经在现在就淡掉） */
@@ -314,7 +320,7 @@
 }
 
 /* 一排数：一样宽的五格，竖线隔开；数是字，不是方块 */
-.spend .sp-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--sp-line); border-bottom: 1px solid var(--sp-line); }
+.spend .sp-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--sp-line); border-bottom: 1px solid var(--sp-line); }
 .spend .sp-kpi { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 14px 18px 15px; }
 .spend .sp-kpi + .sp-kpi { border-left: 1px solid var(--sp-line); }
 .spend .sp-kpi:first-child { padding-left: 0; }
@@ -347,6 +353,8 @@
 .spend .sp-pills { display: inline-flex; gap: 6px; }
 .spend .sp-pill { all: unset; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px 0 11px; border-radius: 999px; background: rgba(76, 114, 216, .24); font-size: 12px; cursor: pointer; }
 .spend .sp-pill span { opacity: .7; }
+.spend .sp-pill[data-act="recent"] { padding: 0 11px; background: rgba(255, 255, 255, .08); color: #D8D4CB; }
+.spend .sp-pill[data-act="recent"].on { background: var(--mn-pri); color: var(--mn-pri-ink); }
 .spend .sp-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13.5px; }
 .spend .sp-table col.d { width: 78px; }
 .spend .sp-table col.c { width: 26%; }
@@ -428,9 +436,9 @@
 @container (max-width: 980px) {
   .spend .sp-body { grid-template-columns: minmax(0, 1fr); }
   .spend .sp-side { position: static; margin-top: 24px; padding: 18px 0 0; border-left: 0; border-top: 1px solid var(--sp-line); }
-  .spend .sp-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .spend .sp-kpi:nth-child(4) { padding-left: 0; border-left: 0; }
-  .spend .sp-kpi:nth-child(n + 4) { border-top: 1px solid var(--sp-line); }
+  .spend .sp-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .spend .sp-kpi:nth-child(3) { padding-left: 0; border-left: 0; }
+  .spend .sp-kpi:nth-child(n + 3) { border-top: 1px solid var(--sp-line); }
 }
 
 /* 设定弹窗（苦昼短自己的弹窗，里面是苦昼短的样式） */

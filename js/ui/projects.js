@@ -20,7 +20,7 @@ import * as S from "../stats.js";
 import * as GR from "../groups.js";
 import * as G from "../goals.js";
 import { esc, on, icon } from "../dom.js";
-import { addDays, diffDays, fmtShort, fmtMin, WEEKDAYS } from "../dates.js";
+import { addDays, diffDays, fmtShort, fmtMin, fmtHours, WEEKDAYS } from "../dates.js";
 import { healthPill, groupsOf, chainHTML } from "./common.js";
 import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
 import { goalsHTML } from "./goals.js";
@@ -84,14 +84,14 @@ function cardHTML(c, p, track = "progress") {
   }).join("");
   const tips = E.modulesOf(c, p).map((m) => E.moduleStats(c, p, m)).filter((s) => s.suggest).map((s) =>
     '<div class="calib"><p><b>' + esc(s.module || "Items") + ":</b> you take about " + s.ratio.toFixed(1) + "× the estimate (" + s.samples.length + " done). " +
-    "Update the " + s.open.length + " unstarted to match? " + fmtMin(s.oldRemaining) + " → " + fmtMin(s.newRemaining) + "</p>" +
+    "Update the " + s.open.length + " unstarted to match? " + fmtHours(s.oldRemaining) + " → " + fmtHours(s.newRemaining) + "</p>" +
     '<div><button type="button" class="btn primary" data-act="calib-apply" data-module="' + esc(s.module) + '">Update</button><button type="button" class="btn" data-act="calib-keep" data-module="' + esc(s.module) + '">Keep plan</button></div></div>').join("");
   const sub = [p.deadline ? "due " + fmtShort(p.deadline) : "no deadline", E.earlyDays(p) && p.deadline ? "aim " + E.earlyDays(p) + "d early" : ""].filter(Boolean).join(" · ");
   return '<article class="pcard" data-project="' + p.id + '" style="--pc:' + esc(p.color) + '">' +
     '<header><button type="button" class="pname" data-act="edit-project"><i></i>' + esc(p.name || "Untitled") + "</button>" + placeTag(p) + archBtn(p) + "</header>" +
     '<div class="pc-sub"><p class="psub">' + esc(sub) + "</p>" + healthPill(h) + "</div>" +
     '<div class="pbar" title="Done · on the calendar · not placed yet"><i class="d" style="width:' + w(plan.done) + '"></i><i class="s" style="width:' + w(plan.scheduled) + '"></i></div>' +
-    '<p class="pnums num">' + pct + "% · " + fmtMin(plan.remaining) + " left" + (plan.unscheduled > 0.5 && !E.isAuto(p) ? " · " + fmtMin(plan.unscheduled) + " in pool" : "") + (today ? " · <b>today " + fmtMin(today) + "</b>" : "") + "</p>" +
+    '<p class="pnums num">' + pct + "% · " + fmtHours(plan.remaining) + " left" + (plan.unscheduled > 0.5 && !E.isAuto(p) ? " · " + fmtHours(plan.unscheduled) + " in pool" : "") + (today ? " · <b>today " + fmtHours(today) + "</b>" : "") + "</p>" +
     timeline(c, p, plan) +
     (mods ? '<div class="mods">' + mods + "</div>" : "") + tips + "</article>";
 }
@@ -119,11 +119,11 @@ function groupHealthHTML(c, name, last) {
     text = h.days === null ? "No catch-up yet" : !ok ? "No catch-up in " + h.days + " days" : "Last catch-up " + (h.days === 0 ? "today" : h.days === 1 ? "yesterday" : h.days + " days ago");
     aim = "at least one every 2 weeks";
   } else if (h.kind === "min") {
-    text = fmtMin(h.min) + " in the last 7 days" + (ok ? "" : " · under " + fmtMin(h.limit));
-    aim = "at least " + fmtMin(h.limit) + " a week";
+    text = fmtHours(h.min) + " in the last 7 days" + (ok ? "" : " · under " + fmtHours(h.limit));
+    aim = "at least " + fmtHours(h.limit) + " a week";
   } else {
-    text = fmtMin(h.min) + " to relax in the last 7 days" + (h.level === "low" ? " · under " + fmtMin(h.lo) : h.level === "high" ? " · over " + fmtMin(h.hi) : "");
-    aim = h.lo && h.hi ? fmtMin(h.lo) + "–" + fmtMin(h.hi) + " a week" : h.lo ? "at least " + fmtMin(h.lo) + " a week" : h.hi ? "at most " + fmtMin(h.hi) + " a week" : "";
+    text = fmtHours(h.min) + " to relax in the last 7 days" + (h.level === "low" ? " · under " + fmtHours(h.lo) : h.level === "high" ? " · over " + fmtHours(h.hi) : "");
+    aim = h.lo && h.hi ? fmtHours(h.lo) + "–" + fmtHours(h.hi) + " a week" : h.lo ? "at least " + fmtHours(h.lo) + " a week" : h.hi ? "at most " + fmtHours(h.hi) + " a week" : "";
   }
   return '<p class="ghealth"><span class="health h-' + (ok ? "safe" : "danger") + '">' + (ok ? "✓ " : "! ") + esc(text) + "</span>" + (aim ? "<span>" + esc(aim) + "</span>" : "") + "</p>";
 }
@@ -173,7 +173,7 @@ function groupHead(c, name, subs, empty, track, last, more = {}) {
   const editing = renaming === name && name;
   const color = store.groupByName(name)?.color;
   const title = editing ? renameHTML(name, empty) : "<h3>" + (color ? '<i class="gdot" style="background:' + esc(color) + '"></i>' : "") + esc(name || "No project") + "</h3>";
-  const meta = [subs.length ? subs.length + " plan" + (subs.length > 1 ? "s" : "") : more.reps ? "" : "No plans yet", progress && sum ? pct + "% done" : "", progress && deadline ? "until " + fmtShort(deadline) : "", today >= 0.5 ? "today " + fmtMin(today) : ""].filter(Boolean).join(" · ");
+  const meta = [subs.length ? subs.length + " plan" + (subs.length > 1 ? "s" : "") : more.reps ? "" : "No plans yet", progress && sum ? pct + "% done" : "", progress && deadline ? "until " + fmtShort(deadline) : "", today >= 0.5 ? "today " + fmtHours(today) : ""].filter(Boolean).join(" · ");
   return '<header class="pg-top' + (editing ? " editing" : "") + '">' + title + (editing ? "" : '<span class="pg-meta">' + esc(meta) + "</span>" +
     (progress && name && subs.some((x) => !E.isRegular(x)) ? '<span class="health h-' + worst + ' dot-only" title="Most at risk: ' + worst + '">●</span>' : "") +
     '<span class="pg-actions">' + (more.gone ? '<button type="button" class="btn ghosty" data-act="toggle-archived" aria-expanded="' + Boolean(more.shown) + '">' + more.gone + " archived</button>" : "") +
@@ -293,7 +293,7 @@ function editorHTML(p) {
 function itemsHTML(c, p) {
   const items = E.itemsOf(c, p.id);
   const mods = E.modulesOf(c, p);
-  let h = '<h3 class="sub">Items <small>' + items.length + " · " + fmtMin(items.reduce((a, i) => a + (Number(i.est) || 0), 0)) + "</small></h3>";
+  let h = '<h3 class="sub">Items <small>' + items.length + " · " + fmtHours(items.reduce((a, i) => a + (Number(i.est) || 0), 0)) + "</small></h3>";
   if (!items.length) h += '<p class="hint">Items are the pieces of work: chapters, papers, sessions. Each gets an estimate in minutes.</p>';
   mods.forEach((m) => {
     h += '<div class="imod"><div class="imod-head">' + esc(m || "Items") + "</div>";

@@ -33,16 +33,18 @@ export function createSpending() {
   const root = document.createElement("div");
   root.className = "mn spend";
   root.innerHTML =
-    '<header class="sp-head"><div class="sp-title"><h2 data-title></h2><p class="sp-status" data-status></p></div>' +
+    // 翻页的箭头夹着标题（一眼看到现在翻到哪）；不在当前这一期时，标题后面多一颗青柠小圆点 = 回到现在
+    '<header class="sp-head"><div class="sp-title"><div class="sp-tnav"><button type="button" class="sp-nb" data-act="prev" aria-label="Earlier" title="Earlier">‹</button><h2 data-title></h2>' +
+    '<button type="button" class="sp-nb" data-act="next" aria-label="Later" title="Later">›</button><button type="button" class="sp-nb sp-now" data-act="now" aria-label="Back to now" title="Back to now" hidden><i></i></button></div><p class="sp-status" data-status></p></div>' +
     '<div class="sp-tools">' + seg("mode", [["month", "Month"], ["year", "Year"]]) +
-    '<div class="sp-nav"><button type="button" class="sp-nb" data-act="prev" aria-label="Earlier" title="Earlier">‹</button><button type="button" class="sp-nb sp-now" data-act="now" aria-label="Back to now" title="Back to now"><i></i></button><button type="button" class="sp-nb" data-act="next" aria-label="Later" title="Later">›</button></div>' +
     '<label class="sp-find">' + icon("search") + '<input type="search" data-q placeholder="Search" aria-label="Search notes, categories, amounts" autocomplete="off"><kbd>/</kbd></label>' +
     '<select class="sp-curs" data-show aria-label="Show totals in" title="Show totals in">' + M.CURS.map((c) => '<option value="' + c.k + '">' + c.code + "</option>").join("") + "</select>" +
     '<button type="button" class="sp-ic" data-act="set" aria-label="Spending settings" title="Settings">' + icon("settings") + "</button>" +
     '<button type="button" class="sp-add" data-act="add" title="Add a transaction (N)">' + icon("plus") + "Add<kbd>N</kbd></button></div></header>" +
     '<div class="sp-addw" data-add></div>' +
-    '<section class="sp-kpis" data-kpis aria-label="This period at a glance">' + [["out", "Spent"], ["inc", "Income"], ["bal", "Balance"], ["used", "Budget used"], ["left", "Budget left"]].map(([k, l]) =>
-      '<div class="sp-kpi" data-k="' + k + '"><span class="sp-kl">' + l + '</span><span class="sp-kv mn-num mn-rn"></span><div class="sp-kb"></div><span class="sp-ks mn-num"></span></div>').join("") + "</section>" +
+    '<section class="sp-kpis" data-kpis aria-label="This period at a glance">' + [["out", "Spent"], ["inc", "Income"], ["bal", "Balance"], ["left", "Budget left"]].map(([k, l]) =>
+      // 线和点只建一次：换期时点从原处弹簧滑到新位置（重画就没有过渡了）
+      '<div class="sp-kpi" data-k="' + k + '"><span class="sp-kl">' + l + '</span><span class="sp-kv mn-num mn-rn"></span><div class="sp-kb"><div class="mn-track mn-range"><b hidden></b></div></div><span class="sp-ks mn-num"></span></div>').join("") + "</section>" +
     '<div class="sp-body"><div class="sp-main">' +
     '<figure class="sp-chart"><figcaption><div><h3 data-ctitle></h3><p class="sp-lede" data-pace></p></div><div class="sp-legend" data-legend aria-hidden="true"></div></figcaption>' +
     '<svg class="mn-chart" data-chart role="img" aria-label="Spending against the budget"></svg></figure>' +
@@ -77,7 +79,7 @@ export function createSpending() {
     $("[data-title]").textContent = periodTitle(V.cur, V.mode);
     $("[data-show]").value = SP.show();
     segTo("mode", V.mode);
-    $('[data-act="now"]').disabled = M.samePeriod(V.cur, todayP(), V.mode);
+    $('[data-act="now"]').hidden = M.samePeriod(V.cur, todayP(), V.mode);
     const [st, bad] = statusText(), el = $("[data-status]");
     el.textContent = st;
     el.classList.toggle("bad", bad);
@@ -86,26 +88,34 @@ export function createSpending() {
   // ---------- 一排数 ----------
   function renderKpis(c) {
     const p = V.cur, mode = V.mode, cmp = M.compare(IX(), budgetsShown(), p, mode, today());
-    const g = c.used, B = c.B, u = B ? M.counted(g) / B : 0, bal = cmp.cur.balance, left = cmp.cur.left;
+    const g = c.used, B = c.B, bal = cmp.cur.balance, pct = cmp.cur.leftPct;
     const since = (mode === "year" ? "earlier years" : "the last six months") + (cmp.cutText ? ", " + cmp.cutText : "");
-    const range = (key, worse) => {
-      const r = cmp.range[key], v = cmp.cur[key];
-      if (!r) return { bar: '<div class="mn-track"></div>', small: mode === "year" ? "No earlier years yet" : "No history yet" };
-      const span = r[1] - r[0], pos = span ? (v - r[0]) / span : 0.5, bad = worse === "high" ? v > r[1] : v < r[0];
-      return { bar: '<div class="mn-track mn-range" title="' + esc("Lowest to highest over " + since) + '"><b style="left:' + (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + '%"' + (bad ? ' class="over"' : "") + "></b></div>", small: "Usually " + kfmt(r[0]) + "–" + kfmt(r[1]) };
-    };
-    const cell = (k, value, { color = "", money = true, bar, small }) => {
-      const el = root.querySelector('[data-k="' + k + '"]'), v = el.querySelector(".sp-kv");
+    const pctText = (x) => Math.round(x * 100) + "%";
+    // 范围线：之前六个月（年 = 往年）最低到最高，点 = 这一期落在哪儿
+    const cell = (k, value, { color = "", money = true, key, worse, fmt = kfmt, small = "" }) => {
+      const el = root.querySelector('[data-k="' + k + '"]'), v = el.querySelector(".sp-kv"), tr = el.querySelector(".mn-track"), dot = tr.querySelector("b");
       roll(v, value, money);
       v.style.color = color;
-      el.querySelector(".sp-kb").innerHTML = bar;
-      el.querySelector(".sp-ks").textContent = small;
+      const r = key && cmp.range[key], x = cmp.cur[key];
+      if (!r || x === null || x === undefined) {
+        dot.hidden = true;
+        tr.title = "";
+        el.querySelector(".sp-ks").textContent = small || (mode === "year" ? "No earlier years yet" : "No history yet");
+        return;
+      }
+      const span = r[1] - r[0], pos = span ? (x - r[0]) / span : 0.5, bad = worse === "high" ? x > r[1] : x < r[0];
+      dot.hidden = false;
+      dot.classList.toggle("over", bad);
+      dot.style.left = (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + "%";
+      tr.title = "Lowest to highest over " + since;
+      el.querySelector(".sp-ks").textContent = (small ? small + " · " : "") + "usually " + fmt(r[0]) + "–" + fmt(r[1]);
     };
-    cell("out", "−" + M.money(g.out), range("expense", "high"));
-    cell("inc", "+" + M.money(g.inc), { color: "var(--mn-green)", ...range("income", "low") });
-    cell("bal", (bal < 0 ? "−" : "+") + M.money(bal), { color: bal < 0 ? "var(--mn-orange)" : "", ...range("balance", "low") });
-    cell("used", B ? (u * 100).toFixed(1) + "%" : "—", { money: false, bar: '<div class="mn-track"><i style="width:' + Math.min(100, u * 100).toFixed(1) + '%"' + (u > 1 ? ' class="over"' : "") + "></i></div>", small: B ? "of " + M.money(B) : "No budget yet" });
-    cell("left", B ? (left < 0 ? "−" : "+") + M.money(left) : "—", { money: Boolean(B), color: B && left < 0 ? "var(--mn-orange)" : "", ...range("left", "low") });
+    cell("out", "−" + M.money(g.out), { key: "expense", worse: "high" });
+    cell("inc", "+" + M.money(g.inc), { color: "var(--mn-green)", key: "income", worse: "low" });
+    cell("bal", (bal < 0 ? "−" : "+") + M.money(bal), { color: bal < 0 ? "var(--mn-orange)" : "", key: "balance", worse: "low" });
+    // 预算还剩几成：不算 House（底座）和 Bonds；提前记的未来那几笔也算在里面
+    cell("left", pct === null ? "—" : (pct < 0 ? "−" : "") + pctText(Math.abs(pct)), { money: false, color: pct !== null && pct < 0 ? "var(--mn-orange)" : "", key: "leftPct", worse: "low", fmt: pctText,
+      small: pct === null ? (B ? "Budget is all base" : "No budget yet") : kfmt(cmp.cur.left) + " of " + kfmt(cmp.cur.room) });
   }
 
   // ---------- 图表 ----------
@@ -147,15 +157,18 @@ export function createSpending() {
     const label = d === t ? "Today" : d === M.addDaysISO(t, -1) ? "Yesterday" : WD[new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay()];
     return label + ", " + M.MON[p.m - 1] + " " + p.d + (p.y !== todayP().y ? ", " + p.y : "");
   };
+  const RECENT = 20;
   function txRows() {
     const q = V.q.trim().toLowerCase();
+    // Recent：最近记 / 改过的那几笔，不管哪一期（改动时间新的在前）
+    if (V.recent && !q) return SP.entries().slice().sort((a, b) => (b.u || 0) - (a.u || 0)).slice(0, RECENT);
     if (q) return SP.entries().filter((e) => (e.c + " " + e.n + " " + (Math.abs(e.v) / 100).toFixed(2) + " " + M.money(e.v, M.curOf(e)) + " " + curLabel(M.curOf(e))).toLowerCase().includes(q)).sort(M.byNewest);
     return SP.entries().filter((e) => M.inPeriod(e, V.cur, V.mode) && (!V.filt || e.c === V.filt)).sort(M.byNewest);
   }
   const amountHTML = (e) => (e.v > 0 ? "+" : "−") + cents(M.money(e.v, M.curOf(e))) + (convOf(e) ? '<small class="sp-conv">' + esc(convOf(e)) + "</small>" : "");
   const rowHTML = (e, dated) => '<tr class="sp-row' + (e.id === fresh ? " new" : "") + '" data-id="' + esc(e.id) + '" tabindex="0" aria-label="' + esc(e.c + " " + amtOf(e) + (e.n ? ", " + e.n : "") + ", " + M.fmtDate(e.d) + " — press Enter to edit") + '">' +
-    (dated ? '<td class="d mn-num">' + M.MON[M.parts(e.d).m - 1] + " " + M.parts(e.d).d + "</td>" : "") +
-    '<td class="c">' + esc(e.c) + '</td><td class="n" title="' + esc(e.n || "") + '">' + esc(e.n || "") + "</td>" +
+    (dated ? '<td class="d mn-num">' + M.MON[M.parts(e.d).m - 1] + " " + M.parts(e.d).d + (M.parts(e.d).y !== todayP().y ? ", " + M.parts(e.d).y : "") + "</td>" : "") +
+    '<td class="c">' + esc(e.c) + (e.d > today() ? ' <span class="sp-up" title="Dated ' + esc(M.fmtDate(e.d)) + ' — already counted">upcoming</span>' : "") + '</td><td class="n" title="' + esc(e.n || "") + '">' + esc(e.n || "") + "</td>" +
     '<td class="r mn-num' + (e.v > 0 ? " in" : "") + '">' + amountHTML(e) + "</td>" +
     '<td class="a"><button type="button" class="sp-ra" data-act="edit" tabindex="-1">Edit</button><button type="button" class="sp-ra x" data-act="del" tabindex="-1" aria-label="Delete" title="Delete">×</button></td></tr>';
 
@@ -206,14 +219,16 @@ export function createSpending() {
   }
   function renderTable() {
     readForm();
-    const q = V.q.trim(), rows = txRows(), dated = Boolean(q) || V.mode === "year";
+    const q = V.q.trim(), rows = txRows(), recent = V.recent && !q, dated = Boolean(q) || V.mode === "year" || recent;
     const shown = V.all ? rows : rows.slice(0, CAP), cols = dated ? 5 : 4;
     const groups = new Map();
     for (const e of shown) { const k = dated ? e.d.slice(0, 7) : e.d; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); }
     const editing = V.edit && V.edit !== "new" ? SP.get(V.edit) : null;   // 新记的那一行在页头下面（renderAdd），这里只有原地改的
     let body = "";
     const R = RATES(), show = SP.show(), inShow = (e) => M.convert(e.v, M.curOf(e), show, R);
-    for (const [k, list] of groups) {
+    if (recent) body = '<tbody><tr class="sp-grp"><th colspan="' + cols + '" scope="rowgroup">Recently added or changed <small>newest first</small></th></tr>' +
+      shown.map((e) => (editing && e.id === editing.id ? formRow(cols, e) : rowHTML(e, true))).join("") + "</tbody>";
+    else for (const [k, list] of groups) {
       const out = list.reduce((s, e) => s + (e.v < 0 ? -inShow(e) : 0), 0), inc = list.reduce((s, e) => s + (e.v > 0 ? inShow(e) : 0), 0);
       const title = dated ? M.MONTH[Number(k.slice(5, 7)) - 1] + " " + k.slice(0, 4) : dayTitle(k);
       body += '<tbody><tr class="sp-grp"><th colspan="' + (cols - 2) + '" scope="rowgroup">' + esc(title) + " <small>" + list.length + "</small></th>" +
@@ -226,8 +241,8 @@ export function createSpending() {
       body + empty + "</table>" +
       (rows.length > shown.length ? '<button type="button" class="sp-more" data-act="all">Show all ' + rows.length + "</button>" : "");
     $("[data-count]").textContent = rows.length ? String(rows.length) : "";
-    $("[data-pills]").innerHTML = (q ? '<button type="button" class="sp-pill" data-act="unq" title="Clear the search">Search: ' + esc(q) + " <span aria-hidden=\"true\">×</span></button>" : "") +
-      (V.filt && !q ? '<button type="button" class="sp-pill" data-act="unfilt" title="Show every category">' + esc(V.filt) + ' <span aria-hidden="true">×</span></button>' : "");
+    $("[data-pills]").innerHTML = (!q ? '<button type="button" class="sp-pill' + (V.recent ? " on" : "") + '" data-act="recent" aria-pressed="' + Boolean(V.recent) + '" title="' + (V.recent ? "Back to " + esc(periodTitle(V.cur, V.mode)) : "The last " + RECENT + " you added or changed") + '">Recent</button>' : "") + (q ? '<button type="button" class="sp-pill" data-act="unq" title="Clear the search">Search: ' + esc(q) + " <span aria-hidden=\"true\">×</span></button>" : "") +
+      (V.filt && !q && !V.recent ? '<button type="button" class="sp-pill" data-act="unfilt" title="Show every category">' + esc(V.filt) + ' <span aria-hidden="true">×</span></button>' : "");
     fresh = null;
   }
 
@@ -310,7 +325,7 @@ export function createSpending() {
     if (V.mode === "month") ({ y, m } = M.addMonths(y, m, k)); else y += k;
     if (y < 2000 || y > todayP().y + 5) return;
     V.cur = { y, m, d: 1 };
-    V.filt = null; V.all = false; V.edit = null;
+    V.filt = null; V.all = false; V.edit = null; V.recent = false;
     render(true);
     if (!quiet()) $("[data-title]").animate([{ transform: "translateX(" + k * 10 + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 280, easing: "cubic-bezier(.16, 1, .3, 1)" });
   }
@@ -356,7 +371,8 @@ export function createSpending() {
     const act = a.dataset.act, rowId = a.closest("[data-id]")?.dataset.id;
     if (act === "prev") shift(-1);
     else if (act === "next") shift(1);
-    else if (act === "now") { V.cur = todayP(); V.filt = null; V.all = false; V.edit = null; render(true); }
+    else if (act === "now") { V.cur = todayP(); V.filt = null; V.all = false; V.edit = null; V.recent = false; render(true); }
+    else if (act === "recent") { V.recent = !V.recent; V.all = false; V.edit = null; renderTable(); }
     else if (act === "add") startNew();
     else if (act === "set") openSettings();
     else if (act === "edit" && rowId) startEdit(rowId);

@@ -367,7 +367,7 @@ export function createView() {
     const chip = (c, p, isIn) => '<button type="button" class="mn-chip' + (isIn ? " mn-inc" : "") + (V.filt === c ? " on" : "") + '" data-chip="' + esc(c) + '"><span>' + esc(c) + '</span><span class="mn-num mn-pct">' + (p * 100).toFixed(1) + "%</span>" + pie(p) + "</button>";
     $(".mn-chips").innerHTML = [...out].sort((a, b) => b[1] - a[1]).map(([c, v]) => chip(c, v / (to || 1), false)).join("") + [...inc].sort((a, b) => b[1] - a[1]).map(([c, v]) => chip(c, v / (ti || 1), true)).join("");
   }
-  const rowHTML = (e) => '<div class="mn-rw2"><div class="mn-del">Delete</div><div class="mn-row' + (e.id === V.fresh ? " mn-new" : "") + '" data-id="' + esc(e.id) + '"><div style="min-width:0"><div class="mn-r1">' + esc(e.c) + (e.n ? '<span class="mn-nt">' + esc(e.n) + "</span>" : "") + '</div><div class="mn-meta" style="margin-top:3px">' + M.fmtDate(e.d) + '</div></div><span class="mn-num mn-am' + (e.v > 0 ? " inc" : "") + '">' + amtOf(e) + (convOf(e) ? "<small>" + convOf(e) + "</small>" : "") + "</span></div></div>";
+  const rowHTML = (e) => '<div class="mn-rw2"><div class="mn-del">Delete</div><div class="mn-row' + (e.id === V.fresh ? " mn-new" : "") + '" data-id="' + esc(e.id) + '"><div style="min-width:0"><div class="mn-r1">' + esc(e.c) + (e.n ? '<span class="mn-nt">' + esc(e.n) + "</span>" : "") + '</div><div class="mn-meta" style="margin-top:3px">' + M.fmtDate(e.d) + (e.d > today() ? ' <span class="mn-up" title="Already counted">upcoming</span>' : "") + '</div></div><span class="mn-num mn-am' + (e.v > 0 ? " inc" : "") + '">' + amtOf(e) + (convOf(e) ? "<small>" + convOf(e) + "</small>" : "") + "</span></div></div>";
   function renderList() {
     const rows = SP.entries().filter((e) => inView(e) && (!V.filt || e.c === V.filt)).sort(M.byNewest);
     list.innerHTML = rows.length ? rows.slice(0, 300).map(rowHTML).join("") + (rows.length > 300 ? '<div class="mn-empty">+' + (rows.length - 300) + " more — search finds them all</div>" : "") : '<div class="mn-empty">No transactions</div>';
@@ -608,29 +608,30 @@ export function createView() {
     }
   }
 
-  // 五个小方块：一样的四行（名字 / 数 / 一条线 / 小字），所以对得齐。Budget Used 的线 = 用了多少；
-  // 别的四个的线 = 之前六个月（年模式 = 之前几年）这个数的范围，点 = 这次落在哪儿（这个月的话，之前的也只算到同一天）
-  function cards(c, mode, p, d0) {
-    const g = c.used, B = c.B, used = M.counted(g), u = B ? used / B : 0, cmp = M.compare(IX(), budgetsShown(), p, mode, today());
+  // 四个小方块：一样的四行（名字 / 数 / 一条线 / 小字），所以对得齐。线 = 之前六个月（年模式 = 之前几年）这个数的范围，
+  // 点 = 这次落在哪儿（这个月的话，之前的也只算到同一天）。方块只建一次，换期只挪点（弹着滑过去）、换数
+  const CARDS = [["left", "Budget Left", "leftPct", "low"], ["expense", "Expense", "expense", "high"], ["income", "Income", "income", "low"], ["balance", "Balance", "balance", "low"]];
+  function cards(c, mode, p) {
+    const box = $(".mn-cards");
+    if (!box.querySelector("[data-card]")) box.innerHTML = CARDS.map(([k, label]) => '<div class="mn-card" data-card="' + k + '"><span class="mn-meta">' + label + '</span><span class="mn-num v"></span><div class="mn-track mn-range"><b hidden></b></div><span class="mn-num mn-meta"></span></div>').join("");
+    const g = c.used, B = c.B, cmp = M.compare(IX(), budgetsShown(), p, mode, today()), pct = cmp.cur.leftPct, bal = cmp.cur.balance;
     const since = (mode === "year" ? "Earlier years" : "6 mo") + (cmp.cutText ? " " + cmp.cutText : "");
-    const card = (label, value, col, key, worse) => {
-      const r = cmp.range[key], v = cmp.cur[key];
-      let bar, small;
-      if (!r) { bar = '<div class="mn-track"></div>'; small = mode === "year" ? "No earlier years" : "No history yet"; }
-      else {
-        const span = r[1] - r[0], pos = span ? (v - r[0]) / span : 0.5, bad = worse === "high" ? v > r[1] : v < r[0];
-        bar = '<div class="mn-track mn-range"><b style="left:' + (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + '%"' + (bad ? ' class="over"' : "") + "></b></div>";
-        small = kfmt(r[0]) + "–" + kfmt(r[1]);
-      }
-      return '<div class="mn-card" title="' + esc(since) + '"><span class="mn-meta">' + label + '</span><span class="mn-num v"' + (col ? ' style="color:' + col + '"' : "") + ">" + cents(value) + "</span>" + bar + '<span class="mn-num mn-meta">' + small + "</span></div>";
-    };
-    const left = cmp.cur.left, bal = cmp.cur.balance;
-    $(".mn-cards").innerHTML = '<div class="mn-card"><span class="mn-meta">Budget Used</span><span class="mn-num v">' + (B ? cents((u * 100).toFixed(1)) + "%" : "—") + '</span><div class="mn-track"><i data-w="' + Math.min(100, u * 100).toFixed(1) + '"' + (u > 1 ? ' class="over"' : "") + ' style="transition-delay:' + (d0 + 0.15) + 's"></i></div><span class="mn-num mn-meta">' + (B ? M.money(B) : "No budget yet") + "</span></div>" +
-      card("Budget Left", B ? (left < 0 ? "−" : "+") + M.money(left) : "—", B && left < 0 ? "var(--mn-orange)" : "", "left", "low") +
-      card("Expense", "−" + M.money(g.out), "", "expense", "high") +
-      card("Income", "+" + M.money(g.inc), "var(--mn-green)", "income", "low") +
-      card("Balance", (bal < 0 ? "−" : "+") + M.money(bal), bal < 0 ? "var(--mn-orange)" : "", "balance", "low");
-    requestAnimationFrame(() => root.querySelectorAll(".mn-track > i").forEach((s) => { s.style.width = s.dataset.w + "%"; }));
+    const pctText = (x) => Math.round(x * 100) + "%";
+    const show = { left: [pct === null ? "—" : (pct < 0 ? "−" : "") + pctText(Math.abs(pct)), pct !== null && pct < 0 ? "var(--mn-orange)" : "", pctText, pct === null ? (B ? "All base" : "No budget yet") : kfmt(cmp.cur.left) + " of " + kfmt(cmp.cur.room)],
+      expense: ["−" + M.money(g.out), "", kfmt, ""], income: ["+" + M.money(g.inc), "var(--mn-green)", kfmt, ""], balance: [(bal < 0 ? "−" : "+") + M.money(bal), bal < 0 ? "var(--mn-orange)" : "", kfmt, ""] };
+    for (const [k, , key, worse] of CARDS) {
+      const el = box.querySelector('[data-card="' + k + '"]'), [value, col, fmt, note] = show[k], v = el.querySelector(".v"), dot = el.querySelector(".mn-range > b"), small = el.querySelector(".mn-meta:last-child");
+      v.innerHTML = k === "left" ? esc(value) : cents(value);
+      v.style.color = col;
+      el.title = since;
+      const r = cmp.range[key], x = cmp.cur[key];
+      if (!r || x === null || x === undefined) { dot.hidden = true; small.textContent = note || (mode === "year" ? "No earlier years" : "No history yet"); continue; }
+      const span = r[1] - r[0], pos = span ? (x - r[0]) / span : 0.5;
+      dot.hidden = false;
+      dot.classList.toggle("over", worse === "high" ? x > r[1] : x < r[0]);
+      dot.style.left = (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + "%";
+      small.textContent = note || fmt(r[0]) + "–" + fmt(r[1]);
+    }
   }
   function breakdown(mode, p) {
     const inP = (e) => M.inPeriod(e, p, mode), rows = shownEntries().filter(inP);
@@ -837,7 +838,12 @@ export function createView() {
   // ---------- 搜索 ----------
   function renderFind() {
     const q = $("[data-q]").value.trim().toLowerCase(), fr = $("[data-fres]");
-    if (!q) { fr.innerHTML = '<div class="mn-empty">Type a note, a category, or an amount</div>'; return; }
+    // 没打字：先列最近记 / 改过的 10 笔（记错了好找），点一笔就能改
+    if (!q) {
+      const recent = SP.entries().slice().sort((a, b) => (b.u || 0) - (a.u || 0)).slice(0, 10);
+      fr.innerHTML = (recent.length ? '<div class="mn-meta" style="padding:14px 0 2px">Recently added</div>' + recent.map(rowHTML).join("") : "") + '<div class="mn-empty">Type a note, a category, or an amount</div>';
+      return;
+    }
     const hit = SP.entries().filter((e) => (e.c + " " + e.n + " " + (Math.abs(e.v) / 100).toFixed(2) + " " + M.money(e.v, M.curOf(e)) + " " + curLabel(M.curOf(e))).toLowerCase().includes(q)).sort(M.byNewest), groups = new Map();
     for (const e of hit) { const k = e.d.slice(0, 7); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); }
     fr.innerHTML = hit.length ? [...groups].map(([k, a]) => { const p = M.parts(k + "-01"); return '<div class="mn-meta" style="padding:14px 0 2px">' + M.MONTH[p.m - 1] + " " + p.y + " · " + a.length + "</div>" + a.slice(0, 40).map(rowHTML).join(""); }).join("") : '<div class="mn-empty">Nothing matches</div>';

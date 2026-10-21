@@ -36,7 +36,7 @@ export function nameParts(root, on) {
 
 // 系统要求减少动态、或设置里关了 Sparkles（html.fx-off，js/fx.js 的 setFx）：下面这些小动作都不放
 const quiet = () => reduce.matches || document.documentElement.classList.contains("fx-off");
-const SPRING = "linear(0, .035, .121, .233, .354, .473, .582, .679, .761, .829, .883, .924, .956, .979, .994, 1.005, 1.011, 1.014, 1.015, 1.015, 1.014, 1.012, 1.01, 1.008, 1.007, 1.005, 1.004, 1.003, 1)";   // 同 css 的 --spring
+export const SPRING = "linear(0, .035, .121, .233, .354, .473, .582, .679, .761, .829, .883, .924, .956, .979, .994, 1.005, 1.011, 1.014, 1.015, 1.015, 1.014, 1.012, 1.01, 1.008, 1.007, 1.005, 1.004, 1.003, 1)";   // 同 css 的 --spring
 
 // ---------- 选中的那块滑过去 ----------
 // 分段开关（.seg）选中的那段、侧栏当前页底下各垫一块（.seg-pill / .snav-pill）。整页是 innerHTML 重画的，所以重画前量一次、重画后量一次，
@@ -151,4 +151,14 @@ export function initEdgeGlow() {
     card = c; x = e.clientX; y = e.clientY;
     if (card && !queued) { queued = true; requestAnimationFrame(paint); }
   }, { passive: true });
+}
+
+// 手机今天页换天：日期条上选中的标记（.dmark）从原来那天弹着滑到新的那天，下面的清单按方向滑进来。
+// before = 换之前标记的 offsetLeft；dir = 1 往后翻 / −1 往前翻。不靠 View Transitions（iPhone 上不一定有）
+export function slideDay(before, dir) {
+  if (quiet()) return;
+  const mark = document.querySelector(".daystrip .dmark");
+  if (mark && before !== null && before !== undefined && before !== mark.offsetLeft) mark.animate([{ transform: "translateX(" + (before - mark.offsetLeft) + "px)" }, { transform: "none" }], { duration: 480, easing: SPRING });
+  const list = document.querySelectorAll(".phone-day .list, .phone-day .stripmeta, .phone-day .strip");
+  if (dir) list.forEach((el) => el.animate([{ transform: "translateX(" + dir * 28 + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 320, easing: "cubic-bezier(.16, 1, .3, 1)" }));
 }

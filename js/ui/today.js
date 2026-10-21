@@ -6,7 +6,7 @@ import * as store from "../store.js";
 import * as sync from "../sync.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
-import { fmtDay, fmtShort, fmtMin, addDays, diffDays, weekday, startOfWeek, WEEKDAYS } from "../dates.js";
+import { fmtDay, fmtShort, fmtMin, fmtHours, hoursOf, addDays, diffDays, weekday, startOfWeek, WEEKDAYS } from "../dates.js";
 import * as S from "../stats.js";
 import * as F from "../friends.js";
 import * as I from "../ideas.js";
@@ -18,7 +18,7 @@ import * as R from "../routines.js";
 import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickable, pickTarget, segHTML, lineInfo, toast, STATUS, ballHTML, taskChainHTML, groupsOf } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
-import { animateNext } from "../motion.js";
+import { animateNext, slideDay } from "../motion.js";
 import { cheer } from "../fx.js";
 import { openMenu } from "./select.js";
 import { shopCount } from "./meals.js";
@@ -29,7 +29,6 @@ import { quadHTML } from "./quads.js";
 
 const openDesc = new Set();
 const logOpen = new Set();   // 已经有计时记录、又点了「+ time」要再补一段的任务
-const chainAll = new Set();  // 手机上点过「⋯」、整条链条都列出来的任务
 const seen = new Set();
 let overdueOpen = false;
 let viewDate = "";
@@ -140,7 +139,7 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
     (!open && withText(t.id) ? ' <span class="wth">' + esc(withText(t.id)) + "</span>" : "") +
     (t.desc && !desc ? '<span class="more"> ⋯</span>' : "") + "</div>" + side +
     (phone ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") +
-    "</div>" + (open ? taskChainHTML(t, 2, phone && !chainAll.has(t.id) ? 3 : 0) + timesHTML(c, t, list, form) : "") +
+    "</div>" + (open ? taskChainHTML(t, 2) + timesHTML(c, t, list, form) : "") +
     (desc ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Details">' + esc(t.desc || "") + "</textarea>" : "") +
     (open || !phone ? chips : "") +
     (open && meetable(t) ? taskMeetHTML(t.id) : "") +
@@ -175,7 +174,7 @@ function noticesHTML(c) {
   if (store.local().weekSeen !== start && c.tasks.some((t) => t.date >= start && t.date <= end && E.spentMin(t) > 0)) {
     const w = S.weekCheck(c, start, end, store.setting("weekly", {}));
     if (w.warn.length) {
-      h += '<div class="note"><p><b>Last week</b> — ' + w.warn.map((x) => "<b>" + fmtMin(x.min) + "</b> " + (x.what === "growth" ? "of growth" : "to relax") + ", " + (x.dir === "low" ? "under" : "over") + " your " + fmtMin(x.limit)).join("; ") + ".</p>" +
+      h += '<div class="note"><p><b>Last week</b> — ' + w.warn.map((x) => "<b>" + fmtHours(x.min) + "</b> " + (x.what === "growth" ? "of growth" : "to relax") + ", " + (x.dir === "low" ? "under" : "over") + " your " + fmtHours(x.limit)).join("; ") + ".</p>" +
         '<button type="button" class="link" data-act="week-seen" data-week="' + start + '">Got it</button></div>';
     }
   }
@@ -320,11 +319,13 @@ function phoneHTML(c) {
   const days = Array.from({ length: PHONE_SPAN * 2 + 1 }, (_, i) => addDays(c.today, i - PHONE_SPAN));
   const strip = '<nav class="daystrip" aria-label="Days">' + days.map((x) =>
     '<button type="button" class="dpill' + (x === c.today ? " today" : "") + (x === d ? " on" : "") + (x < c.today ? " past" : "") + '" data-act="day-pick" data-date="' + x + '" aria-label="' + fmtDay(x) + '">' +
-    "<span>" + WEEKDAYS[weekday(x)].slice(0, 2) + "</span><b>" + Number(x.slice(8)) + "</b>" + dayDot(store.tasksOn(x)) + "</button>").join("") + "</nav>";
+    "<span>" + WEEKDAYS[weekday(x)].slice(0, 2) + "</span><b>" + Number(x.slice(8)) + "</b>" + dayDot(store.tasksOn(x)) + "</button>").join("") +
+    // 选中的标记单独一个元素，压在选中那天的格子上（换天时它滑过去，见 js/motion.js 的 slideDay）
+    '<i class="dmark" aria-hidden="true" style="--k:' + days.indexOf(d) + '"></i></nav>';
   const day = E.daySummary(c, d);
   const { line, done } = lineInfo(c, d);
-  const lineText = line > 0 ? (done >= line - 1 ? "Line " + fmtMin(line) + " ✓" : "Line " + fmtMin(line) + " · " + fmtMin(line - done) + " to go") : "";
-  const meta = '<div class="stripmeta' + (day.cap > 0 && day.planned > day.cap ? " over" : "") + '"><span>' + Math.round(day.done) + " / " + day.planned + " min done</span><span>" + lineText + "</span></div>";
+  const lineText = line > 0 ? (done >= line - 1 ? "Line " + fmtHours(line) + " ✓" : "Line " + fmtHours(line) + " · " + fmtHours(line - done) + " to go") : "";
+  const meta = '<div class="stripmeta' + (day.cap > 0 && day.planned > day.cap ? " over" : "") + '"><span>' + hoursOf(day.done) + " / " + fmtHours(day.planned) + " done</span><span>" + lineText + "</span></div>";
   const bar = '<div class="strip">' + all.map(segHTML).join("") + "</div>";
   const toBuy = shopCount(c);   // 下次采购还剩几样（顶栏的 🛒）
   return '<div class="dayview phone-day" data-date="' + d + '">' +
@@ -382,7 +383,18 @@ export function initToday(rerender) {
   on(document, "click", ".dayview [data-act]", (e, el) => {
     const act = el.dataset.act, id = rowId(el);
     // 换日子：往后翻列表往左滑，往前翻往右滑
-    const go = (d) => { if (d !== shownDate()) animateNext(d > shownDate() ? "next" : "prev"); showDate(d); rerender(); };
+    const go = (d) => {
+      const from = shownDate();
+      // 手机：自己滑（标记弹过去、清单滑进来）；电脑照旧用页面过渡
+      if (document.body.classList.contains("phone")) {
+        const was = document.querySelector(".daystrip .dmark")?.offsetLeft;
+        showDate(d); rerender();
+        if (d !== from) requestAnimationFrame(() => slideDay(was, d > from ? 1 : -1));
+        return;
+      }
+      if (d !== from) animateNext(d > from ? "next" : "prev");
+      showDate(d); rerender();
+    };
     if (act === "pj-pick") { openPicker(el, rerender); return; }
     if (act !== "edit" && !act.startsWith("day-")) animateNext();
     if (act === "status") {
@@ -396,7 +408,6 @@ export function initToday(rerender) {
     else if (act === "time-edit-x") { timeEdit = ""; rerender(); }
     else if (act === "time-more") { logOpen.add(id); rerender(); }
     else if (act === "row-move") { focus = id; if (moveRow(id, Number(el.dataset.to))) refocusRow(id, act, el.dataset.to); }
-    else if (act === "chain-all") { chainAll.add(id); rerender(); }
     else if (act === "time-log") logFromRow(el.closest(".row"));
     else if (act === "dish-open") { dishOpen.add(id); rerender(); requestAnimationFrame(() => setTimeout(() => document.querySelector('.dish-quick[data-task="' + CSS.escape(id) + '"] [name=name]')?.focus(), 0)); }
     else if (act === "dish-x") { const d = store.meals().dish[el.dataset.did]; if (d) store.deleteMeal("dish", d.id, "Removed " + (d.name || "it")); }

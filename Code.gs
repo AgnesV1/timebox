@@ -1237,6 +1237,20 @@ function spendTab_(book, k) {
   return { sh: sh, col: col, width: names.length };
 }
 
+// 日期那一列照表格里显示的字读（"2026-10-23"），不用 getValues 给的时刻再按时区换——记账表格和脚本的时区不一样时会差一天
+function spendShown_(tab, name) {
+  var last = tab.sh.getLastRow();
+  return last < 2 || tab.col[name] === undefined ? [] : tab.sh.getRange(2, tab.col[name] + 1, last - 1, 1).getDisplayValues().map(function (r) { return r[0]; });
+}
+// 显示的字 → yyyy-mm-dd（格子改成了 2026/10/23、10/23/2026 也认）；认不出就退回旧的办法
+function spendDay_(raw, shown, tz) {
+  var s = String(typeof raw === 'string' ? raw : shown || '').trim(), m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(s);
+  if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+  m = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/.exec(s);
+  if (m) return m[3] + '-' + ('0' + m[1]).slice(-2) + '-' + ('0' + m[2]).slice(-2);
+  return day_(raw, tz);
+}
+
 function spendData_(tab) {
   var last = tab.sh.getLastRow();
   return last < 2 ? [] : tab.sh.getRange(2, 1, last - 1, tab.width).getValues();
@@ -1252,9 +1266,10 @@ function spendCats_(book) {
 }
 
 function spendBudgets_(book) {
-  var tab = spendTab_(book, 'budgets'), c = tab.col, tz = book.getSpreadsheetTimeZone();
-  return spendData_(tab).map(function (r) {
-    var f = r[c.From], from = Object.prototype.toString.call(f) === '[object Date]' ? Utilities.formatDate(f, tz, 'yyyy-MM-dd').slice(0, 7) : String(f || '').trim().slice(0, 7);
+  var tab = spendTab_(book, 'budgets'), c = tab.col, tz = book.getSpreadsheetTimeZone(), shown = spendShown_(tab, 'From');
+  return spendData_(tab).map(function (r, i) {
+    var f = r[c.From], s = String(typeof f === 'string' ? f : shown[i] || '').trim(), m = /^(\d{4})[-/.](\d{1,2})/.exec(s);
+    var from = m ? m[1] + '-' + ('0' + m[2]).slice(-2) : Object.prototype.toString.call(f) === '[object Date]' ? Utilities.formatDate(f, tz, 'yyyy-MM-dd').slice(0, 7) : s.slice(0, 7);
     var v = Math.round(Number(String(r[c.Amount]).replace(/[^\d.]/g, '')) * 100);
     var cur = c.Currency === undefined ? '' : spendCur_(r[c.Currency]);
     return /^\d{4}-\d{2}$/.test(from) && v > 0 ? (cur ? { from: from, v: v, cur: cur } : { from: from, v: v }) : null;
@@ -1330,9 +1345,9 @@ function spend_(req) {
     cats = spendCats_(book);
   }
   // 拉：since 之后写过的（since = 0 就是全部）。同一毫秒写的也算上（多发几行没关系，漏了就找不回来）
-  var rows = [];
-  data.forEach(function (r) {
-    var id = String(r[c.ID] || '').trim(), d = day_(r[c.Date], tz);
+  var rows = [], shown = spendShown_(tx, 'Date');
+  data.forEach(function (r, i) {
+    var id = String(r[c.ID] || '').trim(), d = spendDay_(r[c.Date], shown[i], tz);
     if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(d) || (since && !(Number(r[c.Synced]) >= since))) return;
     var v = Math.round(Number(String(r[c.Amount]).replace(/[^\d.]/g, '')) * 100) || 0, cat = String(r[c.Category] || '').trim();
     var isIn = /^inc/i.test(String(r[c.Kind] || '')) || (!String(r[c.Kind] || '').trim() && inc[cat]);

@@ -11,7 +11,7 @@ import * as store from "../store.js";
 import * as S from "../stats.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
-import { fmtMin, fmtShort, fmtDay, fmtClock, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf } from "../dates.js";
+import { fmtHours, fmtShort, fmtDay, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf } from "../dates.js";
 import { healthPill, groupsOf } from "./common.js";
 import { hourLabel } from "../day.js";
 import { neon } from "../groups.js";
@@ -92,10 +92,10 @@ function tile(label, value, sub, dlt = "") {
 // Time 页签顶上一条细条（她挑的，替掉原来两块大卡片）：左边 Build 花了多久、其中多少深度、比上一段；右边全部一共、深度、平均一天。
 // b、bp = 只看 Build 的这一段和上一段；没有 Build 就只有全部那一半（带比上一段）
 function timeStrip(s, p, b, bp, name) {
-  const n = (v, cls = "") => '<b class="num' + (cls ? " " + cls : "") + '">' + fmtMin(v) + "</b>";
-  const all = "All " + n(s.spent) + ' <span class="ss-m">· ◆ ' + fmtMin(s.deep) + (s.days ? " · ~" + fmtMin(s.avgSpent) + " a day" : "") + "</span>";
-  if (!b) return '<div class="st-strip"><span>' + all + "</span>" + delta(s.spent, p.spent, fmtMin) + "</div>";
-  return '<div class="st-strip"><span>' + esc(name) + " " + n(b.spent, "ss-b") + "</span><span>◆ deep " + n(b.deep) + "</span>" + delta(b.spent, bp.spent, fmtMin) +
+  const n = (v, cls = "") => '<b class="num' + (cls ? " " + cls : "") + '">' + fmtHours(v) + "</b>";
+  const all = "All " + n(s.spent) + ' <span class="ss-m">· ◆ ' + fmtHours(s.deep) + (s.days ? " · ~" + fmtHours(s.avgSpent) + " a day" : "") + "</span>";
+  if (!b) return '<div class="st-strip"><span>' + all + "</span>" + delta(s.spent, p.spent, fmtHours) + "</div>";
+  return '<div class="st-strip"><span>' + esc(name) + " " + n(b.spent, "ss-b") + "</span><span>◆ deep " + n(b.deep) + "</span>" + delta(b.spent, bp.spent, fmtHours) +
     '<span class="ss-all">' + all + "</span></div>";
 }
 
@@ -154,23 +154,23 @@ function timeTrendHTML(s, seg = "") {
   const labels = axisLabels(rows, byWeek);
   tips.ttrend = rows.map((r) => ({
     title: byWeek ? "Week of " + fmtShort(r.date) : fmtDay(r.date),
-    rows: [["Logged", fmtMin(r.spent), "dn"], ["Deep", fmtMin(r.deep), "tide"], ...(r.goal ? [["Deep goal", fmtMin(r.goal), "dgoal"]] : [])]
+    rows: [["Logged", fmtHours(r.spent), "dn"], ["Deep", fmtHours(r.deep), "tide"], ...(r.goal ? [["Deep goal", fmtHours(r.goal), "dgoal"]] : [])]
   }));
   const insight = s.days
-    ? "You logged <b>" + fmtMin(s.avgSpent) + "</b> a day on average" + (s.deep ? ", <b>" + fmtMin(s.deep / s.days) + "</b> of it deep." : ".")
+    ? "You logged <b>" + fmtHours(s.avgSpent) + "</b> a day on average" + (s.deep ? ", <b>" + fmtHours(s.deep / s.days) + "</b> of it deep." : ".")
     : "This period hasn't started yet.";
   return '<figure class="card chart"><figcaption><div><h3>Time per ' + (byWeek ? "week" : "day") + "</h3><p>" + insight + "</p></div>" +
     '<div class="legend">' + seg + '<span><i class="k tide"></i>Deep</span><span><i class="k dn"></i>Logged</span>' + (s.goal ? '<span><i class="k dgoal"></i>Deep goal</span>' : "") + "</div></figcaption>" +
-    '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtMin(max * f) : "0") + "</span></i>").join("") +
+    '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtHours(max * f) : "0") + "</span></i>").join("") +
     '<div class="cols" data-chart="ttrend"' + dense(rows) + ">" + rows.map((r, i) =>
-      '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.ttrend[i].title + ": " + fmtMin(r.spent) + " logged, " + fmtMin(r.deep) + " deep") + '">' +
+      '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.ttrend[i].title + ": " + fmtHours(r.spent) + " logged, " + fmtHours(r.deep) + " deep") + '">' +
       (r.spent ? '<i class="dn solo" style="height:' + h(r.spent) + '"></i>' : "") +
       (r.deep ? '<i class="tide" style="height:' + h(r.deep) + '"><span class="wv" style="animation-delay:-' + ((i * 0.7) % 5).toFixed(1) + "s,-" + ((i * 1.3) % 7).toFixed(1) + 's"></span><span class="wv b" style="animation-delay:-' + ((i * 1.1) % 8).toFixed(1) + "s,-" + ((i * 0.9) % 7).toFixed(1) + 's"></span></i>' : "") +
       (r.goal && !r.future ? '<i class="dgoal" style="bottom:' + h(r.goal) + '"></i>' : "") +
-      (top > 0 && r.spent === top ? '<b class="cap-label num" style="bottom:' + h(r.spent) + '">' + fmtMin(r.spent) + "</b>" : "") + "</div>").join("") + "</div></div>" +
+      (top > 0 && r.spent === top ? '<b class="cap-label num" style="bottom:' + h(r.spent) + '">' + fmtHours(r.spent) + "</b>" : "") + "</div>").join("") + "</div></div>" +
     '<div class="xaxis">' + labels.map((t) => "<span>" + t + "</span>").join("") + "</div>" +
     '<details class="tview"><summary>Show as table</summary><table><thead><tr><th>' + (byWeek ? "Week of" : "Day") + "</th><th>Logged</th><th>Deep</th></tr></thead><tbody>" +
-    rows.filter((r) => !r.future).map((r) => "<tr><td>" + fmtShort(r.date) + '</td><td class="num">' + fmtMin(r.spent) + '</td><td class="num">' + fmtMin(r.deep) + "</td></tr>").join("") +
+    rows.filter((r) => !r.future).map((r) => "<tr><td>" + fmtShort(r.date) + '</td><td class="num">' + fmtHours(r.spent) + '</td><td class="num">' + fmtHours(r.deep) + "</td></tr>").join("") +
     "</tbody></table></details></figure>";
 }
 
@@ -184,21 +184,21 @@ function trendHTML(s, filtered) {
   const labels = axisLabels(rows, byWeek);
   tips.trend = rows.map((r) => ({
     title: byWeek ? "Week of " + fmtShort(r.date) : fmtDay(r.date),
-    rows: [["Done", fmtMin(r.spent), "dn"], ["Planned", fmtMin(r.planned), "pl"], ["Line", r.line ? fmtMin(r.line) : "—", "ln"]]
+    rows: [["Done", fmtHours(r.spent), "dn"], ["Planned", fmtHours(r.planned), "pl"], ["Line", r.line ? fmtHours(r.line) : "—", "ln"]]
   }));
   const insight = s.days
-    ? "On average you planned <b>" + fmtMin(s.avgPlanned) + "</b> and spent <b>" + fmtMin(s.avgSpent) + "</b> a day" + (s.avgCap ? ", with " + fmtMin(s.avgCap) + " available." : ".")
+    ? "On average you planned <b>" + fmtHours(s.avgPlanned) + "</b> and spent <b>" + fmtHours(s.avgSpent) + "</b> a day" + (s.avgCap ? ", with " + fmtHours(s.avgCap) + " available." : ".")
     : "This period hasn't started yet.";
   return '<figure class="card chart"><figcaption><div><h3>Planned and done, per ' + unit + "</h3><p>" + insight + "</p></div>" +
     '<div class="legend"><span><i class="k dn"></i>Done</span><span><i class="k pl"></i>Planned</span>' + (filtered ? "" : '<span><i class="k ln"></i>Project line</span>') + "</div></figcaption>" +
-    '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtMin(max * f) : "0") + "</span></i>").join("") +
+    '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtHours(max * f) : "0") + "</span></i>").join("") +
     '<div class="cols" data-chart="trend"' + dense(rows) + ">" + rows.map((r, i) =>
-      '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.trend[i].title + ": " + fmtMin(r.spent) + " done of " + fmtMin(r.planned) + " planned") + '">' +
+      '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.trend[i].title + ": " + fmtHours(r.spent) + " done of " + fmtHours(r.planned) + " planned") + '">' +
       '<i class="pl" style="height:' + h(r.planned) + '"></i>' + (r.future ? "" : '<i class="dn" style="height:' + h(r.spent) + '"></i>') +
       (r.line ? '<i class="ln" style="bottom:' + h(r.line) + '"></i>' : "") + "</div>").join("") + "</div></div>" +
     '<div class="xaxis">' + labels.map((t) => "<span>" + t + "</span>").join("") + "</div>" +
     '<details class="tview"><summary>Show as table</summary><table><thead><tr><th>' + (byWeek ? "Week of" : "Day") + "</th><th>Done</th><th>Planned</th><th>Line</th></tr></thead><tbody>" +
-    rows.filter((r) => !r.future).map((r) => "<tr><td>" + fmtShort(r.date) + '</td><td class="num">' + fmtMin(r.spent) + '</td><td class="num">' + fmtMin(r.planned) + '</td><td class="num">' + (r.line ? fmtMin(r.line) : "—") + "</td></tr>").join("") +
+    rows.filter((r) => !r.future).map((r) => "<tr><td>" + fmtShort(r.date) + '</td><td class="num">' + fmtHours(r.spent) + '</td><td class="num">' + fmtHours(r.planned) + '</td><td class="num">' + (r.line ? fmtHours(r.line) : "—") + "</td></tr>").join("") +
     "</tbody></table></details></figure>";
 }
 
@@ -212,7 +212,7 @@ function projectHTML(s) {
       const c = esc(x.color || "var(--c-None)");
       return '<div class="crow"><span class="cname"><i style="background:' + c + '"></i>' + esc(x.name || "No project") + "</span>" +
         '<span class="ctrack"><i class="cbar" style="width:' + ((x.spent / max) * 100).toFixed(1) + "%;background:" + c + '"></i></span>' +
-        '<span class="cval num">' + fmtMin(x.spent) + "</span>" +
+        '<span class="cval num">' + fmtHours(x.spent) + "</span>" +
         '<span class="cdone num">' + x.done + "/" + x.counted + (x.counted ? " · " + pct(x.done / x.counted) : "") + "</span>" +
         '<span class="cacc num">' + (x.accuracy === null ? "—" : x.accuracy.toFixed(2) + "×") + "</span></div>";
     }).join("") +
@@ -260,9 +260,9 @@ function heatRows(chart, rows) {
   return '<div class="heat" data-chart="' + chart + '">' + head + rows.map((r) =>
     '<div class="hrow">' + day(r) + r.hours.map((min, h) => {
       const tint = S.hourTint(r.parts?.[h]);
-      const i = tips[chart].push({ title: r.label + " · " + hourLabel(h) + "–" + hourLabel(h + 1), rows: [[r.what, fmtMin(Math.round(min)), "ln"],
-        ...(tint ? tint.list.slice(0, 4).map(([n, m]) => [n || "No project", fmtMin(Math.round(m)), "sw", heatColors[n] || "var(--c-None)"]) : []),
-        ...(r.fixed?.[h] ? [["commute", fmtMin(r.fixed[h]), "pl"]] : [])] }) - 1;
+      const i = tips[chart].push({ title: r.label + " · " + hourLabel(h) + "–" + hourLabel(h + 1), rows: [[r.what, fmtHours(Math.round(min)), "ln"],
+        ...(tint ? tint.list.slice(0, 4).map(([n, m]) => [n || "No project", fmtHours(Math.round(m)), "sw", heatColors[n] || "var(--c-None)"]) : []),
+        ...(r.fixed?.[h] ? [["commute", fmtHours(r.fixed[h]), "pl"]] : [])] }) - 1;
       return '<i class="hc' + (r.fixed?.[h] && min < 0.5 ? " fx" : "") + (tint && tint.next !== null ? " mix" : "") + '" data-i="' + i + '" tabindex="-1" style="' + shade(min, tint) + '"></i>';
     }).join("") + "</div>").join("") + "</div>";
 }
@@ -275,7 +275,7 @@ function heatHTML(c, s, by, seg = "") {
   const byWd = S.heatByWeekday(heatGrid);
   const timed = heatGrid.reduce((a, x) => a + x.hours.reduce((b, v) => b + v, 0), 0);
   tips.wday = order.map((wd) => { const r = s.byWeekday[wd]; return { title: WEEKDAYS[wd] + " · " + r.days + " day" + (r.days === 1 ? "" : "s"),
-    rows: [["a day on average", fmtMin(r.avg), "ln"], ...r.parts.map((x) => [x.name || "No project", fmtMin(x.avg), "sw", paint(x)])] }; });
+    rows: [["a day on average", fmtHours(r.avg), "ln"], ...r.parts.map((x) => [x.name || "No project", fmtHours(x.avg), "sw", paint(x)])] }; });
   return '<section class="card heatcard"><header class="heat-head"><h3>When you worked</h3>' + seg + '</header><p class="lede">Average minutes timed in each hour, from 6:00. The colour is what that hour mostly went to — a blend when it was shared. Only time with a start and end counts. Point at a weekday for its daily average.</p>' +
     (timed ? heatRows("heat", order.map((wd, k) => ({ label: WEEKDAYS[wd], hours: byWd[wd].hours, parts: byWd[wd].parts, what: "average", wdI: k }))) : '<p class="empty">No timed sessions in this period.</p>') +
     (timed ? '<details class="heat-weeks"' + (weeksOpen ? " open" : "") + '><summary>Week by week</summary><div data-heat-weeks>' + (weeksOpen ? weeksHTML() : "") + "</div></details>" : "") + "</section>";
@@ -299,11 +299,11 @@ function projectsHTML(c, s) {
       const rs = g.subs.map((p) => rows.find((r) => r.p === p));
       const sum = (k) => rs.reduce((a, r) => a + r[k], 0);
       const head = g.name && rs.length > 1
-        ? '<tr class="grow"><td>' + esc(g.name) + '</td><td class="num">' + fmtMin(sum("planned")) + '</td><td class="num">' + fmtMin(sum("done")) + '</td><td class="num">' + fmtMin(sum("spent")) + '</td><td class="num">' + fmtMin(sum("spentHere")) + "</td><td></td></tr>"
+        ? '<tr class="grow"><td>' + esc(g.name) + '</td><td class="num">' + fmtHours(sum("planned")) + '</td><td class="num">' + fmtHours(sum("done")) + '</td><td class="num">' + fmtHours(sum("spent")) + '</td><td class="num">' + fmtHours(sum("spentHere")) + "</td><td></td></tr>"
         : "";
-      return head + rs.map((r) => '<tr' + (head ? ' class="nested"' : "") + '><td><span class="pdot" style="background:' + esc(r.p.color) + '"></span>' + (g.name && !head ? '<small class="gname">' + esc(g.name) + " · </small>" : "") + esc(r.p.name) + '</td><td class="num">' + fmtMin(r.planned) + '</td><td class="num">' + fmtMin(r.done) +
-        (r.planned ? " <small>" + pct(r.done / r.planned) + "</small>" : "") + '</td><td class="num">' + fmtMin(r.spent) +
-        (r.done > 0 && r.spent > 0 ? " <small>" + (r.spent / r.done).toFixed(2) + "×</small>" : "") + '</td><td class="num">' + fmtMin(r.spentHere) + "</td><td>" + (r.p.kind === "regular" ? '<span class="health h-regular">↻ Regular</span>' : healthPill(r.health)) + "</td></tr>").join("");
+      return head + rs.map((r) => '<tr' + (head ? ' class="nested"' : "") + '><td><span class="pdot" style="background:' + esc(r.p.color) + '"></span>' + (g.name && !head ? '<small class="gname">' + esc(g.name) + " · </small>" : "") + esc(r.p.name) + '</td><td class="num">' + fmtHours(r.planned) + '</td><td class="num">' + fmtHours(r.done) +
+        (r.planned ? " <small>" + pct(r.done / r.planned) + "</small>" : "") + '</td><td class="num">' + fmtHours(r.spent) +
+        (r.done > 0 && r.spent > 0 ? " <small>" + (r.spent / r.done).toFixed(2) + "×</small>" : "") + '</td><td class="num">' + fmtHours(r.spentHere) + "</td><td>" + (r.p.kind === "regular" ? '<span class="health h-regular">↻ Regular</span>' : healthPill(r.health)) + "</td></tr>").join("");
     }).join("") +
     "</tbody></table></div></section>";
 }
@@ -353,7 +353,7 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
   const lit = (x) => (neon(x.color) ? esc(neon(x.color)) : "oklch(from " + esc(x.color) + " calc(l + .12) calc(c * 1.9) h)");
   const color = (x) => (x.kind === "life" ? LIFE_COLOR[x.key] : x.kind === "blank" ? "var(--k-blank)" : x.kind === "rest" ? "url(#st-hatch)" : x.kind === "more" ? "var(--k-None)" : esc(neon(x.color) || x.color || "var(--c-None)"));
   const swatch = (x) => (x.kind === "rest" ? HATCH : ink(x) ? lit(x) : color(x));
-  tips.pie = parts.map((x) => ({ title: x.name, rows: [["of the whole period", fmtMin(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.unlogged ? [["usual housework", fmtMin(x.unlogged), "pl"]] : []), ...(x.deep > 0 ? [["deep", fmtMin(x.deep), "tide"]] : [])] }));
+  tips.pie = parts.map((x) => ({ title: x.name, rows: [["of the whole period", fmtHours(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.unlogged ? [["usual housework", fmtHours(x.unlogged), "pl"]] : []), ...(x.deep > 0 ? [["deep", fmtHours(x.deep), "tide"]] : [])] }));
   // 每片之间留一条缝（周长的 0.5% ≈ 2px）；pathLength = 100，所以长度直接写百分比
   let at = 0, under = "", mid = 100;   // mid = Untracked 正中（流光从这里往下扫）；没有 Untracked 就从 12 点
   const arcs = parts.map((x, i) => {
@@ -368,9 +368,9 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
   }).join("");
   const hz = haze && haze.min >= 1 && shown > 0 ? haze : null;
   const hzTitle = "Shows, novels… taken in alongside other things, so it overlaps";
-  const legend = parts.map((x) => '<li title="' + esc(x.name + (x.unlogged ? " · includes " + fmtMin(x.unlogged) + " usual housework" : "") + (x.deep > 0 ? " · " + fmtMin(x.deep) + " deep" : "")) + '"><i style="background:' + swatch(x) + '"></i><span>' + esc(x.name) +
-    '</span><b class="num">' + fmtMin(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("") +
-    (hz ? '<li class="haze-li" title="' + esc(hzTitle) + '"><i class="haze-sw"></i><span>On the side</span><b class="num">~' + fmtMin(hz.min) + "</b><em>overlaps</em></li>" : "");
+  const legend = parts.map((x) => '<li title="' + esc(x.name + (x.unlogged ? " · includes " + fmtHours(x.unlogged) + " usual housework" : "") + (x.deep > 0 ? " · " + fmtHours(x.deep) + " deep" : "")) + '"><i style="background:' + swatch(x) + '"></i><span>' + esc(x.name) +
+    '</span><b class="num">' + fmtHours(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("") +
+    (hz ? '<li class="haze-li" title="' + esc(hzTitle) + '"><i class="haze-sw"></i><span>On the side</span><b class="num">~' + fmtHours(hz.min) + "</b><em>overlaps</em></li>" : "");
   const field = (k, label, unit, v) => "<label><span>" + label + '</span><input class="num" type="number" min="0" max="24" step="0.5" data-life="' + k + '" data-keep="life-' + k + '" value="' + (v ? Math.round(v / 6) / 10 : "") + '" placeholder="' + (k === "deepGoal" ? "none" : "0") + '"><em>' + unit + "</em></label>";
   return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">Each 24-hour day. Sleep and meals count but aren\'t drawn.' +
     ' <button type="button" class="link" data-act="life-adjust" aria-expanded="' + adjust + '">' + (adjust ? "Done" : "Adjust") + "</button></p></div></header>" +
@@ -381,7 +381,7 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
       ? '<div class="pie-wrap"><div class="pie" data-chart="pie"><svg viewBox="-60 -60 120 120" role="img" aria-label="' + esc(parts.map((x) => x.name + " " + share(x.min, pie.total) + " of the day").join(", ")) + '">' +
         '<defs><pattern id="st-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="var(--k-blank)"/><rect width="1.5" height="5" fill="var(--muted)"/></pattern></defs>' +
         '<g transform="translate(.9 .9) rotate(-90)">' + under + '</g><g transform="rotate(-90)">' + arcs + (hz ? hazeHTML(hz, shown, mid) : "") + "</g></svg>" +
-        '<div class="pie-c"><b class="num">' + fmtMin(pie.tracked) + "</b><span>logged</span>" + (pie.deep > 0 ? '<span class="num" title="Deep work">◆ ' + fmtMin(pie.deep) + "</span>" : "") + "</div></div>" +
+        '<div class="pie-c"><b class="num">' + fmtHours(pie.tracked) + "</b><span>logged</span>" + (pie.deep > 0 ? '<span class="num" title="Deep work">◆ ' + fmtHours(pie.deep) + "</span>" : "") + "</div></div>" +
         '<ul class="pie-legend">' + legend + "</ul></div>"
       : '<p class="empty">' + (s.days ? "Nothing logged in this period." : "This period hasn't started yet.") + "</p>") +
     "</section>";
@@ -410,13 +410,13 @@ const sheetOpen = new Set();   // 点开了哪几个项目（默认都收着）
 function sheetHTML(c, s, by) {
   const sh = S.sheet(c, s.from, s.to, { weekStartsOn: store.prefs().weekStartsOn, by });
   if (!sh.rows.length) return '<section class="card"><h3>Timesheet</h3><p class="empty">Nothing logged in this period.</p></section>';
-  const cell = (v, i) => '<td class="num' + (sh.cols[i].future ? " future" : "") + '">' + (v ? fmtClock(v) : "") + "</td>";
-  const line = (r, lead, cls) => "<tr" + (cls ? ' class="' + cls + '"' : "") + "><th>" + lead + "</th>" + r.cells.map(cell).join("") + '<td class="num sum">' + fmtClock(r.total) + "</td></tr>";
+  const cell = (v, i) => '<td class="num' + (sh.cols[i].future ? " future" : "") + '">' + (v ? fmtHours(v) : "") + "</td>";
+  const line = (r, lead, cls) => "<tr" + (cls ? ' class="' + cls + '"' : "") + "><th>" + lead + "</th>" + r.cells.map(cell).join("") + '<td class="num sum">' + fmtHours(r.total) + "</td></tr>";
   const dot = (r) => '<span class="pdot" style="background:' + paint(r) + '"></span>';
   // 能点开的：下面不止一个计划，或者只有一个、但名字和它自己不一样
   const subsOf = (r) => (r.subs.length > 1 || (r.subs.length === 1 && r.subs[0].name && r.subs[0].name !== r.name) ? r.subs : []);
   const any = sh.rows.some((r) => subsOf(r).length);
-  return '<section class="card"><h3>Timesheet</h3><p class="lede">Hours and minutes logged on each ' + (by === "plan" ? "plan" : "project") + (any ? ". Open a project to see its plans" : "") + ".</p>" +
+  return '<section class="card"><h3>Timesheet</h3><p class="lede">Hours logged on each ' + (by === "plan" ? "plan" : "project") + (any ? ". Open a project to see its plans" : "") + ".</p>" +
     '<div class="table-wrap"><table class="tsheet"><thead><tr><th>' + (by === "plan" ? "Plan" : "Project") + "</th>" + sh.cols.map((x) => "<th" + (x.future ? ' class="future"' : "") + ">" + colLabel(x) + "</th>").join("") + "<th>Total</th></tr></thead><tbody>" +
     sh.rows.map((r) => {
       const subs = subsOf(r), open = subs.length > 0 && sheetOpen.has(r.name), name = dot(r) + esc(r.name || "No plan");
@@ -426,8 +426,8 @@ function sheetHTML(c, s, by) {
         (open ? subs.map((x) => line(x, dot(x) + esc(x.name || "General"), "sub")).join("") : "");
     }).join("") +
     "</tbody><tfoot>" +
-    (sh.deepSum ? "<tr><th>" + (any ? '<span class="tw-gap"></span>' : "") + "◆ Deep</th>" + sh.deep.map(cell).join("") + '<td class="num sum">' + fmtClock(sh.deepSum) + "</td></tr>" : "") +
-    '<tr class="total"><th>' + (any ? '<span class="tw-gap"></span>' : "") + "Total</th>" + sh.total.map(cell).join("") + '<td class="num sum">' + fmtClock(sh.sum) + "</td></tr></tfoot></table></div></section>";
+    (sh.deepSum ? "<tr><th>" + (any ? '<span class="tw-gap"></span>' : "") + "◆ Deep</th>" + sh.deep.map(cell).join("") + '<td class="num sum">' + fmtHours(sh.deepSum) + "</td></tr>" : "") +
+    '<tr class="total"><th>' + (any ? '<span class="tw-gap"></span>' : "") + "Total</th>" + sh.total.map(cell).join("") + '<td class="num sum">' + fmtHours(sh.sum) + "</td></tr></tfoot></table></div></section>";
 }
 
 // ---------- 整页 ----------

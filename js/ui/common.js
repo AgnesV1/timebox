@@ -4,7 +4,7 @@ import * as E from "../engine.js";
 import * as G from "../goals.js";
 import * as store from "../store.js";
 import { esc } from "../dom.js";
-import { fmtMin } from "../dates.js";
+import { fmtMin, fmtHours, hoursOf } from "../dates.js";
 import { zebraFor } from "../patterns.js";
 
 export const STATUS = [["done", "Done"], ["delay", "Delay"], ["drop", "Drop"]];
@@ -130,13 +130,13 @@ export function heroHTML(c, d) {
     const scale = Math.max(day.cap, day.planned, day.done, 60);
     return '<section class="hero free">' +
       '<div class="hero-k">' + (isToday ? "Today" : "This day") + "</div>" +
-      '<div class="nums"><span class="big" data-roll="hero-' + d + '">' + Math.round(day.done) + '</span><span class="of">/ ' + day.planned + ' min</span><span class="state quiet">No project line</span></div>' +
+      '<div class="nums"><span class="big" data-roll="hero-' + d + '">' + hoursOf(day.done) + '</span><span class="of">/ ' + fmtHours(day.planned) + '</span><span class="state quiet">No project line</span></div>' +
       '<div class="meter"><div class="fill" style="width:' + pct(day.done, scale) + '"></div></div>' +
       '<div class="meta"><span>Nothing due from projects</span></div></section>';
   }
   const scale = Math.max(day.cap, line * 1.2, done, 60);
   const held = done >= line - 1;
-  const state = held ? (done - line >= 5 ? "+" + fmtMin(done - line) + " ahead" : "Line held ✓") : fmtMin(line - done) + " to go";
+  const state = held ? (done - line >= 5 ? "+" + fmtHours(done - line) + " ahead" : "Line held ✓") : fmtHours(line - done) + " to go";
   const ahead = isToday ? E.todayAhead(c) : null;
   // 线来自哪几个计划：只有一个的话，大字的「/ 15 min」就是它，小签只写名字；两个以上才各写各的「做了 / 要做」
   const parts = Object.entries(shares).filter(([, v]) => v > 0).map(([pid, min]) => ({ p: store.get("projects", pid), pid, min })).filter((x) => x.p);
@@ -146,25 +146,25 @@ export function heroHTML(c, d) {
   }).join("");
   return '<section class="hero' + (held ? " held" : "") + '">' +
     '<div class="hero-k">' + (isToday ? "Today's line" : d < c.today ? "That day's line" : "Planned line") + "</div>" +
-    '<div class="nums"><span class="big" data-roll="hero-' + d + '">' + done + '</span><span class="of">/ ' + line + ' min</span><span class="state">' + state + "</span></div>" +
+    '<div class="nums"><span class="big" data-roll="hero-' + d + '">' + hoursOf(done) + '</span><span class="of">/ ' + fmtHours(line) + '</span><span class="state">' + state + "</span></div>" +
     '<div class="meter"><div class="fill" style="width:' + pct(done, scale) + '"></div><i class="tick" style="left:' + pct(line, scale) + '"></i></div>' +
     (chips ? '<div class="shares">' + chips + "</div>" : "") +
-    (ahead ? '<div class="meta"><span></span><span>Ahead ' + fmtMin(ahead.extra) + " · " + perDay(ahead.lessPerDay) + " less a day for " + ahead.days + "d</span></div>" : "") + "</section>";
+    (ahead ? '<div class="meta"><span></span><span>Ahead ' + fmtHours(ahead.extra) + " · " + perDay(ahead.lessPerDay) + " less a day for " + ahead.days + "d</span></div>" : "") + "</section>";
 }
 
 export function stripHTML(c, d, tasks) {
   const day = E.daySummary(c, d);
   const over = day.cap > 0 && day.planned > day.cap;
   return '<div class="strip">' + tasks.map(segHTML).join("") + "</div>" +
-    '<div class="stripmeta' + (over ? " over" : "") + '"><span>' + day.planned + " / " + (day.cap || "—") + " min planned" + (over ? " · over" : "") + "</span><span>" + Math.round(day.done) + " min done</span></div>";
+    '<div class="stripmeta' + (over ? " over" : "") + '"><span>' + hoursOf(day.planned) + " / " + (day.cap ? fmtHours(day.cap) : "—") + " planned" + (over ? " · over" : "") + "</span><span>" + fmtHours(day.done) + " done</span></div>";
 }
 
 export function billHTML(bill) {
   if (!bill || bill.kind === "met") return "";
   let text;
-  if (bill.kind === "ahead") text = "<b>Yesterday you did " + fmtMin(bill.extra) + " extra.</b> Spread over the next " + bill.days + " days — " + perDay(bill.lessPerDay) + " less a day.";
+  if (bill.kind === "ahead") text = "<b>Yesterday you did " + fmtHours(bill.extra) + " extra.</b> Spread over the next " + bill.days + " days — " + perDay(bill.lessPerDay) + " less a day.";
   else if (bill.kind === "rest") text = "<b>Yesterday was a rest day.</b> Deadlines didn't move — " + perDay(bill.extraPerDay) + " more a day for " + bill.days + " days catches up.";
-  else text = "<b>Yesterday ran " + fmtMin(bill.short) + " short.</b> Spread over the next " + bill.days + " days — about +" + perDay(bill.extraPerDay) + " a day.";
+  else text = "<b>Yesterday ran " + fmtHours(bill.short) + " short.</b> Spread over the next " + bill.days + " days — about +" + perDay(bill.extraPerDay) + " a day.";
   return '<div class="bill ' + bill.kind + '">' + text + "</div>";
 }
 

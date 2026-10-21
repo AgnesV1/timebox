@@ -87,6 +87,10 @@ export function fmtClock(min) {
   return Math.floor(v / 60) + ":" + pad(v % 60);
 }
 
+// 总量用小时、一位小数（一天的、一周一个月的统计）：90 → "1.5h"，420 → "7h"，0 → "0h"，两三分钟 → "<0.1h"。单个任务、计时那一段还是用 fmtMin
+export const hoursOf = (min) => { const v = Math.max(0, Number(min) || 0), h = Math.round(v / 6) / 10; return v > 0 && h === 0 ? "<0.1" : String(h); };
+export const fmtHours = (min) => hoursOf(min) + "h";
+
 // 45 → "45m"，90 → "1h 30m"，120 → "2h"
 export function fmtMin(min) {
   const v = Math.max(0, Math.round(Number(min) || 0));

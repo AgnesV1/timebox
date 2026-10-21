@@ -386,7 +386,7 @@ body.side-min .sync-pill span { display: none; }
 .psync::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
 .psync.wait::before { background: var(--muted); }
 .psync.bad::before { background: var(--warn); }
-.daystrip { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 3px; margin: 0 -6px 8px; }
+.daystrip { position: relative; display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 3px; margin: 0 -6px 8px; }
 .dpill { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; padding: 4px 0 5px; border: 1.5px solid transparent; border-radius: 12px; background: none; font-size: 10px; font-weight: 600; color: var(--muted); }
 .dpill b { font: 700 15px/1.2 var(--num); color: var(--ink); }
 .dpill i { width: 6px; height: 6px; margin-top: 2px; border-radius: 50%; }
@@ -399,11 +399,13 @@ body.side-min .sync-pill span { display: none; }
 .dpill.today i.all { background: var(--accent-ink); }
 /* 选中的那天：白天不框，数字底下一道墨线（Material 标签页的选中条）；夜里是霓虹边 */
 .dpill.on { opacity: 1; }
-.dpill.on::after { content: ""; position: absolute; left: 28%; right: 28%; bottom: 0; height: 2.5px; border-radius: 2px; background: var(--ink); }
+/* 选中的标记是单独的 .dmark（第 --k 格），换天时弹着滑过去（js/motion.js 的 slideDay）：白天是底下一道短线，夜里是霓虹框 */
+.daystrip .dmark { position: absolute; top: 0; bottom: 0; left: calc(var(--k) * ((100% - 30px) / 11 + 3px)); width: calc((100% - 30px) / 11); border: 1px solid transparent; border-radius: 12px; pointer-events: none; }
+.daystrip .dmark::after { content: ""; position: absolute; left: 28%; right: 28%; bottom: 0; height: 2.5px; border-radius: 2px; background: var(--ink); }
 [data-theme="dark"] .dpill.today { background: rgba(204, 255, 0, .14); color: var(--accent); }
 [data-theme="dark"] .dpill.today b { color: var(--accent); }
-[data-theme="dark"] .dpill.on { border: 1px solid var(--accent); box-shadow: 0 0 12px rgba(204, 255, 0, .4); }
-[data-theme="dark"] .dpill.on::after { display: none; }
+[data-theme="dark"] .daystrip .dmark { border-color: var(--accent); box-shadow: 0 0 12px rgba(204, 255, 0, .4); }
+[data-theme="dark"] .daystrip .dmark::after { display: none; }
 [data-theme="dark"] .dpill i.all, [data-theme="dark"] .dpill.today i.all { background: var(--accent); }
 [data-theme="dark"] .dpill i.some { background: linear-gradient(90deg, var(--accent) 50%, transparent 50%); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .phone-day .strip { margin-top: 4px; }
@@ -1865,6 +1867,12 @@ html.fx-off .lk-dot { animation: none; }
 .chain .ch-star::before { content: "✦ "; color: var(--hot); }
 [data-theme="dark"] .chain .ch-star::before { color: var(--accent); }
 .chain.ch-more { font: 600 11px var(--num); }
+/* 手机今天页：一条链只占一行，长的横着拖着看（右边淡出 = 还有）；每一段不截断 */
+.phone-day .chain { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; touch-action: pan-x pan-y;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); padding-right: 24px; }
+.phone-day .chain::-webkit-scrollbar { display: none; }
+.phone-day .chain > * { flex-shrink: 0; }
+.phone-day .chain span:not(.ch-for) { max-width: none; overflow: visible; }
 .chain .ch-fold { padding: 0 4px; border: 0; border-radius: 6px; background: var(--tonal); font: inherit; line-height: 1.2; color: var(--ink); }
 body.phone .chain { font-size: 13px; }
 .task-editor .chains, .project-editor .chains { margin: 6px 0 2px; }

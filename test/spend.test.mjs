@@ -191,3 +191,17 @@ test("spend: budgets keep the currency they were set in, on the sheet and the ot
   sync(mac);
   assert.deepEqual(mac.budgets(), [{ from: "2017-11", v: 200000, cur: "aud" }, { from: "2018-08", v: 500000, cur: "cny" }, { from: "2023-09", v: 272000 }]);
 });
+
+test("spend: a date comes back exactly as the sheet shows it, whatever the time zones", async () => {
+  const { g, book, sync } = sheet();
+  const phone = await device(), mac = await device();
+  phone.add({ d: "2026-10-23", v: -1800, c: "Food" });
+  phone.setBudgets([{ from: "2026-10", v: 300000 }]);
+  sync(phone);
+  // 表格和脚本时区不一样时，按时刻换算会差一天：这里故意让换算总差一天，读回来的仍要是表格里显示的那天
+  g.sandbox.Utilities.formatDate = (d) => { const x = new Date(d.getTime() - 864e5); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); };
+  sync(mac);
+  assert.deepEqual(mac.entries().map((e) => e.d), ["2026-10-23"]);
+  assert.deepEqual(mac.budgets().map((b) => b.from), ["2026-10"]);
+  void book;
+});

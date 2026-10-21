@@ -16,6 +16,11 @@ class Range {
     }
     return out;
   }
+  // 表格里显示的那串字（日期照格子的样子 yyyy-mm-dd，不经过时区）
+  getDisplayValues() {
+    const pad = (n) => String(n).padStart(2, "0");
+    return this.getValues().map((row) => row.map((v) => (v instanceof Date ? v.getFullYear() + "-" + pad(v.getMonth() + 1) + "-" + pad(v.getDate()) : v === null || v === undefined ? "" : String(v))));
+  }
   setValues(vals) {
     if (vals.length !== this.nr || vals.some((row) => row.length !== this.nc)) throw new Error(`setValues size mismatch ${vals.length}x${vals[0]?.length} vs ${this.nr}x${this.nc}`);
     vals.forEach((row, i) => row.forEach((v, j) => this.sh.check(this.c + j, v)));

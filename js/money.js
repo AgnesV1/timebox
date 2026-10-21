@@ -163,10 +163,11 @@ export function niceMax(v) {
 export function monthChart(ix, budgets, y, m, today) {
   const t = parts(today), N = dim(y, m), B = budgetAt(budgets, y, m), g = sumOf(ix, { y, m }, "month"), base = g.base;
   const isCur = y === t.y && m === t.m, last = ord(y, m) > ord(t.y, t.m) ? 0 : isCur ? t.d : N;
-  const cv = [0];
-  for (let d = 1; d <= N; d++) { const x = sumOf(ix, { y, m, d }, "day"); cv[d] = cv[d - 1] + (d <= last ? x.out - x.base - x.outside : 0); }
+  // 今天以后的虚线 = 到今天的 + 已经提前记下的那几笔（落在它们那天）+ 照平均速度
+  const cv = [0], ahead = [0];
+  for (let d = 1; d <= N; d++) { const x = sumOf(ix, { y, m, d }, "day"), k = x.out - x.base - x.outside; cv[d] = cv[d - 1] + (d <= last ? k : 0); ahead[d] = ahead[d - 1] + (d > last ? k : 0); }
   const rate = last ? cv[last] / last : 0;
-  const val = (d) => (d <= last ? base + cv[d] : base + cv[last] + rate * (d - last));
+  const val = (d) => (d <= last ? base + cv[d] : base + cv[last] + ahead[d] + rate * (d - last));
   const pace = (d) => (B ? base + Math.max(0, B - base) * d / N : 0);
   return { n: N, B, base, last, isCur, val, pace, top: niceMax(Math.max(B, val(N), base) * 1.04 || 100), used: g, home: (isCur ? t.d : N) - 1 };
 }
@@ -178,7 +179,7 @@ export function dayOfYear(y, m, d) { let n = d; for (let k = 1; k < m; k++) n +=
 export function dateOfDay(y, i) { let m = 1; while (m < 12 && i > dim(y, m)) { i -= dim(y, m); m++; } return iso(y, m, i); }
 export function yearChart(ix, budgets, y, today) {
   const t = parts(today), n = daysIn(y), last = y > t.y ? 0 : y === t.y ? dayOfYear(t.y, t.m, t.d) : n;
-  const val = [0], bud = [0], base = [0];
+  const val = [0], bud = [0], base = [0], ahead = [0];
   let done = 0, budDone = 0, baseDone = 0, i = 0, lastBase = 0;
   for (let m = 1; m <= 12; m++) {
     const N = dim(y, m), B = budgetAt(budgets, y, m), g = sumOf(ix, { y, m }, "month"), started = i + 1 <= last;
@@ -187,7 +188,9 @@ export function yearChart(ix, budgets, y, today) {
     let cv = 0;
     for (let d = 1; d <= N; d++) {
       i++;
-      if (i <= last) { const x = sumOf(ix, { y, m, d }, "day"); cv += x.out - x.base - x.outside; }
+      const x = sumOf(ix, { y, m, d }, "day"), k = x.out - x.base - x.outside;
+      if (i <= last) cv += k;
+      ahead[i] = ahead[i - 1] + (i > last ? k : 0);   // 提前记下的、今天以后的那几笔
       val[i] = done + (started ? g.base : 0) + cv;
       bud[i] = B ? budDone + b + Math.max(0, B - b) * d / N : budDone;
       base[i] = baseDone + b;
@@ -197,7 +200,7 @@ export function yearChart(ix, budgets, y, today) {
     baseDone += b;
   }
   const rate = last ? val[last] / last : 0;
-  const v = (k) => (k <= last ? val[k] : val[last] + rate * (k - last));
+  const v = (k) => (k <= last ? val[k] : val[last] + ahead[k] + rate * (k - last));
   return { n, B: yearBudget(budgets, y, today), last, isCur: y === t.y, val: v, budgetLine: bud, baseLine: base,
     top: niceMax(Math.max(bud[n], v(n)) * 1.04 || 100), used: sumOf(ix, { y }, "year"), home: (last || n) - 1, dateOf: (k) => dateOfDay(y, k) };
 }
@@ -209,7 +212,10 @@ function upTo(ix, y, m, cut) {
   for (let d = 1; d <= cut; d++) { const x = sumOf(ix, { y, m, d }, "day"); g.out += x.out; g.inc += x.inc; g.base += x.base; g.outside += x.outside; }
   return g;
 }
-export const metricsOf = (g, B) => ({ expense: g.out, income: g.inc, left: B - (g.out - g.outside), balance: g.inc - g.out, used: B ? (g.out - g.outside) / B : 0 });
+// leftPct = 预算还剩几成，不算底座（House）和不算进预算的（Bonds）：1 −（支出 − 底座 − 不算的）÷（预算 − 底座）；没预算 = null。
+// 提前记的、日期还没到的也算在里面（记了就算）
+export const metricsOf = (g, B) => ({ expense: g.out, income: g.inc, left: B - (g.out - g.outside), balance: g.inc - g.out, used: B ? (g.out - g.outside) / B : 0,
+  leftPct: B - g.base > 0 ? 1 - (g.out - g.outside - g.base) / (B - g.base) : null, room: Math.max(0, B - g.base) });
 export function compare(ix, budgets, p, mode, today) {
   const t = parts(today), prev = [];
   let cur, cutText = "";
@@ -240,8 +246,8 @@ export function compare(ix, budgets, p, mode, today) {
     }
     if (isCur) cutText = "by day " + t.d;
   }
-  const range = (k) => (prev.length >= 2 ? [Math.min(...prev.map((x) => x[k])), Math.max(...prev.map((x) => x[k]))] : null);
-  return { cur, n: prev.length, cutText, range: { expense: range("expense"), income: range("income"), left: range("left"), balance: range("balance") } };
+  const range = (k) => { const xs = prev.map((x) => x[k]).filter((v) => v !== null && v !== undefined); return xs.length >= 2 ? [Math.min(...xs), Math.max(...xs)] : null; };
+  return { cur, n: prev.length, cutText, range: { expense: range("expense"), income: range("income"), left: range("left"), leftPct: range("leftPct"), balance: range("balance") } };
 }
 
 // 推荐：①这个月之前两个月都有、同样金额的底座类别（房租、网费这类），这个月还没记的；②最近 60 天里同一类同一个金额出现得最多的那笔（至少两次）。

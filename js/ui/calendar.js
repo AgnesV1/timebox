@@ -9,7 +9,7 @@
 import * as store from "../store.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
-import { addDays, addMonths, startOfWeek, startOfMonth, range, fmtShort, fmtMin, WEEKDAYS, MONTHS, MONTHS_LONG, weekday } from "../dates.js";
+import { addDays, addMonths, startOfWeek, startOfMonth, range, fmtShort, fmtMin, fmtHours, WEEKDAYS, MONTHS, MONTHS_LONG, weekday } from "../dates.js";
 import * as SC from "../scores.js";
 import { isPayday } from "../offdays.js";
 import { colorOf, lineInfo, badgeOf, projectOptions, groupsOf, toast } from "./common.js";
@@ -54,10 +54,10 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
     '<button type="button" class="cm-t' + (commute ? " on" : "") + '" data-act="commute" data-date="' + d + '" aria-pressed="' + commute + '" title="' + (commute ? "Commute day — click to clear" : "Mark as a commute day") + '">' + icon("commute") + "</button>" +
     (month ? "" : capEdit === d
       ? '<input class="cap-input num" type="number" min="0" step="15" data-cap-input="' + d + '" data-keep="cap-' + d + '" value="' + sum.cap + '" title="Minutes available · 0 = rest day · empty = weekly default">'
-      : '<button type="button" class="cap num' + (capOver ? " set" : "") + '" data-act="cap" data-date="' + d + '" title="Available minutes this day — click to change">' + (sum.rest ? "rest" : fmtMin(sum.cap)) + "</button>") + "</div>" +
+      : '<button type="button" class="cap num' + (capOver ? " set" : "") + '" data-act="cap" data-date="' + d + '" title="Available minutes this day — click to change">' + (sum.rest ? "rest" : fmtHours(sum.cap)) + "</button>") + "</div>" +
     '<button type="button" class="load-t" data-act="super-rest" data-date="' + d + '" aria-pressed="' + gold + '" title="' + (gold ? "Super rest day — click to clear" : "Mark as a super rest day") + '">' +
     '<span class="load' + (gold && !still ? " shine" : "") + '"><i style="width:' + loadPct + '%"></i></span></button>' +
-    (line && !month ? '<div class="ln num">line ' + fmtMin(line) + "</div>" : "") +
+    (line && !month ? '<div class="ln num">line ' + fmtHours(line) + "</div>" : "") +
     all.join("");
   if (!month) {
     h += adding === d
@@ -93,7 +93,7 @@ export function calendarHTML(c) {
     '<button type="button" class="nav" data-act="cal-prev" aria-label="Previous">' + icon("left") + '</button><button type="button" class="nav" data-act="cal-next" aria-label="Next">' + icon("right") + "</button>" +
     '<span class="seg"><button type="button" data-act="cal-mode" data-mode="week"' + (week ? ' class="on"' : "") + '>Week</button><button type="button" data-act="cal-mode" data-mode="month"' + (!week ? ' class="on"' : "") + ">Month</button></span>" +
     '<button type="button" class="nav' + (store.local().pool ? " on" : "") + '" data-act="pool-toggle">' + icon("pool") + " Pool</button></div></header>" +
-    (line > 0 ? '<div class="lineband"><span>Today\'s line ' + fmtMin(line) + '</span><div class="meter"><div class="fill" style="width:' + Math.min(100, (done / scale) * 100) + '%"></div><i class="tick" style="left:' + Math.min(100, (line / scale) * 100) + '%"></i></div><em>' + fmtMin(done) + " done</em></div>" : "") +
+    (line > 0 ? '<div class="lineband"><span>Today\'s line ' + fmtHours(line) + '</span><div class="meter"><div class="fill" style="width:' + Math.min(100, (done / scale) * 100) + '%"></div><i class="tick" style="left:' + Math.min(100, (line / scale) * 100) + '%"></i></div><em>' + fmtHours(done) + " done</em></div>" : "") +
     body + "</div>";
 }
 
@@ -105,7 +105,7 @@ export function poolHTML(c) {
   const regs = E.poolRegulars(c);
   const subs = projects.map((p) => ({ p, items: list.filter((x) => x.item.projectId === p.id) })).filter((g) => g.items.length);
   const total = list.reduce((a, x) => a + x.state.unscheduled, 0);
-  let h = '<div class="pool-inner" data-drop="pool"><header class="pool-head"><div><h3>Pool</h3><p>' + (list.length ? list.length + " items · " + fmtMin(total) + " to place" : "Drag onto a day to plan it") + '</p></div>' +
+  let h = '<div class="pool-inner" data-drop="pool"><header class="pool-head"><div><h3>Pool</h3><p>' + (list.length ? list.length + " items · " + fmtHours(total) + " to place" : "Drag onto a day to plan it") + '</p></div>' +
     '<button type="button" class="icon-btn" data-act="pool-toggle" aria-label="Hide pool">' + icon("close") + "</button></header>";
   if (projects.length) {
     h += '<form class="pool-add" autocomplete="off"><select name="project" aria-label="Plan">' + projectOptions(projects, "", null, false) + "</select>" +
@@ -123,7 +123,7 @@ export function poolHTML(c) {
   groupsOf(subs.map((x) => x.p)).forEach((g) => g.subs.forEach((p) => {
     const { items } = subs.find((x) => x.p === p);
     if (g.name !== lastGroup) { lastGroup = g.name; if (g.name) h += '<div class="pg-group">' + esc(g.name) + "</div>"; }
-    h += '<section class="pg"><div class="pg-head" style="--pc:' + esc(p.color) + '"><i></i><span>' + esc(p.name) + "</span><em>" + fmtMin(items.reduce((a, x) => a + x.state.unscheduled, 0)) + "</em></div>";
+    h += '<section class="pg"><div class="pg-head" style="--pc:' + esc(p.color) + '"><i></i><span>' + esc(p.name) + "</span><em>" + fmtHours(items.reduce((a, x) => a + x.state.unscheduled, 0)) + "</em></div>";
     let mod = null;
     items.forEach(({ item, state }) => {
       if ((item.module || "") !== mod) { mod = item.module || ""; if (mod) h += '<div class="pg-mod">' + esc(mod) + "</div>"; }
@@ -142,7 +142,7 @@ function forecastHTML(c) {
   if (!rows.some((r) => r.total > 0)) return "";
   const max = Math.max(...rows.map((r) => Math.max(r.total, r.cap)), 60);
   return '<section class="forecast"><h4>Next 14 days</h4><div class="fc">' + rows.map((r) =>
-    '<div class="fc-col' + (r.over ? " over" : "") + (r.rest ? " rest" : "") + '" title="' + fmtShort(r.date) + ": " + fmtMin(r.total) + (r.cap ? " of " + fmtMin(r.cap) : "") + '">' +
+    '<div class="fc-col' + (r.over ? " over" : "") + (r.rest ? " rest" : "") + '" title="' + fmtShort(r.date) + ": " + fmtHours(r.total) + (r.cap ? " of " + fmtHours(r.cap) : "") + '">' +
     '<i class="cap" style="height:' + (r.cap / max) * 100 + '%"></i><i class="need" style="height:' + (r.total / max) * 100 + '%"></i><span>' + WEEKDAYS[weekday(r.date)][0] + "</span></div>").join("") + "</div></section>";
 }
 

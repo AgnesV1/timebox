@@ -101,15 +101,16 @@ const SHOTS = [
   { device: "desk", name: "plan-editor", hash: "projects", act: tap('.pcard[data-project="seed-b2"] .pname') },
   { device: "desk", name: "stats", hash: "stats" },
   { device: "desk", name: "spending", hash: "spending" },
-  { device: "desk", name: "spending-drawer", hash: "spending", act: tap(".mn-desk [data-act=drawer]") },
-  { device: "desk", name: "spending-add", hash: "spending", act: async (page) => { await tap(".mn-desk .mn-hadd")(page); await page.keyboard.type("12.5+8"); } },
-  { device: "desk", name: "spending-set", hash: "spending", act: async (page) => { await tap(".mn-desk [data-act=dset]")(page); await tap('.mn-desk [data-sub="cats"]')(page); } },
-  { device: "desk", name: "spending-find", hash: "spending", act: async (page) => { await tap(".mn-desk [data-act=dfind]")(page); await page.keyboard.type("coffee"); await page.waitForTimeout(300); } },
-  { device: "desk", name: "spending-year", hash: "spending", act: async (page) => { await tap('.mn-desk [data-seg="cmode"] [data-v="year"]')(page); await page.waitForTimeout(900); } },
+  { device: "desk", name: "spending-add", hash: "spending", act: async (page) => { await page.keyboard.press("n"); await page.waitForTimeout(300); await page.keyboard.type("12.5+8"); await page.keyboard.press("Tab"); } },
+  { device: "desk", name: "spending-edit", hash: "spending", act: tap(".spend .sp-row:nth-child(3)") },
+  { device: "desk", name: "spending-filter", hash: "spending", act: async (page) => { await tap(".spend .sp-cat:nth-child(2)")(page); await page.mouse.move(5, 5); await page.waitForTimeout(200); } },
+  { device: "desk", name: "spending-search", hash: "spending", act: async (page) => { await page.keyboard.press("/"); await page.keyboard.type("coffee"); await page.waitForTimeout(300); } },
+  { device: "desk", name: "spending-year", hash: "spending", act: async (page) => { await tap('.spend [data-seg="mode"] [data-v="year"]')(page); await page.waitForTimeout(900); } },
+  { device: "desk", name: "spending-set", hash: "spending", act: async (page) => { await tap('.spend [data-act="set"]')(page); await tap('#modal [data-sact="tab"][data-v="cats"]')(page); } },
   { device: "desk", name: "settings", hash: "settings" },
   { device: "small", name: "projects", hash: "projects" },
   { device: "small", name: "spending", hash: "spending" },
-  { device: "small", name: "spending-drawer", hash: "spending", act: tap(".mn-desk [data-act=drawer]") }
+  { device: "small", name: "spending-add", hash: "spending", act: async (page) => { await page.keyboard.press("n"); await page.waitForTimeout(300); await page.keyboard.type("12.5"); } }
 ];
 const DEVICES = {
   phone: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },

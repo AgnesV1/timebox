@@ -1,15 +1,15 @@
-// 记账的界面。一份代码两个地方用：手机上是从顶上拉出来的纯黑面板（外壳和下拉手势在 island.js），电脑上是 Spending 页。
+// 记账的界面（手机）：从今天页顶上拉下来的那块面板（外壳和下拉手势在 island.js）。电脑上的 Spending 页是网页的排法，在 js/ui/spending.js，
+// 它也用这里导出的几样：金额的小数缩小（cents）、滚着变的数字（roll）、短金额（kfmt）、图表（chartView）。
 // 主页：Year / Month / Day → 能拖的柱状时间轴（停在中间那格就是选中的；超了橙、正常蓝、有收入底下一个青绿点）→ 类别小标签（点了筛下面的流水）→
 // 流水（点一笔改、往左滑删）→ 推荐 → Add a new transaction。往上拉流水时柱子压成小点。
-// 图表（figure）：梯形图（House 是底座、预算是浅天蓝底、实线是花的、虚线是照现在的速度）、五个小方块、两个 Breakdown（点开看那一类的每一笔），
-// 自己一套 Month / Year 和前后翻。手机上图表是从底下升上来的一页；电脑上整页就是图表，主页收在右边的抽屉里（只看某一天、记一笔）：
-// 收着时右边露一条把手（今天花了多少、「+」），点它 / 按 N / 触控板往左划打开，Esc / 往右划 / 点外面收起。
+// 图表：梯形图（House 是底座、预算是浅天蓝底、实线是花的、虚线是照现在的速度）、五个小方块、两个 Breakdown（点开看那一类的每一笔），
+// 自己一套 Month / Year 和前后翻；从底下升上来的一页，先停在半高。
 // 设定：Budget（从某月起每月多少）/ Categories（加、改名、藏、没用过的能删）/ Export（.md）/ Import a month / Currency。
 
 import * as SP from "../spend.js";
 import * as M from "../money.js";
 import * as store from "../store.js";
-import { esc, icon, onSwipe } from "../dom.js";
+import { esc, icon } from "../dom.js";
 
 // 小东西（按钮、开关、小签）用的弹簧：只冲过头 0.5%；面板、抽屉、图表页这种大块不冲过头（ENTER / EXIT，见 css/money.css 开头）
 const SPR = "linear(0, .029, .099, .192, .296, .399, .498, .588, .668, .737, .795, .844, .883, .915, .939, .959, .973, .984, .992, .997, 1.001, 1.003, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1)";
@@ -22,16 +22,16 @@ const CW = { day: 30, month: 40, year: 76 };
 
 // 加总按数据版本缓存（每存一次 spend.js 的 ver 就变）
 let ixCache = null, ixVer = -1;
-const IX = () => { if (ixVer !== SP.ver() || !ixCache) { ixCache = M.index(SP.entries(), SP.cats()); ixVer = SP.ver(); } return ixCache; };
+export const IX = () => { if (ixVer !== SP.ver() || !ixCache) { ixCache = M.index(SP.entries(), SP.cats()); ixVer = SP.ver(); } return ixCache; };
 const visible = (kind) => SP.cats().filter((c) => c.kind === kind && !c.hidden).map((c) => c.name);
 const isIncomeCat = (name) => M.kindOf(SP.cats(), name) === "in";
 
 // 金额：小数点后那两位小一号、淡一点（「$1,234」后面跟着小的「.56」），大数字好排
-const cents = (s) => { const i = s.lastIndexOf("."); return i < 0 ? esc(s) : esc(s.slice(0, i)) + '<span class="mn-dec">' + esc(s.slice(i)) + "</span>"; };
+export const cents = (s) => { const i = s.lastIndexOf("."); return i < 0 ? esc(s) : esc(s.slice(0, i)) + '<span class="mn-dec">' + esc(s.slice(i)) + "</span>"; };
 
 // 滚着变的数字：每一位一列 0–9，从旧的那位滚到新的。small = 小数那几位小一号（16px 以上的大数字才这样，小字本来就小）
 const DIG = [..."0123456789"].map((d) => "<span>" + d + "</span>").join("");
-function roll(el, s, small = false) {
+export function roll(el, s, small = false) {
   if (!el) return;
   const was = el.dataset.v;
   el.dataset.v = s;
@@ -55,43 +55,106 @@ function tracker() {
     vel() { if (p.length < 2) return 0; const a = p[0], b = p[p.length - 1]; return (b[0] - a[0]) / Math.max(8, b[1] - a[1]); }
   };
 }
+// 放不下的大金额写短：「$1.2k」「−$12k」
+export const kfmt = (c) => { const a = Math.abs(c) / 100, sgn = c < 0 ? "−" : ""; return sgn + "$" + (a >= 1000 ? (a / 1000).toFixed(a >= 10000 ? 0 : 1) + "k" : Math.round(a)); };
 const pie = (p, cls = "") => '<svg class="mn-pie ' + cls + '" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="currentColor" fill-opacity=".2"/><circle cx="7" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="6" stroke-dasharray="' + (Math.max(0, Math.min(1, p)) * 18.85).toFixed(2) + ' 18.85" transform="rotate(-90 7 7)"/></svg>';
 const btn = (act, ic, label, cls = "") => '<button type="button" class="mn-ic ' + cls + '" data-act="' + act + '" aria-label="' + label + '" title="' + label + '">' + icon(ic) + "</button>";
 const back = '<button type="button" class="mn-ic" data-act="back" aria-label="Back">' + icon("left") + "</button>";
 const chevR = '<svg class="ic mn-cr" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
-const periodTitle = (p, mode) => (mode === "day" ? M.fmtDate(M.iso(p.y, p.m, p.d)) : mode === "month" ? M.MONTH[p.m - 1] + " " + p.y : String(p.y));
+export const periodTitle = (p, mode) => (mode === "day" ? M.fmtDate(M.iso(p.y, p.m, p.d)) : mode === "month" ? M.MONTH[p.m - 1] + " " + p.y : String(p.y));
 
-export function createView(kind) {
-  const desk = kind === "desk";
+// 图表：梯形图（House 是底座、预算是浅天蓝底、实线是花的、虚线是照现在的速度）+ 鼠标 / 手指移上去的读数（竖线、橙点，上面哪天、下面到那天一共多少）。
+// 手机的图表页和电脑的 Spending 页共用。draw 按给的宽高画（viewBox = 像素，字不跟着缩放），返回这一期的数（monthChart / yearChart）
+export function chartView(svg) {
+  let CS = null, ct = 0, ci = 0, craf = 0;
+  function draw({ mode, p, w, h, animate = false, delay = 0 }) {
+    const W = w, H = h;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    const ix = IX(), bud = SP.budgets();
+    const c = mode === "month" ? M.monthChart(ix, bud, p.y, p.m, today()) : M.yearChart(ix, bud, p.y, today());
+    const X0 = 4, X1 = W - 4, Y0 = H - 22, Y1 = 26;
+    const X = (i) => X0 + (i - 1) / Math.max(1, c.n - 1) * (X1 - X0), Y = (v) => Y0 - v / c.top * (Y0 - Y1);
+    const pts = Array.from({ length: c.n }, (_, i) => ({ x: X(i + 1), y: Y(c.val(i + 1)) }));
+    const poly = (arr) => "M" + arr.map((v, i) => X(i + 1).toFixed(1) + " " + Y(v).toFixed(1)).join(" L") + " L" + X1 + " " + Y0 + " L" + X0 + " " + Y0 + "Z";
+    let h0;
+    if (mode === "month") {
+      h0 = (c.B ? '<path class="ar" d="M' + X0 + " " + Y(c.pace(1)) + " L" + X1 + " " + Y(c.B) + " L" + X1 + " " + Y0 + " L" + X0 + " " + Y0 + 'Z" fill="var(--mn-bud)"/>' : "") +
+        (c.base ? '<path class="ar" d="M' + X0 + " " + Y(c.base) + " H" + X1 + " V" + Y0 + " H" + X0 + 'Z" fill="var(--mn-base)"/>' : "");
+    } else {
+      h0 = (c.budgetLine[c.n] ? '<path class="ar" d="' + poly(c.budgetLine.slice(1)) + '" fill="var(--mn-bud)"/>' : "") + '<path class="ar" d="' + poly(c.baseLine.slice(1)) + '" fill="var(--mn-base)"/>';
+    }
+    h0 += [c.top, c.top / 2].map((v) => '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#fff" stroke-opacity=".07"/><text class="mn-ax" x="6" y="' + (Y(v) + 12) + '">$' + Math.round(v / 100).toLocaleString("en-US") + "</text>").join("");
+    if (c.last) h0 += '<path class="ln" pathLength="1" d="' + pts.slice(0, c.last).map((q, i) => (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1)).join(" ") + '" fill="none" stroke="#F2EEE6" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>';
+    if (c.isCur && c.last && c.last < c.n) h0 += '<path class="fc" d="M' + pts[c.last - 1].x + " " + pts[c.last - 1].y + " L" + pts[c.n - 1].x + " " + pts[c.n - 1].y + '" fill="none" stroke="#F2EEE6" stroke-opacity=".5" stroke-width="1.4" stroke-dasharray="4 4"/>';
+    const xl = mode === "month" ? [[1, M.MON[p.m - 1] + " 1"], [Math.ceil(c.n / 2), M.MON[p.m - 1] + " " + Math.ceil(c.n / 2)], [c.n, M.MON[p.m - 1] + " " + c.n]] : [[1, "Jan"], [M.dayOfYear(p.y, 7, 1), "Jul"], [c.n, "Dec"]];
+    h0 += '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y0 + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".14"/>' + xl.map(([i, txt], k) => '<text x="' + X(i) + '" y="' + (H - 5) + '" text-anchor="' + (k === 0 ? "start" : k === 2 ? "end" : "middle") + '">' + txt + "</text>").join("") +
+      '<line data-csl y1="' + (Y1 - 14) + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".35" style="pointer-events:none"/><circle data-csp r="4.5" fill="var(--mn-orange)" stroke="#000" stroke-width="1.5" style="pointer-events:none"/>' +
+      // 读数在竖线右边：上面是哪天，下面是到那天一共多少（靠右边放不下就挪到左边）
+      '<g data-lab style="pointer-events:none"><text data-lt class="mn-ax" y="' + (Y1 - 4) + '" style="font-size:11px;fill:#8C8CA0"></text><text data-lv class="mn-ax" y="' + (Y1 + 12) + '" style="font-size:13px;fill:#F2EEE6"></text></g>';
+    svg.innerHTML = h0;
+    if (animate && !quiet()) {
+      svg.querySelectorAll(".ar").forEach((a) => a.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 520, delay: delay * 1000, fill: "backwards" }));
+      svg.querySelectorAll(".ln").forEach((q) => { q.style.strokeDasharray = 1; q.style.strokeDashoffset = 1; q.getBoundingClientRect(); q.style.transition = "stroke-dashoffset .9s " + ENTER + " " + (delay + 0.1) + "s"; q.style.strokeDashoffset = 0; });
+      svg.querySelectorAll(".fc").forEach((q) => q.animate([{ opacity: 0 }, { opacity: 0, offset: 0.65 }, { opacity: 1 }], { duration: 1000 + delay * 1000 }));
+      svg.querySelector("[data-lab]").animate([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 900 + delay * 1000 });
+    }
+    CS = { c, pts, mode, p, W, dateOf: (i) => (mode === "month" ? M.MON[p.m - 1] + " " + (i + 1) : (() => { const q = M.parts(c.dateOf(i + 1)); return M.MON[q.m - 1] + " " + q.d; })()) };
+    ct = ci = Math.min(c.n - 1, c.home);
+    cread(ci);
+    svg.classList.add("mn-st");
+    return c;
+  }
+  function cplace(f) {
+    if (!CS) return;
+    const P = CS.pts, a = Math.floor(f), b = Math.min(P.length - 1, a + 1), t = f - a, x = P[a].x + (P[b].x - P[a].x) * t, y = P[a].y + (P[b].y - P[a].y) * t;
+    const sl = svg.querySelector("[data-csl]"), sp = svg.querySelector("[data-csp]");
+    if (!sl) return;
+    sl.setAttribute("x1", x); sl.setAttribute("x2", x); sp.setAttribute("cx", x); sp.setAttribute("cy", y);
+    const lt = svg.querySelector("[data-lt]"), lv = svg.querySelector("[data-lv]"), w = Math.max(lt.getComputedTextLength?.() || 60, lv.getComputedTextLength?.() || 60);
+    const right = x + 8 + w <= CS.W - 2, lx = right ? x + 8 : x - 8;
+    for (const el of [lt, lv]) { el.setAttribute("x", lx.toFixed(1)); el.setAttribute("text-anchor", right ? "start" : "end"); }
+  }
+  function cread(i) {
+    const lt = svg.querySelector("[data-lt]");
+    if (!lt) return;
+    lt.textContent = CS.dateOf(i) + (i + 1 > CS.c.last ? " · trend" : "");
+    svg.querySelector("[data-lv]").textContent = M.money(CS.c.val(i + 1));
+    cplace(ci);
+  }
+  const ctick = () => { ci += (ct - ci) * 0.18; if (Math.abs(ct - ci) < 0.005) ci = ct; cplace(ci); craf = ci === ct ? 0 : requestAnimationFrame(ctick); };
+  const caim = (i) => { if (i !== ct) { ct = i; cread(i); } if (!craf) craf = requestAnimationFrame(ctick); };
+  const cnear = (e) => { const r = svg.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * CS.W, P = CS.pts; const k = Math.round((vx - P[0].x) / Math.max(1e-6, P[P.length - 1].x - P[0].x) * (P.length - 1)); return Math.max(0, Math.min(P.length - 1, k)); };
+  svg.addEventListener("pointermove", (e) => CS && caim(cnear(e)));
+  svg.addEventListener("pointerdown", (e) => CS && caim(cnear(e)));
+  svg.addEventListener("pointerleave", () => CS && caim(Math.min(CS.c.n - 1, CS.c.home)));
+  return { draw };
+}
+
+export function createView() {
   const root = document.createElement("div");
-  root.className = "mn mn-" + kind;
-  let W = desk ? 720 : 244, H = desk ? 260 : 172;   // 电脑上图表跟着那一栏的宽度量（renderChart），字不跟着缩放
+  root.className = "mn mn-phone";
+  const W = 244, H = 172;
   const blur = '<div class="mn-pblur" aria-hidden="true"><i></i><i></i><i></i></div>';   // 渐进模糊：三层 1 / 3 / 8px，越靠边越糊
 
-  // 电脑上的抽屉只看某一天：没有 Year / Month / Day，标题旁边多一个日历挑哪天；记一笔的表单在最上面
   const home = '<section class="mn-pg mn-home" data-pg="home">' +
-    '<div class="mn-hdr">' + btn("set", "settings", "Settings") + (desk ? '<span class="mn-status" data-status></span><span class="mn-hgrp">' + btn("find", "search", "Search") + btn("dclose", "close", "Close", "mn-sm") + "</span>" : btn("chart", "chart", "Charts") + btn("find", "search", "Search")) + "</div>" +
-    (desk ? formHTML() : "") +
+    '<div class="mn-hdr">' + btn("set", "settings", "Settings") + btn("chart", "chart", "Charts") + btn("find", "search", "Search") + "</div>" +
     '<div class="mn-thead"><div><h2 class="mn-h1" data-title></h2><div class="mn-num mn-13" style="margin-top:3px"><span class="mn-rn" data-to></span><span style="display:inline-block;width:12px"></span><span class="mn-rn" data-ti style="color:var(--mn-green)"></span></div></div>' +
-    '<div class="mn-nav">' + (desk ? btn("dcal", "calendar", "Pick a day", "mn-sm") : "") + btn("reset", "reset", "Back to today", "mn-sm mn-rst") + btn("prev", "left", "Earlier", "mn-sm") + btn("next", "right", "Later", "mn-sm") + "</div></div>" +
-    (desk ? "" : '<div class="mn-seg" data-seg="mode" style="margin-top:14px"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button><button type="button" data-v="day">Day</button></div>') +
+    '<div class="mn-nav">' + btn("reset", "reset", "Back to today", "mn-sm mn-rst") + btn("prev", "left", "Earlier", "mn-sm") + btn("next", "right", "Later", "mn-sm") + "</div></div>" +
+    '<div class="mn-seg" data-seg="mode" style="margin-top:14px"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button><button type="button" data-v="day">Day</button></div>' +
     '<div class="mn-tl"><span class="mn-hl"></span><div class="mn-rw"><div class="mn-rail"></div></div></div>' +
     '<div class="mn-hs mn-chips"></div>' +
     '<div class="mn-lw"><div class="mn-list mn-vs"></div>' + blur.replace("mn-pblur", "mn-pblur top") + blur.replace("mn-pblur", "mn-pblur bot") + "</div>" +
     '<div class="mn-foot"><div class="mn-recw" hidden><span class="mn-meta" style="flex:none">Recommended</span><div class="mn-hs mn-recs"></div></div>' +
-    '<button type="button" class="mn-big" data-act="add">Add a new transaction' + (desk ? '<span class="mn-kbd">N</span>' : "") + "</button>" +
-    (desk ? "" : '<div class="mn-grab" data-grab aria-label="Close"><span class="mn-grabber"></span></div>') + "</div></section>";
+    '<button type="button" class="mn-big" data-act="add">Add a new transaction</button>' +
+    '<div class="mn-grab" data-grab aria-label="Close"><span class="mn-grabber"></span></div></div></section>';
   const pages = '<section class="mn-pg off" data-pg="set"><div class="mn-hdr">' + back + '<span style="font-size:15px;font-weight:500">Settings</span><span style="width:32px"></span></div><div class="mn-vs" data-setb style="flex:1;margin-top:14px"></div></section>' +
     '<section class="mn-pg off" data-pg="sub"><div class="mn-hdr">' + back + '<span data-subt style="font-size:15px;font-weight:500"></span><span style="width:32px"></span></div><div class="mn-vs" data-subb style="flex:1;margin-top:14px"></div></section>' +
     '<section class="mn-pg off" data-pg="find"><div class="mn-hdr" style="gap:6px">' + back + '<input class="mn-tx" data-q placeholder="Search notes, categories, amounts" autocomplete="off" style="flex:1;padding:6px 0;border-bottom:1px solid var(--mn-line)"></div><div class="mn-vs" data-fres style="flex:1;margin-top:8px"></div></section>';
-  // 图表：手机上是升上来的那一页的内容；电脑上是整页的主角，顶上一栏是期间、花了 / 收入、Year / Month、前后翻、搜索、设定、记一笔
+  // 图表：从底下升上来的那一页
   const cseg = '<div class="mn-seg" data-seg="cmode"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button></div>';
   const cnav = '<div class="mn-nav">' + btn("creset", "reset", "Back to this month", "mn-sm mn-rst") + btn("cprev", "left", "Earlier", "mn-sm") + btn("cnext", "right", "Later", "mn-sm") + "</div>";
-  const chartBody = '<div class="mn-cbody mn-vs"><svg class="mn-chart" data-chart viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Spending against the budget"></svg><div class="' + (desk ? "" : "mn-hs ") + 'mn-cards"></div><div class="mn-bks"><div data-xb></div><div data-ib></div></div></div>';
-  const chartInner = desk
-    ? '<header class="mn-fhead"><div class="mn-ftitle"><h2 class="mn-h1" data-ctitle></h2><div class="mn-ftot"><span><span class="mn-num mn-rn" data-cto></span><span class="mn-meta">spent</span></span><span><span class="mn-num mn-rn" data-cti style="color:var(--mn-green)"></span><span class="mn-meta">in</span></span></div></div>' +
-      '<div class="mn-ftools">' + cseg + cnav + '<span class="mn-hgrp">' + btn("dfind", "search", "Search") + btn("dset", "settings", "Settings") + '</span><button type="button" class="mn-big mn-addb" data-act="add">' + icon("plus") + 'Add<span class="mn-kbd">N</span></button></div>' + blur + "</header>" + chartBody
-    : '<div class="mn-thead"><h2 class="mn-h1" data-ctitle></h2>' + cnav + "</div>" + cseg.replace('class="mn-seg"', 'class="mn-seg" style="margin-top:14px"') + chartBody;
+  const chartBody = '<div class="mn-cbody mn-vs"><svg class="mn-chart" data-chart viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Spending against the budget"></svg><div class="mn-hs mn-cards"></div><div class="mn-bks"><div data-xb></div><div data-ib></div></div></div>';
+  const chartInner = '<div class="mn-thead"><h2 class="mn-h1" data-ctitle></h2>' + cnav + "</div>" + cseg.replace('class="mn-seg"', 'class="mn-seg" style="margin-top:14px"') + chartBody;
   const sheet = '<div class="mn-scrim" data-act="sclose"></div><section class="mn-sheet" aria-label="Transaction">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;height:30px"><span data-sht style="font-size:15px;font-weight:500"></span><div style="display:flex;align-items:center;gap:6px"><button type="button" class="mn-act warn" data-act="sdel" hidden>Delete</button>' + btn("sclose", "close", "Close", "mn-sm") + "</div></div>" +
     '<div class="mn-seg" data-seg="skind" style="margin-top:8px"><i></i><button type="button" data-v="out">Expense</button><button type="button" data-v="in">Income</button></div>' +
@@ -102,18 +165,13 @@ export function createView(kind) {
     '<div class="mn-pad" data-pad>' + ["1", "2", "3", "⌫", "4", "5", "6", "+", "7", "8", "9", "Add", ".", "0", "00"].map((k) => '<button type="button" class="mn-k' + (k === "Add" ? " add" : k === "⌫" || k === "+" ? " op" : "") + '" data-k="' + k + '">' + k + "</button>").join("") + "</div></section>";
   const cal = '<div class="mn-cal" data-cal><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' + btn("calp", "left", "Earlier month", "mn-sm") + '<span data-calt style="font-size:13px;font-weight:500"></span>' + btn("caln", "right", "Later month", "mn-sm") + '</div><div class="mn-cg wd mn-meta"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div><div class="mn-cg" data-calg></div></div>';
   const snackHTML = '<div class="mn-snack" role="status" aria-live="polite"><span data-snt></span><button type="button" class="mn-act" data-act="undo">Undo</button></div>';
-  root.innerHTML = desk
-    ? '<div class="mn-fig">' + chartInner + "</div>" +
-      '<div class="mn-handle"><button type="button" class="mn-hmain" data-act="drawer" aria-label="Open the day\'s spending"><span class="mn-meta">Today</span><span class="mn-num" data-htot></span></button>' +
-      '<button type="button" class="mn-hadd" data-act="add" aria-label="Add a transaction" title="Add a transaction (N)">' + icon("plus") + "</button></div>" +
-      '<div class="mn-dscrim" data-act="dclose"></div><aside class="mn-drawer" aria-label="One day">' + home + pages + "</aside>" + cal + snackHTML
-    // 手机：面板（mn-inner）只有屏幕约 88% 高，底边是一道水面弧线；底下露出来的那条是 mn-veil（压暗的今天页，点了收起，见 island.js）。
-    // 记一笔的面板、日历盖满整屏（数字键盘贴着屏幕底）
-    : '<div class="mn-veil"></div><div class="mn-inner">' + home + pages + '<div class="mn-cdim" data-act="cclose"></div><section class="mn-csheet" aria-label="Charts"><div class="mn-cgrab" data-cgrab><span class="mn-grabber"></span><button type="button" class="mn-plain mn-done" data-act="cclose">Done</button></div>' + chartInner + "</section>" + snackHTML + "</div>" + sheet + cal;
+  // 面板（mn-inner）只有屏幕约 88% 高，底边是一道水面弧线；底下露出来的那条是 mn-veil（压暗的今天页，点了收起，见 island.js）。
+  // 记一笔的面板、日历盖满整屏（数字键盘贴着屏幕底）
+  root.innerHTML = '<div class="mn-veil"></div><div class="mn-inner">' + home + pages + '<div class="mn-cdim" data-act="cclose"></div><section class="mn-csheet" aria-label="Charts"><div class="mn-cgrab" data-cgrab><span class="mn-grabber"></span><button type="button" class="mn-plain mn-done" data-act="cclose">Done</button></div>' + chartInner + "</section>" + snackHTML + "</div>" + sheet + cal;
 
   const $ = (s) => root.querySelector(s);
   const homeEl = $('[data-pg="home"]'), rw = $(".mn-rw"), rail = $(".mn-rail"), hl = $(".mn-hl"), tl = $(".mn-tl"), list = $(".mn-list");
-  const V = { mode: desk ? "day" : "month", cur: todayP(), filt: null, items: [], cw: 40, sel: 0, collapsed: false, stack: [], cmode: "month", cc: todayP(), bk: new Set(), fresh: null, chartOpen: false, drawer: false, sub: "", catKind: "out", budEdit: null, newBud: null, expM: null };
+  const V = { mode: "month", cur: todayP(), filt: null, items: [], cw: 40, sel: 0, collapsed: false, stack: [], cmode: "month", cc: todayP(), bk: new Set(), fresh: null, chartOpen: false, sub: "", catKind: "out", budEdit: null, newBud: null, expM: null };
 
   // ---------- 分段开关 ----------
   function seg(name, val) {
@@ -427,75 +485,8 @@ export function createView(kind) {
     renderAmt(app);
   }
 
-  // 电脑：流水顶上展开一行，直接打字（Tab 跳格、回车存、Esc 收起）
-  function formHTML() {
-    return '<form class="mn-form" data-form hidden autocomplete="off"><div class="mn-seg full" data-seg="fkind"><i></i><button type="button" data-v="out">Expense</button><button type="button" data-v="in">Income</button></div>' +
-      '<div class="mn-cats full" data-fcats></div>' +
-      '<span class="mn-meta mn-13">Date</span><button type="button" class="mn-plain" data-act="fdate" style="display:flex;align-items:center;gap:6px;justify-self:start"><span class="mn-num mn-13" data-fdl></span>' + icon("calendar") + "</button>" +
-      '<span class="mn-meta mn-13">Amount</span><input class="mn-tx amt" data-famt inputmode="decimal" placeholder="0.00  (12.50+8 adds up)">' +
-      '<span class="mn-meta mn-13">Note</span><input class="mn-tx" data-fnote placeholder="Add a note">' +
-      '<div class="btns full"><span class="mn-meta" data-ferr style="margin-right:auto;color:#E8674A"></span><button type="button" class="mn-act warn" data-act="fdel" hidden>Delete</button><button type="button" class="mn-act" data-act="fcancel">Cancel<span class="mn-kbd">Esc</span></button><button type="submit" class="mn-big">Save<span class="mn-kbd">↵</span></button></div></form>';
-  }
-  function openForm(e) {
-    const f = $("[data-form]");
-    S.edit = e || null;
-    if (e) Object.assign(S, { kind: e.v < 0 ? "out" : "in", cat: e.c, d: e.d });
-    else Object.assign(S, { kind: "out", cat: "Food", d: entryDate() });
-    f.hidden = false;
-    $("[data-famt]").value = e ? (Math.abs(e.v) / 100).toFixed(2) : "";
-    $("[data-fnote]").value = e ? e.n : "";
-    $('[data-act="fdel"]').hidden = !e;
-    $("[data-ferr]").textContent = "";
-    renderForm();
-    if (!quiet()) f.animate([{ opacity: 0, transform: "translateY(-6px)" }, { opacity: 1, transform: "none" }], { duration: 280, easing: ENTER });
-    $("[data-famt]").focus();
-  }
-  function renderForm() {
-    seg("fkind", S.kind);
-    $("[data-fcats]").innerHTML = sheetCats().map((c) => '<button type="button" class="mn-chip' + (c === S.cat ? " on" : "") + '" data-fcat="' + esc(c) + '">' + esc(c) + "</button>").join("");
-    $("[data-fdl]").textContent = M.fmtDate(S.d);
-    const used = M.notesOf(SP.entries(), S.cat);
-    $("[data-fnote]").placeholder = used[0] ? "e.g. " + used[0] : "Add a note";
-  }
-  function closeForm() { const f = $("[data-form]"); if (f) f.hidden = true; closeCal(); S.edit = null; }
-  function saveForm() {
-    const raw = $("[data-famt]").value, s = raw.split("+").reduce((a, v) => a + (parseFloat(String(v).replace(/[^\d.]/g, "")) || 0), 0);
-    if (!(s > 0)) { $("[data-ferr]").textContent = "Type an amount first"; $("[data-famt]").focus(); return; }
-    const v = Math.round(s * 100) * (S.kind === "out" ? -1 : 1), n = $("[data-fnote]").value.trim(), e = S.edit;
-    closeForm();
-    if (e) { V.fresh = e.id; SP.update(e.id, { d: S.d, v, c: S.cat, n }); snack("Saved", null); }
-    else addEntry({ d: S.d, v, c: S.cat, n });
-  }
-  const edit = (e) => { if (!e) return; if (desk) { openDrawer(false); openForm(e); } else openSheet(e); };
-  const startNew = () => { if (desk) { openDrawer(true); openForm(null); } else openSheet(null); };
-
-  // ---------- 电脑：右边的抽屉 ----------
-  // 打开：从收着打开的时候回到今天（把手上写的就是今天）；收起：表单、日历、推进去的页都收掉
-  function openDrawer(toToday) {
-    if (!desk || V.drawer) return;
-    V.drawer = true;
-    if (toToday && !M.samePeriod(V.cur, todayP(), "day")) { V.cur = todayP(); buildRail(false); renderTitle(); renderBody(); }
-    root.classList.add("drawer-on");
-    $(".mn-drawer").removeAttribute("inert");
-    if (!quiet()) [...homeEl.children].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateX(18px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: 60 + i * 20, easing: ENTER, fill: "backwards" }));
-  }
-  function closeDrawer() {
-    if (!desk || !V.drawer) return;
-    V.drawer = false;
-    closeForm(); closeCal();
-    while (V.stack.length) pop();
-    root.classList.remove("drawer-on");
-    $(".mn-drawer").setAttribute("inert", "");
-    if (root.contains(document.activeElement)) $('[data-act="drawer"]')?.focus({ preventScroll: true });
-  }
-  // 把手上：今天花了多少。把手只有 64px 宽：放不下的（$1,000 以上）写成「$1.2k」，整数写在悬停的提示里
-  function paintHandle() {
-    const el = desk && $("[data-htot]");
-    if (!el) return;
-    const out = M.sumOf(IX(), todayP(), "day").out, full = "−" + M.money(out);
-    el.innerHTML = full.length <= 8 ? "−" + cents(M.money(out)) : esc(kfmt(-out));
-    el.parentNode.title = "Today " + full;
-  }
+  const edit = (e) => { if (e) openSheet(e); };
+  const startNew = () => openSheet(null);
 
   // 月历：从日期按钮那里弹出来，哪天都能选
   const C = { y: 2026, m: 1, onPick: null, sel: "" };
@@ -524,89 +515,24 @@ export function createView(kind) {
   function closeCal() { $("[data-cal]")?.classList.remove("on"); }
 
   // ---------- 图表 ----------
-  let CS = null, ct = 0, ci = 0, craf = 0;
+  const chart = chartView($("[data-chart]"));
   function renderChart(animate, entering) {
     const mode = V.cmode, p = V.cc, t = todayP();
     $("[data-ctitle]").textContent = periodTitle(p, mode);
     $('[data-act="creset"]').classList.toggle("on", mode === "month" ? !(p.y === t.y && p.m === t.m) : p.y !== t.y);
-    if (desk) {
-      // 电脑：图表按那一栏的实际宽度画（viewBox = 像素），字不跟着放大；高度跟着宽度走，有个上下限
-      const svg0 = $("[data-chart]");
-      W = Math.max(320, Math.round(svg0.clientWidth || W));
-      H = Math.round(Math.max(220, Math.min(340, W * 0.32)));
-      svg0.setAttribute("viewBox", "0 0 " + W + " " + H);
-      const g = M.sumOf(IX(), p, mode);
-      roll($("[data-cto]"), "−" + M.money(g.out), true);
-      roll($("[data-cti]"), "+" + M.money(g.inc), true);
-    }
-    const ix = IX(), bud = SP.budgets();
-    const c = mode === "month" ? M.monthChart(ix, bud, p.y, p.m, today()) : M.yearChart(ix, bud, p.y, today());
-    const X0 = 4, X1 = W - 4, Y0 = H - 22, Y1 = 26;
-    const X = (i) => X0 + (i - 1) / Math.max(1, c.n - 1) * (X1 - X0), Y = (v) => Y0 - v / c.top * (Y0 - Y1);
-    const pts = Array.from({ length: c.n }, (_, i) => ({ x: X(i + 1), y: Y(c.val(i + 1)) }));
-    const poly = (arr) => "M" + arr.map((v, i) => X(i + 1).toFixed(1) + " " + Y(v).toFixed(1)).join(" L") + " L" + X1 + " " + Y0 + " L" + X0 + " " + Y0 + "Z";
-    let h;
-    if (mode === "month") {
-      h = (c.B ? '<path class="ar" d="M' + X0 + " " + Y(c.pace(1)) + " L" + X1 + " " + Y(c.B) + " L" + X1 + " " + Y0 + " L" + X0 + " " + Y0 + 'Z" fill="var(--mn-bud)"/>' : "") +
-        (c.base ? '<path class="ar" d="M' + X0 + " " + Y(c.base) + " H" + X1 + " V" + Y0 + " H" + X0 + 'Z" fill="var(--mn-base)"/>' : "");
-    } else {
-      h = (c.budgetLine[c.n] ? '<path class="ar" d="' + poly(c.budgetLine.slice(1)) + '" fill="var(--mn-bud)"/>' : "") + '<path class="ar" d="' + poly(c.baseLine.slice(1)) + '" fill="var(--mn-base)"/>';
-    }
-    h += [c.top, c.top / 2].map((v) => '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#fff" stroke-opacity=".07"/><text class="mn-ax" x="6" y="' + (Y(v) + 12) + '">$' + Math.round(v / 100).toLocaleString("en-US") + "</text>").join("");
-    if (c.last) h += '<path class="ln" pathLength="1" d="' + pts.slice(0, c.last).map((q, i) => (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1)).join(" ") + '" fill="none" stroke="#F2EEE6" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>';
-    if (c.isCur && c.last && c.last < c.n) h += '<path class="fc" d="M' + pts[c.last - 1].x + " " + pts[c.last - 1].y + " L" + pts[c.n - 1].x + " " + pts[c.n - 1].y + '" fill="none" stroke="#F2EEE6" stroke-opacity=".5" stroke-width="1.4" stroke-dasharray="4 4"/>';
-    const xl = mode === "month" ? [[1, M.MON[p.m - 1] + " 1"], [Math.ceil(c.n / 2), M.MON[p.m - 1] + " " + Math.ceil(c.n / 2)], [c.n, M.MON[p.m - 1] + " " + c.n]] : [[1, "Jan"], [M.dayOfYear(p.y, 7, 1), "Jul"], [c.n, "Dec"]];
-    h += '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y0 + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".14"/>' + xl.map(([i, txt], k) => '<text x="' + X(i) + '" y="' + (H - 5) + '" text-anchor="' + (k === 0 ? "start" : k === 2 ? "end" : "middle") + '">' + txt + "</text>").join("") +
-      '<line data-csl y1="' + (Y1 - 14) + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".35" style="pointer-events:none"/><circle data-csp r="4.5" fill="var(--mn-orange)" stroke="#000" stroke-width="1.5" style="pointer-events:none"/>' +
-      // 读数在竖线右边：上面是哪天，下面是到那天一共多少（靠右边放不下就挪到左边）
-      '<g data-lab style="pointer-events:none"><text data-lt class="mn-ax" y="' + (Y1 - 4) + '" style="font-size:11px;fill:#8C8CA0"></text><text data-lv class="mn-ax" y="' + (Y1 + 12) + '" style="font-size:13px;fill:#F2EEE6"></text></g>';
-    const svg = $("[data-chart]");
-    svg.innerHTML = h;
     const d0 = entering ? 0.3 : 0;
-    if (animate && !quiet()) {
-      svg.querySelectorAll(".ar").forEach((a) => a.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 520, delay: d0 * 1000, fill: "backwards" }));
-      svg.querySelectorAll(".ln").forEach((q) => { q.style.strokeDasharray = 1; q.style.strokeDashoffset = 1; q.getBoundingClientRect(); q.style.transition = "stroke-dashoffset .9s " + ENTER + " " + (d0 + 0.1) + "s"; q.style.strokeDashoffset = 0; });
-      svg.querySelectorAll(".fc").forEach((q) => q.animate([{ opacity: 0 }, { opacity: 0, offset: 0.65 }, { opacity: 1 }], { duration: 1000 + d0 * 1000 }));
-      $("[data-lab]").animate([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 900 + d0 * 1000 });
-    }
-    CS = { c, pts, mode, p, W, dateOf: (i) => (mode === "month" ? M.MON[p.m - 1] + " " + (i + 1) : (() => { const q = M.parts(c.dateOf(i + 1)); return M.MON[q.m - 1] + " " + q.d; })()) };
-    ct = ci = Math.min(c.n - 1, c.home);
-    cread(ci);
+    const c = chart.draw({ mode, p, w: W, h: H, animate, delay: d0 });
     cards(c, mode, p, d0);
     breakdown(mode, p);
     if (animate && !quiet()) {
       const base = entering ? 200 : 30;
-      [...root.querySelectorAll(desk ? ".mn-fig .mn-st" : ".mn-csheet .mn-st")].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: base + Math.min(i, 14) * 30, easing: ENTER, fill: "backwards" }));
+      [...root.querySelectorAll(".mn-csheet .mn-st")].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: base + Math.min(i, 14) * 30, easing: ENTER, fill: "backwards" }));
       root.querySelectorAll(".mn-card").forEach((el, i) => el.animate([{ opacity: 0, transform: "translateX(16px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: base + 100 + i * 30, easing: ENTER, fill: "backwards" }));
     }
   }
-  function cplace(f) {
-    if (!CS) return;
-    const P = CS.pts, a = Math.floor(f), b = Math.min(P.length - 1, a + 1), t = f - a, x = P[a].x + (P[b].x - P[a].x) * t, y = P[a].y + (P[b].y - P[a].y) * t;
-    const sl = $("[data-csl]"), sp = $("[data-csp]");
-    if (!sl) return;
-    sl.setAttribute("x1", x); sl.setAttribute("x2", x); sp.setAttribute("cx", x); sp.setAttribute("cy", y);
-    const lt = $("[data-lt]"), lv = $("[data-lv]"), w = Math.max(lt.getComputedTextLength?.() || 60, lv.getComputedTextLength?.() || 60);
-    const right = x + 8 + w <= CS.W - 2, lx = right ? x + 8 : x - 8;
-    for (const el of [lt, lv]) { el.setAttribute("x", lx.toFixed(1)); el.setAttribute("text-anchor", right ? "start" : "end"); }
-  }
-  function cread(i) {
-    if (!$("[data-lt]")) return;
-    $("[data-lt]").textContent = CS.dateOf(i) + (i + 1 > CS.c.last ? " · trend" : "");
-    $("[data-lv]").textContent = M.money(CS.c.val(i + 1));
-    cplace(ci);
-  }
-  const ctick = () => { ci += (ct - ci) * 0.18; if (Math.abs(ct - ci) < 0.005) ci = ct; cplace(ci); craf = ci === ct ? 0 : requestAnimationFrame(ctick); };
-  const caim = (i) => { if (i !== ct) { ct = i; cread(i); } if (!craf) craf = requestAnimationFrame(ctick); };
-  const svgEl = $("[data-chart]");
-  const cnear = (e) => { const r = svgEl.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * W, P = CS.pts; const k = Math.round((vx - P[0].x) / Math.max(1e-6, P[P.length - 1].x - P[0].x) * (P.length - 1)); return Math.max(0, Math.min(P.length - 1, k)); };
-  svgEl.addEventListener("pointermove", (e) => CS && caim(cnear(e)));
-  svgEl.addEventListener("pointerdown", (e) => CS && caim(cnear(e)));
-  svgEl.addEventListener("pointerleave", () => CS && caim(Math.min(CS.c.n - 1, CS.c.home)));
 
   // 五个小方块：一样的四行（名字 / 数 / 一条线 / 小字），所以对得齐。Budget Used 的线 = 用了多少；
   // 别的四个的线 = 之前六个月（年模式 = 之前几年）这个数的范围，点 = 这次落在哪儿（这个月的话，之前的也只算到同一天）
-  const kfmt = (c) => { const a = Math.abs(c) / 100, sgn = c < 0 ? "−" : ""; return sgn + "$" + (a >= 1000 ? (a / 1000).toFixed(a >= 10000 ? 0 : 1) + "k" : Math.round(a)); };
   function cards(c, mode, p, d0) {
     const g = c.used, B = c.B, used = M.counted(g), u = B ? used / B : 0, cmp = M.compare(IX(), SP.budgets(), p, mode, today());
     const since = (mode === "year" ? "Earlier years" : "6 mo") + (cmp.cutText ? " " + cmp.cutText : "");
@@ -645,8 +571,7 @@ export function createView(kind) {
     };
     $("[data-xb]").innerHTML = make("Expense Breakdown", false);
     $("[data-ib]").innerHTML = make("Income Breakdown", true);
-    if (!desk) $(".mn-csheet .mn-thead").classList.add("mn-st");
-    $("[data-chart]").classList.add("mn-st");
+    $(".mn-csheet .mn-thead").classList.add("mn-st");
   }
   function toggleBk(el) {
     const bin = el.querySelector(".mn-bin"), k = el.dataset.bk, open = !el.classList.contains("open");
@@ -700,7 +625,7 @@ export function createView(kind) {
     V.chartOpen = false;
     sheetTo("", quiet() ? "" : ".26s", EXIT);
   }
-  if (!desk) {
+  {
     let cg = null;
     const grab = $("[data-cgrab]"), cbody = $(".mn-csheet .mn-cbody");
     grab.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) return; cg = { y: e.clientY, base: detent === "full" ? 0 : halfY, d: 0, tr: tracker() }; cg.tr.add(e.clientY); csheet.style.transition = "none"; grab.setPointerCapture(e.pointerId); });
@@ -845,7 +770,6 @@ export function createView(kind) {
         renderTitle(); renderBody();
       } else if (name === "cmode" && v !== V.cmode) { V.cmode = v; V.bk = new Set(); seg("cmode", v); renderChart(true); }
       else if (name === "skind" && v !== S.kind) { S.kind = v; renderSheet(); }
-      else if (name === "fkind" && v !== S.kind) { S.kind = v; renderForm(); }
       else if (name === "catk" && v !== V.catKind) { V.catKind = v; renderSub(); }
       return;
     }
@@ -855,8 +779,6 @@ export function createView(kind) {
     if (rec) { const x = recList[Number(rec.dataset.rec)]; if (x) addEntry({ d: entryDate(), v: x.v, c: x.c, n: x.n }); return; }
     const sc = e.target.closest("[data-scat]");
     if (sc) { S.cat = sc.dataset.scat; renderSheet(); return; }
-    const fc = e.target.closest("[data-fcat]");
-    if (fc) { S.cat = fc.dataset.fcat; renderForm(); $("[data-famt]").focus(); return; }
     const k = e.target.closest("[data-k]");
     if (k) { key(k.dataset.k); return; }
     const cd = e.target.closest("[data-cd]");
@@ -893,15 +815,6 @@ export function createView(kind) {
     if (!a) return;
     const act = a.dataset.act, t = todayP();
     if (act === "add") startNew();
-    else if (act === "drawer") openDrawer(true);
-    else if (act === "dclose") closeDrawer();
-    else if (act === "dfind" || act === "dset") {
-      openDrawer(false);
-      while (V.stack.length) pop();
-      if (act === "dset") { renderSet(); push("set"); }
-      else { $("[data-q]").value = ""; renderFind(); push("find"); setTimeout(() => $("[data-q]").focus(), 320); }
-    }
-    else if (act === "dcal") openCal(a, M.iso(V.cur.y, V.cur.m, V.cur.d), (d) => { V.cur = M.parts(d); buildRail(false); renderTitle(); renderBody(); });
     else if (act === "reset") { if (!quiet()) a.querySelector(".ic")?.animate([{ transform: "rotate(0)" }, { transform: "rotate(-360deg)" }], { duration: 520, easing: SPR }); goTo(V.items.findIndex((it) => M.samePeriod(it, t, V.mode))); }
     else if (act === "prev") goTo(V.sel - 1);
     else if (act === "next") goTo(V.sel + 1);
@@ -916,9 +829,6 @@ export function createView(kind) {
     else if (act === "sclose") closeSheet();
     else if (act === "sdel") { const x = S.edit; closeSheet(); setTimeout(() => x && removeEntry(x.id), 200); }
     else if (act === "sdate") openCal(a, S.d, (d) => { S.d = d; $("[data-sdl]").textContent = M.fmtDate(d); });
-    else if (act === "fdate") openCal(a, S.d, (d) => { S.d = d; $("[data-fdl]").textContent = M.fmtDate(d); });
-    else if (act === "fcancel") closeForm();
-    else if (act === "fdel") { const x = S.edit; closeForm(); if (x) removeEntry(x.id); }
     else if (act === "calp" || act === "caln") { ({ y: C.y, m: C.m } = M.addMonths(C.y, C.m, act === "calp" ? -1 : 1)); drawCal(act === "calp" ? -1 : 1); }
     else if (act === "undo") { const fn = undoFn; undoFn = null; $(".mn-snack").classList.remove("on"); fn?.(); }
     else if (act === "nbo") { V.newBud = M.addMonths(t.y, t.m, 1); renderSub(); setTimeout(() => $("[data-nbv]")?.focus(), 30); }
@@ -970,13 +880,8 @@ export function createView(kind) {
     if (e.key === "Enter" && e.target.matches("[data-newcat]")) { e.preventDefault(); addCat(); }
     if (e.key === "Enter" && e.target.matches("[data-nbv]")) { e.preventDefault(); root.querySelector('[data-act="nbs"]')?.click(); }
     if (e.key === "Enter" && e.target.matches("[data-bpv]")) { e.preventDefault(); e.target.blur(); }
-    if (e.key === "Escape" && desk && !$("[data-form]").hidden) { e.preventDefault(); closeForm(); }
-    else if (e.key === "Escape" && desk && $("[data-cal]").classList.contains("on")) { e.preventDefault(); closeCal(); }
-    else if (e.key === "Escape" && desk && V.stack.length) { e.preventDefault(); pop(); }
-    else if (e.key === "Escape" && desk && V.drawer) { e.preventDefault(); closeDrawer(); }
   });
-  root.addEventListener("input", (e) => { if (e.target.matches("[data-q]")) renderFind(); if (e.target.matches("[data-famt]")) $("[data-ferr]").textContent = ""; });
-  root.addEventListener("submit", (e) => { e.preventDefault(); saveForm(); });
+  root.addEventListener("input", (e) => { if (e.target.matches("[data-q]")) renderFind(); });
 
   // 窗口宽度变了：时间轴两边的留白、选中那格居中、各个分段开关的滑块都按新的宽度重算
   let lastW = 0;
@@ -985,22 +890,15 @@ export function createView(kind) {
     const w = root.clientWidth;
     if (w === lastW) return;
     lastW = w;
-    if (desk) root.classList.toggle("narrow", w < 900);
     rail.style.padding = "0 " + Math.max(0, ((rw.clientWidth || 272) - V.cw) / 2) + "px";
     rw.scrollLeft = V.sel * V.cw;
     seg("mode", V.mode);
     seg("cmode", V.cmode);
     listEdges();
     if (V.sub === "cats") seg("catk", V.catKind);
-    if (CS) renderChart(false);
+    if (V.chartOpen) renderChart(false);
   };
   if (typeof ResizeObserver === "function") new ResizeObserver(relayout).observe(root);
-  if (desk) {
-    onSwipe(root, ".mn-fig, .mn-drawer, .mn-handle, .mn-dscrim", (dir) => (dir === "left" ? openDrawer(true) : closeDrawer()), ".mn-rw, .mn-hs, .mn-cards, input, textarea");
-    // 图表往下滚了：顶栏下沿那条渐进模糊才出来（没滚的时候没有东西要糊）
-    const fb = $(".mn-fig .mn-cbody");
-    fb.addEventListener("scroll", () => $(".mn-fig").classList.toggle("scrolled", fb.scrollTop > 2), { passive: true });
-  }
 
   // ---------- 对外 ----------
   let shown = false;
@@ -1009,34 +907,26 @@ export function createView(kind) {
     repaintBars();
     renderTitle();
     renderBody();
-    if (desk || V.chartOpen) renderChart(false);
-    paintHandle();
+    if (V.chartOpen) renderChart(false);
     if (V.stack.includes("set")) renderSet();
     if (V.stack[V.stack.length - 1] === "sub" && V.sub !== "import") renderSub();
     if (V.stack.includes("find")) renderFind();
-    if (desk) { const [st, bad] = statusText(); const el = $("[data-status]"); el.textContent = bad ? st : SP.pendingCount() ? "Syncing…" : ""; el.classList.toggle("bad", bad); }
   }
-  // 打开：手机上面板长开以后（柱子从选中那格往两边一根根长出来），电脑上切到 Spending 页
-  // 电脑上每次进 Spending 页：只有图表，抽屉收着
+  // 打开：面板长开以后，柱子从选中那格往两边一根根长出来
   function show() {
     shown = true;
-    if (desk) { V.drawer = true; closeDrawer(); }
     requestAnimationFrame(() => {
       lastW = root.clientWidth;
-      if (desk) root.classList.toggle("narrow", lastW < 900);
       seg("mode", V.mode);
       seg("cmode", V.cmode);
-      buildRail(!desk);
-      if (desk) renderChart(true);
+      buildRail(true);
     });
     renderTitle();
     renderBody();
-    paintHandle();
-    if (desk) { const [st, bad] = statusText(); const el = $("[data-status]"); el.textContent = bad ? st : ""; el.classList.toggle("bad", bad); }
   }
   function hide() {
     shown = false;
-    closeSheet(); closeChart(); closeCal(); closeDrawer();
+    closeSheet(); closeChart(); closeCal();
     while (V.stack.length) pop();
   }
   // 手机：收起前回到主页最上面；下次打开从今天看起（隔了一会儿才再打开的话）
@@ -1046,5 +936,5 @@ export function createView(kind) {
     setCol(false);
     list.scrollTop = 0;
   }
-  return { el: root, show, hide, refresh, reset, tookChange, startNew, closeForm, formOpen: () => desk && !$("[data-form]").hidden, sheetOpen: () => $(".mn-sheet")?.classList.contains("on") };
+  return { el: root, show, hide, refresh, reset, tookChange, startNew, sheetOpen: () => $(".mn-sheet")?.classList.contains("on") };
 }

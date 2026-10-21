@@ -54,8 +54,8 @@
 * { box-sizing: border-box; }
 html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.4 var(--body); }
-/* 记账、备餐页上触控板横着划是开抽屉 / 收 Big buys：别让浏览器当成「后退 / 前进」 */
-html:has(> body:is([data-view="spending"], [data-view="meals"])) { overscroll-behavior-x: none; }
+/* 备餐页上触控板横着划是开 / 收 Big buys：别让浏览器当成「后退 / 前进」 */
+html:has(> body[data-view="meals"]) { overscroll-behavior-x: none; }
 body.phone { background: var(--bg); }
 /* 手机宽度下底色从第一笔就是 --bg，不等脚本加上 body.phone：iPhone 顶上那一条（灵动岛那里）是照页面一打开时的底色取的 */
 @media (max-width: 760px) { body { background: var(--bg); } }

@@ -44,7 +44,7 @@ function statusBar(black) {
 
 function build() {
   if (panel) return;
-  view = createView("phone");
+  view = createView();
   panel = view.el;
   document.body.appendChild(panel);
   inner = panel.querySelector(".mn-inner");

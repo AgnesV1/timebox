@@ -1,5 +1,6 @@
 // Projects 页（电脑）上「谁为谁服务」的连线。页面上盖一层 SVG，鼠标点得穿；只在悬停、拖的时候画。
 // 悬停一条目标 / North star 里框出来的词 / 一个项目的头 / 一张计划卡（停一下，路过不算）：跟它有关的线一条条从它这儿飞出去（每条隔 40ms），
+//   用键盘（Tab）停在它们上面也一样（不出拖的把手——拖本来就要鼠标）；Esc、焦点离开 Projects 页就收起，
 //   画完以后，线上一道流光一直朝「为了谁」那头跑：计划 / 项目 → 目标 → 上级 → … → North star。没关系的目标、卡片淡下去。
 //   目标：往上一路到顶，往下是挂在它下面的（一层层）和为它们服务的项目、计划；
 //   计划：它连着的目标（自己没连的，看它所在的项目连着的），再一路往上；项目：它连着的，加上它下面自己连了目标的计划。
@@ -32,7 +33,7 @@ const RUN = 1.4, SPEED = 260, STREAKS = 24;
 
 let layer = null, svg = null, handle = null, cutX = null, dragSvg = null;
 const edges = new Map();   // 画着的线：id → { e, g, pts, mask, gone, cutting }
-let cur = null;            // 悬停中：{ key, el }
+let cur = null;            // 悬停中：{ key, el, kb（键盘停着的：不出把手） }
 let want = "", wantT = 0, closeT = 0, clearT = 0;
 let drag = null;           // 拖着建链接：{ from, el, can: Map(元素 → key), target, id }
 let landing = null;        // 刚连上、还没换成真线的那条临时的线
@@ -368,11 +369,12 @@ function placeHandle(el) {
 
 // ---------- 悬停 ----------
 
-function open(key, el) {
+function open(key, el, kb = false) {
   clearTimeout(closeT); closeT = 0;
-  cur = { key, el };
+  cur = { key, el, kb };
   paint(key);
-  placeHandle(el);
+  if (kb) handle?.classList.remove("on");
+  else placeHandle(el);
 }
 
 // 线收起来（now：马上拿掉，不淡出）
@@ -461,6 +463,19 @@ function onMove() {
   const x = nearest(mx - o.left, my - o.top);
   showCut(x);
   if (x) keep(); else later();
+}
+
+// 键盘：焦点落在目标、计划卡、项目的头（或它们里面的按钮）上，停一下就画；落到别的地方收起。正在改字的框不算
+function onFocus(e) {
+  if (drag || !onPage()) return;
+  const t = e.target;
+  if (t.matches?.("input, select, textarea, [contenteditable]")) return;
+  const n = t.closest?.(NODE), key = n && n.closest(".projects") ? keyOf(n) : "";
+  if (!key) { want = ""; clearTimeout(wantT); if (cur?.kb) close(); return; }
+  if (cur?.key === key) return;
+  want = key;
+  clearTimeout(wantT);
+  wantT = setTimeout(() => { want = ""; if (n.isConnected && onPage() && n.contains(document.activeElement)) open(key, n, true); }, DWELL);
 }
 
 // ---------- 拖一下建链接 ----------
@@ -594,7 +609,7 @@ export function afterRender() {
   if (!el) { close(true); return; }
   cur.el = el;
   paint(cur.key, { fly: !landing });
-  placeHandle(el);
+  if (!cur.kb) placeHandle(el);
   if (landing) { landing.remove(); landing = null; }
 }
 
@@ -608,13 +623,18 @@ export function initLinks() {
   addEventListener("pointerdown", (e) => { if (!e.target.closest?.(".lk-ui")) close(); }, true);
   addEventListener("keydown", (e) => {
     if (drag && e.key === "Escape") { e.preventDefault(); dragEnd({ type: "cancel" }); return; }
-    if (!drag) close();
+    if (drag) return;
+    // 用键盘走过来的：Tab 往下走交给 focusin（停到下一个上面就换成它的线），别的键收起
+    if (cur?.kb && (e.key === "Tab" || e.key === "Shift")) return;
+    close();
   }, true);
+  addEventListener("focusin", onFocus);
+  addEventListener("focusout", (e) => { if (cur?.kb && !page()?.contains(e.relatedTarget)) close(); });
   document.documentElement.addEventListener("mouseleave", () => { if (!drag) close(); });
   addEventListener("hashchange", () => close(true));
   // 窗口变了、滚动了（页面、右栏、North star 那段字）：每帧最多重算一次位置，不重新飞
   let raf = 0;
-  const again = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { if (cur && !drag && onPage()) { paint(cur.key, { fly: false }); placeHandle(cur.el); cutX?.classList.remove("on"); } }); };
+  const again = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { if (cur && !drag && onPage()) { paint(cur.key, { fly: false }); if (!cur.kb) placeHandle(cur.el); cutX?.classList.remove("on"); } }); };
   addEventListener("resize", again);
   addEventListener("scroll", () => { if (cur && !drag) again(); }, { passive: true, capture: true });
 }

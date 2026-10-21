@@ -1,13 +1,14 @@
 // 下拉框：页面里还是普通的 <select>（各处的 change 处理都不用改）。电脑上点开时不用系统自带的菜单，
 // 换成自己画的一块：分组小标题（组里第一项带 data-self 的，组名自己也能选）、颜色点（option 的 data-color）、当前项打勾、键盘上下 / 回车 / Esc，选项多的顶上带一格搜索。
 // 选中后给原来的 <select> 赋值并发 input / change。手机和触屏还是系统自带的选择器。
+// 同一个样子还有一种不挂在 <select> 上的：openMenu(按钮, 清单, 选了以后做什么)——能拖的东西不用拖的做法（js/ui/dnd.js 的「Put on…」）就用它。
 
 import { esc } from "../dom.js";
 
 const fine = matchMedia("(hover: hover) and (pointer: fine)");
 const SEARCH_FROM = 12;   // 选项到这么多就带搜索
 const OPEN_KEYS = [" ", "Enter", "ArrowDown", "ArrowUp"];
-let cur = null;   // 开着的那块：{ el, sel, active, watch, typed, typedAt }
+let cur = null;   // 开着的那块：{ el, sel, active, watch, typed, typedAt }；openMenu 开的没有 sel，有 anchor（点开它的那个）、list、pick
 
 const usable = (sel) => !sel.multiple && !sel.disabled && fine.matches && !document.body.classList.contains("phone");
 const optionsOf = (sel) => [...sel.querySelectorAll("option")];
@@ -30,6 +31,18 @@ function listHTML(sel, q = "") {
   return html || '<div class="mg">Nothing matches</div>';
 }
 
+// openMenu 的清单：[{ label, value, group?, color? }]，同一个 group 的排在一起、上面一行小标题
+function plainHTML(list, q = "") {
+  let html = "", last = null;
+  list.forEach((x, i) => {
+    if (q && !x.label.toLowerCase().includes(q)) return;
+    if (x.group && x.group !== last) html += '<div class="mg">' + esc(x.group) + "</div>";
+    last = x.group || null;
+    html += '<div class="mi' + (x.group ? " in" : "") + '" role="option" aria-selected="false" data-i="' + i + '">' + (x.color ? '<i style="--dot:' + esc(x.color) + '"></i>' : "") + "<span>" + esc(x.label) + "</span></div>";
+  });
+  return html || '<div class="mg">Nothing matches</div>';
+}
+
 const items = () => (cur ? [...cur.el.querySelectorAll(".mi:not(.off)")] : []);
 
 function setActive(el, scroll = true) {
@@ -42,7 +55,7 @@ function setActive(el, scroll = true) {
 }
 
 function place() {
-  const r = cur.sel.getBoundingClientRect(), m = cur.el;
+  const r = (cur.anchor || cur.sel).getBoundingClientRect(), m = cur.el;
   m.style.minWidth = Math.max(150, r.width) + "px";
   const w = m.offsetWidth, h = m.offsetHeight;
   const below = r.bottom + 4 + h <= innerHeight - 8 || r.top < h + 12;
@@ -84,7 +97,7 @@ function open(sel) {
 export function close() {
   if (!cur) return;
   cur.watch?.disconnect();
-  cur.sel.classList.remove("open");
+  (cur.sel || cur.anchor).classList.remove("open");
   // 收的时候缩一点淡掉（0.13 秒）再拿掉；系统要求减少动态就直接拿掉
   const el = cur.el;
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) el.remove();
@@ -95,11 +108,41 @@ export function close() {
 // 收起来、焦点还给 <select>：先还焦点再收。有的 <select> 只在它那个表单里有焦点（或这块开着）时才显示（加任务那一排），
 // 带搜索框的时候焦点在这块里：先收的话，那一排跟着藏起来，焦点就还不回去了
 function closeTo(sel) {
-  sel.focus({ preventScroll: true });
+  sel?.focus({ preventScroll: true });
   close();
 }
 
+// 不挂在 <select> 上的小菜单。anchor = 点开它的那个（菜单从它那里长出来，收起时焦点回到它）；
+// list = [{ label, value, group?, color? }]；挑了一项 → pick(value)。再开同一个 = 收起
+export function openMenu(anchor, list, pick, { title = "" } = {}) {
+  if (cur?.anchor === anchor) { closeTo(anchor); return; }
+  close();
+  const el = document.createElement("div");
+  el.className = "menu";
+  el.setAttribute("role", "listbox");
+  if (title) el.setAttribute("aria-label", title);
+  const search = list.length >= SEARCH_FROM;
+  el.innerHTML = (title ? '<div class="mg">' + esc(title) + "</div>" : "") + (search ? '<input class="ms" type="search" placeholder="Search" aria-label="Search" autocomplete="off" spellcheck="false">' : "") +
+    '<div class="ml">' + (list.length ? plainHTML(list) : '<div class="mg">Nowhere to put it on this page</div>') + "</div>";
+  document.body.appendChild(el);
+  cur = { el, sel: null, anchor, list, pick, active: null, typed: "", typedAt: 0 };
+  anchor.classList.add("open");
+  place();
+  setActive(items()[0]);
+  if (search) el.querySelector(".ms").focus({ preventScroll: true });
+  // 页面重画把点开它的那个换掉了：收起来
+  cur.watch = new MutationObserver(() => { if (cur && !cur.anchor.isConnected) close(); });
+  cur.watch.observe(document.body, { childList: true, subtree: true });
+}
+export const menuOpen = () => Boolean(cur);
+
 function choose(item) {
+  if (!cur.sel) {
+    const x = cur.list[Number(item.dataset.i)], fn = cur.pick, a = cur.anchor;
+    closeTo(a);
+    if (x) fn(x.value);
+    return;
+  }
   const sel = cur.sel, o = optionsOf(sel)[Number(item.dataset.i)];
   closeTo(sel);
   if (!o || o.disabled) return;
@@ -131,6 +174,7 @@ export function initSelect() {
   // 点 <select>：拦下系统菜单，开自己的；再点一下收起
   document.addEventListener("mousedown", (e) => {
     if (cur && (cur.el.contains(e.target))) return;
+    if (cur && !cur.sel && cur.anchor.contains(e.target)) return;   // 再点一下点开它的那个：交给 openMenu 收起
     const sel = e.target.closest?.("select");
     if (sel && e.button === 0 && usable(sel)) {
       e.preventDefault();
@@ -148,7 +192,7 @@ export function initSelect() {
       return;
     }
     const typing = e.target.classList?.contains("ms");
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeTo(cur.sel); }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeTo(cur.sel || cur.anchor); }
     else if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); move(e.key === "ArrowDown" ? 1 : -1); }
     else if (e.key === "Home" && !typing) { e.preventDefault(); setActive(items()[0]); }
     else if (e.key === "End" && !typing) { e.preventDefault(); setActive(items().pop()); }
@@ -159,7 +203,8 @@ export function initSelect() {
 
   document.addEventListener("input", (e) => {
     if (!cur || !e.target.classList?.contains("ms")) return;
-    cur.el.querySelector(".ml").innerHTML = listHTML(cur.sel, e.target.value.trim().toLowerCase());
+    const q = e.target.value.trim().toLowerCase();
+    cur.el.querySelector(".ml").innerHTML = cur.sel ? listHTML(cur.sel, q) : plainHTML(cur.list, q);
     setActive(items()[0]);
     place();
   });

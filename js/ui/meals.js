@@ -154,8 +154,8 @@ function planHTML(D, c) {
   const pr = store.mealPrefs(), w0 = planWeek(c.today), w1 = addDays(w0, 7);
   const boxes = Object.values(D.box).sort(bySlot);
   const palette = boxes.length
-    ? '<div class="mpalette"><span class="msub">Drag a box onto a day</span>' + boxes.map((b) =>
-      '<span class="mpk" data-drag="box:' + esc(b.id) + '" title="' + esc((b.parts || []).map((p) => M.partIng(D, p)?.name).filter(Boolean).join(" · ")) + '">' +
+    ? '<div class="mpalette"><span class="msub">Drag a box onto a day, or click it</span>' + boxes.map((b) =>
+      '<span class="mpk" data-drag="box:' + esc(b.id) + '" role="button" tabindex="0" aria-haspopup="listbox" title="' + esc((b.parts || []).map((p) => M.partIng(D, p)?.name).filter(Boolean).join(" · ")) + '">' +
       dot(M.boxLevel(D, b)) + "<b>" + esc(b.name || "Untitled") + "</b><small>" + slotName(b.slot) + "</small></span>").join("") + "</div>"
     : '<p class="mpalette msub">No boxes yet — <a href="#meals/boxes">make a few</a>, then drag them onto the days.</p>';
   return nextShopHTML(D, c, false) + dealsHTML(D, c.today) + palette +
@@ -245,8 +245,8 @@ function roughHTML(D, start, pr, boxes) {
 // 架子：常买的东西按类别摆好，拖到右边的 Box 上；每类最前面是「随便哪种」
 function shelfHTML(D) {
   const catOf = (i) => (M.CATS.some(([k]) => k === i.cat) ? i.cat : "");
-  const chip = (drag, lv, name, any) => '<span class="mpk' + (any ? " any" : "") + '" data-drag="' + drag + '">' + dot(lv) + "<b>" + name + "</b></span>";
-  return '<aside class="mshelf"><p class="msub">Drag onto a box</p>' + [...M.CATS, ["", "Other"]].map(([k, l]) => {
+  const chip = (drag, lv, name, any) => '<span class="mpk' + (any ? " any" : "") + '" data-drag="' + drag + '" role="button" tabindex="0" aria-haspopup="listbox">' + dot(lv) + "<b>" + name + "</b></span>";
+  return '<aside class="mshelf"><p class="msub">Drag onto a box, or click</p>' + [...M.CATS, ["", "Other"]].map(([k, l]) => {
     const list = Object.values(D.ing).filter((i) => catOf(i) === k).sort(M.byName);
     if (!list.length && !M.ANY[k]) return "";
     return "<section><h4>" + l + '</h4><div class="mbin">' + (M.ANY[k] ? chip("any:" + k, M.ANY[k], "Any " + l.toLowerCase(), true) : "") +
@@ -558,9 +558,18 @@ function dayEditor(D) {
       '<select data-dbox data-i="' + i + '" data-k="dbox-' + i + '">' + boxOptions(D, id, i < ids.length ? "— remove" : "+ Add a box") + "</select>" +
       "<span>" + (D.box[id] ? dot(M.boxLevel(D, D.box[id])) + " " + M.levelName(M.boxLevel(D, D.box[id])) : "") + "</span></div>").join("") + "</div>"
       : '<p class="hint">No boxes yet — <a href="#meals/boxes" data-modal-close>make some</a> first.</p>') +
+    copyFromHTML(D, date) +
     '<div class="sheet-foot"><span class="tools"><button type="button" class="btn' + (entry?.off ? " on" : "") + '" data-act="day-off">' + (entry?.off ? "Cooking after all" : "Not cooking") + "</button>" +
     (entry ? '<button type="button" class="btn ghosty" data-act="day-clear">Clear</button>' : "") + "</span>" +
     '<button type="button" class="btn primary" data-modal-close>Done</button></div>';
+}
+
+// 「Same as…」：照搬另一天（这两周里排了 Box 的日子）——拖一天到另一天复制的不用拖的做法
+function copyFromHTML(D, date) {
+  const w0 = planWeek(store.today()), days = Array.from({ length: 14 }, (_, k) => addDays(w0, k)).filter((d) => d !== date && M.boxesOfDay(D, D.days[d]).length);
+  if (!days.length) return "";
+  return '<label class="field"><span>Same as another day</span><select data-dcopy aria-label="Copy the boxes of another day"><option value="">Copy from…</option>' +
+    days.map((d) => '<option value="' + d + '">' + fmtDay(d) + " · " + M.boxesOfDay(D, D.days[d]).map((id) => esc(D.box[id]?.name || "Untitled")).join(", ") + "</option>").join("") + "</select></label>";
 }
 
 function prefsEditor() {
@@ -856,6 +865,7 @@ export function initMeals(rerender) {
     else parts[i] = el.value.startsWith("any:") ? { any: el.value.slice(4), amt: parts[i].amt || "" } : { ing: el.value, amt: parts[i].amt || "" };
     update({ parts });
   });
+  on(document, "change", ".meal-editor [data-dcopy]", (e, el) => { if (el.value) mealDrop("mcopy:" + el.value, "mday:" + editing.date); });
   on(document, "change", ".meal-editor [data-dbox]", (e, el) => {
     const D = store.meals(), date = editing.date;
     const boxes = [...M.boxesOfDay(D, D.days[date])];

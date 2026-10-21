@@ -4,13 +4,14 @@
 // 拖、写、打勾、删：这里先把页面挪好再存（存的时候不整页重画），动画才接得上——
 //   拿起：原位留一个虚线空位，纸浮起来跟着鼠标，有一点弹簧的滞后，往哪边甩就往哪边歪；
 //   经过的那一格亮起来，空位挪到要落的地方，别的纸让开；松手：纸飞进空位、摆正，胶条按一下；拖到窗外松手 = 飞回原处。
-// 点一下便签 = 改字（回车存、Esc 不改），右边出现 ✓ 和删除；每格底下的 + 新写一张，回车接着写下一张，Esc 收起。
+// 点一下便签 = 改字（回车存、Esc 不改），右边出现 ✓、挪到别的格（不用拖的做法：挑四格里的另一格）和删除；每格底下的 + 新写一张，回车接着写下一张，Esc 收起。
 // 整页重画的时候（同步拉下来之类）照这里记着的画回来：开着的「新写」框、正在改的那张、正拖着 / 正落下的那张（画成空位）。
 
 import * as store from "../store.js";
 import * as Q from "../quads.js";
 import { esc, on, icon } from "../dom.js";
 import { toast } from "./common.js";
+import { openMenu } from "./select.js";
 
 const SPRING = "linear(0, .035, .121, .233, .354, .473, .582, .679, .761, .829, .883, .924, .956, .979, .994, 1.005, 1.011, 1.014, 1.015, 1.015, 1.014, 1.012, 1.01, 1.008, 1.007, 1.005, 1.004, 1.003, 1)";   // 同 css 的 --spring
 const POP = "linear(0, .053, .183, .351, .527, .693, .833, .944, 1.024, 1.074, 1.101, 1.108, 1.103, 1.089, 1.071, 1.051, 1.033, 1.018, 1.006, .998, .992, .989, .988, .989, .99, .992, .994, .996, 1)";   // 同 css 的 --spring-pop
@@ -40,6 +41,7 @@ function noteHTML(n, q) {
     return '<div class="qd-note open' + (n.done ? " done" : "") + '"' + attrs + ">" +
       '<textarea class="qd-edit" data-keep="qd-edit-' + esc(n.id) + '" rows="1" maxlength="' + Q.MAX + '" spellcheck="false" aria-label="Note">' + esc(n.text) + "</textarea>" +
       '<span class="qd-acts"><button type="button" data-qd="done" aria-pressed="' + Boolean(n.done) + '" title="' + tick + '" aria-label="' + tick + '">' + icon("check") + "</button>" +
+      '<button type="button" data-qd="move" title="Move to another box" aria-label="Move to another box" aria-haspopup="listbox">' + icon("arrow") + "</button>" +
       '<button type="button" data-qd="del" title="Remove" aria-label="Remove">' + icon("trash") + "</button></span></div>";
   }
   return '<div class="qd-note' + (n.done ? " done" : "") + '"' + attrs + ' tabindex="0" role="button"><span class="qd-t"><span class="qd-tx">' + esc(n.text) + "</span></span></div>";
@@ -280,6 +282,20 @@ function toggleDone(id) {
   requestAnimationFrame(() => fresh?.classList.toggle("done", !n.done));
 }
 
+// 挪到别的格（拖的替代）：挑一格，存好字、放到那一格最后，整页画一遍，焦点跟着那张纸
+function moveMenu(btn, id) {
+  const here = btn.closest(".qd-q")?.dataset.q;
+  const list = Object.keys(NAMES).filter((q) => q !== here).map((q) => ({ value: q, label: NAMES[q] }));
+  openMenu(btn, list, (q) => {
+    const ta = noteOf(id)?.querySelector(".qd-edit");
+    editing = "";
+    if (ta) store.editQuad(id, ta.value);
+    store.moveQuad(id, q);
+    rerender();
+    setTimeout(() => noteOf(id)?.focus({ preventScroll: true }), 80);
+  }, { title: "Move to" });
+}
+
 // 删：纸往下掉、转一下淡掉，别的纸补上来；底下弹「撤销」
 function remove(id) {
   editing = "";
@@ -344,7 +360,7 @@ export function initQuads(render) {
   // 点到正在改的那张外面 = 存好收起
   document.addEventListener("pointerdown", (e) => {
     const el = noteOf(editing);
-    if (el && !el.contains(e.target)) closeEdit(true);
+    if (el && !el.contains(e.target) && !e.target.closest?.(".menu")) closeEdit(true);
   }, true);
 
   on(document, "click", ".qd .qd-note:not(.open)", (e, el) => openEdit(el.dataset.id));
@@ -355,6 +371,7 @@ export function initQuads(render) {
     const id = b.closest(".qd-note")?.dataset.id, k = b.dataset.qd;
     if (k === "add") openAdd(b.closest(".qd-q").dataset.q);
     else if (k === "done") toggleDone(id);
+    else if (k === "move") moveMenu(b, id);
     else if (k === "del") remove(id);
   });
   on(document, "dblclick", ".qd .qd-q", (e, cell) => { if (!e.target.closest(".qd-note, .qd-addf, button")) openAdd(cell.dataset.q); });
@@ -368,7 +385,7 @@ export function initQuads(render) {
   // 用 Tab 离开正在改的那张：也存好收起
   on(document, "focusout", ".qd-note.open", (e, el) => {
     if (!el.isConnected || el.contains(e.relatedTarget)) return;
-    setTimeout(() => { if (editing === el.dataset.id && !noteOf(editing)?.contains(document.activeElement)) closeEdit(true); }, 0);
+    setTimeout(() => { if (editing === el.dataset.id && !noteOf(editing)?.contains(document.activeElement) && !document.activeElement?.closest?.(".menu")) closeEdit(true); }, 0);
   });
 
   // 新写：回车加一张、框留着接着写；Esc 或者空着离开 = 收起

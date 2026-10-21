@@ -116,7 +116,7 @@ export function poolHTML(c) {
   // 规律计划（Pool）：这周还剩几次，拖一次排一次
   if (regs.length) {
     h += '<section class="pg"><div class="pg-head"><i></i><span>This week</span></div>' + regs.map((x) =>
-      '<div class="pi" data-drag="regular:' + x.plan.id + '" style="--c:' + esc(x.plan.color) + '"><i class="g"></i><span>↻ ' + esc(x.plan.name) + '</span><b class="num">' + x.min + "m · " + x.left + " left</b></div>").join("") + "</section>";
+      '<div class="pi" data-drag="regular:' + x.plan.id + '" role="button" tabindex="0" aria-haspopup="listbox" style="--c:' + esc(x.plan.color) + '"><i class="g"></i><span>↻ ' + esc(x.plan.name) + '</span><b class="num">' + x.min + "m · " + x.left + " left</b></div>").join("") + "</section>";
   }
   // 项目 → 子项目 → 模块
   let lastGroup = null;
@@ -128,11 +128,11 @@ export function poolHTML(c) {
     items.forEach(({ item, state }) => {
       if ((item.module || "") !== mod) { mod = item.module || ""; if (mod) h += '<div class="pg-mod">' + esc(mod) + "</div>"; }
       const part = state.progress > 0 || state.scheduled > 0;
-      h += '<div class="pi" data-drag="item:' + item.id + '" style="--c:' + esc(p.color) + '"><i class="g"></i><span>' + esc(item.title) + '</span><b class="num">' + fmtMin(state.unscheduled) + (part ? " left" : "") + "</b></div>";
+      h += '<div class="pi" data-drag="item:' + item.id + '" role="button" tabindex="0" aria-haspopup="listbox" style="--c:' + esc(p.color) + '"><i class="g"></i><span>' + esc(item.title) + '</span><b class="num">' + fmtMin(state.unscheduled) + (part ? " left" : "") + "</b></div>";
     });
     h += "</section>";
   }));
-  h += ideasPoolHTML(c) + forecastHTML(c) + '<p class="pool-hint">Drag items onto a day. Drag a task back here to unschedule it.</p></div>';
+  h += ideasPoolHTML(c) + forecastHTML(c) + '<p class="pool-hint">Drag items onto a day, or click one to pick the day. Drag a task back here to unschedule it (or open it: Back to the pool).</p></div>';
   return h;
 }
 

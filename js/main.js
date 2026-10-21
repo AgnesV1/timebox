@@ -15,7 +15,7 @@ import { initSelect } from "./ui/select.js";
 import { todayHTML, initToday, shownDate, showDate } from "./ui/today.js";
 import { calendarHTML, poolHTML, initCalendar, handleDrop } from "./ui/calendar.js";
 import { projectsHTML, initProjects, refreshProjectEditor, projectAlerts } from "./ui/projects.js";
-import { initGoals } from "./ui/goals.js";
+import { initGoals, goalDrop } from "./ui/goals.js";
 import { initLinks, afterRender as linksAfterRender } from "./ui/links.js";
 import { initIdeas, ideasPhoneHTML } from "./ui/ideas.js";
 import { settingsHTML, initSettings } from "./ui/settings.js";
@@ -32,6 +32,7 @@ import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/
 import { renderSun, initSun } from "./ui/sun.js";
 import { createSpending } from "./ui/spending.js";
 import { initIsland, refreshIsland, closeIsland } from "./ui/island.js";
+import { fxChanged } from "./ui/money.js";
 import { animateNext, animateSoft, takeTransition, nameParts, dusk, measurePills, placePills, glidePills, rollNumbers, titleIn, initEdgeGlow } from "./motion.js";
 import { lookAt, nextTurn } from "./day.js";
 
@@ -283,7 +284,7 @@ initLinks();
 initIdeas(render);
 initSettings();
 initEditor();
-initDnd((payload, target) => (target.startsWith("m") ? mealDrop(payload, target) : handleDrop(payload, target)));
+initDnd((payload, target) => (target.startsWith("gcol:") ? goalDrop(payload, target) : target.startsWith("m") ? mealDrop(payload, target) : handleDrop(payload, target)));
 initStats(render);
 initTimer(render);
 initChores(render);
@@ -300,6 +301,8 @@ store.subscribe((meta) => {
   if (!meta.quiet) render();
   else paintSync();
   if (meta.dirty) sync.queue();
+  // 记账的汇率在 Settings 里（spend-fx）：改了（这台设备或同步过来的）记账那两块跟着换算
+  if (fxChanged()) { if (desk && desk.el.isConnected) desk.refresh(); refreshIsland(); }
 });
 store.onUndo((label, before) => toast(label, () => store.undo(before)));
 reading.subscribe(() => { if (route() === "reading") render(); });

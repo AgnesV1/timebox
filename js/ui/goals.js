@@ -74,7 +74,9 @@ function rowHTML(x, k, dflt) {
     opts.map((t) => '<option value="' + esc(t) + '"' + (low(t) === low(tag) ? " selected" : "") + (k.colors[low(t)] ? ' data-color="' + esc(k.colors[low(t)]) + '"' : "") + ">" + esc(t) + "</option>").join("") + "</select>";
   const when = field === "when" ? whenEditHTML(g, k.T)
     : '<button type="button" class="gdue' + (dflt ? " dflt" : "") + '" data-act="g-when" title="' + (x.done ? "Finished — click to change" : x.late ? "Was due — click to change" : "Due — click to change") + '">' + (x.done ? "✓ " : "") + esc(x.when) + "</button>";
-  return '<li class="gl' + (x.done ? " done" : "") + (x.late ? " late" : "") + (x.ahead ? " ahead" : "") + (field === "text" ? " editing" : "") + '" data-goal="' + id + '">' +
+  // 左边的小把手：拖到别的一段 = 改成那一段的默认期限；点一下 / 回车 = 挑一段（js/ui/dnd.js）。拖目标本身是连线（js/ui/links.js），两个不打架
+  const grip = field ? "" : '<span class="ggrip" data-drag="goal:' + id + '" role="button" tabindex="0" aria-haspopup="listbox" aria-label="Move to another time" title="Drag to another time, or click"></span>';
+  return '<li class="gl' + (x.done ? " done" : "") + (x.late ? " late" : "") + (x.ahead ? " ahead" : "") + (field === "text" ? " editing" : "") + '" data-goal="' + id + '" data-drag-show>' + grip +
     '<input type="checkbox" data-g="done"' + (x.done ? " checked" : "") + ' aria-label="Done">' + text +
     '<span class="gmeta">' + (field === "text" ? upHTML(g, k) : "") + tagSel + when + '<button type="button" class="gx" data-act="g-del" aria-label="Delete goal">×</button></span></li>';
 }
@@ -85,7 +87,7 @@ function colHTML(col, k, first) {
   const shown = all ? col.items : col.items.slice(0, limit), more = col.items.length - shown.length;
   const add = adding === col.key || (k.empty && col.key === "month");
   const title = esc(col.title);
-  return '<section class="gcol' + (shown.length || add ? "" : " empty") + (first ? " far1" : "") + '" data-col="' + col.key + '"><h4>' + title + (col.sub ? " <small>" + col.sub + "</small>" : "") +
+  return '<section class="gcol' + (shown.length || add ? "" : " empty") + (first ? " far1" : "") + '" data-col="' + col.key + '" data-drop="gcol:' + col.key + '" data-name="' + esc(col.title + (col.sub ? " · " + col.sub : "")) + '"><h4>' + title + (col.sub ? " <small>" + col.sub + "</small>" : "") +
     '<button type="button" class="gplus" data-act="g-add" aria-expanded="' + add + '" aria-label="Add a goal: ' + title + '" title="Add a goal">+</button></h4>' +
     (shown.length ? "<ul>" + shown.map((x) => rowHTML(x, k, !x.done && !x.late && !x.ahead && x.goal.due === col.due)).join("") + "</ul>" : "") +
     (more ? '<button type="button" class="gmore" data-act="g-more">+' + more + " more</button>" : all && col.items.length > limit ? '<button type="button" class="gmore" data-act="g-less">Less</button>' : "") +
@@ -145,6 +147,17 @@ export function goalsHTML(c) {
   return '<aside class="goals pj-rail" aria-label="Goals and ideas">' + northHTML() +
     '<div class="rail-tabs">' + seg + (tab === "goals" && open ? '<span class="msub">' + open + " open</span>" : "") + "</div>" +
     '<div class="rail-body" data-rail="' + tab + '">' + (tab === "ideas" ? ideasHTML(c) : listHTML(c)) + "</div></aside>";
+}
+
+// 拖到 / 挑了另一段（js/ui/dnd.js 转过来的）：改成那一段的长短和默认期限（这个月 = 这个月，这一季 = 季末，今年 = 12 月……）；提示条能撤销
+export function goalDrop(payload, target) {
+  const id = payload.slice(payload.indexOf(":") + 1), key = target.slice(target.indexOf(":") + 1);
+  const g = store.goals().find((x) => x.id === id), col = G.columns(store.today()).find((c) => c.key === key);
+  if (!g || !col || col.span === "north") return;
+  if (g.span === col.span && g.due === col.due) return;
+  edit = null;
+  openCols.add(key);   // 落到折起来的那几条里也看得到
+  store.saveGoal({ ...g, span: col.span, due: col.due }, "Moved to " + col.title + (col.sub ? " (" + col.sub + ")" : ""));
 }
 
 export function initGoals(rerender) {

@@ -118,8 +118,12 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
   const run = store.timer();
   const running = run?.taskId === t.id;
   const want = open && !phone ? askFinished(t) : undefined;
+  // 展开那一行多两个小箭头：往上 / 往下挪一格（按住分钟数拖的不用拖的做法；电脑上 Alt+↑↓ 也行）
+  const k = tasks.indexOf(t), mv = open && tasks.length > 1 ? '<span class="row-mv">' +
+    '<button type="button" class="chip mv" data-act="row-move" data-to="-1" aria-label="Move up" title="Move up (Alt+↑)"' + (k > 0 ? "" : " disabled") + ">↑</button>" +
+    '<button type="button" class="chip mv" data-act="row-move" data-to="1" aria-label="Move down" title="Move down (Alt+↓)"' + (k < tasks.length - 1 ? "" : " disabled") + ">↓</button></span>" : "";
   const chips = '<div class="chips' + (open ? "" : " hov") + '">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
-    (open && t.status === "delay" && !list.length && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") + "</div>";
+    (open && t.status === "delay" && !list.length && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") + mv + "</div>";
   const total = store.timeTotal(t.id);
   const side = open ? "" : '<span class="rside">' +
     (running ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : total ? '<span class="num">' + fmtMin(total) + "</span>" : "") +
@@ -321,6 +325,25 @@ function logFromRow(row) {
 }
 const rowId = (el) => el.closest(".row")?.dataset.id;
 
+// 往上 / 往下挪一格：照这一天列表里现在的顺序换一下位置（和按住分钟数拖一样存）
+function moveRow(id, dir) {
+  const list = document.querySelector('.dayview .row[data-id="' + CSS.escape(id) + '"]')?.closest(".list");
+  const ids = [...(list?.querySelectorAll(".row[data-id]") || [])].map((r) => r.dataset.id), i = ids.indexOf(id), j = i + dir;
+  if (i < 0 || j < 0 || j >= ids.length) return false;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  store.reorder(ids);
+  return true;
+}
+// 挪完页面重画了：焦点放回同一行的同一个按钮（箭头到头了变灰，就放在另一个箭头上）
+function refocusRow(id, act, to) {
+  setTimeout(() => {
+    const row = document.querySelector('.dayview .row[data-id="' + CSS.escape(id) + '"]');
+    if (!row) return;
+    const b = row.querySelector('[data-act="' + act + '"]' + (to ? '[data-to="' + to + '"]' : "") + ":not([disabled])") || row.querySelector(".row-mv button:not([disabled])") || row.querySelector("button");
+    b?.focus({ preventScroll: true });
+  }, 60);
+}
+
 export function initToday(rerender) {
   on(document, "click", ".dayview [data-act]", (e, el) => {
     const act = el.dataset.act, id = rowId(el);
@@ -337,6 +360,7 @@ export function initToday(rerender) {
     else if (act === "time-edit") { timeEdit = el.dataset.tid; rerender(); requestAnimationFrame(() => setTimeout(() => document.querySelector(".tm-edit [name=from]")?.focus(), 0)); }
     else if (act === "time-edit-x") { timeEdit = ""; rerender(); }
     else if (act === "time-more") { logOpen.add(id); rerender(); }
+    else if (act === "row-move") { focus = id; if (moveRow(id, Number(el.dataset.to))) refocusRow(id, act, el.dataset.to); }
     else if (act === "chain-all") { chainAll.add(id); rerender(); }
     else if (act === "time-log") logFromRow(el.closest(".row"));
     else if (act === "dish-open") { dishOpen.add(id); rerender(); requestAnimationFrame(() => setTimeout(() => document.querySelector('.dish-quick[data-task="' + CSS.escape(id) + '"] [name=name]')?.focus(), 0)); }
@@ -363,6 +387,15 @@ export function initToday(rerender) {
     else if (act === "day-next") go(addDays(shownDate(), 1));
     else if (act === "day-today") go(store.today());
     else if (act === "day-pick") go(el.dataset.date);
+  });
+
+  // 电脑上：焦点在某一行里（⋯、状态按钮……）按 Alt+↑↓ = 往上 / 往下挪一格
+  on(document, "keydown", ".dayview .row[data-id]", (e, row) => {
+    if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown") || e.target.matches("input, textarea, select")) return;
+    e.preventDefault();
+    const act = document.activeElement?.dataset?.act || "", to = document.activeElement?.dataset?.to || "";
+    animateNext();
+    if (moveRow(row.dataset.id, e.key === "ArrowUp" ? -1 : 1)) refocusRow(row.dataset.id, act, to);
   });
 
   // 点任务：还没展开的 → 展开它（今天能计时的同时选中，底部浮条换成它）；已经展开的再点名字 → 展开说明

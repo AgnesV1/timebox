@@ -2,15 +2,16 @@
 // 和阅读表格一样走同一个 Apps Script）。手机、电脑都能记、都能改：每一笔有自己的 id 和 u（改的时间），两边改同一笔，后改的算数；
 // 删掉的表格里记一条（Deleted 页），另一边下次同步也删掉。没网照样记，排着队，联网再发。
 // 预算和类别各是一整张小清单：本机改过就整张发过去；没改过就用表格里的（表格里手改也认）。
+// 每一笔记的是哪种钱（cur，加币不写）；记一笔时用哪种（inCur，换了就一直用它）、总数换成哪种看（show，默认加币）只管这台设备，不同步。
 
 import { readLocal, writeLocal } from "./dom.js";
-import { DEFAULT_CATS, parts } from "./money.js";
+import { DEFAULT_CATS, parts, isCur } from "./money.js";
 
 const KEY = "kuzhouduan-spend";
 const FULL_EVERY = 30 * 60000;   // 打开记账页时，半小时没整份对过就整份拉一次（表格里手改的那几行也能拉回来）
 const STALE = 13 * 864e5;        // 太久没同步：表格里的删除记录只留 14 天，整份对一遍
 
-let S = { entries: {}, budgets: [], cats: DEFAULT_CATS.map((c) => ({ ...c })), put: {}, del: {}, bDirty: false, cDirty: false, cursor: 0, fullAt: 0, wantFull: true, error: "", linked: false };
+let S = { entries: {}, budgets: [], cats: DEFAULT_CATS.map((c) => ({ ...c })), put: {}, del: {}, bDirty: false, cDirty: false, cursor: 0, fullAt: 0, wantFull: true, error: "", linked: false, inCur: "cad", show: "cad" };
 Object.assign(S, readLocal(KEY, {}) || {});
 
 let version = 0, listCache = null, listVer = -1;
@@ -34,8 +35,10 @@ export const pendingCount = () => Object.keys(S.put).length + Object.keys(S.del)
 
 function change(fn) { fn(); save(); emit({ dirty: true }); }
 
+// 加币不写 cur（表格里那一格空着 = 加币）
+const withCur = (e, cur) => { if (isCur(cur) && cur !== "cad") e.cur = cur; else delete e.cur; return e; };
 export function add(x) {
-  const e = { id: x.id || newId(), d: x.d, v: Math.round(x.v), c: x.c, n: String(x.n || "").trim(), u: Date.now() };
+  const e = withCur({ id: x.id || newId(), d: x.d, v: Math.round(x.v), c: x.c, n: String(x.n || "").trim(), u: Date.now() }, x.cur);
   change(() => { S.entries[e.id] = e; S.put[e.id] = e.u; delete S.del[e.id]; });
   return e;
 }
@@ -44,7 +47,7 @@ export function addMany(list) {
   change(() => {
     let u = Date.now();
     for (const x of list) {
-      const e = { id: newId(), d: x.d, v: Math.round(x.v), c: x.c, n: String(x.n || "").trim(), u: u++ };
+      const e = withCur({ id: newId(), d: x.d, v: Math.round(x.v), c: x.c, n: String(x.n || "").trim(), u: u++ }, x.cur);
       S.entries[e.id] = e; S.put[e.id] = e.u; out.push(e);
     }
   });
@@ -55,9 +58,16 @@ export function update(id, patch) {
   if (!e) return null;
   const n = { ...e, ...patch, id, u: Date.now() };
   if (patch.n !== undefined) n.n = String(patch.n || "").trim();
+  if ("cur" in patch) withCur(n, patch.cur);
   change(() => { S.entries[id] = n; S.put[id] = n.u; });
   return n;
 }
+
+// 这台设备：记一笔时用哪种钱（换了就一直是它）、总数换成哪种看。只存本机，不进表格
+export const inCur = () => (isCur(S.inCur) ? S.inCur : "cad");
+export const show = () => (isCur(S.show) ? S.show : "cad");
+export function setInCur(k) { if (isCur(k) && k !== S.inCur) { S.inCur = k; save(); } }
+export function setShow(k) { if (isCur(k) && k !== S.show) { S.show = k; save(); emit(); } }
 export function remove(id) {
   const e = S.entries[id];
   if (!e) return null;
@@ -115,21 +125,28 @@ export function apply(res, sent) {
   if (!res) { S.error = "Update Code.gs in your 苦昼短 Sheet to sync spending"; save(); emit(); return; }
   if (res.error) { S.error = readError(res.error); save(); emit(); return; }
   S.error = "";
+  // 旧的 Code.gs 不认币种（回来的没有 curs）：不是加币的那几笔留在队列里（不然拉回来就变成加币了），提示换脚本
+  const oldScript = !res.curs, held = oldScript ? sent.put.filter((e) => e.cur) : [];
+  if (held.length) S.error = "Update Code.gs in your 苦昼短 Sheet to sync currencies";
   // 发出去的：这期间没再改过的从队列里拿掉
-  for (const e of sent.put) if (S.put[e.id] === e.u) delete S.put[e.id];
+  for (const e of sent.put) if (S.put[e.id] === e.u && !(oldScript && e.cur)) delete S.put[e.id];
   for (const d of sent.del) if (S.del[d.id] === d.u) delete S.del[d.id];
   if (sent.budgets && JSON.stringify(sent.budgets) === JSON.stringify(S.budgets)) S.bDirty = false;
   if (sent.cats && JSON.stringify(sent.cats) === JSON.stringify(S.cats)) S.cDirty = false;
   // 拉回来的：排着队的那几笔以本机的为准
   const full = sent.since === 0;
+  const prev = {};   // 整份拉之前本机每一笔的币种（旧脚本回来的不带币种，用它补上）
   if (full) {
     const keep = {};
+    for (const e of Object.values(S.entries)) if (e.cur) prev[e.id] = e.cur;
     for (const id of Object.keys(S.put)) if (S.entries[id]) keep[id] = S.entries[id];
     S.entries = keep;
   }
   for (const r of res.rows || []) {
     if (S.put[r.id] || S.del[r.id]) continue;
-    S.entries[r.id] = { id: r.id, d: r.d, v: r.v, c: r.c, n: r.n || "", u: r.u || 0 };
+    // 旧脚本回来的没有币种：本机记着的那个留着
+    const was = full ? null : S.entries[r.id];
+    S.entries[r.id] = withCur({ id: r.id, d: r.d, v: r.v, c: r.c, n: r.n || "", u: r.u || 0 }, oldScript ? (was?.cur || prev[r.id]) : r.cur);
   }
   for (const id of res.dels || []) if (!S.put[id]) delete S.entries[id];
   // 清单：本机没有没发出去的改动就用表格里的；表格里还是空的（刚建好）就把本机的发过去

@@ -177,6 +177,24 @@
 .mn .mn-cd.sel { background: var(--mn-pri); color: var(--mn-pri-ink); box-shadow: none; }
 .mn .mn-cd:active { transform: scale(.88); }
 
+/* 币种：标题总数后面的「CAD ▾」、记一笔时金额左边那个；点了弹出一张小清单（和月历一样的玻璃） */
+.mn .mn-curb { all: unset; display: inline-flex; align-items: center; gap: 2px; height: 22px; margin-left: 10px; padding: 0 5px 0 7px; border-radius: 7px; background: var(--mn-fill); box-shadow: var(--mn-hair); font: 500 11px "JetBrains Mono", monospace; letter-spacing: .02em; color: #B9B5AC; cursor: pointer; transition: transform .28s var(--mn-spring), background .2s; }
+.mn .mn-curb .ic { width: 12px; height: 12px; opacity: .7; }
+.mn .mn-curb:active { transform: scale(.92); transition-duration: .12s; }
+.mn .mn-curb:focus-visible { outline: 1.5px solid var(--mn-blue); outline-offset: 1px; }
+.mn [data-scur] { min-width: 3ch; }
+.mn .mn-sheet .mn-curb { margin-left: 0; }
+.mn .mn-curm { width: 250px; padding: 6px; transform-origin: 10% 0; }
+.mn .mn-curi { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 38px 34px 1fr 14px; align-items: center; width: 100%; height: 36px; padding: 0 8px; border-radius: 9px; font-size: 13px; color: #E8E4DA; cursor: pointer; }
+.mn .mn-curi b { font-weight: 500; }
+.mn .mn-curi .mn-meta { text-align: right; }
+.mn .mn-curi i { font-style: normal; text-align: right; color: var(--mn-blue); }
+.mn .mn-curi.sel { background: rgba(76, 114, 216, .16); }
+.mn .mn-curi:active { background: rgba(255, 255, 255, .06); }
+/* 流水里别的钱的那一笔：金额照原样，底下一行小字是换算过的 */
+.mn .mn-row .mn-am { display: flex; flex-direction: column; align-items: flex-end; }
+.mn .mn-am small { margin-top: 2px; font-size: 11px; color: var(--mn-mute); }
+
 /* 设定：分组的入口，点进去是子页 */
 .mn .mn-grp { flex: none; margin-bottom: 14px; border-radius: 14px; background: var(--mn-fill); box-shadow: var(--mn-hair); overflow: hidden; }
 .mn .mn-li { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 46px; padding: 0 12px 0 14px; border-bottom: 1px solid var(--mn-line); font-size: 14px; cursor: pointer; }   /* all: unset 会把 border-box 也去掉：宽 100% 再加内边距就撑出去，右边的按钮被切掉 */
@@ -367,6 +385,12 @@
 .spend .sp-fi::placeholder { color: #6E6E82; }
 .spend .sp-f-amt { width: 118px; text-align: right; font: 500 15px "JetBrains Mono", monospace; }
 .spend .sp-f-cat { max-width: 170px; }
+.spend .sp-f-cur { width: 76px; font: 500 12.5px "JetBrains Mono", monospace; }
+/* 页头的「看哪种钱」：和搜索框一样的淡底小药丸 */
+.spend .sp-curs { height: 32px; padding: 0 10px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .07); box-shadow: var(--mn-hair); font: 500 12.5px "JetBrains Mono", monospace; color: #D8D4CB; color-scheme: dark; cursor: pointer; }
+.spend .sp-curs:focus-visible { outline: 1.5px solid var(--mn-blue); outline-offset: 2px; }
+/* 流水表里别的钱的那一笔：底下一行小字是换算过的 */
+.spend .sp-conv { display: block; margin-top: 1px; font: 11px "JetBrains Mono", monospace; color: var(--mn-mute); }
 .spend .sp-f-note { flex: 1 1 150px; min-width: 120px; }
 .spend .sp-f-date { width: 142px; }
 .spend .sp-sign { all: unset; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: rgba(255, 255, 255, .07); font: 500 17px "JetBrains Mono", monospace; color: #F2EEE6; cursor: pointer; }
@@ -425,6 +449,7 @@
 .sp-set .sp-md { max-height: 220px; margin: 10px 0 0; padding: 10px 12px; overflow: auto; border-radius: 10px; background: var(--surface); font: 11px/1.5 "JetBrains Mono", monospace; white-space: pre-wrap; }
 .sp-set .sp-imp { width: 100%; font: 12px/1.5 "JetBrains Mono", monospace; }
 .sp-set .sp-sets.bad { color: var(--warn); }
+.sp-set .sp-role { padding: 3px 8px; font-size: 12.5px; }
 
 /* 系统要求减少动态：不挪、不转、不弹，淡入淡出和颜色变化留着（状态变了还看得出来） */
 @media (prefers-reduced-motion: reduce) {

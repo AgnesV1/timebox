@@ -25,7 +25,7 @@ test("spend: what the phone logs reaches the sheet and the computer; edits and d
   phone.add({ d: "2026-10-15", v: 240000, c: "Salary" });
   sync(phone);
   const tx = book.getSheetByName("Transactions");
-  assert.deepEqual(tx.header(), ["Date", "Kind", "Category", "Note", "Amount", "ID", "Updated", "Synced"]);
+  assert.deepEqual(tx.header(), ["Date", "Kind", "Category", "Note", "Amount", "Currency", "ID", "Updated", "Synced"]);
   const o = tx.objects();
   assert.equal(o.length, 2);
   assert.equal(o[0].Kind, "Expense");
@@ -104,4 +104,62 @@ test("spend: no link yet → the sheet says so and nothing is lost", async () =>
   assert.equal(phone.pendingCount() >= 1, true);
   phone.apply(undefined, phone.request());   // an old Code.gs doesn't answer `spend`
   assert.match(phone.error(), /Update Code\.gs/);
+});
+
+test("spend: a record in another currency keeps it on the sheet and on the other device; typed rows can name one too", async () => {
+  const { book, sync } = sheet();
+  const phone = await device(), mac = await device();
+  phone.setInCur("cny");
+  const a = phone.add({ d: "2026-10-18", v: -8800, c: "Food", n: "noodles", cur: phone.inCur() });
+  const b = phone.add({ d: "2026-10-18", v: -1200, c: "Drink", cur: "cad" });
+  assert.equal(a.cur, "cny");
+  assert.equal("cur" in b, false, "CAD isn't written");
+  sync(phone);
+  const tx = book.getSheetByName("Transactions"), o = tx.objects();
+  assert.deepEqual(o.map((x) => x.Amount + " " + x.Currency), ["88 RMB", "12 "]);
+  sync(mac);
+  assert.equal(mac.get(a.id).cur, "cny");
+  assert.equal(mac.get(b.id).cur, undefined);
+  // 改成加币：那一格清空，另一边也跟着
+  mac.update(a.id, { cur: "cad" });
+  sync(mac); sync(phone);
+  assert.equal(phone.get(a.id).cur, undefined);
+  assert.equal(tx.objects().find((x) => x.Note === "noodles").Currency, "");
+  // 表格里手打的一行写 CNY / usd
+  const r = tx.getLastRow() + 1;
+  ["2026-10-19", "Expense", "Food", "dumplings", 30, "CNY"].forEach((v, j) => tx.put(r, j + 1, v));
+  ["2026-10-19", "Expense", "Traffic", "taxi", 15, "usd"].forEach((v, j) => tx.put(r + 1, j + 1, v));
+  phone.link(false); phone.link(true);
+  sync(phone);
+  assert.equal(phone.entries().find((e) => e.n === "dumplings").cur, "cny");
+  assert.equal(phone.entries().find((e) => e.n === "taxi").cur, "usd");
+  // 记一笔用哪种、看哪种：只在这台设备上
+  assert.equal(phone.inCur(), "cny");
+  assert.equal(mac.inCur(), "cad");
+  mac.setShow("usd");
+  assert.equal(mac.show(), "usd");
+  assert.equal(phone.show(), "cad");
+});
+
+test("spend: an old Code.gs (no currencies yet) keeps the RMB record queued and its currency on this device", async () => {
+  const { g, sync } = sheet();
+  const phone = await device();
+  const a = phone.add({ d: "2026-10-18", v: -8800, c: "Food", cur: "cny" });
+  phone.add({ d: "2026-10-18", v: -500, c: "Food" });
+  // 装作旧脚本：回来的没有 curs、每一笔也不带币种
+  const old = (rq) => { const res = g.post({ secret: "CHANGE_ME", spend: rq }).spend; delete res.curs; res.rows.forEach((r) => delete r.cur); return res; };
+  let rq = phone.request();
+  phone.apply(old(rq), rq);
+  assert.match(phone.error(), /Update Code\.gs/);
+  assert.equal(phone.get(a.id).cur, "cny");
+  assert.deepEqual(phone.request().put.map((x) => x.id), [a.id], "only the RMB one waits");
+  phone.link(false); phone.link(true);   // 整份拉一次也不丢
+  rq = phone.request();
+  phone.apply(old(rq), rq);
+  assert.equal(phone.get(a.id).cur, "cny");
+  // 换上新脚本：发出去、错误消掉
+  sync(phone);
+  assert.equal(phone.error(), "");
+  assert.deepEqual(phone.request().put, []);
+  assert.equal(phone.get(a.id).cur, "cny");
 });

@@ -1171,18 +1171,28 @@ function archive_(before, now) {
 }
 
 // ================= 记账：单独一个表格（链接存在 Settings 的 spend） =================
-// 四页（没有就建）：Transactions 一行一笔（Date / Kind / Category / Note / Amount，后面藏着 ID / Updated / Synced）、
+// 四页（没有就建）：Transactions 一行一笔（Date / Kind / Category / Note / Amount / Currency（空着 = CAD），后面藏着 ID / Updated / Synced）、
 // Budgets（From 哪个月起 / Amount 每月多少）、Categories（Kind / Name / Budget：Base = 预算的底座、Not counted = 不算进预算 / Hidden）、
 // Deleted（藏起来：删掉的那几笔，给别的设备看）。表格里可以直接改、直接加行（没有 ID 的行脚本会补上）。
-// 网页发来 { since, put: [{id, d, v, c, n, u}], del: [{id, u}], budgets?, cats? }：v 是分，负的 = 支出；u 是改的时间，同一笔后改的算数。
-// 回 { now, rows: since 之后变过的那几笔（since = 0 就是全部）, dels, budgets, cats }
+// 网页发来 { since, put: [{id, d, v, c, n, u, cur?}], del: [{id, u}], budgets?, cats? }：v 是那种钱的分，负的 = 支出；cur 是哪种钱（cny / usd …，没有 = 加币）；
+// u 是改的时间，同一笔后改的算数。回 { now, rows: since 之后变过的那几笔（since = 0 就是全部）, dels, budgets, cats, curs: true（这版认币种） }。
+// 旧表格没有 Currency 那一列：第一次同步时加在最后
 var SPEND = {
-  tx: { sheet: 'Transactions', head: ['Date', 'Kind', 'Category', 'Note', 'Amount', 'ID', 'Updated', 'Synced'], hide: ['ID', 'Updated', 'Synced'] },
+  tx: { sheet: 'Transactions', head: ['Date', 'Kind', 'Category', 'Note', 'Amount', 'Currency', 'ID', 'Updated', 'Synced'], hide: ['ID', 'Updated', 'Synced'] },
   budgets: { sheet: 'Budgets', head: ['From', 'Amount'] },
   cats: { sheet: 'Categories', head: ['Kind', 'Name', 'Budget', 'Hidden'] },
   dead: { sheet: 'Deleted', head: ['ID', 'At'] }
 };
 var SPEND_ROLE_OUT = { base: 'Base', outside: 'Not counted' };
+// 币种：网页里的代号 ↔ 表格里写的（人民币写 RMB）。表格里手打 CNY、¥、usd 也认；空着 = 加币
+var SPEND_CUR = { cny: 'RMB', usd: 'USD', eur: 'EUR', gbp: 'GBP', jpy: 'JPY', hkd: 'HKD' };
+function spendCur_(cell) {
+  var t = String(cell || '').trim().toUpperCase();
+  if (!t || t === 'CAD' || t === '$') return '';
+  if (t === 'CNY' || t === '¥' || t === '人民币') return 'cny';
+  for (var k in SPEND_CUR) if (SPEND_CUR[k] === t || k.toUpperCase() === t) return k;
+  return '';
+}
 
 function spendBook_() {
   var row = readAll_('settings').filter(function (r) { return r.id === 'spend'; })[0];
@@ -1275,7 +1285,7 @@ function spend_(req) {
   var cell = function (x) {
     var row = data.length && at[x.id] !== undefined ? data[at[x.id]].slice() : Array(tx.width).fill('');
     row[c.Date] = String(x.d || ''); row[c.Kind] = x.v > 0 ? 'Income' : 'Expense'; row[c.Category] = toCell_('text', x.c || '');
-    row[c.Note] = toCell_('text', x.n || ''); row[c.Amount] = Math.abs(Number(x.v) || 0) / 100;
+    row[c.Note] = toCell_('text', x.n || ''); row[c.Amount] = Math.abs(Number(x.v) || 0) / 100; row[c.Currency] = SPEND_CUR[x.cur] || '';
     row[c.ID] = x.id; row[c.Updated] = Number(x.u) || now; row[c.Synced] = now;
     return row;
   };
@@ -1319,13 +1329,15 @@ function spend_(req) {
     if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(d) || (since && !(Number(r[c.Synced]) >= since))) return;
     var v = Math.round(Number(String(r[c.Amount]).replace(/[^\d.]/g, '')) * 100) || 0, cat = String(r[c.Category] || '').trim();
     var isIn = /^inc/i.test(String(r[c.Kind] || '')) || (!String(r[c.Kind] || '').trim() && inc[cat]);
-    rows.push({ id: id, d: d, v: isIn ? v : -v, c: cat, n: String(r[c.Note] || ''), u: Number(r[c.Updated]) || 0 });
+    var cur = spendCur_(r[c.Currency]), one = { id: id, d: d, v: isIn ? v : -v, c: cat, n: String(r[c.Note] || ''), u: Number(r[c.Updated]) || 0 };
+    if (cur) one.cur = cur;
+    rows.push(one);
   });
   var dels = since ? spendData_(dead).filter(function (r) { return Number(r[1]) >= since; }).map(function (r) { return String(r[0]); }) : [];
   // 删除记录只留 14 天
   var keep = spendData_(dead).filter(function (r) { return now - Number(r[1]) < KEEP_DELETED_DAYS * 864e5; });
   if (keep.length < spendData_(dead).length) spendWrite_(dead, keep);
-  return { ok: true, now: now, rows: rows, dels: dels, budgets: spendBudgets_(book), cats: cats };
+  return { ok: true, now: now, rows: rows, dels: dels, budgets: spendBudgets_(book), cats: cats, curs: true };
 }
 
 // ================= 网页接口 =================

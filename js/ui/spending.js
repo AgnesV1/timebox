@@ -6,7 +6,8 @@
 //     鼠标移到一行出 Edit / ×，点一行就在原地改）
 //   + Add（按 N）：页头下面展开一行直接打字（不用滚到流水那里）：Tab 跳格、回车存（存完这一行留着，接着记下一笔）、Esc 收起；底下一排推荐，点了直接记上
 //   右边（贴着顶）：By category，Expense / Income；每类一行：名字、金额、占比，底下一条按金额长的细线；点一类 = 流水只看这一类，再点取消
-//   齿轮：苦昼短自己的弹窗（Budget | Categories | Export | Import），功能和手机上的一样
+//   齿轮：苦昼短自己的弹窗（Budget | Categories | Currency | Export | Import），功能和手机上的一样
+//   币种：每一笔是记的那种钱（金额那一格照原样写，换算过的小字在下面）；页头的 CAD ▾ = 总数换成哪种看（这台电脑自己的）；记一笔那一行金额后面能换币种，换了就一直用它
 // 颜色是记账那一套（奶白字、钴蓝、超了橙、收入青绿），控件的形状、大小照苦昼短的（药丸形的分段开关和按钮、32px 的图标按钮）。
 // 改了、删了都能在提示条上撤销（苦昼短的 toast）。这一页自己管自己：main.js 只在第一次进来时挂上，之后数据变了调 refresh。
 
@@ -16,7 +17,7 @@ import * as store from "../store.js";
 import { esc, icon } from "../dom.js";
 import { toast } from "./common.js";
 import { openModal, modalSheet } from "./modal.js";
-import { IX, cents, roll, kfmt, periodTitle, chartView } from "./money.js";
+import { IX, cents, roll, kfmt, periodTitle, chartView, shownEntries, budgetsShown, amtOf, convOf, setShowCur, setRate, fetchRates, RATES, rateNote, curLabel, fx } from "./money.js";
 
 const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const today = () => store.today();
@@ -35,6 +36,7 @@ export function createSpending() {
     '<div class="sp-tools">' + seg("mode", [["month", "Month"], ["year", "Year"]]) +
     '<div class="sp-nav"><button type="button" class="sp-nb" data-act="prev" aria-label="Earlier" title="Earlier">‹</button><button type="button" class="sp-nb" data-act="now">Now</button><button type="button" class="sp-nb" data-act="next" aria-label="Later" title="Later">›</button></div>' +
     '<label class="sp-find">' + icon("search") + '<input type="search" data-q placeholder="Search" aria-label="Search notes, categories, amounts" autocomplete="off"><kbd>/</kbd></label>' +
+    '<select class="sp-curs" data-show aria-label="Show totals in" title="Show totals in">' + M.CURS.map((c) => '<option value="' + c.k + '">' + c.code + "</option>").join("") + "</select>" +
     '<button type="button" class="sp-ic" data-act="set" aria-label="Spending settings" title="Settings">' + icon("settings") + "</button>" +
     '<button type="button" class="sp-add" data-act="add" title="Add a transaction (N)">' + icon("plus") + "Add<kbd>N</kbd></button></div></header>" +
     '<div class="sp-addw" data-add></div>' +
@@ -50,7 +52,7 @@ export function createSpending() {
   const $ = (s) => root.querySelector(s);
   // mode：Month / Year；cur：看的是哪一期；filt：右边点了的那一类；side：右边看支出还是收入；q：搜索；edit：正在改的那一笔（"new" = 新记一笔）
   const V = { mode: "month", cur: todayP(), filt: null, side: "out", q: "", edit: null, all: false };
-  const F = { kind: "out", cat: "", d: today(), v: "", n: "" };   // 正在填的那一行（页面重画时先读回来，填到一半不丢）
+  const F = { kind: "out", cat: "", d: today(), v: "", n: "", cur: "cad" };   // 正在填的那一行（页面重画时先读回来，填到一半不丢）
   const chart = chartView($("[data-chart]"));
   let shown = false, fresh = null;
 
@@ -72,6 +74,7 @@ export function createSpending() {
   }
   function renderHead() {
     $("[data-title]").textContent = periodTitle(V.cur, V.mode);
+    $("[data-show]").value = SP.show();
     segTo("mode", V.mode);
     $('[data-act="now"]').disabled = M.samePeriod(V.cur, todayP(), V.mode);
     const [st, bad] = statusText(), el = $("[data-status]");
@@ -81,7 +84,7 @@ export function createSpending() {
 
   // ---------- 一排数 ----------
   function renderKpis(c) {
-    const p = V.cur, mode = V.mode, cmp = M.compare(IX(), SP.budgets(), p, mode, today());
+    const p = V.cur, mode = V.mode, cmp = M.compare(IX(), budgetsShown(), p, mode, today());
     const g = c.used, B = c.B, u = B ? M.counted(g) / B : 0, bal = cmp.cur.balance, left = cmp.cur.left;
     const since = (mode === "year" ? "earlier years" : "the last six months") + (cmp.cutText ? ", " + cmp.cutText : "");
     const range = (key, worse) => {
@@ -123,7 +126,7 @@ export function createSpending() {
   function renderCats() {
     const p = V.cur, mode = V.mode, isIn = V.side === "in", cats = SP.cats();
     segTo("side", V.side);
-    const rows = SP.entries().filter((e) => M.inPeriod(e, p, mode) && (e.v > 0) === isIn), by = new Map();
+    const rows = shownEntries().filter((e) => M.inPeriod(e, p, mode) && (e.v > 0) === isIn), by = new Map();
     let total = 0;
     for (const e of rows) { const x = by.get(e.c) || { v: 0, n: 0 }; x.v += Math.abs(e.v); x.n++; by.set(e.c, x); total += Math.abs(e.v); }
     const list = [...by].sort((a, b) => b[1].v - a[1].v), max = list[0]?.[1].v || 1;
@@ -145,11 +148,11 @@ export function createSpending() {
   };
   function txRows() {
     const q = V.q.trim().toLowerCase();
-    if (q) return SP.entries().filter((e) => (e.c + " " + e.n + " " + (Math.abs(e.v) / 100).toFixed(2) + " " + M.money(e.v)).toLowerCase().includes(q)).sort(M.byNewest);
+    if (q) return SP.entries().filter((e) => (e.c + " " + e.n + " " + (Math.abs(e.v) / 100).toFixed(2) + " " + M.money(e.v, M.curOf(e)) + " " + curLabel(M.curOf(e))).toLowerCase().includes(q)).sort(M.byNewest);
     return SP.entries().filter((e) => M.inPeriod(e, V.cur, V.mode) && (!V.filt || e.c === V.filt)).sort(M.byNewest);
   }
-  const amountHTML = (e) => (e.v > 0 ? "+" : "−") + cents(M.money(e.v));
-  const rowHTML = (e, dated) => '<tr class="sp-row' + (e.id === fresh ? " new" : "") + '" data-id="' + esc(e.id) + '" tabindex="0" aria-label="' + esc(e.c + " " + M.signed(e.v) + (e.n ? ", " + e.n : "") + ", " + M.fmtDate(e.d) + " — press Enter to edit") + '">' +
+  const amountHTML = (e) => (e.v > 0 ? "+" : "−") + cents(M.money(e.v, M.curOf(e))) + (convOf(e) ? '<small class="sp-conv">' + esc(convOf(e)) + "</small>" : "");
+  const rowHTML = (e, dated) => '<tr class="sp-row' + (e.id === fresh ? " new" : "") + '" data-id="' + esc(e.id) + '" tabindex="0" aria-label="' + esc(e.c + " " + amtOf(e) + (e.n ? ", " + e.n : "") + ", " + M.fmtDate(e.d) + " — press Enter to edit") + '">' +
     (dated ? '<td class="d mn-num">' + M.MON[M.parts(e.d).m - 1] + " " + M.parts(e.d).d + "</td>" : "") +
     '<td class="c">' + esc(e.c) + '</td><td class="n" title="' + esc(e.n || "") + '">' + esc(e.n || "") + "</td>" +
     '<td class="r mn-num' + (e.v > 0 ? " in" : "") + '">' + amountHTML(e) + "</td>" +
@@ -177,12 +180,13 @@ export function createSpending() {
     return '<div class="sp-fl">' +
       '<button type="button" class="sp-sign' + (F.kind === "in" ? " in" : "") + '" data-act="sign" aria-label="' + (F.kind === "in" ? "Income — switch to an expense" : "Expense — switch to income") + '" title="Expense or income">' + (F.kind === "in" ? "+" : "−") + "</button>" +
       '<input class="sp-fi sp-f-amt mn-num" data-f="v" inputmode="decimal" autocomplete="off" placeholder="0.00" value="' + esc(F.v) + '" aria-label="Amount (12.50+8 adds up)" title="12.50+8 adds up">' +
+      '<select class="sp-fi sp-f-cur" data-f="cur" aria-label="Currency" title="Currency — new records keep using the one you pick">' + M.CURS.map((c) => '<option value="' + c.k + '"' + (c.k === F.cur ? " selected" : "") + ">" + c.code + "</option>").join("") + "</select>" +
       '<select class="sp-fi sp-f-cat" data-f="c" aria-label="Category">' + cats.map((c) => "<option" + (c === F.cat ? " selected" : "") + ">" + esc(c) + "</option>").join("") + "</select>" +
       '<input class="sp-fi sp-f-note" data-f="n" autocomplete="off" placeholder="' + esc(used[0] ? "e.g. " + used[0] : "Note") + '" value="' + esc(F.n) + '" aria-label="Note">' +
       '<input class="sp-fi sp-f-date" type="date" data-f="d" value="' + esc(F.d) + '" aria-label="Date">' +
       '<span class="sp-fb">' + (e ? '<button type="button" class="sp-link warn" data-act="fdel">Delete</button>' : "") + '<button type="button" class="sp-link" data-act="cancel">Cancel</button>' +
       '<button type="button" class="sp-save" data-act="save">Save<kbd>↵</kbd></button></span></div><p class="sp-ferr" data-ferr role="alert"></p>' +
-      (recs.length ? '<div class="sp-recs"><span>Quick add</span>' + recs.map((x, i) => '<button type="button" class="sp-rec" data-rec="' + i + '" data-c="' + esc(x.c) + '" data-v="' + x.v + '" data-n="' + esc(x.n || "") + '">' + esc(x.c) + ' <span class="mn-num">' + esc(M.money(x.v)) + "</span></button>").join("") + "</div>" : "");
+      (recs.length ? '<div class="sp-recs"><span>Quick add</span>' + recs.map((x, i) => '<button type="button" class="sp-rec" data-rec="' + i + '" data-c="' + esc(x.c) + '" data-v="' + x.v + '" data-cur="' + esc(x.cur || "cad") + '" data-n="' + esc(x.n || "") + '">' + esc(x.c) + ' <span class="mn-num">' + esc(M.money(x.v, x.cur)) + "</span></button>").join("") + "</div>" : "");
   }
   const formRow = (cols, e) => '<tr class="sp-form" data-form="' + esc(e.id) + '"><td colspan="' + cols + '">' + formInner(e) + "</td></tr>";
   // 新记一笔的那一行：在页头下面（已经开着就不重画，正在打的字、光标都留着；force = 切了支出 / 收入、刚打开）
@@ -197,7 +201,7 @@ export function createSpending() {
     const f = $(".sp-form");
     if (!f) return;
     const val = (k) => f.querySelector('[data-f="' + k + '"]')?.value ?? "";
-    Object.assign(F, { v: val("v"), cat: val("c") || F.cat, n: val("n"), d: val("d") || F.d });
+    Object.assign(F, { v: val("v"), cat: val("c") || F.cat, n: val("n"), d: val("d") || F.d, cur: val("cur") || F.cur });
   }
   function renderTable() {
     readForm();
@@ -207,8 +211,9 @@ export function createSpending() {
     for (const e of shown) { const k = dated ? e.d.slice(0, 7) : e.d; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); }
     const editing = V.edit && V.edit !== "new" ? SP.get(V.edit) : null;   // 新记的那一行在页头下面（renderAdd），这里只有原地改的
     let body = "";
+    const R = RATES(), show = SP.show(), inShow = (e) => M.convert(e.v, M.curOf(e), show, R);
     for (const [k, list] of groups) {
-      const out = list.reduce((s, e) => s + (e.v < 0 ? -e.v : 0), 0), inc = list.reduce((s, e) => s + (e.v > 0 ? e.v : 0), 0);
+      const out = list.reduce((s, e) => s + (e.v < 0 ? -inShow(e) : 0), 0), inc = list.reduce((s, e) => s + (e.v > 0 ? inShow(e) : 0), 0);
       const title = dated ? M.MONTH[Number(k.slice(5, 7)) - 1] + " " + k.slice(0, 4) : dayTitle(k);
       body += '<tbody><tr class="sp-grp"><th colspan="' + (cols - 2) + '" scope="rowgroup">' + esc(title) + " <small>" + list.length + "</small></th>" +
         '<td class="r mn-num">' + (out ? "−" + esc(M.money(out)) : "") + (inc ? ' <span class="in">+' + esc(M.money(inc)) + "</span>" : "") + "</td><td></td></tr>" +
@@ -241,7 +246,7 @@ export function createSpending() {
     if (V.edit === "new") { focusAmount(); return; }
     const wasEditing = Boolean(V.edit);
     V.edit = "new";
-    Object.assign(F, { kind: "out", cat: firstCat("out"), d: entryDate(), v: "", n: "" });
+    Object.assign(F, { kind: "out", cat: firstCat("out"), d: entryDate(), v: "", n: "", cur: SP.inCur() });
     renderAdd(true);
     if (wasEditing) renderTable();
     if (!quiet()) $(".sp-addbar")?.animate([{ opacity: 0, transform: "translateY(-6px)" }, { opacity: 1, transform: "none" }], { duration: 280, easing: "cubic-bezier(.16, 1, .3, 1)" });
@@ -252,7 +257,7 @@ export function createSpending() {
     if (!e) return;
     if (V.edit === "new") { V.edit = null; renderAdd(); }
     V.edit = id;
-    Object.assign(F, { kind: e.v < 0 ? "out" : "in", cat: e.c, d: e.d, v: (Math.abs(e.v) / 100).toFixed(2), n: e.n || "" });
+    Object.assign(F, { kind: e.v < 0 ? "out" : "in", cat: e.c, d: e.d, v: (Math.abs(e.v) / 100).toFixed(2), n: e.n || "", cur: M.curOf(e) });
     renderTable();
     focusAmount();
   }
@@ -268,13 +273,13 @@ export function createSpending() {
     if (!(s > 0)) { if (err) err.textContent = "Type an amount first"; focusAmount(); return; }
     if (!F.cat) { if (err) err.textContent = "Add a category in Settings first"; return; }
     if (!/^\d{4}-\d\d-\d\d$/.test(F.d)) { if (err) err.textContent = "Pick a date"; return; }
-    const v = Math.round(s * 100) * (F.kind === "out" ? -1 : 1), row = { d: F.d, v, c: F.cat, n: F.n.trim() }, id = V.edit;
+    const v = Math.round(s * 100) * (F.kind === "out" ? -1 : 1), row = { d: F.d, v, c: F.cat, n: F.n.trim(), cur: F.cur }, id = V.edit;
     if (id && id !== "new") {
       const old = SP.get(id);
       V.edit = null;
       fresh = id;
       SP.update(id, row);
-      if (old) toast("Saved " + row.c + " " + M.money(v), () => SP.update(id, { d: old.d, v: old.v, c: old.c, n: old.n }));
+      if (old) toast("Saved " + row.c + " " + M.money(v, F.cur), () => SP.update(id, { d: old.d, v: old.v, c: old.c, n: old.n, cur: M.curOf(old) }));
       return;
     }
     // 新记的：这一行留着，接着记下一笔（日期、类别不变；金额、备注先清掉，记上以后页面刷新时读回来的就是空的）
@@ -283,12 +288,12 @@ export function createSpending() {
     bar?.querySelectorAll('[data-f="v"], [data-f="n"]').forEach((i) => { i.value = ""; });
     const e = SP.add({ id: SP.newId(), ...row });
     fresh = e.id;
-    toast("Added " + e.c + " " + M.money(e.v), () => SP.remove(e.id));
+    toast("Added " + e.c + " " + M.money(e.v, M.curOf(e)), () => SP.remove(e.id));
     focusAmount();
   }
   function del(id) {
     const e = SP.remove(id);
-    if (e) toast("Deleted " + e.c + " " + M.money(e.v), () => { fresh = e.id; SP.restore(e); });
+    if (e) toast("Deleted " + e.c + " " + M.money(e.v, M.curOf(e)), () => { fresh = e.id; SP.restore(e); });
   }
 
   // ---------- 换期间 ----------
@@ -329,9 +334,9 @@ export function createSpending() {
     if (cat) { V.filt = V.filt === cat.dataset.cat ? null : cat.dataset.cat; V.all = false; V.edit = null; renderCats(); renderTable(); return; }
     const rec = e.target.closest("[data-rec]");
     if (rec) {
-      const x = SP.add({ id: SP.newId(), d: F.d || entryDate(), v: Number(rec.dataset.v), c: rec.dataset.c, n: rec.dataset.n || "" });
+      const x = SP.add({ id: SP.newId(), d: F.d || entryDate(), v: Number(rec.dataset.v), c: rec.dataset.c, n: rec.dataset.n || "", cur: rec.dataset.cur });
       fresh = x.id;
-      toast("Added " + x.c + " " + M.money(x.v), () => SP.remove(x.id));
+      toast("Added " + x.c + " " + M.money(x.v, M.curOf(x)), () => SP.remove(x.id));
       return;
     }
     const a = e.target.closest("[data-act]");
@@ -370,19 +375,24 @@ export function createSpending() {
     else if (e.target.matches('[data-f="v"]')) { const err = $("[data-ferr]"); if (err) err.textContent = ""; }
   });
   root.addEventListener("change", (e) => {
+    if (e.target.matches("[data-show]")) { setShowCur(e.target.value); wantRate(e.target.value); return; }
+    if (e.target.matches('.sp-form [data-f="cur"]')) { F.cur = e.target.value; if (V.edit === "new") SP.setInCur(F.cur); wantRate(F.cur); return; }
     if (!e.target.matches('.sp-form [data-f="c"]')) return;
     F.cat = e.target.value;
     const used = M.notesOf(SP.entries(), F.cat), note = $('.sp-form [data-f="n"]');
     if (note) note.placeholder = used[0] ? "e.g. " + used[0] : "Note";
   });
 
+  // 选了一种还没填过汇率的钱：在后台拉一下欧洲央行当天的（没网就先用粗略的那个）
+  const wantRate = (k) => { if (!M.rateSet(fx(), k)) fetchRates([k], true).catch(() => {}); };
+
   // ---------- 设定（苦昼短的弹窗） ----------
   const SET = { tab: "budget", catKind: "out", expM: null };
   function setHTML() {
-    const tabs = [["budget", "Budget"], ["cats", "Categories"], ["export", "Export"], ["import", "Import"]];
+    const tabs = [["budget", "Budget"], ["cats", "Categories"], ["currency", "Currency"], ["export", "Export"], ["import", "Import"]];
     const [st, bad] = statusText();
     return '<h3>Spending settings</h3><div class="sp-sett"><span class="seg">' + tabs.map(([k, l]) => '<button type="button" data-sact="tab" data-v="' + k + '"' + (SET.tab === k ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span></div>" +
-      '<div class="sp-setb">' + setBody() + '</div><p class="msub sp-sets' + (bad ? " bad" : "") + '">' + esc(st) + " · Currency: CAD</p>";
+      '<div class="sp-setb">' + setBody() + '</div><p class="msub sp-sets' + (bad ? " bad" : "") + '">' + esc(st) + " · Totals in " + esc(curLabel(SP.show())) + "</p>";
   }
   function setBody() {
     const t = todayP();
@@ -401,12 +411,22 @@ export function createSpending() {
       const all = SP.cats(), mine = all.filter((c) => c.kind === SET.catKind), cnt = new Map();
       for (const e of SP.entries()) cnt.set(e.c, (cnt.get(e.c) || 0) + 1);
       const row = (c) => '<tr' + (c.hidden ? ' class="dim"' : "") + '><td><input class="sp-cin" data-rn="' + esc(c.name) + '" value="' + esc(c.name) + '" aria-label="Rename ' + esc(c.name) + '"></td>' +
-        '<td class="msub">' + (c.role === "base" ? "base" : c.role === "outside" ? "not in budget" : "") + '</td><td class="r num">' + (cnt.get(c.name) || 0) + "</td>" +
+        // 预算里怎么算：— = 照常；base = 梯形下面那一截（房租这类）；not in budget = 算支出、不算进预算（押金这类）。收入类没有这一格
+        "<td>" + (c.kind === "out" ? '<select class="sp-role" data-role="' + esc(c.name) + '" aria-label="How ' + esc(c.name) + ' counts in the budget">' + [["", "—"], ["base", "base"], ["outside", "not in budget"]].map(([v, l]) => '<option value="' + v + '"' + ((c.role || "") === v ? " selected" : "") + ">" + l + "</option>").join("") + "</select>" : "") + '</td><td class="r num">' + (cnt.get(c.name) || 0) + "</td>" +
         '<td class="r">' + (cnt.get(c.name) ? '<button type="button" class="link" data-sact="hide" data-c="' + esc(c.name) + '">' + (c.hidden ? "Show" : "Hide") + "</button>" : '<button type="button" class="link sp-warn" data-sact="cdel" data-c="' + esc(c.name) + '">Delete</button>') + "</td></tr>";
       return '<div class="sp-setrow"><span class="seg">' + [["out", "Expense"], ["in", "Income"]].map(([k, l]) => '<button type="button" data-sact="catk" data-v="' + k + '"' + (SET.catKind === k ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span></div>" +
-        '<table class="mtable"><thead><tr><th>Name</th><th></th><th class="r">Records</th><th></th></tr></thead><tbody>' + mine.filter((c) => !c.hidden).map(row).join("") + mine.filter((c) => c.hidden).map(row).join("") + "</tbody></table>" +
+        '<table class="mtable"><thead><tr><th>Name</th><th>' + (SET.catKind === "out" ? "Budget" : "") + '</th><th class="r">Records</th><th></th></tr></thead><tbody>' + mine.filter((c) => !c.hidden).map(row).join("") + mine.filter((c) => c.hidden).map(row).join("") + "</tbody></table>" +
         '<div class="sp-setrow"><input class="sp-cin" data-newcat placeholder="New category" aria-label="New category name"><button type="button" class="btn" data-sact="addcat">Add</button></div>' +
-        '<p class="msub">Records = how many transactions use it. Used ones can be hidden (kept for old records, not offered when adding); unused ones can be deleted.</p>';
+        '<p class="msub">Budget: <b>base</b> is the bottom of the trapezoid (like House); <b>not in budget</b> still counts as spending but not against the budget (like Bonds). Records = how many transactions use it. Used ones can be hidden (kept for old records, not offered when adding); unused ones can be deleted.</p>';
+    }
+    if (SET.tab === "currency") {
+      const R = RATES();
+      return '<p class="msub">Each record keeps the currency it was paid in. Totals, the chart and the budget are shown in one currency (on this computer); budgets are set in CAD.</p>' +
+        '<div class="sp-setrow"><label>Show totals in <select data-sshow>' + M.CURS.map((c) => '<option value="' + c.k + '"' + (c.k === SP.show() ? " selected" : "") + ">" + c.code + " " + c.sym + "</option>").join("") + "</select></label>" +
+        '<label>New records in <select data-sin>' + M.CURS.map((c) => '<option value="' + c.k + '"' + (c.k === SP.inCur() ? " selected" : "") + ">" + c.code + " " + c.sym + "</option>").join("") + "</select></label></div>" +
+        '<table class="mtable"><thead><tr><th>1 CAD =</th><th class="r">Rate</th><th>From</th></tr></thead><tbody>' + M.CURS.filter((c) => c.k !== "cad").map((c) =>
+          "<tr><td>" + esc(c.code) + ' <span class="msub">' + esc(c.sym) + '</span></td><td class="r"><input class="num sp-bv" data-rate="' + c.k + '" value="' + R[c.k] + '" inputmode="decimal" aria-label="' + esc(c.code) + ' for one Canadian dollar"></td><td class="msub">' + esc(rateNote(c.k)) + "</td></tr>").join("") + "</tbody></table>" +
+        '<div class="sp-setrow"><button type="button" class="btn" data-sact="ecb">Use today\'s rates</button><span class="msub" data-ecbr>From the European Central Bank (frankfurter.dev), only when you click. “rough” = not set yet.</span></div>';
     }
     if (SET.tab === "export") {
       const e = SET.expM || (SET.expM = { y: V.cur.y, m: V.mode === "year" ? (V.cur.y === t.y ? t.m : 12) : V.cur.m });
@@ -458,9 +478,14 @@ export function createSpending() {
       else if (act === "hide") { SP.setCats(SP.cats().map((c) => (c.name === b.dataset.c ? { ...c, hidden: !c.hidden } : c))); renderSet(); }
       else if (act === "cdel") { const before = SP.cats(); SP.setCats(before.filter((c) => c.name !== b.dataset.c)); renderSet(); toast("Deleted " + b.dataset.c, () => { SP.setCats(before); renderSet(); }); }
       else if (act === "addcat") addCat(sheet.querySelector("[data-newcat]"));
+      else if (act === "ecb") {
+        const note = sheet.querySelector("[data-ecbr]");
+        note.textContent = "Getting today's rates…";
+        fetchRates().then((d) => { renderSet(); toast("Rates from the ECB · " + M.fmtDate(d)); }).catch(() => { note.textContent = "Couldn't reach the ECB. Check the connection, or type the rates in."; });
+      }
       else if (act === "exp" || act === "exn") { SET.expM = M.addMonths(SET.expM.y, SET.expM.m, act === "exp" ? -1 : 1); renderSet(); }
       else if (act === "exgo" || act === "exall") {
-        const which = act === "exgo" ? SET.expM : null, md = M.toMarkdown(SP.entries(), SP.cats(), SP.budgets(), which, today()), pre = sheet.querySelector("[data-mdp]");
+        const which = act === "exgo" ? SET.expM : null, md = M.toMarkdown(SP.entries(), SP.cats(), SP.budgets(), which, today(), SP.show(), RATES()), pre = sheet.querySelector("[data-mdp]");
         pre.hidden = false;
         pre.textContent = md.split("\n").slice(0, 18).join("\n") + (md.split("\n").length > 18 ? "\n…" : "");
         shareFile(which ? "spending-" + M.ym(which.y, which.m) + ".md" : "spending-all-" + today() + ".md", md);
@@ -482,13 +507,23 @@ export function createSpending() {
         const from = t.dataset.rn, to = t.value.trim();
         if (!to || SP.cats().some((c) => c.name.toLowerCase() === to.toLowerCase() && c.name !== from)) { t.value = from; return; }
         if (to !== from) { SP.renameCat(from, to); if (V.filt === from) V.filt = to; renderSet(); }
+      } else if (t.matches("[data-rate]")) {
+        const v = parseFloat(String(t.value).replace(/[^\d.]/g, ""));
+        if (v > 0) { setRate(t.dataset.rate, v); toast("1 CAD = " + v + " " + curLabel(t.dataset.rate)); } else t.value = RATES()[t.dataset.rate];
+      } else if (t.matches("[data-sshow]")) { setShowCur(t.value); wantRate(t.value); renderSet(); }
+      else if (t.matches("[data-role]")) {
+        const before = SP.cats(), name = t.dataset.role, role = t.value;
+        SP.setCats(before.map((c) => (c.name === name ? { ...c, role } : c)));
+        renderSet();
+        toast(name + (role === "base" ? " is the base now" : role === "outside" ? " no longer counts against the budget" : " counts as usual"), () => { SP.setCats(before); renderSet(); });
       }
+      else if (t.matches("[data-sin]")) { SP.setInCur(t.value); wantRate(t.value); }
     });
     sheet.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
       if (e.target.matches("[data-newcat]")) { e.preventDefault(); addCat(e.target); }
       else if (e.target.matches("[data-nbv]")) { e.preventDefault(); sheet.querySelector('[data-sact="nbs"]')?.click(); }
-      else if (e.target.matches("[data-bpv], [data-rn]")) { e.preventDefault(); e.target.blur(); }
+      else if (e.target.matches("[data-bpv], [data-rn], [data-rate]")) { e.preventDefault(); e.target.blur(); }
     });
   }
 

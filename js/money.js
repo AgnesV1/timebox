@@ -1,5 +1,5 @@
 // 记账的计算（不碰页面）：按日 / 月 / 年加总、预算、超没超、图表的线、推荐、导出成 .md、从文字里导入。
-// 一笔 = { id, d: "2026-10-15", v: 分（负 = 支出、正 = 收入）, c: 类别, n: 备注, u: 改的时间 }。只记年月日，不记钟点。
+// 一笔 = { id, d: "2026-10-15", v: 分（负 = 支出、正 = 收入）, c: 类别, n: 备注, u: 改的时间, cur: 哪种钱（没写 = 加币，见下面 CURS） }。只记年月日，不记钟点。
 // 预算 = 从某个月起每月多少（{ from: "2026-10", v: 分 }，一个月用它之前最近定的那个）。
 // 类别 = { name, kind: "out" / "in", hidden, role }：role "base" = 预算的底座（House：月度图里是梯形下面那一截，
 // 每天的额度不算它）；"outside" = 算支出、不算进预算（Bonds：押金、还没出正式账单的，以后要回来的）。
@@ -23,9 +23,39 @@ export function addMonths(y, m, k) { const t = (y * 12 + m - 1) + k; return { y:
 export function addDaysISO(d, k) { const p = parts(d), t = new Date(Date.UTC(p.y, p.m - 1, p.d + k)); return t.toISOString().slice(0, 10); }
 export const fmtDate = (d) => { const p = parts(d); return MON[p.m - 1] + " " + p.d + ", " + p.y; };
 
-// 钱：$1,234.56（不带正负号；要符号的地方自己加 − / +）
-export const money = (c) => "$" + (Math.abs(c) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export const signed = (c) => (c < 0 ? "−" : "+") + money(c);
+// 币种：每一笔按记的那种钱存（e.cur；没写 = 加币），看的时候整份换成一种（默认加币，每台设备自己能换，见 js/spend.js 的 show）。
+// 汇率都对加币：rates.cny = 1 加币合几块人民币，存在 Settings 的 spend-fx（{ rates: { cny: { v, at, ecb } } }），自己填，或者点一下拉欧洲央行当天的。
+// 还没填过的用 ROUGH（2026-10-20 欧洲央行的，取整），只为了不算错太多；预算都按加币定。金额一律是那种钱的「分」（日元也乘 100，只是显示不带小数）
+export const CURS = [
+  { k: "cad", sym: "$", code: "CAD", dec: 2 }, { k: "cny", sym: "¥", code: "RMB", dec: 2 }, { k: "usd", sym: "US$", code: "USD", dec: 2 },
+  { k: "eur", sym: "€", code: "EUR", dec: 2 }, { k: "gbp", sym: "£", code: "GBP", dec: 2 }, { k: "jpy", sym: "JP¥", code: "JPY", dec: 0 },
+  { k: "hkd", sym: "HK$", code: "HKD", dec: 2 }
+];
+const ROUGH = { cad: 1, cny: 4.75, usd: 0.71, eur: 0.635, gbp: 0.533, jpy: 112.5, hkd: 5.59 };
+export const curInfo = (k) => CURS.find((c) => c.k === k) || CURS[0];
+export const isCur = (k) => CURS.some((c) => c.k === k);
+export const curOf = (e) => (e && isCur(e.cur) ? e.cur : "cad");
+// 汇率表 { cad: 1, cny: 4.75, … }：填过的用填的，没填的用 ROUGH
+export function ratesOf(fx) {
+  const out = { ...ROUGH };
+  for (const c of CURS) { const r = fx?.rates?.[c.k], v = Number(typeof r === "object" ? r?.v : r); if (c.k !== "cad" && v > 0) out[c.k] = v; }
+  return out;
+}
+export const rateSet = (fx, k) => k === "cad" || Number(fx?.rates?.[k]?.v ?? fx?.rates?.[k]) > 0;
+export const convert = (v, from, to, R) => (from === to ? v : Math.round(v / (R[from] || 1) * (R[to] || 1)));
+// 整份换成 to 那种钱（总数、图表、类别占比都拿这份算）；原来的金额、币种留在 v0 / cur0
+export const inCur = (entries, to, R) => entries.map((e) => { const c = curOf(e); return c === to ? e : { ...e, v: convert(e.v, c, to, R), v0: e.v, cur0: c }; });
+// 一个金额换成「看的那种钱」时用的币种（spend.js 的 show）：页面上的 money() 不写币种时就是它
+let SHOW = "cad";
+export const setShow = (k) => { SHOW = isCur(k) ? k : "cad"; };
+export const showing = () => SHOW;
+
+// 钱：$1,234.56（不带正负号；要符号的地方自己加 − / +）。cur 不写 = 现在看的那种钱；日元不带小数
+export const money = (c, cur = SHOW) => {
+  const x = curInfo(cur);
+  return x.sym + (Math.abs(c) / 100).toLocaleString("en-US", { minimumFractionDigits: x.dec, maximumFractionDigits: x.dec });
+};
+export const signed = (c, cur = SHOW) => (c < 0 ? "−" : "+") + money(c, cur);
 // 用户打的金额 → 分。「12.5」「$1,450」「−23.15」都认；认不出来是 NaN
 export const toCents = (s) => Math.round(parseFloat(String(s ?? "").replace(/[^\d.]/g, "")) * 100);
 
@@ -191,28 +221,30 @@ export function compare(ix, budgets, p, mode, today) {
   return { cur, n: prev.length, cutText, range: { expense: range("expense"), income: range("income"), left: range("left"), balance: range("balance") } };
 }
 
-// 推荐：①这个月之前两个月都有、同样金额的底座类别（房租、网费这类），这个月还没记的；②最近 60 天里同一类同一个金额出现得最多的那笔（至少两次）
+// 推荐：①这个月之前两个月都有、同样金额的底座类别（房租、网费这类），这个月还没记的；②最近 60 天里同一类同一个金额出现得最多的那笔（至少两次）。
+// 同样金额 = 同一种钱、同一个数；推荐出来的那笔带着它的币种（cur）
 export function recommend(entries, cats, view, today) {
   const out = [];
   const baseCats = new Set(cats.filter((c) => c.role === "base").map((c) => c.name));
   if (view) {
     const p1 = addMonths(view.y, view.m, -1), p2 = addMonths(view.y, view.m, -2);
     const of = (p) => entries.filter((e) => e.v < 0 && baseCats.has(e.c) && e.d.startsWith(ym(p.y, p.m)));
-    const a = of(p1), b = of(p2), now = new Set(of(view).map((e) => e.c + "|" + e.v));
+    const key = (e) => e.c + "|" + e.v + "|" + curOf(e);
+    const a = of(p1), b = of(p2), now = new Set(of(view).map(key));
     for (const e of a) {
-      const k = e.c + "|" + e.v;
-      if (b.some((x) => x.c === e.c && x.v === e.v) && !now.has(k) && !out.some((o) => o.c + "|" + o.v === k)) out.push({ c: e.c, v: e.v, n: e.n || "" });
+      const k = key(e);
+      if (b.some((x) => key(x) === k) && !now.has(k) && !out.some((o) => key(o) === k)) out.push({ c: e.c, v: e.v, n: e.n || "", cur: curOf(e) });
     }
   }
   const hidden = new Set(cats.filter((c) => c.hidden).map((c) => c.name));
   const from = addDaysISO(today, -60), cnt = new Map();
   for (const e of entries) {
     if (e.v > 0 || baseCats.has(e.c) || hidden.has(e.c) || e.d < from || e.d > today) continue;
-    const k = e.c + "|" + e.v;
+    const k = e.c + "|" + e.v + "|" + curOf(e);
     cnt.set(k, (cnt.get(k) || 0) + 1);
   }
   const top = [...cnt].sort((x, y) => y[1] - x[1])[0];
-  if (top && top[1] >= 2) { const [c, v] = top[0].split("|"); out.push({ c, v: Number(v), n: "" }); }
+  if (top && top[1] >= 2) { const [c, v, cur] = top[0].split("|"); out.push({ c, v: Number(v), n: "", cur }); }
   return out.slice(0, 3);
 }
 
@@ -226,33 +258,43 @@ export function notesOf(entries, cat) {
 // 新的在前：日期越新越前，同一天后记的在前
 export const byNewest = (a, b) => b.d.localeCompare(a.d) || (b.u || 0) - (a.u || 0);
 
-// 导出成 .md：一个月（which = { y, m }）或全部（which = null）。表格能再导回来（fromText 认这个格式）
-export function toMarkdown(entries, cats, budgets, which, today) {
+// 导出成 .md：一个月（which = { y, m }）或全部（which = null）。表格能再导回来（fromText 认这个格式）。
+// 总数、Breakdown 换成 show 那种钱（R = 汇率表）；Transactions 里每一笔是它自己的那种钱（「−¥88.00」），导回来币种还在
+export function toMarkdown(entries, cats, budgets, which, today, show = "cad", R = ROUGH) {
   const rows = (which ? entries.filter((e) => e.d.startsWith(ym(which.y, which.m))) : entries.slice()).sort((a, b) => a.d.localeCompare(b.d) || (a.u || 0) - (b.u || 0));
-  const ix = index(rows, cats);
-  const tot = rows.reduce((g, e) => { if (e.v < 0) g.out -= e.v; else g.inc += e.v; return g; }, { out: 0, inc: 0 });
-  const lines = ["# Spending · " + (which ? MONTH[which.m - 1] + " " + which.y : "everything") + " (CAD)", ""];
+  const conv = inCur(rows, show, R), ix = index(conv, cats), m$ = (v) => money(v, show);
+  const tot = conv.reduce((g, e) => { if (e.v < 0) g.out -= e.v; else g.inc += e.v; return g; }, { out: 0, inc: 0 });
+  const lines = ["# Spending · " + (which ? MONTH[which.m - 1] + " " + which.y : "everything") + " (" + curInfo(show).code + ")", ""];
   if (which) {
-    const B = budgetAt(budgets, which.y, which.m), g = sumOf(ix, which, "month");
-    lines.push("Spent " + money(tot.out) + " · Income " + money(tot.inc) + (B ? " · Budget " + money(B) + " · Left " + (B - counted(g) < 0 ? "−" : "") + money(B - counted(g)) : ""), "");
+    const B = convert(budgetAt(budgets, which.y, which.m), "cad", show, R), g = sumOf(ix, which, "month");
+    lines.push("Spent " + m$(tot.out) + " · Income " + m$(tot.inc) + (B ? " · Budget " + m$(B) + " · Left " + (B - counted(g) < 0 ? "−" : "") + m$(B - counted(g)) : ""), "");
   } else lines.push(rows.length + " records · exported " + fmtDate(today), "");
   const outCats = new Map(), inCats = new Map();
-  for (const e of rows) (e.v < 0 ? outCats : inCats).set(e.c, ((e.v < 0 ? outCats : inCats).get(e.c) || 0) + Math.abs(e.v));
+  for (const e of conv) (e.v < 0 ? outCats : inCats).set(e.c, ((e.v < 0 ? outCats : inCats).get(e.c) || 0) + Math.abs(e.v));
   const brk = (title, m, total) => {
     if (!m.size) return;
     lines.push("## " + title, "", "| Category | Amount | Share |", "|---|---:|---:|");
-    for (const [k, v] of [...m].sort((a, b) => b[1] - a[1])) lines.push("| " + k + " | " + money(v) + " | " + (v / (total || 1) * 100).toFixed(1) + "% |");
+    for (const [k, v] of [...m].sort((a, b) => b[1] - a[1])) lines.push("| " + k + " | " + m$(v) + " | " + (v / (total || 1) * 100).toFixed(1) + "% |");
     lines.push("");
   };
   brk("Expense breakdown", outCats, tot.out);
   brk("Income breakdown", inCats, tot.inc);
   lines.push("## Transactions", "", "| Date | Category | Note | Amount |", "|---|---|---|---:|");
   const cell = (s) => String(s || "").replace(/\|/g, "/").replace(/\n/g, " ");
-  for (const e of rows) lines.push("| " + fmtDate(e.d) + " | " + cell(e.c) + " | " + cell(e.n) + " | " + signed(e.v) + " |");
+  for (const e of rows) lines.push("| " + fmtDate(e.d) + " | " + cell(e.c) + " | " + cell(e.n) + " | " + signed(e.v, curOf(e)) + " |");
   return lines.join("\n") + "\n";
 }
 
-// 从文字里导入：导出的 .md（只读 Transactions 那张表），或者一行一笔「日期, 类别, 金额, 备注」（日期 2026-10-03 或 Oct 3, 2026）。
+// 金额里写的是哪种钱：符号在前（US$12、HK$5、JP¥1500、¥88、€5、£5、$12）或代码在后（88 RMB、12 usd）；都没有 = 加币
+export function curFromText(s) {
+  const t = String(s || "").trim().replace(/^[+−-]\s*/, "");
+  const code = /([A-Za-z]{3})\s*$/.exec(t)?.[1]?.toUpperCase();
+  if (code) { const hit = CURS.find((c) => c.code === code || c.k.toUpperCase() === code); if (hit) return hit.k; }
+  for (const c of [...CURS].sort((a, b) => b.sym.length - a.sym.length)) if (t.startsWith(c.sym)) return c.k;
+  return "cad";
+}
+
+// 从文字里导入：导出的 .md（只读 Transactions 那张表），或者一行一笔「日期, 类别, 金额, 备注」（日期 2026-10-03 或 Oct 3, 2026；金额可以带币种：¥88、88 RMB）。
 // 收入：类别是收入类，或者金额前面带 +。不认识的类别：带 + 的当新的收入类，别的当新的支出类（cats 里多出来的那几个在 added 里）
 export function fromText(text, cats) {
   const rows = [], added = [];
@@ -284,12 +326,12 @@ export function fromText(text, cats) {
     // 表格是 日期 | 类别 | 备注 | 金额；一行一笔是 日期, 类别, 金额, 备注
     const d = dateOf(f[0]);
     const [c, amt, note] = line.startsWith("|") ? [f[1], f[3], f[2]] : [f[1], f[2], f.slice(3).join(", ")];
-    const v = toCents(amt);
+    const v = toCents(amt), cur = curFromText(amt);
     if (!d || !c || !(v > 0)) { bad++; continue; }
     let cat = known.get(c.toLowerCase());
     const plus = /^\s*\+/.test(String(amt));
     if (!cat) { cat = { name: c, kind: plus ? "in" : "out", hidden: false, role: "" }; known.set(c.toLowerCase(), cat); added.push(cat); }
-    rows.push({ d, v: cat.kind === "in" ? v : -v, c: cat.name, n: (note || "").trim() });
+    rows.push({ d, v: cat.kind === "in" ? v : -v, c: cat.name, n: (note || "").trim(), ...(cur !== "cad" ? { cur } : {}) });
   }
   return { rows, added, bad };
 }

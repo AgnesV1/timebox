@@ -10,7 +10,7 @@
 import * as store from "../store.js";
 import * as M from "../money.js";
 import * as SP from "../spend.js";
-import { createView } from "./money.js";
+import { createView, IX } from "./money.js";
 
 // 和 money.js 同一套：进场快出来慢慢停稳（不冲过头），出场干脆、越走越快；小东西用只冲过头一点点的弹簧
 const ENTER = "cubic-bezier(.16, 1, .3, 1)", EXIT = "cubic-bezier(.4, 0, 1, 1)", FALL = "cubic-bezier(.45, 0, .85, .55)";
@@ -267,7 +267,7 @@ function close() {
 
 // 收起以后在岛上停一下：今天的总数 + 转圈变勾。宽度先量字再长到那么宽
 function showLive() {
-  const g = M.sumOf(M.index(SP.entries(), SP.cats()), M.parts(store.today()), "day");
+  const g = M.sumOf(IX(), M.parts(store.today()), "day");   // 换成看的那种钱（默认加币）
   live.querySelector(".t").innerHTML = "−" + M.money(g.out) + "<small>today</small>";
   const ring = live.querySelector(".ring"), ok = live.querySelector(".ok");
   ring.style.strokeDasharray = "12 29"; ring.classList.add("spin"); ok.style.strokeDashoffset = "10";

@@ -115,3 +115,45 @@ test("cards compare with the previous six months, cut at the same day for the cu
   assert.deepEqual(past.range.expense, [145000 + 6500 + 2000, 145000 + 6500 + 1000 + 5000]);
   assert.equal(M.compare(ix, budgets, { y: 2026, m: 8 }, "month", "2026-10-03").range.expense, null);   // nothing before August
 });
+
+test("currencies: each record keeps its own; totals convert at the typed rate, or a rough one until there is one", () => {
+  const fx = { rates: { cny: { v: 5, at: "2026-10-20" }, usd: 0.75 } };
+  const R = M.ratesOf(fx);
+  assert.equal(R.cad, 1);
+  assert.equal(R.cny, 5);
+  assert.equal(R.usd, 0.75);
+  assert.ok(R.jpy > 50, "rough default for one never typed");
+  assert.equal(M.rateSet(fx, "cny"), true);
+  assert.equal(M.rateSet(fx, "jpy"), false);
+  assert.equal(M.convert(-8800, "cny", "cad", R), -1760);
+  assert.equal(M.convert(-1000, "cad", "cny", R), -5000);
+  const mixed = [e("2026-10-02", -2000, "Food"), { ...e("2026-10-03", -8800, "Food"), cur: "cny" }];
+  const conv = M.inCur(mixed, "cad", R);
+  assert.equal(conv[1].v, -1760);
+  assert.equal(conv[1].v0, -8800);
+  assert.equal(conv[1].cur0, "cny");
+  assert.equal(M.sumOf(M.index(conv, cats), { y: 2026, m: 10 }, "month").out, 3760);
+  assert.equal(M.curOf(mixed[0]), "cad");
+  assert.equal(M.money(8800, "cny"), "¥88.00");
+  assert.equal(M.signed(-150000, "jpy"), "−JP¥1,500");
+  assert.equal(M.signed(-1250, "usd"), "−US$12.50");
+  M.setShow("eur");
+  assert.equal(M.money(500), "€5.00", "no currency = the one being shown");
+  M.setShow("cad");
+  assert.equal(M.money(500), "$5.00");
+});
+
+test("currencies survive an .md round trip and one-line imports; recommendations keep theirs", () => {
+  const R = M.ratesOf({ rates: { cny: 5 } });
+  const mixed = [e("2026-10-02", -2000, "Food", "lunch"), { ...e("2026-10-03", -8800, "Food", "noodles"), cur: "cny" }, { ...e("2026-10-04", -150000, "Gift", "omiyage"), cur: "jpy" }];
+  const md = M.toMarkdown(mixed, cats, budgets, { y: 2026, m: 10 }, "2026-10-16", "cad", R);
+  assert.match(md, /\(CAD\)/);
+  assert.match(md, /\| Oct 3, 2026 \| Food \| noodles \| −¥88\.00 \|/);
+  const back = M.fromText(md, cats);
+  assert.deepEqual(back.rows.map((r) => [r.v, r.cur || "cad"]), [[-2000, "cad"], [-8800, "cny"], [-150000, "jpy"]]);
+  const lines = M.fromText("2026-10-05, Food, 88 RMB, noodles\n2026-10-06, Traffic, US$12.50\n2026-10-07, Food, €4\n2026-10-08, Food, $3", cats);
+  assert.deepEqual(lines.rows.map((r) => r.cur || "cad"), ["cny", "usd", "eur", "cad"]);
+  assert.equal(M.curFromText("−HK$5"), "hkd");
+  const rent = [{ ...e("2026-09-01", -500000, "House"), cur: "cny" }, { ...e("2026-08-01", -500000, "House"), cur: "cny" }, e("2026-08-02", -500000, "House")];
+  assert.deepEqual(M.recommend(rent, cats, { y: 2026, m: 10 }, "2026-10-16").map((x) => x.c + " " + x.v + " " + x.cur), ["House -500000 cny"]);
+});

@@ -1,9 +1,9 @@
 // 手机：在今天页顶上往下拉，记账面板像一滴水从灵动岛那里落下来（面板里面是 money.js 的手机版）。
 // 拉：手指落在屏幕上面 40% 里、页面滚在最顶上才算。岛下面长出一颗黑色玻璃水滴（带一点高光），越拉越长，和岛之间连着一截细颈
 //   （SVG 模糊再收边，几块黑融在一起）；拉约 90px 过线：细颈断开、「+」变蓝 = 松手就开；拉着往回推，细颈又连上，松手就缩回去。往下快速一甩也开。
-// 开：水滴往下落，面板像一块幕布从顶上落下来（落到底弹一下，甩开的有惯性），停在屏幕约 94% 高；下沿挂着带褶的下摆，
+// 开：水滴往下落，面板像一块幕布从顶上落下来（落到底弹一下，甩开的有惯性），停在屏幕约 94% 高；下沿是一道很浅的弧（下摆，中间垂下来一点、边上一丝反光），
 //   幕布停住时下摆晚一拍，往下坠一下、来回摆两下才稳。底下露出一小条压暗的今天页，点它（或点下摆）就收。里面的东西从上往下淡入，每块隔 20ms。
-// 滑流水、拖底边的小横条时，下摆跟着速度斜一点、拉长一点，褶子横着漂一点，停下以后来回晃两下（一个弹簧，只写在 .mn-hem 上的三个变量）。
+// 滑流水、拖底边的小横条时，弧最低的那一点跟着速度往一边摆、垂得深一点，停下以后来回晃两下（一个弹簧，只写在 .mn-hem 上的变量）。
 // 收：点底下那条，或把底边的小横条往上推 → 幕布往上拉起来，下摆跟在后面先被拉长；这次记过 / 改过的话，岛上停一下「今天花了多少 ✓」，宽度跟着字。
 // 幕布整块只动位置；系统要求减少动态时不弹不摆。灵动岛那一条本身归 iPhone（往下拉会开通知中心），网页收不到——所以要从页面顶上那一块开始拉。
 
@@ -21,7 +21,7 @@ const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ARM = 80;        // 拉过这么多就算要开（加上开始的 10px，手指大约走 90px）
 const LEVEL = 0.94;    // 幕布停在屏幕多高（和 css/money.css 的 .mn-curtain 一样）
 const OPEN_MS = 640, CLOSE_MS = 340;
-const HIDE = "translateY(calc(-100% - 40px))";   // 收着：整块（连下摆）在屏幕上面
+const HIDE = "translateY(calc(-100% - 56px))";   // 收着：整块（连下摆）在屏幕上面
 
 let view = null, panel = null, inner = null, curtain = null, hem = null, veil = null, goo = null, top = null, neck = null, blob = null, drop = null, plus = null, live = null;
 let state = "closed", phoneOK = () => false, pageTop = () => true;
@@ -130,6 +130,7 @@ function hemStep(now) {
   // 褶子漂远了：整数个褶子（26px）一起减回来，看起来一样
   if (Math.abs(HEM.x.shift) > 260) { const w = Math.trunc(HEM.x.shift / 26) * 26; HEM.x.shift -= w; HEM.to.shift -= w; }
   hem.style.setProperty("--sway", HEM.x.sway.toFixed(2) + "deg");
+  hem.style.setProperty("--swn", HEM.x.sway.toFixed(2));   // 弧最低那一点横着挪多少（css 里乘 9px）
   hem.style.setProperty("--stretch", Math.max(0.6, 1 + HEM.x.stretch).toFixed(3));
   hem.style.setProperty("--shift", HEM.x.shift.toFixed(1) + "px");
   HEM.raf = busy ? requestAnimationFrame(hemStep) : 0;
@@ -144,7 +145,7 @@ function hemReset() {
   cancelAnimationFrame(HEM.raf);
   HEM.raf = 0;
   for (const k of ["sway", "stretch", "shift"]) { HEM.x[k] = HEM.v[k] = HEM.to[k] = 0; }
-  hem?.style.removeProperty("--sway"); hem?.style.removeProperty("--stretch"); hem?.style.removeProperty("--shift");
+  hem?.style.removeProperty("--sway"); hem?.style.removeProperty("--swn"); hem?.style.removeProperty("--stretch"); hem?.style.removeProperty("--shift");
 }
 
 // ---------- 拉 ----------

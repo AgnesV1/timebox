@@ -214,7 +214,7 @@ export function createView() {
   const cal = '<div class="mn-cal" data-cal><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' + btn("calp", "left", "Earlier month", "mn-sm") + '<span data-calt style="font-size:13px;font-weight:500"></span>' + btn("caln", "right", "Later month", "mn-sm") + '</div><div class="mn-cg wd mn-meta"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div><div class="mn-cg" data-calg></div></div>';
   const snackHTML = '<div class="mn-snack" role="status" aria-live="polite"><span data-snt></span><button type="button" class="mn-act" data-act="undo">Undo</button></div>';
   const curMenu = '<div class="mn-cal mn-curm" data-curm role="listbox" aria-label="Currency"></div>';
-  // 一块幕布（mn-curtain）：面板（mn-inner）屏幕约 94% 高，下沿挂着带褶的下摆（mn-hem）；底下露出来的那一小条是 mn-veil（压暗的今天页，点了收起，见 island.js）。
+  // 一块幕布（mn-curtain）：面板（mn-inner）屏幕约 94% 高，下沿是一道浅弧的下摆（mn-hem）；底下露出来的那一小条是 mn-veil（压暗的今天页，点了收起，见 island.js）。
   // 记一笔的面板、日历盖满整屏（数字键盘贴着屏幕底）
   root.innerHTML = '<div class="mn-veil"></div><div class="mn-curtain"><div class="mn-inner">' + home + pages + '<div class="mn-cdim" data-act="cclose"></div><section class="mn-csheet" aria-label="Charts"><div class="mn-cgrab" data-cgrab><span class="mn-grabber"></span><button type="button" class="mn-plain mn-done" data-act="cclose">Done</button></div>' + chartInner + "</section>" + snackHTML + '</div><div class="mn-hem" aria-hidden="true"><i></i></div></div>' + sheet + cal + curMenu;
 

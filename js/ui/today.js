@@ -15,7 +15,7 @@ import * as reading from "../reading.js";
 import * as Meal from "../meals.js";
 import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
-import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickable, pickTarget, segHTML, lineInfo, toast, STATUS, ballHTML, taskChainHTML } from "./common.js";
+import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickable, pickTarget, segHTML, lineInfo, toast, STATUS, ballHTML, taskChainHTML, groupsOf } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
 import { animateNext } from "../motion.js";
@@ -234,13 +234,69 @@ function addHTML(c, d, phone = false) {
     '<div class="add-main"><input name="title" data-keep="add-title-' + d + '" placeholder="' + (phone || d > c.today ? "Add a task" : "Add a task, or log one: Reading 14:00-15:10") + '" enterkeyhint="done">' +
     '<input name="est" class="min num" data-keep="add-est-' + d + '" type="number" inputmode="numeric" value="30" min="5" step="5" aria-label="Minutes">' +
     '<button class="btn cta" type="submit">Add</button></div>' +
-    '<div class="add-more"><select name="project" data-keep="add-plan-' + d + '" aria-label="Project or plan">' + projectOptions(projects, target) + "</select>" +
+    '<div class="add-more">' + (phone ? pjChipHTML(projects, target, d) : '<select name="project" data-keep="add-plan-' + d + '" aria-label="Project or plan">' + projectOptions(projects, target) + "</select>") +
     (people ? withHTML("add:" + d) : "") +
     '<label class="deep-tog" title="Deep work: focused, one thing at a time"><input type="checkbox" name="deep" data-keep="add-deep-' + d + '"><span>◆ Deep</span></label>' +
     (phone ? '<label class="deep-tog" title="Save it to Ideas instead of adding a task"><input type="checkbox" name="idea" data-keep="add-idea-' + d + '"><span>Idea</span></label>' : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
       '<option value="weekdays">↻ Weekdays</option><option value="weekly">↻ Every ' + WEEKDAYS[weekday(d)] + "</option></select>" +
       '<select name="for" aria-label="For how long">' + R.LENGTHS.map(([v, l]) => '<option value="' + v + '"' + (v === R.DEFAULT_LENGTH ? " selected" : "") + ">for " + l + "</option>").join("") + "</select>") +
     "</div>" + (phone ? "" : '<div class="idea-pick" data-idea-pick="' + d + '">' + pickHTML(d, document.querySelector('[data-keep="add-title-' + d + '"]')?.value || "") + "</div>") + "</form>";
+}
+
+// ---------- 手机：选项目 ----------
+// 加任务那一排的「项目」：一个和 ◆ Deep 一样的淡底小签（带那个项目的色点）；点了从屏幕底下升起来一张清单——
+// 大类一行（粗体、色点），它的计划缩进列在下面，当前那个打勾；点一行就选上、收起来。值放在一个藏起来的 input 里，表单照旧读
+function pjTargets(projects) {
+  const out = [{ value: "", label: "No project", color: "", top: true }];
+  for (const g of groupsOf(projects, { all: true })) {
+    if (g.name) out.push({ value: "g:" + g.name, label: g.name, color: store.groupByName(g.name)?.color || "", top: true });
+    for (const p of g.subs) out.push({ value: p.id, label: p.name, color: p.color || "", top: !g.name });
+  }
+  return out;
+}
+function pjChipHTML(projects, target, d) {
+  const hit = pjTargets(projects).find((x) => x.value === target) || { label: "No project", color: "" };
+  return '<input type="hidden" name="project" data-keep="add-plan-' + d + '" value="' + esc(target) + '">' +
+    '<button type="button" class="pj-pick' + (target ? " set" : "") + '" data-act="pj-pick" aria-haspopup="dialog" aria-label="Project or plan: ' + esc(hit.label) + '">' +
+    (hit.color ? '<i style="--pc:' + esc(hit.color) + '"></i>' : "") + "<span>" + esc(hit.label) + "</span>" + icon("down") + "</button>";
+}
+let pjSheet = null;
+function closePicker() {
+  const s = pjSheet;
+  if (!s) return;
+  pjSheet = null;
+  s.classList.remove("on");
+  setTimeout(() => s.remove(), 320);
+}
+function openPicker(btn, rerender) {
+  const form = btn.closest("form[data-add]");
+  if (!form) return;
+  closePicker();
+  const d = form.dataset.add, cur = form.querySelector("[name=project]")?.value || "";
+  const list = pjTargets(pickable(store.ctx().projects));
+  const el = document.createElement("div");
+  el.className = "pj-sheet";
+  el.innerHTML = '<div class="pj-scrim" data-pj="x"></div><section class="pj-panel" role="dialog" aria-modal="true" aria-label="Project or plan"><div class="pj-grip" data-pj="x"><span></span></div>' +
+    '<div class="pj-list">' + list.map((x, i) => '<button type="button" class="pj-row' + (x.top ? " top" : "") + (x.value === cur ? " on" : "") + '" data-pj="' + i + '" aria-pressed="' + (x.value === cur) + '">' +
+      (x.color ? '<i style="--pc:' + esc(x.color) + '"></i>' : '<i class="none"></i>') + "<span>" + esc(x.label) + "</span>" + (x.value === cur ? icon("check") : "") + "</button>").join("") + "</div></section>";
+  document.body.appendChild(el);
+  pjSheet = el;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("on")));
+  el.querySelector(".pj-row.on")?.scrollIntoView({ block: "center" });
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-pj]");
+    if (!b) return;
+    const x = list[Number(b.dataset.pj)];
+    if (x) {
+      const live = document.querySelector('form[data-add="' + CSS.escape(d) + '"]');
+      const input = live?.querySelector("[name=project]"), box = live?.querySelector("[name=deep]");
+      if (input) input.value = x.value;
+      if (box) box.checked = store.planDeep(x.value);
+      addTarget[d] = x.value;
+      rerender();
+    }
+    closePicker();
+  });
 }
 
 export function dayParts(c, d) {
@@ -349,6 +405,7 @@ export function initToday(rerender) {
     const act = el.dataset.act, id = rowId(el);
     // 换日子：往后翻列表往左滑，往前翻往右滑
     const go = (d) => { if (d !== shownDate()) animateNext(d > shownDate() ? "next" : "prev"); showDate(d); rerender(); };
+    if (act === "pj-pick") { openPicker(el, rerender); return; }
     if (act !== "edit" && !act.startsWith("day-")) animateNext();
     if (act === "status") {
       logOpen.delete(id);
@@ -425,7 +482,7 @@ export function initToday(rerender) {
   const addTouched = (e) => {
     const form = e.target.closest?.("form.add[data-add]");
     if (form) setAddOpen(form.dataset.add);
-    else if (addOpen && !e.target.closest?.(".menu")) setAddOpen("");
+    else if (addOpen && !e.target.closest?.(".menu, .pj-sheet")) setAddOpen("");
   };
   document.addEventListener("focusin", addTouched);
   document.addEventListener("pointerdown", addTouched, true);

@@ -231,24 +231,20 @@
 #mn-drop i { position: absolute; inset: 0; display: grid; place-items: center; padding-top: 12%; font: 400 17px/1 "Space Grotesk", sans-serif; font-style: normal; color: #7C7C90; opacity: 0;
   transition: color .25s, transform .28s linear(0, .029, .099, .192, .296, .399, .498, .588, .668, .737, .795, .844, .883, .915, .939, .959, .973, .984, .992, .997, 1.001, 1.003, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1); }
 #mn-drop i.armed { color: #6F93F0; transform: rotate(90deg) scale(1.1); }
-/* 面板是一块幕布：.mn-curtain 里是面板（.mn-inner，屏幕约 94% 高）和挂在它下沿的下摆（.mn-hem）；底下露出来的一小条是压暗的今天页（.mn-veil，点了收起）。
+/* 面板是一块幕布：.mn-curtain 里是面板（.mn-inner，屏幕约 94% 高）和挂在它下沿的下摆（.mn-hem，一道浅弧）；底下露出来的一小条是压暗的今天页（.mn-veil，点了收起）。
    开：幕布从顶上落下来，落到底弹一下；收：往上拉起来。动的是 .mn-curtain 这一整块（js/ui/island.js） */
 .mn-phone { position: fixed; z-index: 90; inset: 0; overflow: hidden; visibility: hidden; background: transparent; }
 .mn-phone.on { visibility: visible; }
 .mn-phone .mn-veil { position: absolute; inset: 0; background: rgba(0, 0, 0, .42); opacity: 0; }
-.mn-phone .mn-curtain { position: absolute; left: 0; right: 0; top: 0; height: 94%; transform: translateY(calc(-100% - 40px)); will-change: transform; }
+.mn-phone .mn-curtain { position: absolute; left: 0; right: 0; top: 0; height: 94%; transform: translateY(calc(-100% - 56px)); will-change: transform; }
 .mn-phone .mn-inner { position: absolute; inset: 0; overflow: hidden;   /* 青绿那团光在右下但离下沿远一点：下沿是纯黑，和下摆接得上 */
   background: radial-gradient(80% 45% at 0% 0%, rgba(76, 114, 216, .14), transparent 70%), radial-gradient(70% 38% at 100% 72%, rgba(79, 179, 169, .1), transparent 70%), #000; }
-/* 下摆：一条黑布，一条条竖的褶（每 26px 一道：中间亮一点、两边暗），越往下越明显；下沿每个褶子底下一个圆弧（遮罩）。
-   跟着滑动的速度动的三个变量只写在这一层（不让整块面板重算样式）：--sway 斜多少、--stretch 拉长多少、--shift 褶子和圆弧横着漂多少（js/ui/island.js 的弹簧）。
+/* 下摆：一道很浅的弧——中间垂下来约 14px，两头贴着面板的下沿；弧边上一丝反光（像布的折边），底下一层淡影子压在今天页上。
+   跟着滑动的速度动的只写在这一层（不让整块面板重算样式）：--swn 最低那一点往哪边摆（i 横着挪）、--stretch 垂得多深（整层竖着拉）（js/ui/island.js 的弹簧）。
    点得穿：点下摆和点底下那一条一样，都是收起 */
-.mn-phone .mn-hem { position: absolute; left: -6px; right: -6px; top: calc(100% - 1px); height: 28px; pointer-events: none; transform-origin: 50% 0; transform: skewX(var(--sway, 0deg)) scaleY(var(--stretch, 1)); will-change: transform; }   /* 自己一层：斜着、拉长都只是挪这一层，不重画、不出拼接的缝 */
-.mn-phone .mn-hem > i { position: absolute; inset: 0;
-  background: linear-gradient(#000, rgba(0, 0, 0, .3) 40%, rgba(0, 0, 0, 0) 75%), linear-gradient(90deg, #000, #11111a 6px, #2b2b3a 13px, #11111a 20px, #000 26px);
-  background-size: 100% 100%, 26px 100%;   /* 一格正好一个褶子：铺开来接缝处不断 */
-  background-position: 0 0, var(--shift, 0px) 0;
-  -webkit-mask: linear-gradient(#000 0 0) 0 0 / 100% calc(100% - 7px) no-repeat, radial-gradient(16px 8px at 50% 0, #000 96%, transparent 100%) var(--shift, 0px) 100% / 26px 8px repeat-x;
-  mask: linear-gradient(#000 0 0) 0 0 / 100% calc(100% - 7px) no-repeat, radial-gradient(16px 8px at 50% 0, #000 96%, transparent 100%) var(--shift, 0px) 100% / 26px 8px repeat-x; }   /* 两层遮罩重叠 1px：拉长的时候中间不漏一条缝 */
+.mn-phone .mn-hem { position: absolute; left: 0; right: 0; top: calc(100% - 1px); height: 48px; overflow: hidden; pointer-events: none; transform-origin: 50% 0; transform: scaleY(var(--stretch, 1)); will-change: transform; }
+.mn-phone .mn-hem > i { position: absolute; left: -2%; right: -2%; top: -30px; height: 44px; border-radius: 50%; background: #000;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .11), 0 12px 24px rgba(0, 0, 0, .36); transform: translateX(calc(var(--swn, 0) * 9px)); will-change: transform; }
 .mn-phone .mn-pg { background: transparent; }
 .mn-phone .mn-pg:not(.mn-home) { background: #000; }
 .mn-phone .mn-home, .mn-phone .mn-pg { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }

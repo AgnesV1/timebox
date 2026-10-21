@@ -1,177 +1,174 @@
-# 苦昼短 UI 待办（给本地 AI 用）
+# 苦昼短 UI to-do (for a coding agent)
 
-2026-10-20 整理。这份是写给在你自己电脑上跑的 Claude Code（或别的编程 AI）看的。用法：一次交给它一条，比如「照 TODO.md 第 3 条做」，它就按条目里写的做。
-每一条都写了这几样：要做什么、为什么、相关文件、步骤、做完的标准、怎么验证。做完一条，在标题前面打 ✅，写上日期和提交号。
-第 0 条每次都要先做。第 7 条是 2026-10 那一轮（流光线、记账网页版、Projects 右栏、阅读右框、手机帷幕）推迟下来的事。
+Written 2026-10-20 for Claude Code (or another coding agent) running on the owner's computer. Use: hand it one item at a time, e.g. "do item 3 of TODO.md".
+Each item says what to do, why, which files, the steps, what "done" means and how to check it. When an item is done, put ✅ before its title with the date and commit hash.
+Item 0 comes first every time. Item 7 collects what the 2026-10 round (streaming links, the web-style Spending page, the Projects rail, the Reading rail, the phone curtain) left for later.
 
-## 0. 每条开始前：准备好、记住规矩
-**准备**
-- Node 20 以上。Playwright 要自己装（云端是预装的，本地没有）：`npm i -g playwright && npx playwright install chromium`
-- 拉最新的 main，从它开一个新分支再改
-- 看效果：
-  - `node tools/look.mjs` 一条命令起本地网页和假表格，按清单截图：手机 390×844、电脑 1440×900、窄电脑 1000×760，白天、夜里各一套
-  - `--only 名字` 只截名字里带这几个词的；`--worst` 换成极端数据（很长的名字、一栏一堆目标、大金额）；`--out 目录` 指定图放哪
-  - 截完会打印图在哪、控制台有没有报错、手机上有没有小于 16px 的输入框。**每张图都要打开看**，不能只看打印出来的结果
-- 测试：`node --test test/*.test.mjs`，提交前必须全过
-- 手动点一点：`node tools/serve.mjs .`（http://127.0.0.1:8000）配 `node tools/fake-sheet.mjs`（假的 Google 表格，用法写在文件开头）
+## 0. Before every item: set up and remember the rules
+**Set up**
+- Node 20 or newer. Install Playwright yourself (it's preinstalled in the cloud, not locally): `npm i -g playwright && npx playwright install chromium`. `tools/look.mjs` prefers this global copy over any other found higher up the folder tree
+- Pull the latest main and branch from it before changing anything
+- To see the result:
+  - `node tools/look.mjs` starts the local page and the fake Sheet and screenshots the list: phone 390×844, computer 1440×900, narrow computer 1000×760, day and night
+  - `--only <words>` takes only shots whose names contain those words; `--worst` switches to extreme data (very long names, a column full of goals, huge amounts); `--out <dir>` says where the pictures go; `LOOK_PORT` / `FAKE_PORT` if 8010 / 8012 are taken
+  - It prints where the pictures are, any console errors, and phone inputs under 16px. **Open every picture**; the printed summary isn't enough
+- Tests: `node --test test/*.test.mjs`, all passing before any commit
+- Clicking around by hand: `node tools/serve.mjs .` (http://127.0.0.1:8000) with `node tools/fake-sheet.mjs` (a fake Google Sheet; usage at the top of the file)
 
-**规矩**
-- 界面上的字用英文，代码注释用中文，提交说明用英文
-- 新加的 JS 文件要写进 `sw.js` 的 `SHELL`（`test/sw.test.mjs` 会查）；改了网页用到的文件，`sw.js` 的 `CACHE` 版本号加一，不然手机上一直是旧的
-- `Code.gs` 里的 `SECRET = 'CHANGE_ME'` 不要改
-- North star 那一栏在仓库主人心里另有一个名字，只存在主人自己的表格里。仓库里（代码、文档、提交说明）一律写 North star
-- 设计上以 `css/app.css` 开头那段注释、`css/money.css` 开头那段注释为准（做完第 2 条以后以 DESIGN.md 为准）。别的设计 skill 说的和它冲突时，听它的
+**Rules**
+- Interface text in English, code comments in Chinese, commit messages and docs in English
+- New JS files go into `SHELL` in `sw.js` (`test/sw.test.mjs` checks); when files the page uses change, bump `CACHE` in `sw.js`, or phones keep the old version
+- Never change `SECRET = 'CHANGE_ME'` in `Code.gs`
+- The North star column has another name in the owner's mind that lives only in the owner's own Sheet. In the repository (code, docs, commit messages) it is always North star
+- Design follows `DESIGN.md` (and the comments at the top of `css/app.css` and `css/money.css`). Where another design skill disagrees, `DESIGN.md` wins
 
-## 1. 真机检查（要人来做，AI 负责准备和记录）
-> 2026-10-20：`tools/serve.mjs` 认 `HOST` 了（`dc2bb54`）。清单还没问，等这一轮上线以后在真机上过一遍。
-**为什么**：截图只看得到样子，手感、流畅不流畅、iPhone 会不会把页面放大，只有真机上才知道。
+## 1. Real-device check (a person does it; the agent prepares and records)
+> 2026-10-20: `tools/serve.mjs` reads `HOST` (`dc2bb54`). The checklist hasn't been asked yet — go through it on the devices after this round is live.
 
-**步骤**
-1. 最省事的是用上线后的网址（GitHub Pages）试。要在合并前试的话：
-   - 给 `tools/serve.mjs` 加一个 `HOST` 环境变量，默认还是 `127.0.0.1`
-   - 用 `HOST=0.0.0.0 node tools/serve.mjs .` 起网页，手机和电脑连同一个 Wi-Fi，手机打开 `http://电脑的IP:8000`
-   - 局域网的 http 不是安全来源，service worker 不会生效，这不影响检查
-2. 把下面的清单抄进一个检查记录，一项项问仓库主人，结果写回这一条。
+**Why**: screenshots only show how things look. How they feel, whether they're smooth, whether the iPhone zooms the page — only a real device tells.
 
-**iPhone 清单**
-- 今天页滚在最顶上，从屏幕上面那一截往下拉记账：
-  - 拉大约 90px 才开；往下甩一下也开；拉着往回推就取消
-  - 水滴落下，接着面板像幕布一样落下，停在屏幕约 94% 高（落下时有一点回弹）
-- 面板开着：
-  - 上下滑流水时，下摆的褶子会跟着摆一下再停稳；滑得越快摆得越大，但不会晃得让人晕
-  - 点底下露出的那一小条今天页，幕布拉起来收回去
-- 点这些输入框，页面不该放大：Why?、Details、记账的备注 / 搜索 / 分类改名
-- 系统设置里打开「减弱动态效果」：不摆、不弹，只淡入淡出
+**Steps**
+1. Easiest is the live URL (GitHub Pages) after deploying. To test before merging:
+   - `HOST=0.0.0.0 node tools/serve.mjs .`, phone and computer on the same Wi-Fi, open `http://<computer's IP>:8000` on the phone
+   - Plain http on the LAN isn't a secure origin, so the service worker won't run; that doesn't matter for this check
+2. Copy the checklist below into a record, ask the owner item by item, and write the results back here.
 
-**Mac 清单**
-- 备餐页的 Big buys：触控板左右划能开关，浏览器不会当成「后退」
-- Spending 页：按 N 展开记一笔那一行，按 / 跳到搜索
-- Projects 页：鼠标停在计划卡上，流光线流得顺不顺
-  - 打开 Chrome 的 Performance 面板录 5 秒，悬停的那几秒里每帧的 Paint 应该在 4ms 以内
-  - 超了就把同时带流光的线数从 24 往下调（`js/ui/links.js` 里的 `STREAKS`）
-- 阅读页：右边的框拖顺序、Alt+↑↓ 挪顺序都好用
+**iPhone checklist**
+- On Today scrolled to the top, pull down from the top part of the screen to open the ledger:
+  - It opens after about 90px; a quick flick down opens it too; pushing back up while pulling cancels
+  - The drop falls, then the panel falls like a curtain and stops at about 94% of the screen (with a small bounce)
+- With the panel open:
+  - Scrolling the list makes the soft waves of the hem lean, rise and drift sideways, then settle; faster scrolling moves them more, never enough to feel dizzy
+  - Tapping the strip of Today still showing below pulls the curtain back up
+  - The `CAD ⌄` next to the totals switches the currency; adding a record in RMB shows `−¥…` with the converted amount underneath
+- Tapping these inputs never zooms the page: Why?, Details, the ledger's note / search / category rename / rate fields
+- Today's opened row: Done / Delay / Drop are small but easy to hit; ↑ ↓ move the row
+- Adding a task: the project chip opens a dropdown below it that doesn't jump when the keyboard closes; the chosen project shows on the chip
+- With Reduce Motion on in Settings: no swaying, no bouncing, only fades
 
-**做完的标准**：清单每一项都有结论（好 / 不好 + 一句话）。不好的，各开一条新待办写在第 7 条里。
+**Mac checklist**
+- Meals → Big buys: a trackpad swipe left / right opens and closes it, and the browser doesn't treat it as Back
+- Spending: N opens the add row, Enter saves and closes it; / jumps to search
+- Projects: hovering a plan card, are the streaks smooth?
+  - Record 5 seconds in Chrome's Performance panel; while hovering, each frame's Paint should stay under 4ms
+  - If it's over, lower the number of lines that carry a streak at once from 24 (`STREAKS` in `js/ui/links.js`)
+- Reading: dragging in the right box and Alt+↑↓ reorder fine
 
-## 2. ✅ 把设计规则写成 DESIGN.md
-> 2026-10-20 `dc2bb54`：仓库根目录 `DESIGN.md`，六节都有，每条后面写了选择器 / token。
-**为什么**：以后用别的设计 skill（frontend-design、Impeccable 这些）时，它们会先读需求方给定的设计方向。没有这份文件，它们会按自己的口味把苦昼短的风格「改正」掉，比如把 emoji 类目、霓虹发光、磨砂卡片当成问题。
+**Done when**: every item has a verdict (fine / not fine + one sentence). Each "not fine" becomes a new item under 7.
 
-**来源**
-- `css/app.css` 开头的注释：白天「白昼酸」、夜里「夜店」，强调色只有青柠，框能少就少，动物纹表示状态
-- `css/app.css` 里的 token（:root 和 `[data-theme="dark"]` 两段），以及 2157 行附近「半透明 50% + 轻磨砂」那段
-- `css/money.css` 开头：记账自己的颜色、玻璃、渐进模糊、动效曲线和时长、四档字号
-- 记账电脑版（`.mn.spend`）的规则：50% 透明黑的底、一块板里不套框、数字等宽靠右
-- 流光线的规则：`js/ui/links.js` 开头的注释、`css/app.css` 里的 `.lk-*`
+## 2. ✅ Write the design rules into DESIGN.md
+> 2026-10-20 `dc2bb54` (in English since `30764c2`): `DESIGN.md` at the repository root with all six sections; every rule names its selector / token.
 
-**步骤**：在仓库根目录写 `DESIGN.md`，分这几节：
-1. 原则（五六句话）
-2. 颜色和字（token 表：名字、白天的值、夜里的值、用在哪）
-3. 组件（页头、分段开关、按钮、卡片、表格、弹层，各写一行「长什么样、什么时候用」）
-4. 动效（曲线、时长、弹簧，系统要求减少动态时怎么办）
-5. 记账这一套（它和苦昼短哪里一样、哪里不一样）
-6. 「设计 skill 不许改的东西」：emoji 类目、磨砂卡片、夜里的霓虹发光、夜里的等宽数字、渐变进度条、手写的中文注释
+**Why**: design skills (frontend-design, Impeccable and others) read the given design direction first. Without this file they "correct" 苦昼短's style to their own taste — treating the emoji kinds, neon glow and frosted cards as problems.
 
-**做完的标准**：每条规则都能对到一处 CSS（写上选择器）；不写 CSS 里没有的东西。
+**Sources**
+- The comment at the top of `css/app.css`: acid neon by day, cyberpunk by night, lime as the only accent, as few frames as possible, animal prints for status
+- The tokens in `css/app.css` (the `:root` and `[data-theme="dark"]` blocks), and the "translucent 50% + light frost" section near line 2157
+- The top of `css/money.css`: spending's own colours, glass, progressive blur, motion curves and durations, four type sizes
+- The rules of the computer's Spending page (`.mn.spend`): 50% translucent black, no frames inside the board, monospace numbers aligned right
+- The link streaks: the comment at the top of `js/ui/links.js`, and `.lk-*` in `css/app.css`
 
-## 3. 把查细节的几个 skill 放进仓库
-> 2026-10-20 `dc2bb54`：做了第 1 步（`.gitignore`）和第 4 步（`.claude/skills/look/SKILL.md`）。第 2、3 步要从别人的仓库下载文件，等仓库主人点头再做。
-**为什么**：这几个 skill 不管风格，只查代码本身看不出来的问题：手机上的手感、极端数据、动效性能，再加一个截图看效果的步骤。
+**Steps**: write `DESIGN.md` at the repository root with these sections:
+1. Principles (five or six sentences)
+2. Colour and type (a token table: name, day value, night value, where it's used)
+3. Components (header, segmented control, buttons, cards, tables, dialogs — one line each: what it looks like, when to use it)
+4. Motion (curves, durations, springs, what happens under reduced motion)
+5. The spending set (where it matches 苦昼短 and where it doesn't)
+6. "What design skills must leave alone": emoji kinds, frosted cards, neon glow at night, monospace numbers at night, gradient progress bars, the hand-written Chinese comments
 
-**步骤**
-1. `.gitignore` 第 6 行的 `.claude/` 改成 `.claude/*`，下一行加 `!.claude/skills/`。不改的话，放进去的 skill 提交不上去。
-2. 从 https://github.com/emilkowalski/skills 拷 `skills/mobile-native`、`skills/break-ui`、`skills/animation-performance` 到 `.claude/skills/` 下，同名目录。每个目录里放一份它的 LICENSE（MIT）。
-3. 从 https://github.com/vercel-labs/web-interface-guidelines 拷 `AGENTS.md`（规则清单），放成 `.claude/skills/web-interface-guidelines/SKILL.md`，开头补上 skill 的 frontmatter（name、description）。
-   - 删掉这几类规则：React / hydration 相关的；「标题用 Title Case」（苦昼短一直用句首大写）
-   - 连同 LICENSE（MIT）
-4. 新写 `.claude/skills/look/SKILL.md`，把 `tools/look.mjs` 包成一个 skill：
-   - 什么时候用：改了界面以后
-   - 怎么跑：参数和第 0 条一样
-   - 截哪几张：照 `tools/look.mjs` 里的 `SHOTS`
-   - 看图时查什么：左边缘和基线对齐、同一行一样高、长名字有省略、夜里的发光没有糊成一片、手机输入框不小于 16px
-5. 这几个 skill 里和苦昼短冲突的地方，在各自的 SKILL.md 最上面加一句「以 DESIGN.md 为准」。冲突的例子：
-   - mobile-native 说不要 `touchmove` + `preventDefault`，可下拉记账就靠它
-   - mobile-native 说按系统深浅色配 `theme-color`，可苦昼短的日夜跟着钟点走
+**Done when**: every rule maps to a place in the CSS (with its selector); nothing that isn't in the CSS.
 
-**做完的标准**：`git status` 里看得到 `.claude/skills/` 下的新文件；在本地 Claude Code 里输入 `/look` 能跑出截图。
+## 3. ✅ Put the detail-checking skills into the repository
+> 2026-10-20: `.gitignore` and `.claude/skills/look/SKILL.md` in `dc2bb54`; the four skills from other authors in `30764c2`, each with its MIT licence and a "DESIGN.md wins" note at the top.
 
-## 4. ✅ 拖拽要有不用拖的做法（WCAG 2.2 的 2.5.7）
-> 2026-10-20 `3b2203a`（手机上 ↑ ↓ 的样子在 `4c08f35`）。表里每一行都改成「有」了，见下面。
-**为什么**：拖拽是唯一做法的地方，触控板不好使、手抖、用键盘的时候就做不了。WCAG 2.2 要求每个拖拽都有一个单击就能完成的替代做法，最好键盘也能做。
+**Why**: these skills don't care about style; they check what the code alone doesn't show: how it feels on a phone, extreme data, animation performance, plus a step that screenshots the result.
 
-**先查一遍现状**：每一处拖拽，看已经有没有别的做法。有的就在这里记一句，没有的就补。
-| 拖拽 | 代码 | 现在有没有别的做法 |
+**Steps**
+1. In `.gitignore`, change `.claude/` to `.claude/*` and add `!.claude/skills/` on the next line. Otherwise the skills can't be committed.
+2. Copy `skills/mobile-native`, `skills/break-ui` and `skills/animation-performance` from https://github.com/emilkowalski/skills into `.claude/skills/` under the same names, with its LICENSE (MIT) in each folder.
+3. Copy `AGENTS.md` (the rule list) from https://github.com/vercel-labs/web-interface-guidelines as `.claude/skills/web-interface-guidelines/SKILL.md`, adding skill frontmatter (name, description) at the top.
+   - Remove these kinds of rules: anything React / hydration; "titles in Title Case" (苦昼短 always uses sentence case)
+   - Include its LICENSE (MIT)
+4. Write `.claude/skills/look/SKILL.md`, wrapping `tools/look.mjs` as a skill:
+   - When to use it: after changing the interface
+   - How to run it: the same options as item 0
+   - Which shots: `SHOTS` in `tools/look.mjs`
+   - What to check in the pictures: left edges and baselines aligned, equal heights within a row, long names truncated with an ellipsis, night glow not smeared, phone inputs at least 16px
+5. At the top of each of these SKILL.md files, where it conflicts with 苦昼短, add a line saying `DESIGN.md` wins. Examples of conflicts:
+   - mobile-native says never use `touchmove` + `preventDefault`, but pulling the ledger down depends on it
+   - mobile-native says to set `theme-color` per colour scheme, but 苦昼短's day and night follow the clock
+
+**Done when**: `git status` shows the new files under `.claude/skills/`; typing `/look` in a local Claude Code session produces screenshots.
+
+## 4. ✅ Every drag has a way that needs no drag (WCAG 2.2, 2.5.7)
+> 2026-10-20 `3b2203a` (the look of the phone's ↑ ↓ in `4c08f35` and `6089f70`). Every row of the table below now says "yes".
+
+**Why**: where dragging is the only way, a trackpad, an unsteady hand or a keyboard can't do it. WCAG 2.2 asks for a single-click alternative to every drag, ideally keyboard-operable too.
+
+| Drag | Code | Other way now |
 |---|---|---|
-| 日历里的任务拖到别的日子 / 钟点 | `js/ui/dnd.js`、`js/ui/calendar.js` | 有：编辑框的 Date（日历只排到天，没有钟点）；拖回任务池 = 编辑框里新加的「Back to the pool」 |
-| 任务池的条目、规律计划拖到日历 | `js/ui/dnd.js`、`js/ui/calendar.js` 119–131 行 | 有：点一下或 Tab 过去按回车，出「Put on…」菜单（日历上看得到的每一天） |
-| 备餐：Box 拖到某天、复制一天、食材拖进 Box | `js/ui/dnd.js` 开头的注释、`js/ui/meals.js` | 有：Box 点一下出「Put on…」（每一天 + 粗排的每一周），某天的编辑框里本来就能加 Box；复制一天 = 那天编辑框里新加的「Same as another day」；食材点一下出「Add to…」（每个 Box + A new box），Box 编辑框里本来也能加 |
-| 四象限便签拖到别的格 | `js/ui/quads.js` 333 行 | 有：点开便签，✓ 旁边新加的「挪」按钮，挑另外三格 |
-| 手机今天页：按住分钟数上下拖排顺序 | `js/ui/today.js` 514 行 | 有：展开那一行右边的 ↑ ↓（手机电脑都有），电脑上 Alt+↑↓ |
-| Projects 的连线（拖小圆圈） | `js/ui/links.js` | 有：计划编辑框的 Serves、改目标时的 Part of |
-| 阅读页右框排顺序 | `js/ui/reading.js` | 有：Alt+↑↓ |
+| Calendar task to another day / time | `js/ui/dnd.js`, `js/ui/calendar.js` | Yes: the editor's Date (the calendar only plans by day, there are no times); dragging back to the pool = the editor's new "Back to the pool" |
+| Pool items and Regular plans onto the calendar | `js/ui/dnd.js`, `js/ui/calendar.js` lines 119–131 | Yes: click, or Tab to it and press Enter, for a "Put on…" menu of every day shown |
+| Meals: a Box onto a day, copying a day, a grocery into a Box | the comment at the top of `js/ui/dnd.js`, `js/ui/meals.js` | Yes: click a Box for "Put on…" (each day + each rough-plan week), and a day's editor could always add Boxes; copying a day = "Same as another day" in that day's editor; click a grocery for "Add to…" (each Box + A new box), and the Box editor could always add groceries |
+| Matrix notes to another box | `js/ui/quads.js` line 333 | Yes: open a note; the new move button next to ✓ picks one of the other three boxes |
+| Phone Today: press and drag the minutes to reorder | `js/ui/today.js` line 514 | Yes: ↑ ↓ on the right of the opened row (phone and computer), Alt+↑↓ on the computer |
+| Projects links (dragging the small circle) | `js/ui/links.js` | Yes: Serves in the plan editor, Part of when editing a goal |
+| Reading's right box order | `js/ui/reading.js` | Yes: Alt+↑↓ |
 
-**补的做法**（照苦昼短已有的样子做，别加新的弹层种类）：
-- 能拿起来的东西可以用 Tab 选中。按 Enter 出一个小菜单（`js/ui/select.js` 那种）：
-  - 任务池的条目：「Put on…」，挑日子和钟点
-  - 便签：「Move to」，挑四个象限
-  - 手机排顺序：上移 / 下移
-- 菜单里的每一项用鼠标单击也能选，这就满足了「单击能完成」。
+**What was added** (in 苦昼短's existing style, no new kind of popup):
+- Things that can be picked up can be reached with Tab. Enter opens a small menu (the `js/ui/select.js` kind, `openMenu`):
+  - Pool items: "Put on…", pick the day
+  - Notes: "Move to", pick a box
+  - Reordering: up / down
+- Every item in the menu can be clicked, which satisfies "a single click can do it".
 
-**做完的标准**：表里每一行的「现在有没有别的做法」都变成「有」；只用键盘能走完每一种操作。
+**Done when**: every row in the table says "yes"; every operation can be finished with the keyboard alone.
 
-## 5. ✅ 弹窗开着时页面重画了，关掉后焦点回不到原来的按钮
-> 2026-10-20 `3b2203a`：本地没装 Playwright，那段脚本没跑；在内置浏览器里照同样的步骤验过（重画后回到同一行的 ⋯；那一行没了就落到页面标题）。`test/modal.test.mjs` 测选择器，`node --test` 全过。
-**为什么**：`js/ui/modal.js` 打开时记下了点开它的那个元素（`opener`）。弹窗开着的时候页面整页重画（比如同步拉下来新数据），那个元素就被换掉了。关掉以后 `back.isConnected` 是 false，焦点掉到 `body` 上；用键盘的人得从页面最上面重新 Tab。
+## 5. ✅ A redraw while a dialog is open loses the button focus returns to
+> 2026-10-20 `3b2203a`: checked in the built-in browser with the same steps (after a redraw focus returns to the same row's ⋯; if the row is gone it lands on the page title). `test/modal.test.mjs` tests the selector; `node --test` passes.
 
-**步骤**
-1. `openModal` 时，除了元素本身，再记一个能重新找到它的描述：它的 `data-act`，加上最近的 `data-id` / `data-project` / `data-goal` / `data-idea`，拼成一个选择器。
-2. `closeModal` 时：原来的元素还在页面上就用它；不在了就用这个选择器重新找；都找不到，就把焦点放到 `#main` 的第一个标题上（加 `tabindex="-1"`）。
-3. 写一个测试，或者用 Playwright 写一段：打开任务编辑框 → 触发一次重画 → Esc 关掉 → 看 `document.activeElement` 是不是那一行的按钮。
+**Why**: `js/ui/modal.js` remembers the element that opened it (`opener`). If the page is redrawn while the dialog is open (say a sync pulls new data), that element is replaced. On close, `back.isConnected` is false and focus falls to `body`; a keyboard user has to Tab from the top of the page again.
 
-**做完的标准**：上面那段 Playwright 脚本通过；`node --test` 全过。
+**Steps**
+1. In `openModal`, besides the element, remember a description that can find it again: its `data-act`, plus the nearest `data-id` / `data-project` / `data-goal` / `data-idea`, as a selector.
+2. In `closeModal`: use the original element if it's still on the page; otherwise find it with the selector; if neither works, focus the first heading in `#main` (with `tabindex="-1"`).
+3. Write a test, or a Playwright snippet: open a task editor → trigger a redraw → Esc → check that `document.activeElement` is that row's button.
 
-## 6. 可选：用设计 skill 做一次体检
-都不用装进仓库，在本地临时用一次就行，报告写进 `design/`（这个目录不进仓库）：
-- Impeccable 的 `audit` 和 `harden`：https://github.com/pbakaus/impeccable 。它的自动检测钩子别开，emoji、玻璃那几条会一直报
-- ibelick 的 `improve-ui`（对照 DESIGN.md 找偏差）、`fixing-accessibility`：https://github.com/ibelick/ui-skills
-- 报告里说的每一条，先对照 DESIGN.md 看是不是「故意的」，是的就跳过；剩下的再开成新的待办
+**Done when**: that snippet passes; `node --test` passes.
 
-## 7. 2026-10 那一轮推迟的事
-那一轮做了：Projects 右栏（North star 那段字、Goals | Ideas）、斜穿的流光线、记账电脑版的网页排法、阅读页右边「Rest of 今年」、手机记账的帷幕。
-下面几条是做的时候看到、但没在那一轮做的。每条都小，可以一条一个提交。
+## 6. Optional: a check-up with design skills
+None of these go into the repository; use them once locally and write the reports into `design/` (not committed):
+- Impeccable's `audit` and `harden`: https://github.com/pbakaus/impeccable. Don't turn on its automatic detection hook; the emoji and glass rules would fire all the time
+- ibelick's `improve-ui` (compares against DESIGN.md) and `fixing-accessibility`: https://github.com/ibelick/ui-skills
+- For each point in a report, first check DESIGN.md for whether it's on purpose and skip it if so; make new items for the rest
 
-**7a. ✅ 用键盘停在目标、计划卡上，也画流光线**（2026-10-20 `3b2203a`）
-- 为什么：现在只有鼠标停着才画线（`js/ui/links.js` 的 `onMove`），只用键盘的人看不到「这件事是为了什么」。
-- 步骤：
-  - 监听 `focusin`：焦点落在 `NODE` 里的元素上（目标那一行的 `.gt`、`.ns-g`、计划卡、项目的头）时，和悬停一样调 `open(key, el)`
-  - `focusout` 到页面外、或按 Esc 时 `close()`
-  - 键盘打开的线不出拖的把手（拖本来就要鼠标）
-- 做完的标准：只用 Tab 走到一条目标上，线飞出来、流光在跑；Esc 收起；鼠标悬停的行为不变。
+## 7. Left over from the 2026-10 round
+That round did: the Projects rail (the North star paragraph, Goals | Ideas), the diagonal streaming links, the web-style Spending page on the computer, Reading's "Rest of this year" on the right, and the phone's ledger curtain.
+These are things noticed then but not done in that round. Each is small, one commit each.
 
-**7b. README 里目标板那一句已经过时**（2026-10-20 问了，还没回）
-- `README.md` 59–60 行还写着「最上面是目标板……和之后五年」。目标板现在在右栏，年份是明年起四年再加 North star。
-- 上一轮说好这一句不动，所以新的样子写在了它后面。先问仓库主人要不要改；要改的话，只改这一句，别写进 North star 那一栏在主人心里的名字。
+**7a. ✅ Draw the streaming links when the keyboard stops on a goal or plan card** (2026-10-20 `3b2203a`)
+- Why: links only drew while the mouse rested there (`onMove` in `js/ui/links.js`), so keyboard-only users never saw what a thing is for.
+- Steps:
+  - Listen to `focusin`: when focus lands inside a `NODE` element (a goal row's `.gt`, `.ns-g`, a plan card, a project header), call `open(key, el)` as hover does
+  - `close()` when focus leaves the page or on Esc
+  - Keyboard-opened links show no drag handle (dragging needs a mouse anyway)
+- Done when: Tab alone onto a goal flies its links out with streaks running; Esc closes them; mouse hover behaves as before.
 
-**7c. 截图工具：悬停的截图偶尔截不到线**（2026-10-20 `dc2bb54` 两样都加了：先挪开再挪回来、等线出来最多 3 秒。本地没装 Playwright，「连跑五次」还没验）
-- 现象：页面刚重画、换页的过渡还在跑的时候，Playwright 的第一次 `hover` 可能不算数，截出来没有线（`tools/look.mjs` 的 `hover`）。
-- 改法：`hover` 里先把鼠标移到别处、再移回来；或者等 `.lk-svg .lk` 出现（最多 3 秒）再开始计时截图。
-- 做完的标准：`node tools/look.mjs --only projects-hover` 连跑五次，每次都截到线。
+**7b. ✅ The README sentence about the goal board was out of date** (2026-10-20 `30764c2`, rewritten while the README moved to English: the goals rail on the right, the sections it has now, and the grip that moves a goal to another section)
+- `README.md` lines 59–60 still said "the goal board is at the top … and the following five years". The board is in the right rail now, with years from next year for four years plus the North star.
 
-**7d. ✅ 记账电脑版：在设定里改类别的 base / not in budget**（2026-10-20 `444e39e`：同步到假表格再整份拉下来，值不变）
-- 现在只能在记账表格里改（设定弹窗的 Categories 只显示）。
-- 在 `js/ui/spending.js` 的 `setBody()` 的 Categories 表里加一列下拉（— / base / not in budget），改了调 `SP.setCats`。改之前先看 `js/spend.js` 里 role 是怎么同步到表格的。
-- 做完的标准：改了以后图表的底座、Budget used 跟着变；同步到表格以后再拉下来，值不变。
+**7c. ✅ The screenshot tool sometimes missed the links on hover** (2026-10-20 `dc2bb54`: moves the mouse away and back, then waits up to 3 seconds for `.lk-svg .lk`. Checked with Playwright: `--only desk-projects-hover` five runs in a row, all six hover shots had their links every time)
+- Symptom: right after a redraw, while a page transition is still running, Playwright's first `hover` may not register and the shot has no links (`hover` in `tools/look.mjs`).
+- Done when: `node tools/look.mjs --only projects-hover` five runs in a row, links every time.
 
-**7e. ✅ Projects 右栏：把目标拖到别的一段改期限**（2026-10-20 `3b2203a`：拖的是每一行最左边悬停才出来的小把手；点它也能挑一段）
-- 现在要点月份那个按钮才能改期限。想要的是：把一条目标从 This quarter 拖到 Next quarter（或者某一年）就改成那一段的默认期限（`G.columns()` 里每段的 `due`）。
-- 注意：
-  - 拖目标本身已经用来连线（拖小圆圈）。改期限要拖那一行左边，别和连线的小圆圈冲突
-  - 照第 4 条，也要有不用拖的做法（现在的月份下拉就是）
-- 做完的标准：拖过去以后那一行出现在新的一段，期限是那一段的默认值，能撤销。
+**7d. ✅ Computer Spending: set a category's base / not in budget in settings** (2026-10-20 `444e39e`: synced to the fake Sheet and pulled back whole, the value stays)
+- Previously only the spending Sheet could change it (the settings dialog's Categories only showed it).
+- Done when: changing it moves the chart's base and Budget used; after syncing to the Sheet and pulling back, the value stays.
 
-**7f. 量一下流光线的开销，必要时调小**（还没量：要在 Mac 的 Chrome 里录 Performance）
-- `js/ui/links.js` 里 `STREAKS = 24`（最多 24 条线带流光）是估的。照第 1 条在 Mac 上录 Performance：悬停一条连了很多线的目标时，每帧的 Paint 要在 4ms 以内。
-- 超了就把 `STREAKS` 调小，或者让流光只在离鼠标近的那几条线上跑。
+**7e. ✅ Projects rail: drag a goal to another section to change its due date** (2026-10-20 `3b2203a`: drag the small grip that appears on the far left of a row on hover; clicking it picks a section too)
+- Previously only the month button changed the due date. Dragging a goal from This quarter to Next quarter (or a year) now sets that section's default due date (`due` of each section in `G.columns()`), with undo.
 
-**7g. 汇率有两份**
-- Big buys 的在 `meal-prefs` 的 `rates`（只有 CAD / RMB），记账的在 Settings 的 `spend-fx`（七种钱，能拉欧洲央行的）。以后要的话合成一份：Big buys 也读 `spend-fx`，旧的那份读一次搬过去。先问仓库主人两边是不是该一样。
+**7f. ✅ Measure the cost of the streaming links** (2026-10-20, Playwright + a Chrome trace in headless Chromium at 1440×900, hovering a goal with 31 links by day and 53 at night, 24 of them streaking: main-thread Paint per event max 0.46ms, p95 0.18ms, about 0.2ms per frame, ~56–60fps — well under 4ms, so `STREAKS` stays 24. Raster work at night was heavy in headless software rendering (≈0.58s of raster time per second across raster threads), so still look at night mode on the real Mac (item 1))
+
+**7g. There are two exchange-rate tables**
+- Big buys keeps its rates in `meal-prefs` `rates` (CAD / RMB only); spending keeps them in the Settings row `spend-fx` (seven currencies, can fetch the ECB rate). If wanted, merge them: Big buys reads `spend-fx` too and the old table is moved over once. Ask the owner first whether the two should be the same.

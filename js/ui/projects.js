@@ -1,5 +1,5 @@
-// 项目页，页头 Plans | Ideas 两格。Ideas = 灵感池（想去哪玩、想吃什么，没有时长和期限，见 js/ui/ideas.js）；下面说的都是 Plans。
-// 最上面是目标板（js/ui/goals.js）；下面按「项目」分区（项目 = 大类 = 计划的 group），电脑上宽了分两栏（左 Build、Work，右别的），
+// 项目页。右边一栏是 North star 那段字和 Goals | Ideas（js/ui/goals.js；Ideas = 灵感池，见 js/ui/ideas.js），贴着顶；下面说的都是左边的计划。
+// 左边按「项目」分区（项目 = 大类 = 计划的 group），够宽时再分两栏（左 Build、Work，右别的），
 // 清单里的大类一直都在（空的也在）；区头 Rename 可以改名、换颜色、并进别的大类。
 // 循环小事（engine.js 的 isRepeat）不单独给卡：直接算在大类上，区头下面一行小字，点开是它的编辑框。
 // 每张卡头上有 Archive：归档的折进区头右边的「3 archived」，点开在这个区里展开，卡上是 Restore。
@@ -24,7 +24,6 @@ import { addDays, diffDays, fmtShort, fmtMin, WEEKDAYS } from "../dates.js";
 import { healthPill, groupsOf, chainHTML } from "./common.js";
 import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
 import { goalsHTML } from "./goals.js";
-import { ideasHTML } from "./ideas.js";
 
 let editing = "";
 let draft = null;      // 新建时还没存的：{kind, place, 各个框的值}
@@ -183,18 +182,13 @@ function groupHead(c, name, subs, empty, track, last, more = {}) {
     (progress ? (sum ? '<div class="gbar"><i style="width:' + pct + '%"></i></div>' : "") : groupHealthHTML(c, name, last) + groupDaysHTML(c, name, track));
 }
 
-// 页头的两格：Plans（有总量 / 节奏、引擎帮着排的）| Ideas（灵感池）。记在这台设备上
-const ideasMode = () => store.local().projMode === "ideas";
-const modeSeg = (ideas) => '<span class="seg">' + [["plans", "Plans"], ["ideas", "Ideas"]].map(([v, l]) =>
-  '<button type="button" data-act="proj-mode" data-v="' + v + '"' + ((v === "ideas") === ideas ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
-
+// 页头：标题和「+ New plan」。下面两栏：左边是各个项目（.pj-plans），右边一栏是 North star、Goals | Ideas（js/ui/goals.js），滚的时候贴着顶
 export function projectsHTML(c) {
-  if (ideasMode()) return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div><div class="tools">' + modeSeg(true) + "</div></header>" + ideasHTML(c) + "</div>";
   const groups = groupsOf(c.projects, { all: true });
   const last = lastContactDate();
   return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div>' +
-    '<div class="tools">' + modeSeg(false) + '<button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +
-    goalsHTML(c) +
+    '<div class="tools"><button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +
+    '<div class="pj-wrap"><div class="pj-plans">' +
     (c.projects.length ? "" : '<p class="hint pintro">A project is an area of your life. Tasks can sit right on it, or under a plan inside it: a <b>Total</b> (so many hours by a deadline) or a <b>Regular</b> one (every Monday, three times a week).</p>') +
     columns(groups.map((g) => {
       const track = trackFor(g.name);
@@ -205,11 +199,11 @@ export function projectsHTML(c) {
         repsHTML(reps) +
         (cards.length ? '<div class="pgrid">' + cards.map((p) => cardHTML(c, p, track)).join("") + "</div>" : "") +
         (shown ? '<div class="pgrid closed">' + gone.map((p) => cardHTML(c, p, track)).join("") + "</div>" : "") + "</section>" };
-    })) + "</div>";
+    })) + "</div>" + goalsHTML(c) + "</div></div>";
 }
 
-// 电脑上分两栏（她定的）：左边宽的是 Build、Work（GR.ORDER 的前两个，有进度卡的那种），右边窄的是别的（一句话 + 14 天方块的那种）。
-// 内容区不够宽（css 里的 container query）就按顺序一栏排下来；左边一个都没有就只有一栏
+// 项目那一块再分两栏（之前定的）：左边宽的是 Build、Work（GR.ORDER 的前两个，有进度卡的那种），右边窄的是别的（一句话 + 14 天方块的那种）。
+// 这一块不够宽（css 里的 container query，按 .pj-plans 自己的宽度）就按顺序一栏排下来；左边一个都没有就只有一栏
 function columns(list) {
   const main = new Set(GR.ORDER.slice(0, 2));
   const left = list.filter((x) => main.has(x.name)), right = list.filter((x) => !main.has(x.name));
@@ -399,7 +393,6 @@ export function initProjects(rerender) {
     }
     else if (act === "rename-done") { renaming = null; rerender(); }
     else if (act === "remove-group") { renaming = null; store.removeGroup(group); }
-    else if (act === "proj-mode") store.setLocal({ projMode: el.dataset.v === "ideas" ? "ideas" : "plans" });
     else if (act === "edit-project") openProjectEditor(pid);
     else if ((act === "pkind" || act === "pplace") && !pid) {
       readDraft(el.closest(".project-editor"));

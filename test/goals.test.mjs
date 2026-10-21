@@ -12,7 +12,9 @@ test("columns are worked out from today and roll over the year", () => {
   assert.deepEqual(oct.slice(0, 4).map((c) => [c.title, c.sub, c.due]), [["This month", "Oct", "2026-10"], ["This quarter", "Q4", "2026-12"], ["Next quarter", "Q1 2027", "2027-03"], ["This year", "2026", "2026-12"]]);
   const jan = G.columns("2027-01-03");
   assert.deepEqual(jan.slice(0, 4).map((c) => [c.sub, c.due]), [["Jan", "2027-01"], ["Q1", "2027-03"], ["Q2", "2027-06"], ["2027", "2027-12"]]);
-  assert.deepEqual(jan.slice(4).map((c) => c.title), ["2028", "2029", "2030", "2031", "North star"]);
+  assert.deepEqual(jan.slice(4).map((c) => c.title), ["Next year", "2029", "2030", "2031", "North star"], "next year has a name, the three after it are numbers");
+  assert.equal(jan[4].sub, "2028", "Next year says which year in small type");
+  assert.deepEqual(oct.slice(4).map((c) => c.title + (c.sub ? " " + c.sub : "")), ["Next year 2027", "2028", "2029", "2030", "North star"]);
 });
 
 test("a goal sits in the column of its own kind and period", () => {

@@ -1,22 +1,30 @@
-// 目标板（Projects 页最上面，电脑）。从上往下：North star（一行，没有日期）→ 今年之后的四年 → 这个月 / 这个季度 / 下个季度 / 今年（紧挨着下面的项目）。
-// 年份和近期两排都是四栏，上下对齐。每条一行：勾、文字（长的省略，悬停看全文）、标签（项目的标签是一个色点）、哪个月。
-// 一栏默认只列前 3 条（近期 4 条），多的折成「+N」；鼠标移到那一栏，栏头出一个「+」，点了才出「加一条」的框（一条目标都没有时一直开着）。
-// 点文字改字（「文字 #标签」一起改），同一行还能选它是哪条目标的一部分（Part of = 上级，一条只有一个）；点月份改年月（做完了的改的是实际做完的年月）。
-// 谁为谁服务的连线在 js/ui/links.js（悬停才画，拖一下就连上）。栏目跟着今天走，过期没做完的自己滚到当前那栏，见 js/goals.js。
+// Projects 页右边那一栏（电脑）。从上往下：North star 那一段字（一直在，切到 Ideas 也不变）→ Goals | Ideas → 下面一块自己滚。
+// North star：一段长文字，[ ] 里的词是一条条 North star 目标（画成细框，括号只在改字的时候看得到）。点这段字就能改：
+//   选中一段点「Frame as goal」给它加上括号；Esc 不改，⌘/Ctrl+Enter、Done 或点到外面就存（js/store/goals.js 的 saveNorth：改了措辞还是原来那条）。
+// Goals：这个月 / 这个季度 / 下个季度 / 今年 / 明年（Next year）/ 再三个年份，一段段竖着排（年份跟着今天走，见 js/goals.js 的 columns）。
+//   每条一行：勾、文字（长的省略，悬停看全文）、标签（项目的标签是一个色点）、哪个月。一段默认只列前 4 条（年份 3 条），多的折成「+N more」；
+//   鼠标移到那一段，标题旁出一个「+」，点了才出「加一条」的框（一条目标都没有时 This month 那一格一直开着）。
+//   点文字改字（「文字 #标签」一起改），同一行还能选它是哪条目标的一部分（Part of = 上级，一条只有一个）；点月份改年月（做完了的改的是实际做完的年月）。
+// Ideas：灵感池（js/ui/ideas.js 的 ideasHTML，窄栏的样子见 css）。选的是哪个记在这台设备上（projSide）。
+// 谁为谁服务的连线在 js/ui/links.js（悬停才画，拖一下就连上）。过期没做完的自己滚到当前那段，见 js/goals.js。
 
 import * as store from "../store.js";
 import * as G from "../goals.js";
 import { esc, on } from "../dom.js";
 import { MONTHS } from "../dates.js";
+import { ideasHTML } from "./ideas.js";
 
 let edit = null;        // 正在改的那条：{ id, field: "text" | "when" }
 let showDone = false;   // 做完了、已经过期的也列出来
-let adding = "";        // 哪一栏开着「加一条」的框（栏的 key）
-const openCols = new Set();   // 点过「+N」、全部列出来的栏
-const LIMIT = { north: 3, far: 3, near: 4 };
+let adding = "";        // 哪一段开着「加一条」的框（栏的 key）
+let northEdit = false;  // North star 那段字正在改
+let northPick = -1;     // 点的是第几个框：打开来改的时候把它选上
+const openCols = new Set();   // 点过「+N」、全部列出来的段
+const LIMIT = { far: 3, near: 4 };
 
 const afterRender = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));
 const low = (s) => String(s || "").trim().toLowerCase();
+export const sideTab = () => (store.local().projSide === "ideas" ? "ideas" : "goals");
 
 // 标签的颜色：和哪个项目同名就用它的颜色
 function tagColors(c) {
@@ -52,8 +60,8 @@ function upHTML(g, k) {
   return '<label class="gup"><span>Part of</span><select data-g="up" data-keep="goal-up-' + esc(g.id) + '" aria-label="Part of which goal"><option value="">Nothing above</option>' + groups + "</select></label>";
 }
 
-// dflt：月份就是这一栏的默认（这个月的目标写着这个月）——平时不显示，悬停才出来（点它改年月）
-function rowHTML(x, k, north, dflt) {
+// dflt：月份就是这一段的默认（这个月的目标写着这个月）——平时不显示，悬停才出来（点它改年月）
+function rowHTML(x, k, dflt) {
   const g = x.goal, id = esc(g.id), tag = String(g.tag || "").trim();
   const field = edit?.id === g.id ? edit.field : "";
   const text = field === "text"
@@ -64,48 +72,79 @@ function rowHTML(x, k, north, dflt) {
   const hue = k.colors[low(tag)];
   const tagSel = '<select class="gtag' + (tag ? (hue ? " dot" : "") : " none") + '" data-g="tag" aria-label="' + esc(tag ? "Tag: " + tag : "Tag") + '" title="' + esc(tag || "Add a tag") + '" style="--pc:' + esc(hue || "var(--c-None)") + '"><option value="">' + (tag ? "No tag" : "+ tag") + "</option>" +
     opts.map((t) => '<option value="' + esc(t) + '"' + (low(t) === low(tag) ? " selected" : "") + (k.colors[low(t)] ? ' data-color="' + esc(k.colors[low(t)]) + '"' : "") + ">" + esc(t) + "</option>").join("") + "</select>";
-  // North star 没有日期：没有月份，也不打勾（以前标过做完的照旧给勾，好取消）
-  const when = north ? "" : field === "when" ? whenEditHTML(g, k.T)
+  const when = field === "when" ? whenEditHTML(g, k.T)
     : '<button type="button" class="gdue' + (dflt ? " dflt" : "") + '" data-act="g-when" title="' + (x.done ? "Finished — click to change" : x.late ? "Was due — click to change" : "Due — click to change") + '">' + (x.done ? "✓ " : "") + esc(x.when) + "</button>";
-  const tick = north && !x.done ? '<i class="gstar" aria-hidden="true">✦</i>' : '<input type="checkbox" data-g="done"' + (x.done ? " checked" : "") + ' aria-label="Done">';
-  return '<li class="gl' + (x.done ? " done" : "") + (x.late ? " late" : "") + (x.ahead ? " ahead" : "") + (field === "text" ? " editing" : "") + '" data-goal="' + id + '">' + tick + text +
+  return '<li class="gl' + (x.done ? " done" : "") + (x.late ? " late" : "") + (x.ahead ? " ahead" : "") + (field === "text" ? " editing" : "") + '" data-goal="' + id + '">' +
+    '<input type="checkbox" data-g="done"' + (x.done ? " checked" : "") + ' aria-label="Done">' + text +
     '<span class="gmeta">' + (field === "text" ? upHTML(g, k) : "") + tagSel + when + '<button type="button" class="gx" data-act="g-del" aria-label="Delete goal">×</button></span></li>';
 }
 
-function colHTML(col, k) {
-  const north = col.span === "north", limit = north ? LIMIT.north : col.far ? LIMIT.far : LIMIT.near;
+function colHTML(col, k, first) {
+  const limit = col.far ? LIMIT.far : LIMIT.near;
   const all = openCols.has(col.key) || col.items.slice(limit).some((x) => x.goal.id === edit?.id);
   const shown = all ? col.items : col.items.slice(0, limit), more = col.items.length - shown.length;
-  const add = k.empty || adding === col.key;
+  const add = adding === col.key || (k.empty && col.key === "month");
   const title = esc(col.title);
-  return '<section class="gcol' + (north ? " gnorth" : "") + '" data-col="' + col.key + '"><h4>' + title + (col.sub ? " <small>" + col.sub + "</small>" : "") +
-    (k.empty ? "" : '<button type="button" class="gplus" data-act="g-add" aria-expanded="' + add + '" aria-label="Add a goal: ' + title + '" title="Add a goal">+</button>') + "</h4>" +
-    (shown.length ? "<ul>" + shown.map((x) => rowHTML(x, k, north, !x.done && !x.late && !x.ahead && x.goal.due === col.due)).join("") + "</ul>" : "") +
+  return '<section class="gcol' + (shown.length || add ? "" : " empty") + (first ? " far1" : "") + '" data-col="' + col.key + '"><h4>' + title + (col.sub ? " <small>" + col.sub + "</small>" : "") +
+    '<button type="button" class="gplus" data-act="g-add" aria-expanded="' + add + '" aria-label="Add a goal: ' + title + '" title="Add a goal">+</button></h4>' +
+    (shown.length ? "<ul>" + shown.map((x) => rowHTML(x, k, !x.done && !x.late && !x.ahead && x.goal.due === col.due)).join("") + "</ul>" : "") +
     (more ? '<button type="button" class="gmore" data-act="g-more">+' + more + " more</button>" : all && col.items.length > limit ? '<button type="button" class="gmore" data-act="g-less">Less</button>' : "") +
     (add ? '<form class="gadd" data-span="' + col.span + '" data-due="' + col.due + '" autocomplete="off"><input name="text" data-keep="gadd-' + col.key + '" placeholder="Add…" aria-label="Add a goal: ' + title + '"></form>' : "") + "</section>";
 }
 
-export function goalsHTML(c) {
-  const open = store.local().goalsOpen !== false;
+// ---------- North star 那一段字 ----------
+
+const STAR = '<i class="gstar" aria-hidden="true">✦</i>';
+const rowsFor = (text) => Math.min(14, Math.max(4, String(text).split("\n").reduce((n, line) => n + Math.ceil((line.length + 1) / 38), 0)));
+
+function northHTML() {
+  const text = store.northStar();
+  if (northEdit) {
+    return '<section class="ns editing"><h3>' + STAR + "North star</h3>" +
+      '<textarea class="ns-in" data-keep="north-star" rows="' + rowsFor(text) + '" aria-label="North star. Put [brackets] around the parts that are goals.">' + esc(text) + "</textarea>" +
+      '<div class="ns-bar"><button type="button" class="btn ghosty" data-act="ns-frame" disabled title="Put brackets around the selected words">[ ] Frame as goal</button>' +
+      '<span class="ns-tip">⌘↵ saves · Esc cancels</span><button type="button" class="btn" data-act="ns-done">Done</button></div></section>';
+  }
+  const north = store.goals().filter((g) => g.span === "north"), at = new Map(north.map((g) => [g.id, g]));
+  const phrases = G.parseNorth(text), { ids } = G.matchNorth(phrases, north);
+  let h = "", from = 0;
+  phrases.forEach((p, i) => {
+    h += esc(text.slice(from, p.start));
+    const g = at.get(ids[i]);
+    // 用行内的 span（不是 button）：长的词跟着字一行行折下去，每一截都有框；Tab 能停、回车 / 空格能点（见下面的 keydown）
+    h += g ? '<span class="ns-g' + (g.done ? " done" : "") + '" role="button" tabindex="0" data-goal="' + esc(g.id) + '" data-act="ns-edit" data-i="' + i + '">' + esc(p.text) + "</span>"
+      : '<span class="ns-g ghost">' + esc(p.text) + "</span>";
+    from = p.end;
+  });
+  h += esc(text.slice(from));
+  return '<section class="ns"><h3>' + STAR + 'North star<button type="button" class="link" data-act="ns-edit">Edit</button></h3>' +
+    (text.trim() ? '<p class="ns-text" data-act="ns-edit">' + h + "</p>"
+      : '<p class="ns-text empty" data-act="ns-edit">What are you steering by? Write it here, and put [brackets] around the parts that are goals.</p>') + "</section>";
+}
+
+function listHTML(c) {
   const goals = store.goals();
   // 标签按项目的顺序排（c.groups 已经是 Build、Work、Friends… 的顺序）；不是项目名的标签排在后面，没标签的最后
   const at = new Map(c.groups.map((g, i) => [low(g.name), i]));
   const rank = (tag) => (!low(tag) ? Infinity : at.has(low(tag)) ? at.get(low(tag)) : c.groups.length);
   const b = G.board(goals, c.today, { showDone, rank });
-  const left = b.cols.reduce((a, col) => a + col.items.filter((x) => !x.done).length, 0);
-  const head = "<header><h3>Goals</h3>" + (left ? '<span class="msub">' + left + " open</span>" : "") +
-    '<span class="gtools">' + (open && (b.hidden || showDone) ? '<button type="button" class="link" data-act="g-finished">' + (showDone ? "Hide finished" : "Show " + b.hidden + " finished") + "</button>" : "") +
-    '<button type="button" class="link" data-act="g-fold" aria-expanded="' + open + '">' + (open ? "Hide" : "Show") + "</button></span></header>";
-  if (!open) return '<section class="goals folded">' + head + "</section>";
-  const k = { T: c.today, tags: tagList(c, goals), colors: tagColors(c), goals, rank, empty: !goals.length };
-  const col = (x) => colHTML(x, k);
+  const k = { T: c.today, tags: tagList(c, goals), colors: tagColors(c), goals, rank, empty: !goals.some((g) => g.span !== "north") };
+  const cols = b.cols.filter((x) => x.span !== "north");
   const linked = goals.some((g) => g.up || (Array.isArray(g.by) && g.by.length));
-  const hint = !goals.length ? "Type a goal and press Enter — add <b>#tag</b> to label it. Click the month to change when; tick it when it's done."
+  const hint = k.empty ? "Type a goal and press Enter — add <b>#tag</b> to label it. Click the month to change when; tick it when it's done."
     : linked ? "" : "Hover a goal, project or plan to see what it's for. Drag the little <b>◦</b> that shows up onto a goal to link them.";
-  return '<section class="goals">' + head + col(b.cols.find((x) => x.span === "north")) +
-    '<div class="ggrid far">' + b.cols.filter((x) => x.far && x.span !== "north").map(col).join("") + "</div>" +
-    '<div class="ggrid near">' + b.cols.filter((x) => !x.far).map(col).join("") + "</div>" +
-    (hint ? '<p class="hint">' + hint + "</p>" : "") + "</section>";
+  return cols.map((x, i) => colHTML(x, k, x.far && !cols[i - 1]?.far)).join("") +
+    (b.hidden || showDone ? '<p class="gfoot"><button type="button" class="link" data-act="g-finished">' + (showDone ? "Hide finished" : "Show " + b.hidden + " finished") + "</button></p>" : "") +
+    (hint ? '<p class="hint">' + hint + "</p>" : "");
+}
+
+export function goalsHTML(c) {
+  const tab = sideTab();
+  const open = store.goals().filter((g) => g.span !== "north" && !g.done).length;
+  const seg = '<span class="seg">' + [["goals", "Goals"], ["ideas", "Ideas"]].map(([v, l]) => '<button type="button" data-act="rail-tab" data-v="' + v + '"' + (v === tab ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
+  return '<aside class="goals pj-rail" aria-label="Goals and ideas">' + northHTML() +
+    '<div class="rail-tabs">' + seg + (tab === "goals" && open ? '<span class="msub">' + open + " open</span>" : "") + "</div>" +
+    '<div class="rail-body" data-rail="' + tab + '">' + (tab === "ideas" ? ideasHTML(c) : listHTML(c)) + "</div></aside>";
 }
 
 export function initGoals(rerender) {
@@ -113,8 +152,12 @@ export function initGoals(rerender) {
   const goal = (id) => store.goals().find((g) => g.id === id);
 
   on(document, "click", ".goals [data-act]", (e, el) => {
+    if (el.closest(".idea-page")) return;   // 灵感池自己管（js/ui/ideas.js）
     const act = el.dataset.act, id = rowOf(el), col = el.closest("[data-col]")?.dataset.col || "";
-    if (act === "g-fold") { edit = null; store.setLocal({ goalsOpen: store.local().goalsOpen === false }); return; }
+    if (act === "rail-tab") { edit = null; adding = ""; store.setLocal({ projSide: el.dataset.v === "ideas" ? "ideas" : "goals" }); return; }
+    if (act === "ns-edit") { if (!northEdit) openNorth(el.dataset.i === undefined ? -1 : Number(el.dataset.i)); return; }
+    if (act === "ns-frame") { frame(); return; }
+    if (act === "ns-done") { saveNorth(document.querySelector(".goals .ns-in")?.value); return; }
     if (act === "g-del") { edit = null; store.deleteGoal(id); return; }
     if (act === "g-finished") showDone = !showDone;
     else if (act === "g-add") {
@@ -129,8 +172,69 @@ export function initGoals(rerender) {
         i?.focus();
         if (act === "g-text") i?.select();
       });
-    }
+    } else return;
     rerender();
+  });
+
+  // ---------- North star：点开来改、给选中的字加括号、存 ----------
+  function openNorth(pick) {
+    northEdit = true;
+    northPick = pick;
+    rerender();
+    afterRender(() => {
+      const ta = document.querySelector(".goals .ns-in");
+      if (!ta) return;
+      ta.focus();
+      const p = northPick >= 0 ? G.parseNorth(ta.value)[northPick] : null;
+      if (p) ta.setSelectionRange(p.start + 1, p.end - 1); else ta.setSelectionRange(ta.value.length, ta.value.length);
+      northPick = -1;
+      grow(ta);
+      canFrame(ta);
+    });
+  }
+  function saveNorth(value) {
+    if (!northEdit) return;
+    northEdit = false;
+    if (typeof value === "string" && value.replace(/\s+$/, "") !== store.northStar()) store.saveNorth(value);
+    else rerender();
+  }
+  const grow = (ta) => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight + 2, innerHeight * 0.4) + "px"; };
+  // 选中了一段（不跨行、里面没有括号）才能框
+  const selected = (ta) => { const s = ta.value.slice(ta.selectionStart, ta.selectionEnd); return s.trim() && !/[[\]\n]/.test(s) ? s : ""; };
+  const canFrame = (ta) => { const b = ta.closest(".ns")?.querySelector('[data-act="ns-frame"]'); if (b) b.disabled = !selected(ta); };
+  function frame() {
+    const ta = document.querySelector(".goals .ns-in");
+    if (!ta || !selected(ta)) return;
+    const a = ta.selectionStart, b = ta.selectionEnd, s = ta.value.slice(a, b);
+    const lead = s.length - s.trimStart().length, tail = s.length - s.trimEnd().length;   // 选到的前后空格留在括号外面
+    const word = s.trim(), at = a + lead;
+    ta.focus();
+    ta.setSelectionRange(at, b - tail);
+    // 用 insertText：能撤销（⌘Z），也会触发 input
+    if (!document.execCommand?.("insertText", false, "[" + word + "]")) ta.setRangeText("[" + word + "]", at, b - tail, "end");
+    ta.setSelectionRange(at + word.length + 2, at + word.length + 2);
+    grow(ta);
+    canFrame(ta);
+  }
+  on(document, "keydown", ".goals .ns-g[role=button]", (e, el) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } });
+  // 按钮按下时别把输入框的选中弄丢
+  on(document, "mousedown", '.goals [data-act="ns-frame"]', (e) => e.preventDefault());
+  on(document, "input", ".goals .ns-in", (e, ta) => { grow(ta); canFrame(ta); });
+  ["select", "keyup", "mouseup"].forEach((t) => on(document, t, ".goals .ns-in", (e, ta) => canFrame(ta)));
+  on(document, "keydown", ".goals .ns-in", (e, ta) => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); northEdit = false; rerender(); }
+    else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNorth(ta.value); }
+  });
+  // 点到这一块外面就存。页面重画时（同步拉下来之类）旧的框会被换掉：新的框接着在改，不算离开
+  on(document, "focusout", ".goals .ns.editing", (e, sec) => {
+    if (sec.contains(e.relatedTarget)) return;
+    const value = sec.querySelector(".ns-in")?.value;
+    setTimeout(() => {
+      if (!northEdit) return;
+      const now = document.querySelector(".goals .ns-in");
+      if (now && now === document.activeElement) return;
+      saveNorth(value);
+    }, 0);
   });
 
   // 改字：回车 / 点到这一行外面就存（「文字 #标签」）；清空不算删，留着原来的；Esc 不改。
@@ -174,7 +278,7 @@ export function initGoals(rerender) {
   });
   on(document, "keydown", ".goals .gwhen select", (e) => { if (e.key === "Escape") { edit = null; rerender(); } });
 
-  // 加一条：回车存，框留着接着加（新的那条要是排在折起来的那几条里，这一栏就全部列出来）；Esc、空着点到别处就收起来
+  // 加一条：回车存，框留着接着加（新的那条要是排在折起来的那几条里，这一段就全部列出来）；Esc、空着点到别处就收起来
   on(document, "submit", ".goals .gadd", (e, form) => {
     e.preventDefault();
     const p = G.parseGoal(form.text.value);

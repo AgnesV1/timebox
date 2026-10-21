@@ -82,6 +82,8 @@ const SHOTS = [
   { device: "phone", name: "pull-armed", hash: "today", act: pullTo(115) },
   { device: "phone", name: "pull-falling", hash: "today", act: pullTo(115, true, 150) },
   { device: "phone", name: "ledger", hash: "today", act: pullLedger },
+  { device: "phone", name: "ledger-open", hash: "today", act: async (page) => { await pullTo(115, true, 330)(page); } },
+  { device: "phone", name: "ledger-scroll", hash: "today", act: async (page) => { await pullLedger(page); const b = await page.locator(".mn-phone .mn-list").boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + 60); for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, 140); await page.waitForTimeout(16); } await page.waitForTimeout(70); } },
   { device: "phone", name: "ledger-add", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="add"]')(page); for (const k of ["1", "2", ".", "5", "+", "8"]) await tap('.mn-phone [data-k="' + k + '"]')(page); } },
   { device: "phone", name: "ledger-chart", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="chart"]')(page); await page.waitForTimeout(600); } },
   { device: "phone", name: "ledger-cats", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="set"]')(page); await tap('.mn-phone [data-sub="cats"]')(page); } },
@@ -92,22 +94,44 @@ const SHOTS = [
   { device: "desk", name: "projects", hash: "projects" },
   { device: "desk", name: "projects-hover", hash: "projects", act: hover('.goals .gl[data-goal="t1"] .gt', 1600) },
   { device: "desk", name: "projects-hover-plan", hash: "projects", act: hover('.pcard[data-project="seed-b2"] .psub', 1600) },
-  { device: "desk", name: "projects-drag", hash: "projects", act: dragLink('.goals .gl[data-goal="m2"] .gt', '.pcard[data-project="seed-port"] .psub') },
+  { device: "desk", name: "projects-drag", hash: "projects", act: dragLink('.goals .gl[data-goal="q2"] .gt', '.pcard[data-project="seed-port"] .psub') },
   { device: "desk", name: "projects-edit-goal", hash: "projects", act: tap('.goals .gl[data-goal="q1"] .gt') },
   { device: "desk", name: "projects-add-goal", hash: "projects", act: async (page) => { await hover('.goals [data-col="next"] h4', 300)(page); await tap('.goals [data-col="next"] .gplus')(page); await page.keyboard.type("Run 10k #Fitness"); } },
+  { device: "desk", name: "projects-hover-north", hash: "projects", act: hover('.goals .ns-g[data-goal="n2"]', 1600) },
+  { device: "desk", name: "projects-north-edit", hash: "projects", act: async (page) => { await tap('.goals .ns-g[data-goal="n2"]')(page); await page.keyboard.press("Control+End"); await page.keyboard.type(" Write every week.", { delay: 5 }); await page.keyboard.down("Shift"); for (let i = 0; i < 17; i++) await page.keyboard.press("ArrowLeft"); await page.keyboard.up("Shift"); await page.waitForTimeout(200); } },
+  { device: "desk", name: "projects-ideas", hash: "projects", act: tap('.goals [data-act="rail-tab"][data-v="ideas"]') },
   { device: "desk", name: "plan-editor", hash: "projects", act: tap('.pcard[data-project="seed-b2"] .pname') },
   { device: "desk", name: "stats", hash: "stats" },
   { device: "desk", name: "spending", hash: "spending" },
-  { device: "desk", name: "spending-drawer", hash: "spending", act: tap(".mn-desk [data-act=drawer]") },
-  { device: "desk", name: "spending-add", hash: "spending", act: async (page) => { await tap(".mn-desk .mn-hadd")(page); await page.keyboard.type("12.5+8"); } },
-  { device: "desk", name: "spending-set", hash: "spending", act: async (page) => { await tap(".mn-desk [data-act=dset]")(page); await tap('.mn-desk [data-sub="cats"]')(page); } },
-  { device: "desk", name: "spending-find", hash: "spending", act: async (page) => { await tap(".mn-desk [data-act=dfind]")(page); await page.keyboard.type("coffee"); await page.waitForTimeout(300); } },
-  { device: "desk", name: "spending-year", hash: "spending", act: async (page) => { await tap('.mn-desk [data-seg="cmode"] [data-v="year"]')(page); await page.waitForTimeout(900); } },
+  { device: "desk", name: "spending-add", hash: "spending", act: async (page) => { await page.keyboard.press("n"); await page.waitForTimeout(300); await page.keyboard.type("12.5+8"); await page.keyboard.press("Tab"); } },
+  { device: "desk", name: "spending-edit", hash: "spending", act: tap(".spend .sp-row:nth-child(3)") },
+  { device: "desk", name: "spending-filter", hash: "spending", act: async (page) => { await tap(".spend .sp-cat:nth-child(2)")(page); await page.mouse.move(5, 5); await page.waitForTimeout(200); } },
+  { device: "desk", name: "spending-search", hash: "spending", act: async (page) => { await page.keyboard.press("/"); await page.keyboard.type("coffee"); await page.waitForTimeout(300); } },
+  { device: "desk", name: "spending-year", hash: "spending", act: async (page) => { await tap('.spend [data-seg="mode"] [data-v="year"]')(page); await page.waitForTimeout(900); } },
+  { device: "desk", name: "spending-set", hash: "spending", act: async (page) => { await tap('.spend [data-act="set"]')(page); await tap('#modal [data-sact="tab"][data-v="cats"]')(page); } },
+  { device: "desk", name: "reading", hash: "reading", act: seedReading },
+  { device: "desk", name: "reading-add", hash: "reading", act: async (page) => { await seedReading(page); await page.locator(".yl-in").click(); await page.waitForTimeout(300); } },
   { device: "desk", name: "settings", hash: "settings" },
   { device: "small", name: "projects", hash: "projects" },
   { device: "small", name: "spending", hash: "spending" },
-  { device: "small", name: "spending-drawer", hash: "spending", act: tap(".mn-desk [data-act=drawer]") }
+  { device: "small", name: "spending-add", hash: "spending", act: async (page) => { await page.keyboard.press("n"); await page.waitForTimeout(300); await page.keyboard.type("12.5"); } }
 ];
+// 阅读页：连上假的阅读表格，右边「Rest of 今年」放四条（其中一条在假表格里已经记过看完，会被划掉；一条是去年加的）
+async function seedReading(page) {
+  await page.evaluate(async () => {
+    const store = await import("/js/store.js"), sync = await import("/js/sync.js"), y = Number(store.today().slice(0, 4));
+    if (!store.setting("reading")?.url) store.setSetting("reading", { url: "https://docs.google.com/spreadsheets/d/FAKE-READING-0000000000000000/edit" });
+    if (!store.readPlan().length) {
+      store.addReadPlan({ title: "Dune", tab: "Book" }, y);
+      store.addReadPlan({ title: "The Last Days Of Socrates", tab: "Book" }, y);
+      store.addReadPlan({ title: "Klara and the Sun", tab: "Book" }, y - 1);
+      store.addReadPlan({ title: "A very long title of a book that will not fit on one line in this narrow column" }, y);
+    }
+    await sync.sync();
+  });
+  await page.reload();
+  await page.waitForTimeout(1500);
+}
 const DEVICES = {
   phone: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
   desk: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },

@@ -16,6 +16,7 @@ import timerStore from "./store/timer.js";
 import sideStore from "./store/side.js";
 import friendStore from "./store/friends.js";
 import goalStore from "./store/goals.js";
+import readPlanStore from "./store/readplan.js";
 import mealStore from "./store/meals.js";
 import ideaStore from "./store/ideas.js";
 import scoreStore from "./store/scores.js";
@@ -857,5 +858,6 @@ export const { scores, scoreOf, scoreSetup, scoreCells, setScore, setScoreNote }
 
 export const { quads, quadOf, quadBoard, addQuad, moveQuad, editQuad, doneQuad, deleteQuad, restoreQuad, adoptQuads } = quadStore(core);
 
-export const { goals, saveGoal, deleteGoal, setParent, linkGoal, renameGoalRef, ensureNorthStar } = goalStore(core);
+export const { goals, saveGoal, deleteGoal, setParent, linkGoal, renameGoalRef, ensureNorthStar, northStar, saveNorth } = goalStore(core);
+export const { readPlan, addReadPlan, moveReadPlan, removeReadPlan } = readPlanStore(core);
 export const { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples, addDishes, dishToBox } = mealStore(core);

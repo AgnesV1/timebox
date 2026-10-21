@@ -102,6 +102,8 @@ export function renameCat(from, to) {
 
 // 表格那张：设了链接才同步
 export function link(on) { if (S.linked !== on) { S.linked = on; if (on) S.wantFull = true; save(); } }
+// 下次同步整份从表格拉（Settings 的「Reload everything from the Sheet」）：本机每一笔照表格里的样子重来一遍，还没发出去的留着
+export function forceFull() { S.wantFull = true; save(); }
 export function wantFull() { if (Date.now() - (S.fullAt || 0) > FULL_EVERY) { S.wantFull = true; save(); return true; } return false; }
 
 // 同步时带上：要写的、要删的、改过的清单；从哪个时间点往后拉

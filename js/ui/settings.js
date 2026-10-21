@@ -3,6 +3,7 @@
 
 import * as store from "../store.js";
 import * as sync from "../sync.js";
+import * as spend from "../spend.js";
 import { esc, on, icon } from "../dom.js";
 import { WEEKDAYS, isoOf, fmtShort } from "../dates.js";
 import { WEEKLY } from "../stats.js";
@@ -179,7 +180,7 @@ export function initSettings() {
       });
       return;
     }
-    if (act === "full") sync.sync({ full: true });
+    if (act === "full") { spend.forceFull(); sync.sync({ full: true }); }   // 记账表格也整份重拉
     else if (act === "export") {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([JSON.stringify(store.exportData(), null, 2)], { type: "application/json" }));

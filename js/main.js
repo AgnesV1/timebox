@@ -100,7 +100,11 @@ function sidebarHTML(c, view) {
 let desk = null;
 function showDesk() {
   if (!desk) desk = createSpending();
-  if (desk.el.parentNode !== main || main.children.length !== 1) { main.replaceChildren(desk.el); desk.show(); }
+  if (desk.el.parentNode !== main || main.children.length !== 1) {
+    main.replaceChildren(desk.el); desk.show();
+    // 和手机拉开记账一样：半小时没整份对过，就整份拉一次（表格里手改的、别处改的都回来）
+    if (store.setting("spend")?.url && spend.wantFull()) sync.queue();
+  }
 }
 
 // ---------- 整页重画（正在打字的输入框，值、光标都留住） ----------

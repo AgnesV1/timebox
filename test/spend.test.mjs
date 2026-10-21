@@ -205,3 +205,20 @@ test("spend: a date comes back exactly as the sheet shows it, whatever the time 
   assert.deepEqual(mac.budgets().map((b) => b.from), ["2026-10"]);
   void book;
 });
+
+test("spend: Reload everything brings every record back as the sheet has it, keeping ones not sent yet", async () => {
+  const { sync } = sheet();
+  const phone = await device(), mac = await device();
+  const a = phone.add({ d: "2026-10-23", v: -195000, c: "House", n: "rent" });
+  sync(phone);
+  sync(mac);
+  mac.get(a.id).d = "2026-10-22";   // 这台设备上存的是一天前的（旧脚本拉回来时差了一天）
+  const pending = mac.add({ d: "2026-10-24", v: -500, c: "Food" });
+  sync(mac);
+  assert.equal(mac.get(a.id).d, "2026-10-22", "an ordinary sync only brings back what changed");
+  mac.forceFull();
+  assert.equal(mac.request().since, 0);
+  sync(mac);
+  assert.equal(mac.get(a.id).d, "2026-10-23");
+  assert.equal(mac.get(pending.id).d, "2026-10-24");
+});

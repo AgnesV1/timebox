@@ -1,286 +1,299 @@
 # 苦昼短
 
-从 Deadline 倒推、每天只做好今天这一份的时间盒。电脑上排计划（日历 + 任务池拖拽），还能照 meal kit 的路子排备餐；
-手机上看今天、计时、标完成，往阅读记录里加想看的东西，去超市时看下次采购的单子。数据存在你自己的 Google Sheet，Mac 和手机共用一份。
-页面文字是英文；你自己写的任务名、原因、备注用什么语言都行。
+A timebox that works backwards from the deadline and only asks you to do today's share well. On the computer you plan (a calendar plus a task pool you drag from) and can plan meals the way a meal kit does;
+on the phone you see today, time things, mark them done, add things you want to read or watch, and check the next shopping list at the store. The data lives in your own Google Sheet, shared by the Mac and the phone.
+The interface is in English; your own task names, reasons and notes can be in any language.
 
-## 它怎么算「今天该做多少」
+Design rules (colours, type, components, motion, and what design tools must leave alone) are in [`DESIGN.md`](DESIGN.md).
 
-1. 两层：**项目**（French、Work 1 这种大目标）下面是**计划**。计划建的时候选两样：
-   - 种类（Kind）：**Total** = 总共多少小时、什么时候前做完（B2 exam 20h，10 月 30 日）；**Regular** = 规律的（Gym 周一三五 40 分钟、Yoga 每周 2 次）
-   - 放法（Place）：**Auto** = 自己出现在每天的清单里；**Pool** = 进任务池，你自己拖到哪天
-2. Total 计划可以拆成条目（Items），各有预计分钟；标了 Done 的算整条做完，没标的按记下的时间算到哪儿（不超过预计）。只填总时长的话就是一个大条目
-3. 剩下的分钟，摊到「目标完成日」之前每天能用的时间里（每天的可用时间，0 = 休息日）；那天固定要做的 Regular（Auto）先占掉一块
-4. 几个 Total 计划同时进行时，按 15 分钟一块自动平摊，免得某几天特别挤。Auto 的那份每天早上自己出现在今天的清单里，
-   没做完不顺延——剩下的量会摊到后面几天
-5. 只有今天的那份 / 那一次会写进表格；以后的日子在日历和手机日期条里画成淡色预览
-6. 每天第一次打开时，把今天的量记下来当「安全线」——白天做完任务，线不会跟着降
-7. 第二天对账：昨天少做了，差额摊到之后几天（Yesterday ran … short）；多做了，之后每天轻一点
-8. 完成时填实际分钟，同一模块攒够 2 个样本、和预计差得多，会建议你改剩下条目的估时
-9. 最近两周的真实速度推算预计完成日，给项目一个健康度：On pace / Cutting it close / … late
+## How it works out "how much today"
 
-## 一、Google Sheet 这一端
+1. Two levels: **projects** (big aims like French or Work 1) contain **plans**. A plan has two choices:
+   - Kind: **Total** = so many hours by a date (B2 exam, 20h, by October 30); **Regular** = recurring (Gym Mon/Wed/Fri 40 minutes, Yoga twice a week)
+   - Place: **Auto** = shows up in each day's list by itself; **Pool** = goes into the task pool and you drag it onto a day
+2. A Total plan can be split into items, each with estimated minutes. An item marked Done counts as finished; otherwise it counts the time logged against it (capped at the estimate). A plan with only a total duration is one big item
+3. The remaining minutes are spread over the usable time of each day before the target date (each day's capacity; 0 = a rest day). That day's fixed Regular (Auto) work takes its share first
+4. With several Total plans at once, the load is balanced in 15-minute blocks so no day gets crowded. The Auto share appears in today's list each morning;
+   anything left undone isn't carried over as a task — the remainder is spread over the following days
+5. Only today's share / today's occurrence is written to the Sheet; future days show as faint previews in the calendar and the phone's date strip
+6. The first time you open the app each day, today's amount is recorded as the **line** — finishing tasks during the day doesn't lower it
+7. The next day settles up: if you did less yesterday, the difference is spread over the following days (Yesterday ran … short); if you did more, the following days get lighter
+8. When you finish something you enter the actual minutes; once a module has two samples that differ a lot from the estimate, it suggests re-estimating the remaining items
+9. The real pace of the last two weeks projects a finish date and gives the plan a health label: On pace / Cutting it close / … late
 
-**已经在用旧版 Timebox 的话**（表格里已经有 Tasks 页）：
+## 1. The Google Sheet side
 
-1. 先保险起见：表格 → 文件 → 创建副本（`setup` 也会自动备份，多一份更安心）
-2. 扩展程序 → Apps Script，删掉原来的内容，粘贴新的 `Code.gs` 全文
-3. 第 4 行 `CHANGE_ME` 改回**你原来的口令**（只在 Apps Script 编辑器里改，别改仓库里的文件）
-4. 保存 → 顶部函数下拉选 `setup` → 运行。它会：
-   - 把 Tasks / Projects / Day capacity 整页复制成「Backup … 日期」
-   - 原地升级：补上 ID 等辅助列（会自动隐藏）、状态统一成一个词、
-     按任务名把每日任务挂到同名 Project 上、每个 Project 建一个同名条目（预计 = 原来的 Planned min）
-   - 新建 Items / Log / Settings / Deleted 几页
-   - 精简（每次跑都会检查，跑几次都一样）：Time 页的计时记录并进 Tasks 的 `Times` 列，Day capacity 并进 Settings，
-     以前的重复规则变成 Projects 里的 Regular 计划（以后的、没动过的那几次删掉），
-     删掉 Category / Done order / Planned / Spent / Progress 几列和 Groups 页；
-     搬完的旧页改名「Old …」藏起来，Notes、Backup、Log、Settings、Deleted 也藏起来（右键页签能显示）。
-     确认数据都在后，Old / Backup / Notes 可以自己右键删掉
-5. 部署 → 管理部署 → 编辑 → 版本选「新版本」→ 部署。网址不变，所以手机和电脑都不用重填。
-   表格和网页版本对不上时（比如网页更新了、`Code.gs` 还没换），网页会提示「Update Code.gs in your Sheet first」，改动先留在设备上，不会丢
+**Already using an older Timebox** (your Sheet already has a Tasks tab):
 
-**第一次用**：新建一个空表格，做上面 2–4 步，然后「部署 → 新建部署 → 网页应用」，
-执行身份选「我」，谁有权访问选「任何人」，复制生成的 `…/exec` 网址。
+1. To be safe: Sheet → File → Make a copy (`setup` also makes a backup, but one more doesn't hurt)
+2. Extensions → Apps Script, delete what's there, paste the whole new `Code.gs`
+3. On line 4, change `CHANGE_ME` back to **your own secret** (only in the Apps Script editor — never in the repository file)
+4. Save → pick `setup` in the function menu at the top → Run. It will:
+   - copy Tasks / Projects / Day capacity into "Backup … date" tabs
+   - upgrade in place: add ID and other helper columns (hidden automatically), turn statuses into one word,
+     attach daily tasks to the project with the same name, and create one item per project (estimate = the old Planned min)
+   - create the Items / Log / Settings / Deleted tabs
+   - tidy up (checked on every run; running it twice changes nothing): the Time tab's timer records move into the Tasks `Times` column, Day capacity moves into Settings,
+     old repeat rules become Regular plans in Projects (future occurrences you never touched are removed),
+     the Category / Done order / Planned / Spent / Progress columns and the Groups tab are removed;
+     moved tabs are renamed "Old …" and hidden, and Notes, Backup, Log, Settings and Deleted are hidden too (right-click the tab bar to show them).
+     Once you've checked the data is all there, you can delete Old / Backup / Notes yourself
+5. Deploy → Manage deployments → Edit → Version: New version → Deploy. The URL stays the same, so the phone and computer don't need it again.
+   When the Sheet and the page disagree on the version (say the page was updated but `Code.gs` wasn't), the page says "Update Code.gs in your Sheet first" and keeps your changes on the device until then — nothing is lost
 
-> 每次改完 `Code.gs` 都要「部署 → 管理部署 → 编辑 → 新版本」才生效，否则跑的还是旧代码。
+**First time**: make an empty Sheet, do steps 2–4 above, then Deploy → New deployment → Web app,
+execute as "Me", access "Anyone", and copy the `…/exec` URL it gives you.
 
-## 二、网页这一端
+> After every change to `Code.gs`, you have to do Deploy → Manage deployments → Edit → New version, or the old code keeps running.
 
-推到 GitHub 仓库，Settings → Pages 选 main 分支根目录，`https://<用户名>.github.io/<仓库名>/` 就能打开。
-代码是公开的，但数据不在代码里；Apps Script 网址和口令只存在你浏览器里。
+## 2. The web page side
 
-- 旧版用过的设备：打开新版会自动带上原来的网址和口令
-- 新设备：电脑在 Settings 里填 Apps Script 网址和口令；新手机第一次打开会直接让你填，填好就不再出现
-- 手机：Safari 打开 → 分享 → 添加到主屏幕。装好后没网也能打开
+Push to a GitHub repository, then Settings → Pages → the main branch's root, and `https://<user>.github.io/<repo>/` opens it.
+The code is public, but no data is in it; the Apps Script URL and secret are stored only in your browser.
 
-## 三、每天怎么用
+- A device that used the old version picks up its URL and secret automatically
+- A new device: on the computer, enter the Apps Script URL and secret in Settings; a new phone asks for them the first time and never again
+- Phone: open in Safari → Share → Add to Home Screen. Once installed it opens without a connection too
 
-**电脑**
-- `Projects`：最上面是**目标板**（这个月 / 这个季度 / 下个季度 / 今年，和之后五年；每条有标签、打算哪个月做到，勾了以后记实际哪个月做到，
-  两个都能点开改；栏目跟着日子自己滚，过期没做完的滚进当前那栏；每栏里按标签的项目顺序排，Build 在最前，没标签的最后）。
-  目标现在放在页面**最右边一栏**（滚的时候贴着顶），从上往下：
-  - **North star**：一段长文字，一直在最上面。用 `[ ]` 把词包起来（或者选中几个字点 **Frame as goal**），框出来的词就是一条 North star 目标；
-    点这段字就能改，⌘↵ 或点到外面就存。改了框里的措辞，还是原来那条目标（上级、连线都在）；把框去掉，那条目标就删了（提示条上能撤销）。
-  - **Goals | Ideas**：Goals 一段段竖着排：This month、This quarter、Next quarter、This year、Next year，再三个年份（今年是 2026 就是 2028、2029、2030，跟着日子变）。
-    Ideas 是下面说的灵感池。切到 Ideas，North star 那段还在。
-  **目标、项目、计划可以连起来**，说明每件事是为了什么：鼠标停在一条目标、North star 里框出来的词、一个项目的名字或一张计划卡上，
-  跟它有关的线就一条条斜着飞过去（两头直接连的一条弧线，压着字也没关系，只在鼠标停着时有），线上一道**流光**一直往「为了谁」那头跑
-  （计划 → 目标 → 上级目标 → … → North star），跑到那头小圆点跳一下。白天是墨色加粉、蓝错开的套色，夜里是项目的霓虹色。
-  旁边冒出来的小圆圈拖到另一条目标、计划或项目上就连上，线中间的 × 断开。
-  目标拖到目标 = 设成它的上级（一条只有一个上级）。不拖也行：点目标的字改的时候有 Part of，计划编辑框里有 Serves。
-  计划自己没连目标的，算它所在的项目连着的。今天页点开一个任务，标题下面写着它是为了什么：For 计划 → 目标 → 上级 → …
-  下面每个项目看的东西不一样（Settings → Projects 的 Watch 一列能改）：**Build** 看计划的进度（进度条、健康度、时间轴）；
-  **Fitness** 看最近 7 天够不够 3 小时、**Leisure** 看最近 7 天的 Relax 在不在每周门槛之间（默认 5–20 小时）——
-  都只是一句话，不达标是红的，侧栏 Projects 上会有个数；**Work / Chores** 不看，只列计划。
-  下面按项目分区：Build / Work / Friends / Leisure / Fitness / Chores 六个一直都在、永远是这个顺序（Rename 可以改名、换颜色、并进别的项目，空的可以 Remove）。
-  项目那一块够宽时再分两栏：左边 Build、Work，右边别的；窄了自动变一栏。
-  **任务可以直接挂在项目上**，不一定要有计划：加任务时下拉里每个项目自己是一项，下面才是它的计划。
-  右边那一栏切到 **Ideas** 是**灵感池**——想去哪玩、想吃什么、想参加什么活动，一句话一条，没有时长、大多也没有期限。
-  顶上一格直接加（粘几行 = 几条），可以选类别：🎭 演出 / 展览（现场音乐也算）、✈️ 出去玩、🍽️ 吃饭、🍹 酒吧、🛰️ 别的（户外、逛市集这些不常去的）；少数带日子（On 某天 / By 某天）。
-  顶上一排 emoji 能只看某一类。在 Leisure 或 Friends 下加任务时，
-  标题框底下会列出池子里还没排的，点一条就填进去；任务建好，池子里那条就划掉、写着哪天。之后它跟着任务走：
-  任务 Done = 去过了，这条就从池子里拿掉（一周内取消 Done 它还回得来，之后就删了）；标 Delay / Drop 或者删掉任务 = 回到池子。池子里的行也能直接点 Plan 放到某天。
-  7 天内到日子、还没排的，今天页右边会提一句；所有带日子、还没过、还没排的，在日历的 Pool 里列成一小节 Ideas——只是字，不会自己变成任务。
-  鼠标停在某一行上点 `+`，才把它放到那天（Leisure；✈️ 算 8 小时、🛰️ 4 小时、🎭 🍽️ 🍹 3 小时、没归类的 1 小时；by 的放在最后那天，之后照常拖）。
-  灵感池里的 Plan 也是这几个默认值。哪些项目能挑：Settings → Projects 的 Ideas 一列。
-  手机上：加任务那一行的 `Idea` 开关打开后，Add = 记进池子（先落在 Unsorted，回电脑再归类）；顶栏的灯泡是查的那一页（搜名字和备注，只看不改）。都存在 Settings 页，一条一行（`idea:…`）。
-  区里是计划。点「New plan」或某个项目的「+ Plan」，选 Total / Regular 和 Auto / Pool；
-  Total 填 Deadline 和总时长或条目（可以一行一个批量加，也能用 Numbered 生成「Unit 1…10」），
-  Regular 填每个星期几做几分钟（Auto）或每周几次、每次几分钟（Pool）；「Rename」改项目名，下面的计划一起改
-- **重复的快捷方式**：在加任务框里选「↻ Every day / Weekdays / Every 周几」和「for good / for 1 week …」再点 Add，
-  就是建了一个 Regular + Auto 的计划；点任务的 ⋯ → Repeat 也一样，可以每个星期几填不同分钟。
-  这种循环的小事直接算在它的项目上：Projects 页不给它单独一张卡，只在项目头下面列一行（点开能改、能停）；任务旁边的标签是项目名；
-  编辑框里的 Project 一格可以把整个循环挪到别的项目。
-- **最近 14 天**：看钟点 / Relax 的项目（Fitness、Leisure）头上有一排 14 个方块，一天一格——实心是那天做了，描边是有安排没做，中间那道缝右边是最近 7 天。
-- **Archive**：每张计划卡右上角有 Archive，点了折进项目头右边的「N archived」，点开能看、能 Restore（和编辑框里的 Status 是同一回事）。
-  重复的任务在编辑框顶上选「This one / This & following / All」，改名字、分钟就作用到那些天；
-  「Change…」从这一天起改重复方式。删的时候选 Only this / This & following / This & earlier / All，
-  做过或计过时的留着当记录。错过的自动任务不算「left behind」
-- `Calendar`：点日期就到今天页的那一天。每天的日程永远全部显示（名字完整换行）；格子有最小宽度，窗口放不下就左右滑。右边是任务池，把条目拖到某天就排进去；Pool 的 Regular 计划在「This week」里，显示这周还剩几次，拖一次排一次。
-  日历里的任务能拖到别的天，拖回任务池就撤回；以后几天的淡色预览里，Regular 的那一次可以拖走或点开，Total 的预计份额只能看。
-  格子右上角的数字是那天能用的时间，点一下就能改
-- `Today`：左边是今天的清单，右边是安全线、昨天的账单、过期没做的。
-  屏幕正下方（计时浮条上面）有个半透明的半圆，是这一天的**圆盘**：外圈 6→18 点、内圈 18→6 点，6 点在左、9 点在上、12 点在右；
-  底盘是灰的（没做事的时间就是这层灰），最左边一圈的头尾处横着切开一道细缝；「现在」是从圆心伸出去的一根指针；
-  任务的色块用项目颜色的霓虹版。夜里底盘是镜面铬、任务是发光的整块；白天整个是丝网印的画法——两圈平涂的灰，
-  底下各垫一版错开一点的粉和青蓝（像套印没对准露出来的边），任务是平涂的色块、底下垫一版错开的藏青，整盘压一层颗粒；
-  每天晚上 11 点到第二天早上 8 点算休息，圆盘上磨砂压暗、压着细纹（通勤日再加来回路上的两段）；
-  计过时、写了起止钟点的每一段按计划颜色画上去，正在计时的画到现在，通勤日的固定时段是灰色斜纹。
-  往上拖（手机上滑）它就像日出一样升起来，时间段从 6 点起一段段亮；松手过了三分之一就停在屏幕中间，点某一段看是什么；
-  点外面、往下拖或按 Esc 落回去。点一下也能升起 / 落下
-- **通勤日**：日历格子右上角的小车图标点一下就标成通勤日（图标变实心），再点取消。通勤日固定 23–8 点（睡觉 / 洗漱 / 出门）、
-  8–9 点（通勤 / 吃饭）、17–18:30（通勤），在圆盘和统计页的每周热力图里标灰；不改那天能用的时间
-- **上班那一层**（只在电脑日历上，都只是标记，不改可用时间、不影响排计划）：
-  - 发薪日（从 2026-08-12 起每两周的周三，碰上假日往前挪）日期后面一个小 `$`。
-  - 请假和公众假日，日期旁边一个很小的 💤。假日是安省的 9 个法定假日加 Civic Holiday，按规则每年现算，落在周末的顺延到下一个工作日。
-    工作日鼠标移上去会淡淡出现 💤，点一下标成不上班，再点取消；自动标的假日要上班的话也是点一下去掉。周末不标。
-  - 超级休息日：点格子顶上那条进度条，整条变金色（会慢慢反光），再点取消。
+## 3. Day to day
 
-**计时（电脑和手机一样）**：点今天的一个任务选中它，底部浮条点 **Start** 开始，做完点 **Stop**；
-停下后浮条上可以直接点 Done / Delay。一次只跑一个，在跑的时候选了别的任务，浮条上会出现「Switch to …」。
-计时器跟着表格同步，手机上开始、电脑上也能停；不到 1 分钟的不记。
-没计时也行：点 Done 后，任务下面填「用了几小时几分 + 几点结束」点 Log（已经预填好预计的分钟和现在的钟点）；已经有记录的、或者 Delay 的，点「+ time」再补一段。
+**Computer**
+- `Projects`: goals live in the **right-hand column** (it sticks to the top as you scroll). From top to bottom:
+  - **North star**: a paragraph that always stays at the top. Put `[ ]` around words (or select some and click **Frame as goal**) and each framed phrase is a North star goal;
+    click the paragraph to edit, ⌘↵ or clicking outside saves. Rewording inside a frame keeps the same goal (its parent and links stay); removing the frame deletes that goal (undo in the toast).
+  - **Goals | Ideas**: Goals are stacked by time: This month, This quarter, Next quarter, This year, Next year, then three more years (in 2026 that's 2028, 2029, 2030; they move with the date).
+    Each goal has a tag, the month you mean to finish it, and once ticked, the month you actually did — both can be clicked and changed. Sections roll forward with the date, and unfinished overdue goals roll into the current one;
+    inside a section goals are ordered by their tag's project order (Build first, untagged last). A small grip shows on the left of a goal when you hover it: drag it to another section to give the goal that section's default due date (or click the grip to pick a section; undo in the toast).
+    Ideas is the idea pool described below; switching to it keeps the North star paragraph in view.
+  **Goals, projects and plans can be linked** to say what each thing is for: rest the mouse on a goal, a framed phrase in the North star, a project name or a plan card
+  (or Tab onto it with the keyboard), and the related links fly out one by one (a direct curve between the two ends — crossing text is fine, they only show while you're there).
+  A **streak** of light keeps running along each line towards "what it's for" (plan → goal → parent goal → … → North star), and the dot at that end bounces when it arrives. By day it's ink with pink and blue printed slightly off-register; at night it's the project's neon colour.
+  Drag the small circle that appears onto another goal, plan or project to link them; the × in the middle of a line unlinks.
+  Goal onto goal = make it the parent (one parent per goal). Without dragging: Part of when editing a goal's text, Serves in the plan editor.
+  A plan with no goal of its own counts its project's goals. On Today, an opened task shows what it's for under its title: For plan → goal → parent → …
+  Below, each project tracks something different (the Watch column in Settings → Projects changes it): **Build** tracks plan progress (bar, health, timeline);
+  **Fitness** checks whether the last 7 days reached 3 hours, **Leisure** whether the last 7 days of Relax stayed within the weekly range (5–20 hours by default) —
+  each is one line, red when short, with a count on the Projects item in the sidebar; **Work / Chores** track nothing and just list their plans.
+  The page is split by project: Build / Work / Friends / Leisure / Fitness / Chores are always there, always in that order (Rename changes the name or colour or merges into another project; an empty one can be removed).
+  When the projects area is wide enough it splits into two columns: Build and Work on the left, the rest on the right; narrower, it's one column.
+  **Tasks can belong straight to a project** without a plan: when adding a task, each project is an option of its own in the menu, with its plans under it.
+  Switching the right column to **Ideas** shows the **idea pool** — places to go, things to eat, events — one line each, no duration and mostly no deadline.
+  Add them in the box at the top (paste several lines = several ideas) and pick a kind: 🎭 shows and exhibitions (live music too), ✈️ trips, 🍽️ eating out, 🍹 bars, 🛰️ anything else (outdoors, markets — the rarer things); a few have a date (On a day / By a day).
+  The emoji row at the top filters by kind. When you add a task under Leisure or Friends,
+  the unplanned ideas show under the title box; click one to fill it in. Once the task exists, the idea is struck through with its day, and it follows the task from then on:
+  task Done = you went, and the idea leaves the pool (un-Done within a week brings it back; after that it's deleted); Delay / Drop or deleting the task = back to the pool. Ideas can also go straight onto a day with Plan.
+  Unplanned ideas due within 7 days get a line on the right of Today; every dated, upcoming, unplanned idea is listed in the calendar's Pool under Ideas — just text, it never turns into a task by itself.
+  Hover a line and click `+` to put it on that day (Leisure; ✈️ counts 8 hours, 🛰️ 4, 🎭 🍽️ 🍹 3, unsorted 1; "by" ideas go on the last day, then drag as usual).
+  Plan in the idea pool uses the same defaults. Which projects can pick ideas: the Ideas column in Settings → Projects.
+  On the phone: with the `Idea` switch on in the add-task row, Add saves to the pool instead (it lands in Unsorted; sort it on the computer); the light bulb in the top bar opens the look-up page (search names and notes, read only). All of it is stored in the Settings tab, one row each (`idea:…`).
+  The sections hold plans. Click "New plan" or a project's "+ Plan", choose Total / Regular and Auto / Pool;
+  for Total enter a deadline and either a total duration or items (one per line to add many, or Numbered to generate "Unit 1…10"),
+  for Regular enter minutes per weekday (Auto) or times per week and minutes each (Pool); Rename renames the project and its plans with it
+- **Repeat shortcuts**: in the add-task box, pick "↻ Every day / Weekdays / Every <weekday>" and "for good / for 1 week …", then Add —
+  that creates a Regular + Auto plan; a task's ⋯ → Repeat does the same and lets each weekday have its own minutes.
+  These small repeating things count straight towards their project: Projects shows them as one line under the project header (click to edit or stop) rather than a card; the task's label is the project name;
+  the Project field in the editor moves the whole repeat to another project.
+- **Last 14 days**: projects that track hours or Relax (Fitness, Leisure) have a row of 14 squares in their header, one per day — filled = done that day, outlined = planned but not done; the gap marks the last 7 days on the right.
+- **Archive**: every plan card has Archive at the top right; archived cards fold into "N archived" at the right of the project header, where you can open and Restore them (the same thing as Status in the editor).
+  For a repeating task, the top of the editor offers This one / This & following / All; renaming or changing minutes applies to those days;
+  "Change…" changes the repeat from that day on. Deleting offers Only this / This & following / This & earlier / All;
+  days already done or timed stay as a record. Missed automatic tasks don't count as "left behind"
+- `Calendar`: clicking a date opens that day on Today. Every day always shows its whole schedule (names wrap in full); cells have a minimum width and the calendar scrolls sideways when the window is narrow. The task pool is on the right: drag an item onto a day to plan it,
+  or click it (or Tab to it and press Enter) to pick the day from a "Put on…" menu. Pool-placed Regular plans are under "This week" with how many are left this week; each drag places one.
+  Calendar tasks can be dragged to other days, or back to the pool to unschedule them (in the task editor: Back to the pool). In the faint previews of future days, a Regular occurrence can be dragged away or opened; a Total plan's projected share is view-only.
+  The number at the top right of a cell is that day's usable time; click it to change
+- `Today`: today's list on the left; on the right the line, yesterday's bill, and what's overdue.
+  At the bottom centre of the screen (above the timer bar) is a translucent half-disc, the day's **dial**: the outer ring is 6→18h, the inner ring 18→6h, with 6 on the left, 9 at the top and 12 on the right;
+  the base is grey (time with nothing done stays grey), and the leftmost ring has a thin cut across its ends; "now" is a hand from the centre.
+  Tasks are blocks in the neon version of their project colour. At night the base is mirrored chrome and tasks glow; by day the whole dial is screen-printed —
+  two flat grey rings, each with a pink and a cyan copy slightly off-register underneath, tasks as flat colour with an offset navy copy, and grain over everything.
+  Every night from 11pm to 8am counts as rest: frosted and darkened, with fine lines (commute days add the two trips).
+  Each timed segment with start and end times is drawn in its plan's colour, a running timer is drawn up to now, and a commute day's fixed hours are grey hatching.
+  Drag it up (swipe up on the phone) and it rises like the sun, segments lighting up one by one from 6am; past a third it stays in the middle of the screen, where you can tap a segment to see what it was;
+  tap outside, drag down or press Esc to let it set. A single tap also raises / lowers it
+- **Commute days**: click the small car icon at the top right of a calendar cell to mark a commute day (the icon fills in); click again to unmark. Commute days have fixed blocks 23–8 (sleep / getting ready / leaving),
+  8–9 (commute / eating) and 17–18:30 (commute), shown grey on the dial and in Stats' weekly heat map; the day's usable time doesn't change
+- **The work layer** (computer calendar only; all of these are just marks — they don't change capacity or planning):
+  - Paydays (every second Wednesday from 2026-08-12, moved earlier when it falls on a holiday) get a small `$` after the date.
+  - Days off and public holidays get a tiny 💤 next to the date. Holidays are Ontario's 9 statutory holidays plus Civic Holiday, worked out each year by rule; one falling on a weekend moves to the next working day.
+    On a weekday, hovering shows a faint 💤 — click to mark the day off, click again to undo; click an automatic holiday to remove it if you work that day. Weekends aren't marked.
+  - Super rest days: click the progress bar at the top of a cell and the whole bar turns gold (with a slow glint); click again to undo.
 
-**时间和状态分开**：花了多少时间只看记下的（计时器、补记的那几段），今天做了多少、安全线、圆盘、Stats 的时间、季度表都是它；
-标了 Done 但一点没记的不算时间。状态只有三个——Done（做完）、Delay（没做完、往后放，只是记一下，不会自动挪，要另做就自己再开一条）、Drop（不做了），
-只用在：日历上怎么画（Done 灰掉 + 划掉、Delay 只划掉、Drop 只灰掉）、Stats 的完成率和 Delay / Drop 的原因、计划进度（标了 Done 的条目算整条做完）。
-以前的 Partial、Later 都算 Delay；换上这一版的 Code.gs 跑 setup 时，表格里会先备份一份 Tasks，再把它们改成 Delay，
-以前没计时就标了 Done 的补记一段 = 预计（不带钟点），以前的统计数字不变。
-每段时间记在任务的 `Times` 一格里（「09:10-09:40 30m; 20m」），任务的 Actual min = 它们加起来；计过时但还没标状态的，也先算进今天做了多少。
-忘了开计时：加任务框里直接写「Reading 14:00-15:10」（钟点里至少一个带冒号），就记成一条已经做完的；别的日子在日历里那天加一条。
-晚按了 / 停晚了：计时中点浮条上的「Since 09:10」改成其实开始的钟点；Stop 旁边的 ⏱ = 按某个钟点停；已经记下的那段，在展开的任务里点它的钟点改头尾。
+**Timing (same on computer and phone)**: tap a task on Today to select it, press **Start** in the bar at the bottom, and **Stop** when you're done;
+after stopping, the bar offers Done / Delay right away. Only one runs at a time; selecting another task while one runs shows "Switch to …" in the bar.
+The timer syncs through the Sheet — start on the phone, stop on the computer; anything under a minute isn't kept.
+No timer is fine too: after Done, enter under the task how long it took and when it ended, then Log (the estimate and the current time are filled in); if there's already a record, or for Delay, "+ time" adds another segment.
 
-**Chore 键（电脑和手机一样）**：今天的列表顶上靠右一个小圆键，按一下开始给家务计时，再按一下停。计时中旁边四个 emoji 给这一段归个类——
-🍳 做饭、☎️ 邮件 / 电话 / 消息、🗃️ 整理材料 / 提交、🪪 证件这类必须办的；再点一下就清掉，不选就是没分类。
-一天的家务是同一条 Chores 任务（每按一次多一段），不进普通的任务列表；记下的按 emoji 并成一行小块（「🍳 40m ×3 · 8m = 48m」），点开看每一段。
+**Time and status are separate**: time spent is only what was recorded (the timer and segments you logged) — that's what today's done, the line, the dial, Stats' time and the quarter sheet use;
+a task marked Done with nothing recorded counts no time. There are only three statuses — Done (finished), Delay (not finished, put off; it's only a note, it doesn't move anything — make a new task if you'll do more) and Drop (not doing it) —
+used only for: how the calendar draws it (Done greyed and struck through, Delay struck through, Drop greyed), Stats' completion rate and Delay / Drop reasons, and plan progress (a Done item counts as finished).
+The old Partial and Later both count as Delay; running setup with this `Code.gs` first backs up Tasks and then changes them to Delay;
+old Done tasks with no time get one segment equal to their estimate (no clock times), so past numbers stay the same.
+Each segment is written in the task's `Times` cell ("09:10-09:40 30m; 20m"), and Actual min is their sum; time on a task with no status yet already counts towards today.
+Forgot the timer: type "Reading 14:00-15:10" in the add-task box (at least one time with a colon) and it's logged as a finished task; for another day, add it on that day in the calendar.
+Started or stopped late: while timing, click "Since 09:10" in the bar to set the real start; the ⏱ next to Stop stops at a given time; for a recorded segment, open the task and click its times to change them.
 
-**深度（◆ Deep）**：要专心做的任务可以标成 Deep——加任务时点 ◆ Deep、浮条上 Start 旁边的 ◆（计时中也能点）、电脑上的编辑框里都行。
-计划的编辑框里勾「Deep work by default」，这个计划的任务（包括自动排出来的、以前的）就都算深度，单个任务还能各自改。
-今天做了多少深度写在圆盘正下方的小签上；Stats 页有 Deep 那一块，饼图外圈细的一圈、时间表最下面一行也是它。
-想给自己定个量：Stats 饼图底下 Adjust → Deep goal（每个工作日几小时）。
+**Chore key (same on computer and phone)**: a small round key at the top right of today's list starts timing housework; press again to stop. While timing, five emoji sort the segment —
+🍳 cooking, ☎️ email / calls / messages, 🗃️ paperwork / filing, 🪪 IDs and other must-dos, 🏠 housework and tidying; tap again to clear; none = unsorted.
+A day's housework is one Chores task (one more segment per press) and stays out of the normal list; segments are grouped by emoji into one line of chips ("🍳 40m ×3 · 8m = 48m"), and opening it shows each segment.
 
-- `Stats`：选一段时间（周 / 月 / Season 当季 / 年 / Custom 自己选两头；每次打开从 Month 开始），可以只看某几个项目、某几个计划（勾选，能勾好几个；一个都不勾 = 全部，按项目分），或者只看深度。两个页签：
-  - **Time**（时间去哪了）：最上面一条细条——Build 花了多久、其中多少深度、比上一段多了少了，右边是全部一共；然后是每天的柱子（深度大概到哪，哪里漫着一道电光蓝的潮水，边是虚的）、**一天 24 小时的饼图**、
-    **几点在干活的热力图**（星期几 × 24 小时，从 6 点起；格子的颜色 = 这个钟点主要是哪个项目，一个占了七成以上就是它的颜色，
-    不然前两名渐变；鼠标停在左边的星期几上 = 那个星期几平均一天多久、按项目拆开；「Week by week」展开每一周）、
-    **时间表**（项目 × 日子，长了自动按周 / 按月；点项目名前的小三角展开它下面的计划）。
-    柱子默认只看 Build、热力图默认看全部，右上角都能切。每天的柱子是青柠（总量），按项目拆开的图用项目自己的颜色。
-    项目永远按 Build、Work、Friends、Leisure、Fitness、Chores 排（Projects 页、下拉、饼图、时间表都是）。
-    饼图按每天 24 小时算百分比：睡觉 7h、吃饭做饭洗碗洗澡 3h（每天）算在里面但不画也不列，剩下的铺满一圈；
-    家务每个周末共 2h 的默认值算进 Chores（点 Adjust 改这几个数）。饼图上项目的颜色和圆盘是一套（霓虹版）。
-    **On the side**（也在 Adjust 里）：一个月填一个总数——边健身、边通勤看的剧、小说、播客。平常能填前两个月，月底最后三天里这个月也能填。
-    它摊到那个月每一天，在饼图上是一段流光，从 Untracked 正中往下扫，不占时间（本来就是和别的事叠在一起的）。
-  - **Plan**（计划执行得怎样）：做完多少、守住几天线、估时准不准、每天计划和实际、各项目、没做完的原因、各计划的计划和实际
+**Deep work (◆ Deep)**: tasks that need full focus can be marked Deep — ◆ Deep when adding a task, the ◆ next to Start in the bar (also while timing), or the editor on the computer.
+Tick "Deep work by default" in a plan's editor and all its tasks (including automatic and past ones) count as deep; each task can still be changed.
+Today's deep time is on the small label just under the dial; Stats has a Deep section, plus the thin outer ring of the pie and the last row of the timesheet.
+To set yourself a target: Stats, under the pie → Adjust → Deep goal (hours per working day).
 
-**阅读（电脑和手机都有）**：第一次打开 Reading 页（或电脑 Settings → Reading）贴一次你的阅读记录表格的链接，贴进去就存。表格不用公开，用你自己的 Google 账号打开。
-`Reading` 页（手机右上角的书本图标）右上角两格：
-- **Want**：想看的。填标题、类型（就是那个表格的各页：Book、TV……）、风格（🎉 爽 / 😊 成长 / 👀 好奇）和 Note，
-  点 Add 就加进那个表格的 **Want** 页（没有会自动建，表头 Name / Type / Vibe / Note / Priority）。
-  **Priority** 是多想看（优先级，不是期限）：`Soon` = 这一两年、`5 years` = 五年内，也可以不标。加的时候能选；
-  打字搜到已经在 Want 里的，旁边两个小按钮点一下就标上、再点取消。写在 Want 页的 Priority 那一列，表格里也能直接改、能排序
-  （以前建的 Want 页没有这一列，第一次用到时自动补在最后）。Finished 那一格标题空着时，先列标了 Soon 的那几条。
-- **Finished**：看完的。点选哪一页、小类（那一页的小类格子有下拉才出现，比如 Book 的 book / English…，Game 的 played / completed）、
-  年月、值不值（🥰 成长 / 🎉 爽了 / 💢 踩雷，可以不标），写 Note，点 Log 就写进那一页：落在最后一条有日期的下面，
-  月份照那一页已有的写法写。之前在 Want 里的点一下就填进来，记完会从 Want 页拿掉（Want 里写的 Note 跟过去）；
-  那一页底下已经写了名字、还没写日期的，就地把日期填上。下拉里没有的值（比如新的一年还没加进 Year 的选项）不会硬写，
-  页面上会说缺什么，在表格里加上以后自动补记。etc 那一页不在这里记。
+- `Stats`: pick a period (week / month / Season / year / Custom; it opens on Month each time), optionally only some projects or plans (tick several; none = everything, split by project), or only deep work. Two tabs:
+  - **Time** (where the time went): a thin strip at the top — time on Build, how much of it deep, up or down from the previous period, and the overall total on the right; then daily bars (roughly how much was deep, with a soft electric-blue tide), a **24-hour pie**,
+    an **hours-of-the-week heat map** (weekday × 24 hours from 6am; a cell's colour is the project that mostly filled that hour — its own colour above 70%,
+    otherwise a blend of the top two; hovering a weekday on the left shows that weekday's average day split by project; "Week by week" expands each week),
+    and a **timesheet** (project × day, grouped by week or month when long; the small triangle before a project opens its plans).
+    The bars default to Build and the heat map to everything; both switch at the top right. Daily bars are lime (the total); charts split by project use each project's colour.
+    Projects are always ordered Build, Work, Friends, Leisure, Fitness, Chores (on Projects, in menus, the pie and the timesheet).
+    The pie is a percentage of each 24-hour day: sleep 7h and eating, cooking, dishes and showering 3h (daily) are counted but not drawn or listed, and the rest fills the circle;
+    a default 2h of housework each weekend goes into Chores (Adjust changes these numbers). The pie uses the dial's neon colours.
+    **On the side** (also in Adjust): one total per month — shows, novels and podcasts while working out or commuting. You can fill the previous two months, plus the current month in its last three days.
+    It's spread over each day of that month and shows on the pie as a streak of light sweeping down from the middle of Untracked; it takes no time (it overlapped other things anyway).
+  - **Plan** (how the plans went): how much got done, how many days held the line, how good the estimates were, planned vs actual per day and per project, reasons for unfinished work, and each plan's planned vs actual
 
-电脑上 Reading 页最右边还有一个框 **Rest of 2026**（跟着今年变）：今年接下来想读的。点进底下那一格先列 Want 里的（Soon 的在前），
-打字时列对得上的，点一条就加；回车加打的字。拖左边的把手、或在一行上按 Alt+↑ / ↓ 排先后，× 拿掉（能撤销）。
-阅读表格里记了同名的看完（今年）就自动划掉、写哪个月；去年没读完的跟到今年，写着 from 2025。这张单子存在苦昼短的 Settings 里，跟着同步。
+**Reading (computer and phone)**: the first time you open Reading (or Settings → Reading on the computer), paste the link to your reading log Sheet once; it's saved as you paste. The Sheet doesn't need to be public — it's opened with your own Google account.
+The `Reading` page (the book icon at the top right on the phone) has two boxes at the top right:
+- **Want**: things you want to read or watch. Enter a title, a type (the Sheet's tabs: Book, TV…), a vibe (🎉 fun / 😊 growth / 👀 curious) and a note,
+  and Add puts it on the Sheet's **Want** tab (created if missing, with the headers Name / Type / Vibe / Note / Priority).
+  **Priority** is how much you want it (a priority, not a deadline): `Soon` = within a year or two, `5 years` = within five years, or nothing. You can set it when adding;
+  when your typing finds something already in Want, two small buttons beside it set or clear it. It's written to Want's Priority column, which you can also edit and sort in the Sheet
+  (older Want tabs without the column get it added at the end the first time it's needed). With an empty title, the Finished box lists the Soon ones first.
+- **Finished**: things you finished. Pick the tab, the sub-type (only when that tab's sub-type cells have a dropdown — Book's book / English…, Game's played / completed),
+  year and month, whether it was worth it (🥰 growth / 🎉 fun / 💢 regret, optional), a note, and Log writes it on that tab: under the last dated row,
+  with the month written the way that tab already writes it. Something from Want is one click away, and logging it removes it from Want (its note comes along);
+  a name already at the bottom of the tab without a date gets its date filled in where it is. Values missing from a dropdown (say the new year isn't in the Year options yet) are never forced:
+  the page says what's missing and logs it once you've added it in the Sheet. The etc tab isn't logged from here.
 
-除了这几格，别的格子不改不删。
-打标题时会搜**所有页**里已经有的（每页找写着 Name 的那一行当表头，下面每行一条），显示在哪一页、哪年哪月、那格 emoji；
-同名的（不分大小写、空格、书名号）不会再加。每次打开 Reading 页都会重新读一遍，所以你在表格里直接改的也搜得到。
-不用每次都来这一页记（电脑）：在 Leisure 下加任务时，标题框底下也会列出 Want 里的；任务标了 Done、名字在 Want 里，
-那一行会问一句 **Finished it?**——点 🥰 / 🎉 / 💢（或 ✓ 不标），Book、Game 这种有小类的再点一下小类，就记进它那一页、月份用任务那天的；
-`Not yet` = 还没看完，这条任务不再问。
-没网时先存在设备上，有网了再发。
+On the computer, the Reading page also has a **Rest of 2026** box on the far right (it follows the year): what you mean to read for the rest of this year. Clicking the field at the bottom lists Want first (Soon on top),
+typing lists matches, clicking one adds it; Enter adds what you typed. Drag the handle on the left, or press Alt+↑ / ↓ on a row, to reorder; × removes (with undo).
+Anything the reading log marks as finished this year under the same name is struck through with its month; unfinished ones from last year carry over, marked "from 2025". The list lives in 苦昼短's Settings and syncs.
 
-**备餐（Meals）**：照 HelloFresh 这类 meal kit 的路子，不记克数、不算卡路里数字。电脑上三个分页：
-- `Groceries`：常买的东西——哪个超市（默认 Longo's / Farm Boy / Dodo / T&T / Eataly / Loblaws，也能自己写）、一次买多少钱、
-  **一次够吃几天**（几天份，不填算 7 天）、**热量低中高**（Low 菜和水果 / Mid 正常 / High 油炸、肥的、甜的）、打折。
-  标成 staple（油盐这种）的不进购物单。打折按「几周一轮」记：每周的传单选 Every week，大概一个月打一次折的选 Every 4 weeks，
-  再填某一轮开始的日子；这一轮还没去看的会出现在 Plan 页（侧栏 Meals 旁边的数字），点 No deal 或 On sale…（填打折价和到哪天）就算看过了。
-- `Boxes`：一个 Box = 一顿 = 几样东西，用量随便写（「1 cup」「a handful」）。Box 的低中高自动定：
-  看里面最重的那样，一半以上是 Low 就降一级（staple 不算）；也可以手动选。旁边是一天份大概多少钱（每样的价钱 ÷ 够吃几天，加起来）。
-- `Plan`：最上面是**下次采购**的单子（按超市分）：这周哪几天要用到某样东西 ÷ 一次够吃几天 = 买几次，采购日在打折就按打折价；
-  买了打勾、家里还有的点 Have it（不算钱），也能手动加别的；点 Mark shopped 没勾的都算买了。勾过的会记住——
-  比如一袋米够吃 30 天，买过之后下几周的单子就不会再出现。下面是这一轮还没看的打折、能拖的 Box，
-  这周和下周按天放 Box（到了周五，这周就不再显示，从下周看起；拖到某天，或者点某天挑；拖一个排好的日子到另一天 = 复制；可以标 Not cooking），
-  每周一条低中高的小条，High 超过限额变红。之后四周是四个框，只排「哪个 Box × 几次」，到了下周点 Fill empty days 按早中晚填进空着的日子。
-  右上角齿轮：星期几去买（像截单日：这周开始前最近的那天）、每周 High 最多几个、每周预算（不填就不比）。
-  页面底下一块 **To try**：在外面吃过、想自己做的菜（菜名 + 备注），分 For meal prep（打算做成 Box）和 Try once（只试一次）两种。
-  直接在这里写，粘几行就是几道（「菜名 — 备注」会拆开）；或者在今天页点开一条做完的 Leisure / Friends 任务，底下 `+ What I had` 连着记几道，
-  会带上在哪吃的、哪天。`Make a box` = 建一个同名的 Box（备注带进 How to make it）、从这里拿掉；Try once 的试过了点 `Tried`。只在电脑上。
-- `Restock`：规律要换 / 要补的非食物（维生素、牙刷头、手机）——多少钱、每隔多久（Every 一列短写：3m、2y、3d、1w）、下次哪天，点 Replaced 往后推一个周期；
-  每样一个记号：🏠 日用、💅 衣服护肤、🩺 健康、💻 数码、🎁 礼物、🪐 别的（没标的算 🪐），顶上一排能只看某一类，Coming up 跟着一起算；
-  最上面的 Coming up 按月列接下来三个月要花的。底下一块 **Buy once** 是只买一次的（一条裙子、一盏灯）：价钱、可以不填的日子
-  （填了就算进 Coming up 的那个月，过了日子算 Overdue），买了点 Bought，收在最底下的 Bought (n) 里，点 Put back 放回去。
-  右边一栏 **Big buys**：贵重的东西（相机、电脑、耳机）一天合多少钱。每样左边一个 emoji 类目（📷 相机、💻 电脑和平板、📱 手机、🎧 耳机、🔊 音响、⌚ 手表、💅 医美、🪐 别的，贴进来写 Camera 这种英文名也认）；一天合得最多的在最上面（人民币、加币按汇率换算后比）；填用什么钱买的（RMB / CAD）、价钱、哪天买的，
-  不用了填退役日期（天数算到那天为止，收进底下的 Retired (n)）。页面上统一用一种钱显示（默认加币）：标题旁边小小的 `$` 点开，能换成 `¥`，也能手动改汇率（`1 CAD = 5 RMB`）；以后要加别的钱，在 `js/meals.js` 的 `GEAR_CURS` 里加一行；
-  一天合多少也换成显示的那种钱、留一位小数；还在用的、按买的那种钱一天不到 $0.5 / ¥2 的标 replace。
-  emoji 底下垫颜色：12 个月内买的亮绿，三年内买的淡绿，更早的不标。Restock 页的日期不写星期几。
-  `Paste` 能从表格整段贴进来（带表头：Name、Category、Currency、Price、Purchase、Retired；没写 Currency 的算人民币），名字一样的就更新。
-  和别的一样存在 Settings 页（`meal-gear:…`），手机电脑共用。
-  标题左边的箭头（或者在面板上用触控板 / 手指往右划）把这一栏往右收起来，只露出一条 emoji；再点箭头或往左划就展开。收没收起记在这台设备上。
-- 手机：顶栏的 🛒（数字 = 还剩几样没买）进下次采购的单子，只列要买的东西（不写价钱和说明），在超市里直接打勾。别的备餐功能只在电脑上。
-  第一次打开可以点 Start with examples 看个样子（多伦多几家超市、加元的大概价），Groceries 页右上角一键删掉。
+Apart from these cells, nothing in the Sheet is changed or deleted.
+Typing a title searches **every tab** (each tab's header row is the row that says Name, one entry per row below) and shows the tab, year and month, and emoji of matches;
+an identical name (ignoring case, spaces and title quotes) isn't added again. The Sheet is read again every time Reading opens, so edits made in the Sheet are found.
+You don't have to log here every time (computer): adding a task under Leisure lists Want under the title box too; when a task is marked Done and its name is in Want,
+the row asks **Finished it?** — tap 🥰 / 🎉 / 💢 (or ✓ for no rating), then the sub-type for tabs like Book and Game, and it's logged on its tab with the task's month;
+`Not yet` = not finished; that task won't ask again.
+Offline, entries wait on the device and go out once you're back online.
 
-**手机**：看任务、计时、标结果、加任务，往阅读记录里加东西。顶上一排是今天前后各 5 天，点哪天看哪天。
-列表里只有点开的那一行带 Done / Delay / Drop 三个按钮（别的行右边只写状态）；Done 下面填用了多久、几点结束，Delay 和 Drop 写原因；
-按住左边的分钟数上下拖，调整顺序；列表最下面可以加任务（「Gym 40」末尾的数字当分钟）。排计划、设置都在电脑上做。
+**Meals**: in the spirit of meal kits like HelloFresh — no grams, no calorie numbers. Three tabs on the computer:
+- `Groceries`: things you buy often — which store (Longo's / Farm Boy / Dodo / T&T / Eataly / Loblaws by default, or type your own), the price per purchase,
+  **how many days one purchase lasts** (7 if empty), **energy level** (Low vegetables and fruit / Mid normal / High fried, fatty or sweet), and deals.
+  Staples (oil, salt) stay off the shopping list. Deals run in rounds: weekly flyers are Every week, something on sale about monthly is Every 4 weeks,
+  plus the date one round starts; rounds you haven't checked yet show on the Plan tab (the number next to Meals in the sidebar), and No deal or On sale… (sale price and end date) marks them as checked.
+- `Boxes`: a Box = one meal = a few things, with amounts in words ("1 cup", "a handful"). A box's level is set automatically:
+  its heaviest item, one level lower if more than half is Low (staples don't count); or pick it by hand. Next to it, roughly what a day's worth costs (each item's price ÷ days it lasts, added up).
+  Drag a grocery from the shelf onto a box to add it, or click the grocery for an "Add to…" menu of boxes.
+- `Plan`: at the top, the **next shopping list** by store: what this week's days need ÷ how many days a purchase lasts = how many times to buy, at the sale price if the shop day is during a deal;
+  tick what you bought, Have it for what's still at home (no cost), and add anything else by hand; Mark shopped counts everything unticked as bought. Ticks are remembered —
+  a bag of rice that lasts 30 days won't show up again for the next few weeks. Below: this round's unchecked deals and the Boxes to drag;
+  this week and next by day (from Friday, this week disappears and planning starts from next week). Drag a Box onto a day, click a Box chip for a "Put on…" menu, or click a day to choose;
+  drag a planned day onto another day to copy it (or open the day: Same as another day); mark a day Not cooking.
+  Each week has a small Low / Mid / High bar, red when High goes over the limit. The four weeks after that are four boxes holding only "which Box × how many"; when one becomes next week, Fill empty days spreads them over breakfast, lunch and dinner on the empty days.
+  The gear at the top right: shop day (like a cutoff: the last one on or before the week starts), most High boxes per week, weekly budget (blank = no comparison).
+  At the bottom, **To try**: dishes you had out and want to make yourself (name + note), as For meal prep (to become a Box) or Try once.
+  Write them right there (paste several lines = several dishes; "dish — note" is split), or open a finished Leisure / Friends task on Today and add a few with `+ What I had`,
+  which records where and when. `Make a box` = create a Box with the same name (the note goes into How to make it) and remove it from the list; for Try once, `Tried` when you've tried it. Computer only.
+- `Restock`: non-food things to replace or refill on a schedule (vitamins, toothbrush heads, a phone) — price, how often (short form in the Every column: 3m, 2y, 3d, 1w), next date; Replaced moves it one cycle on;
+  each has a mark: 🏠 household, 💅 clothes and skincare, 🩺 health, 💻 tech, 🎁 gifts, 🪐 other (unmarked = 🪐); the row at the top filters by mark, and Coming up follows the filter;
+  Coming up at the very top lists what the next three months will cost, by month. Further down, **Buy once** is for one-off buys (a dress, a lamp): price and an optional date
+  (with a date it counts in that month of Coming up, and after the date it's Overdue); Bought moves it into Bought (n) at the very bottom, and Put back brings it back.
+  The right-hand column, **Big buys**, shows what each expensive thing (camera, computer, headphones) costs per day. Each has an emoji kind on the left (📷 camera, 💻 computers and tablets, 📱 phone, 🎧 headphones, 🔊 speakers, ⌚ watch, 💅 beauty treatments, 🪐 other; pasted English names like Camera work too); the highest cost per day is on top (RMB and CAD compared at the rate). Enter the currency it was paid in (RMB / CAD), the price and the purchase date,
+  and a retired date when you stop using it (days are counted up to then, and it moves into Retired (n) at the bottom). The page shows one currency (CAD by default): the tiny `$` next to the title switches to `¥` and lets you type the rate (`1 CAD = 5 RMB`); another currency is one more line in `GEAR_CURS` in `js/meals.js`;
+  the cost per day is shown in that currency with one decimal; anything still in use costing under $0.5 / ¥2 a day in its own currency is marked replace.
+  The emoji gets a colour behind it: bright green if bought within 12 months, pale green within three years, nothing earlier. Restock dates don't show the weekday.
+  `Paste` takes a whole block from a spreadsheet (with headers: Name, Category, Currency, Price, Purchase, Retired; no Currency = RMB), updating rows with the same name.
+  Like everything else it's stored in the Settings tab (`meal-gear:…`), shared by phone and computer.
+  The arrow left of the title (or swiping right on the panel with a trackpad or finger) folds the column away to the right, leaving a strip of emoji; the arrow or a swipe left brings it back. Folded or not is remembered on that device.
+- Phone: the 🛒 in the top bar (number = items left to buy) opens the next shopping list with only the things to buy (no prices or notes), to tick off in the store. Everything else about meals is computer only.
+  The first time, Start with examples shows what it looks like (a few Toronto stores, rough CAD prices); one click on the Groceries tab removes them.
 
-**记账（手机、电脑都有）**：记的存在这台设备上；电脑 Settings 里贴一个记账表格的链接，就和那张表同步，两边都能记、都能改。
-- 手机：在今天页顶上那一截（页面滚在最顶上）往下拉——灵动岛下面长出一颗水滴，拉大约 90px 细颈断开、「+」变蓝，松手面板就像一块幕布落下来
-  （落到底弹一下），停在屏幕约 94% 高，下沿挂着带褶的下摆；滑流水时下摆跟着摆一下再停稳。点底下露出的那一小条今天页（或点下摆）、
-  或把底边的小横条往上推，幕布就拉上去（这次记过的话，岛上停一下今天花了多少）。
-  面板里：Year / Month / Day、能拖的柱状时间轴、类别小标签、流水（点一笔改、往左滑删）、推荐、Add a new transaction（数字键盘，能写 `12.5+8`）。
-  顶上的图表图标：图表从底下升到半高（上面还看得到期间和时间轴），往上拖到全高、往下拖收起。
-- 电脑：Spending 页是一整块半透明的黑板（底色透明 50% 的黑），网页的排法：页头是期间和同步状态，右边 Month / Year、‹ Now ›、搜索（按 `/`）、齿轮、`+ Add`（按 N）；
-  下面一排五个数（Spent、Income、Balance、Budget used、Budget left，底下一条细线是之前六个月的范围）；再下面左边是图表和流水表（月 = 按天分组，年和搜索 = 按月），
-  右边是 By category（点一类只看这一类）。`+ Add` 在页头下面展开一行直接打字（Tab 跳格、回车存，存完接着记下一笔，Esc 收起）；点流水里的一行就在原地改，鼠标移上去有 Edit / ×（都能撤销）。
-- 设定：手机上是齿轮，电脑上是苦昼短的弹窗——Budget（从某月起每月多少）、Categories（加、改名、藏，没用过的能删）、Export（.md）、Import a month。大数字的小数点后两位小一号。
+**Phone**: see tasks, time them, mark results, add tasks, add to the reading log. The top row is the five days before and after today; tap a day to see it.
+Only the opened row has Done / Delay / Drop (other rows just show their status on the right), plus ↑ ↓ on the right to move it up or down; after Done you enter how long and when it ended, Delay and Drop ask for a reason;
+press and drag the minutes on the left to reorder; add tasks at the bottom of the list ("Gym 40" — a trailing number is minutes). The project is a small chip; tapping it opens a dropdown of projects with their plans. Planning and settings happen on the computer.
 
-**季度表**：Settings → Quarter sheet 贴你那个表格的链接（每个季度一页，页名 `2026 Q4`）。从贴链接那天起，每天自动填两格（之前的日子不碰）：
-`progress` = 算进 progress 的项目当天实际花的小时 × 10，`focus` = 当天 ◆ Deep 的小时 ÷ 10（四舍五入到整小时）。
-没法自动算的几列（每天自己打的分）在同一张卡片的 Daily scores 里写：一行一列，`表头原名 · 什么意思 · 平常的范围 · 一档一段「数字 + 几个字」`，
-比如 `gym · moving · 3–15 · 3 stayed in · 5 usual · 8 walk out`。从写好这几行那天起，电脑今天页右边每天一块：每列上面是名字和一格数字（也能自己敲），
-下面是几档，点一档就填上那个数；底下一格 note。几列都填上了就收成一行摘要，点 Edit 再改。写进季度表那一天同名的列和 `note` 列。
-日历上过完了还没打满分的日子，日期旁边有个红点。
-别的格子不碰。
-哪些项目算 progress、哪些算成长（全部 / 只算 Deep，剩下的是 Relax）在 Settings → Projects 里勾；
-上周成长或 Relax 的时间太少、太多，今天页右边会提醒一句（四个门槛也在那里改）。
+**Spending (phone and computer)**: records are kept on the device; paste a spending Sheet link in Settings on the computer and it syncs with that Sheet, and both sides can add and edit.
+- Phone: pull down from the top of Today (with the page scrolled to the top) — a drop grows under the Dynamic Island; at about 90px the neck snaps and the "+" turns blue, and letting go drops the panel like a curtain
+  (with a small bounce at the bottom). It stops at about 94% of the screen with a hem of a few soft waves along its lower edge; scrolling the list makes the waves drift and sway before settling. Tap the strip of Today still showing below (or the hem),
+  or push the small bar at the bottom up, and the curtain rises again (if you added anything, the island shows today's total for a moment).
+  Inside: Year / Month / Day, a draggable bar timeline, category chips, the list (tap to edit, swipe left to delete), suggestions, and Add a new transaction (a number pad that also takes `12.5+8`).
+  The chart icon at the top raises the charts to half height (the period and timeline stay visible); drag up for full height, down to close.
+- Computer: Spending is one large translucent black board laid out like a web page: the period and sync status at the top, with Month / Year, ‹ Now ›, search (`/`), the currency to show totals in, the gear and `+ Add` (N) on the right;
+  a row of five numbers below (Spent, Income, Balance, Budget used, Budget left, with a thin line for the range of the previous six months); then the chart and the transaction table on the left (a month is grouped by day; a year and search results by month),
+  and By category on the right (click one to show only that category). `+ Add` opens a row under the header to type straight in (Tab between fields, Enter saves and closes the row, Esc or clicking outside an empty row closes it; N again for the next one). Click a row in the table to edit it in place; hovering shows Edit / × (both can be undone).
+- **Currencies**: each record keeps the currency it was paid in (CAD, RMB, USD, EUR, GBP, JPY, HKD). Pick it next to the amount; new records keep using that currency until you change it (per device).
+  Totals, charts, categories and the budget are shown in one currency — CAD by default, switchable per device (the `CAD ⌄` next to the totals). Rows show the original amount with the converted one underneath.
+  Rates are in Settings → Currency (`1 CAD = …`): type them, or Use today's rates to fetch the European Central Bank's (via frankfurter.dev, only when you ask, or once when you first pick a currency with no rate). A currency with no rate yet uses a rough one, marked "rough". Budgets are set in CAD.
+- Settings: the gear on the phone, a 苦昼短 dialog on the computer — Budget (from a month on, per month), Categories (add, rename, hide; unused ones can be deleted; on the computer also base / not in budget), Currency, Export (.md), Import a month. Big numbers show the cents a size smaller.
 
-**存储**：Settings → Storage 能看到这台设备存了多少、照最近的量还能撑多久；两周内可能写满时今天页会提醒。
-到时候点 Archive：去年 1 月 1 日以前的任务搬到表格的 Archive 页（表格里还能看），这台设备腾出地方。
+**Quarter sheet**: paste your quarter Sheet's link in Settings → Quarter sheet (one tab per quarter, named `2026 Q4`). From the day you paste it, two cells are filled every day (earlier days are left alone):
+`progress` = hours actually spent that day on projects that count towards progress × 10, `focus` = that day's ◆ Deep hours ÷ 10 (rounded to whole hours).
+The columns that can't be worked out (scores you give yourself each day) are set up under Daily scores on the same card: one line per column, `header as in the Sheet · what it means · usual range · steps "number + a few words"`,
+for example `gym · moving · 3–15 · 3 stayed in · 5 usual · 8 walk out`. From the day those lines are written, the right side of Today on the computer has a box each day: each column shows its name and a number field (you can type in it),
+with the steps below — clicking a step fills in its number; a note field at the bottom. Once every column is filled it folds into a one-line summary; Edit opens it again. It writes the columns with the same names and the `note` column on that day's row.
+Past days in the calendar that aren't fully scored have a red dot by the date.
+No other cells are touched.
+Which projects count towards progress, and which count as growth (all / only Deep; the rest is Relax), are ticked in Settings → Projects;
+if last week's growth or Relax time was too little or too much, the right side of Today says so (the four thresholds are there too).
 
-**今天那条进度轴**：一个任务一段，只看记下的时间——实心 = 记下的，斑马纹 = 还没做的那截；标了 Done / Delay / Drop 的只剩记下的那截。
-Optional（可选）的任务有个 Optional 标签；夜间那套底下还垫一层淡豹纹。
+**Storage**: Settings → Storage shows how much this device holds and, at the recent rate, how long it will last; Today warns two weeks before it might fill up.
+Then use Archive: tasks before January 1 of last year move to the Sheet's Archive tab (still viewable there), freeing room on the device.
 
-**白天 / 夜里**：左上角（手机在日期旁边）那颗小球，白天是太阳、夜里是月亮，点一下就换。平时跟着钟点走：当地时间早上 6 点起是白天，晚上 6 点起是夜里；自己点的那一下管到下一个六点，之后又跟回钟点。
+**Today's progress bar**: one segment per task, recorded time only — solid = recorded, zebra stripes = still to do; tasks marked Done / Delay / Drop keep only the recorded part.
+Optional tasks carry an Optional label; at night they also sit on a faint leopard print.
 
-**底图上偶尔经过的小东西**：飞机三五分钟一趟——白天是高空的一个小点拖两道尾迹，夜里是红眼航班的一闪一闪；十来分钟一次，白天按季节飘东西（3–4 月嫩叶、5–8 月康乃馨、9–11 月枫叶、12–2 月雪花，有风时一两片会打个小旋），夜里一阵流星雨；六到十分钟一次，一片又宽又矮的潮水从右下角漫上来再退回去，夜里是荧光海。一次只出一样。手机上只有潮水。Settings → Look 里关掉 Sparkles and confetti 就都不出。
-卡片、侧栏、浮条都是半透明的（带一点磨砂），透得出底下的天、云、星芒和这些小东西；手机上也是整片天。
+**Day / night**: the small ball at the top left (next to the date on the phone) is the sun by day and the moon at night; click to switch. Normally it follows the clock: day from 6am, night from 6pm local time; a click holds until the next six o'clock, then it follows the clock again.
 
-**表格里怎么对应**：平时露出 Tasks / Projects / Items 等几页（归档过就多一页 Archive）。Tasks 的 `Group` 列 = 任务属于哪个项目
-（可以直接挂在项目上、`Project` 列空着）。Projects 页一行是一个计划，`Group` 列 = 项目，
-`Project` 列 = 计划名，`Kind` / `Place` 是种类和放法，Regular 的规则在隐藏的 `Rule` 列；
-自动出现的任务 ID 以 `rt:`（Regular）或 `au:`（Total 的今日份额）开头；
-计时记录在 Tasks 的 `Times` 列，是不是深度在 `Deep` 列（打勾 = 是，可以直接在表格里改）；
-正在跑的计时器、每天单独改的可用时间、通勤日、阅读表格链接、饼图的默认值和深度目标（`life`）在（隐藏的）Settings 页。
-项目清单（名字、颜色、算不算 progress / 成长）是 Settings 页的 `groups`，目标一条一行 `goal:<id>`（`up` 是上级目标，`by` 是为它服务的项目 `g:名字` / 计划 `p:id`），
-North star 那一段字 `north-star`，阅读页右边今年想读的一条一行 `read-plan:<id>`，每周的门槛 `weekly`，季度表链接 `quarter`，每天打分的那几列 `scores`（每天打的分一天一行 `score:<日期>`）。
-备餐的东西也在 Settings 页，一样一行：`meal-ing:` 常买的东西、`meal-box:` 一顿、`meal-week:<这周第一天>` 这周排了什么 / 买了没有、`meal-prefs` 设置（`meal-pack:` 是旧版的 Day pack，读的时候自动展开成 Box）。
+**Small things that sometimes pass over the background**: a plane every three to five minutes — a dot with two contrails high up by day, a blinking red-eye flight at night; every ten minutes or so, something seasonal drifts down by day (new leaves in March–April, carnations May–August, maple leaves September–November, snowflakes December–February; with wind, one or two spin) and a meteor shower falls at night; every six to ten minutes a wide, low tide rolls in from the bottom right and back out, glowing at night. They each keep their own schedule, so they can overlap. On the phone there's only the tide. Turning off Sparkles in Settings → Look stops all of them.
+Cards, the sidebar and the bars are translucent (lightly frosted by day), so the sky, clouds, star glints and these things show through; the phone shows the whole sky too.
 
-## 同步是怎么工作的
+**What's where in the Sheet**: Tasks / Projects / Items and a few more tabs are visible (plus Archive once you've archived). Tasks' `Group` column = the project a task belongs to
+(it can belong straight to a project with `Project` left empty). Each row of Projects is a plan: `Group` = the project,
+`Project` = the plan's name, `Kind` / `Place` as above, and a Regular plan's rule in the hidden `Rule` column;
+automatic task IDs start with `rt:` (Regular) or `au:` (a Total plan's share for today);
+timer records are in Tasks' `Times` column, deep work in `Deep` (ticked = yes, editable in the Sheet);
+the running timer, per-day capacity changes, commute days, the reading Sheet link, the pie defaults and the deep goal (`life`) are in the (hidden) Settings tab.
+The project list (names, colours, progress / growth) is `groups` in Settings; goals are one row each, `goal:<id>` (`up` is the parent goal, `by` the projects `g:name` / plans `p:id` serving it),
+the North star paragraph is `north-star`, Reading's rest-of-year list is one row each `read-plan:<id>`, the weekly thresholds `weekly`, the quarter Sheet link `quarter`, the daily score columns `scores` (each day's scores one row each, `score:<date>`),
+and the spending exchange rates `spend-fx`.
+Meals are in Settings too, one row each: `meal-ing:` groceries, `meal-box:` meals, `meal-week:<first day of the week>` what's planned / bought that week, `meal-prefs` settings (`meal-pack:` is the old Day pack, expanded into Boxes when read).
+Spending has its own Sheet: Transactions (Date, Kind, Category, Note, Amount, Currency — blank means CAD — plus hidden ID / Updated / Synced), Budgets, Categories and a hidden Deleted tab.
 
-- 每条数据都有 ID 和改动时间；两台设备改了同一条，以后改的为准
-- 改完 2.5 秒推一次；页面切走时补发；回到页面、联网、每 2 分钟会再同步
-- 先存本机，所以没网也能用，有网了再推上去
-- 表格里能看、能分析，但别在表里排计划：直接在表里改的内容，要在 Settings 点
-  「Reload everything from the Sheet」才会到设备上
+## How syncing works
 
-## 开发
+- Every record has an ID and a modified time; when two devices change the same record, the later change wins
+- Changes are pushed 2.5 seconds after you make them, again when you leave the page, and everything syncs again when you come back, reconnect, or every 2 minutes
+- Everything is saved on the device first, so it works offline and goes out once you're back online
+- The Sheet is for looking and analysing, not planning: edits made directly in the Sheet only reach the device after
+  "Reload everything from the Sheet" in Settings
 
-纯原生 JS（ES modules），不需要 build、npm。本地预览：
+## Development
+
+Plain JavaScript (ES modules), no build step, no npm. Local preview:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-然后打开 http://localhost:8000 。全部测试（计算引擎、统计、重复任务、备餐、用假表格跑 Code.gs）：
+then open http://localhost:8000. All tests (the planning engine, stats, repeats, meals, spending, and `Code.gs` against a fake Sheet):
 
 ```bash
 node --test test/*.test.mjs
 ```
 
-想连着一个假的表格试同步：`node tools/fake-sheet.mjs` 会在 http://127.0.0.1:8002/exec 起一个
-（口令 `CHANGE_ME`，先用 main 分支的 `Code.gs` 把旧表升级、造一点上一版的数据，再用现在的 `Code.gs` 跑 setup——
-相当于真的从上一版升级；里面还有一个假的阅读表格（几页、表头高低不一），链接填 `https://docs.google.com/spreadsheets/d/FAKE-READING-0000000000000000/edit`）；`python3 tools/serve.py .`（或 `node tools/serve.mjs .`）起一个不缓存的本地网页（端口 8000）。
+To try syncing against a fake Sheet: `node tools/fake-sheet.mjs` starts one at http://127.0.0.1:8002/exec
+(secret `CHANGE_ME`; it first upgrades an old-style Sheet with the main branch's `Code.gs` and creates some previous-version data, then runs setup with the current `Code.gs` —
+just like a real upgrade from the previous version; it also has a fake reading Sheet (several tabs, header rows at different heights), link `https://docs.google.com/spreadsheets/d/FAKE-READING-0000000000000000/edit`). `python3 tools/serve.py .` (or `node tools/serve.mjs .`) serves the page without caching (port 8000);
+`HOST=0.0.0.0 node tools/serve.mjs .` makes it reachable from a phone on the same Wi-Fi at `http://<your computer's IP>:8000` (the service worker doesn't run over plain http on the LAN, which doesn't matter for looking).
 
-截图看样子：`node tools/look.mjs` 自己起网页和假表格，用 Playwright 把常看的几页截下来（手机 390×844、电脑 1440×900、窄电脑 1000×760，白天夜里各一套），
-最后列出控制台报错和手机上小于 16px 的输入框（iPhone 一点就放大）。`--only today,spending` 只截名字里带这几个词的；`--worst` 再造一份极端数据
-（很长的名字、一栏一堆目标、大金额）；`--out 目录` 指定图放哪。要先装 Playwright（`npm i -g playwright`，再 `npx playwright install chromium`）。
+Screenshots: `node tools/look.mjs` starts the page and the fake Sheet itself and uses Playwright to capture the usual pages (phone 390×844, computer 1440×900, narrow computer 1000×760, day and night),
+then lists console errors and phone inputs under 16px (iPhone zooms in on those). `--only today,spending` takes only shots whose names contain those words; `--worst` adds extreme data
+(very long names, a column full of goals, huge amounts); `--out <dir>` says where the pictures go. Install Playwright first (`npm i -g playwright`, then `npx playwright install chromium`); the global install is preferred over any other copy found higher up the folder tree.
 
-字体（Unbounded、Space Grotesk、JetBrains Mono）放在 `fonts/`，SIL Open Font License，许可证在同一个文件夹里。
+Skills for coding agents are in `.claude/skills/`: `look` (the screenshot pass above), and, from other authors under MIT with their licences alongside, `mobile-native`, `break-ui`, `animation-performance` and `web-interface-guidelines`. Where any of them disagrees with `DESIGN.md`, `DESIGN.md` wins.
+
+Fonts (Unbounded, Space Grotesk, JetBrains Mono) are in `fonts/` under the SIL Open Font License, with the licence in the same folder.

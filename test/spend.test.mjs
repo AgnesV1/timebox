@@ -181,3 +181,13 @@ test("spend: thousands of imported records go to the sheet in one write, signs a
   assert.equal(mac.entries().filter((e) => e.cur === "aud").length, 2000);
   void tx;
 });
+
+test("spend: budgets keep the currency they were set in, on the sheet and the other device", async () => {
+  const { book, sync } = sheet();
+  const phone = await device(), mac = await device();
+  phone.setBudgets([{ from: "2017-11", v: 200000, cur: "aud" }, { from: "2018-08", v: 500000, cur: "cny" }, { from: "2023-09", v: 272000 }]);
+  sync(phone);
+  assert.deepEqual(book.getSheetByName("Budgets").objects().map((r) => [r.From, r.Amount, r.Currency]), [["2017-11", 2000, "AUD"], ["2018-08", 5000, "RMB"], ["2023-09", 2720, ""]]);
+  sync(mac);
+  assert.deepEqual(mac.budgets(), [{ from: "2017-11", v: 200000, cur: "aud" }, { from: "2018-08", v: 500000, cur: "cny" }, { from: "2023-09", v: 272000 }]);
+});

@@ -85,7 +85,7 @@ export function removeMany(ids) {
 }
 
 export function setBudgets(list) {
-  change(() => { S.budgets = list.map((b) => ({ from: b.from, v: Math.round(b.v) })).sort((a, b) => a.from.localeCompare(b.from)); S.bDirty = true; });
+  change(() => { S.budgets = list.map((b) => ({ from: b.from, v: Math.round(b.v), ...(b.cur && b.cur !== "cad" ? { cur: b.cur } : {}) })).sort((a, b) => a.from.localeCompare(b.from)); S.bDirty = true; });
 }
 export function setCats(list) {
   change(() => { S.cats = list.map((c) => ({ name: c.name, kind: c.kind, hidden: Boolean(c.hidden), role: c.role || "" })); S.cDirty = true; });
@@ -150,7 +150,10 @@ export function apply(res, sent) {
   }
   for (const id of res.dels || []) if (!S.put[id]) delete S.entries[id];
   // 清单：本机没有没发出去的改动就用表格里的；表格里还是空的（刚建好）就把本机的发过去
-  if (Array.isArray(res.budgets)) { if (!S.bDirty) { if (res.budgets.length || !S.budgets.length) S.budgets = res.budgets; else S.bDirty = true; } }
+  // 旧的 Code.gs 回来的预算不带币种（没有 bcur）：本机记着的那个留着
+  const bcur = Object.fromEntries(S.budgets.filter((b) => b.cur).map((b) => [b.from, b.cur]));
+  if (Array.isArray(res.budgets)) { if (!S.bDirty) { if (res.budgets.length || !S.budgets.length) S.budgets = res.bcur ? res.budgets : res.budgets.map((b) => (bcur[b.from] ? { ...b, cur: bcur[b.from] } : b)); else S.bDirty = true; } }
+  if (!res.bcur && S.budgets.some((b) => b.cur)) S.error = "Update Code.gs in your 苦昼短 Sheet to sync budget currencies";
   if (Array.isArray(res.cats)) { if (!S.cDirty) { if (res.cats.length) S.cats = res.cats; else S.cDirty = true; } }
   S.cursor = res.now || Date.now();
   if (full) { S.fullAt = Date.now(); S.wantFull = false; }

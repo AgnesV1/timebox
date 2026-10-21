@@ -1,6 +1,7 @@
 // 记账的计算（不碰页面）：按日 / 月 / 年加总、预算、超没超、图表的线、推荐、导出成 .md、从文字里导入。
 // 一笔 = { id, d: "2026-10-15", v: 分（负 = 支出、正 = 收入）, c: 类别, n: 备注, u: 改的时间, cur: 哪种钱（没写 = 加币，见下面 CURS） }。只记年月日，不记钟点。
-// 预算 = 从某个月起每月多少（{ from: "2026-10", v: 分 }，一个月用它之前最近定的那个）。
+// 预算 = 从某个月起每月多少（{ from: "2026-10", v: 分, cur: 哪种钱（没写 = 加币） }，一个月用它之前最近定的那个）。
+// 预算按当时用的那种钱定（2017 年澳币、2018 年起人民币、2023-09 起加币），看的时候和每一笔一样按汇率换成「看的那种」。
 // 类别 = { name, kind: "out" / "in", hidden, role }：role "base" = 预算的底座（House：月度图里是梯形下面那一截，
 // 每天的额度不算它）；"outside" = 算支出、不算进预算（Bonds：押金、还没出正式账单的，以后要回来的）。
 
@@ -103,6 +104,28 @@ export function budgetAt(budgets, y, m) {
   let v = 0;
   for (const b of budgets) if (b.from <= k) v = b.v;
   return v;
+}
+
+// 预算整份换成 to 那种钱（R = 汇率表）
+export const budgetsIn = (budgets, to, R) => budgets.map((b) => { const c = isCur(b.cur) ? b.cur : "cad"; return c === to ? b : { ...b, v: convert(b.v, c, to, R) }; });
+
+// 一行一个预算地粘进来：「2018.08 5000 (RMB)」「2020-09 9100」「Prior 2000 (AUD)」——币种写了就一直用到下次写，没写过 = 加币；
+// Prior = 最早那个（from 给 prior 那个月）。→ { list: [{ from, v, cur? }], bad: 行数 }
+export function budgetsFromText(text, prior) {
+  const list = [];
+  let cur = "cad", bad = 0;
+  for (const raw of String(text || "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = /^(prior|before|(\d{4})\s*[.\-/年]\s*(\d{1,2})\s*月?)\s+([\d,]+(?:\.\d+)?)\s*(?:\(?\s*([A-Za-z]{3}|[¥$€£])\s*\)?)?$/i.exec(line);
+    if (!m || !(+m[3] >= 1 && +m[3] <= 12) && !/^(prior|before)$/i.test(m[1])) { bad++; continue; }
+    if (m[5]) cur = /^[A-Za-z]{3}$/.test(m[5]) ? curFromText("1 " + m[5]) : curFromText(m[5] + "1");
+    const v = toCents(m[4].replace(/,/g, ""));
+    if (!(v > 0)) { bad++; continue; }
+    const from = /^(prior|before)$/i.test(m[1]) ? prior : ym(+m[2], +m[3]);
+    list.push({ from, v, ...(cur !== "cad" ? { cur } : {}) });
+  }
+  return { list, bad };
 }
 
 // 算进预算的花销 = 支出 − 不算进预算的那几类
@@ -263,10 +286,11 @@ export const byNewest = (a, b) => b.d.localeCompare(a.d) || (b.u || 0) - (a.u ||
 export function toMarkdown(entries, cats, budgets, which, today, show = "cad", R = ROUGH) {
   const rows = (which ? entries.filter((e) => e.d.startsWith(ym(which.y, which.m))) : entries.slice()).sort((a, b) => a.d.localeCompare(b.d) || (a.u || 0) - (b.u || 0));
   const conv = inCur(rows, show, R), ix = index(conv, cats), m$ = (v) => money(v, show);
+  budgets = budgetsIn(budgets, show, R);
   const tot = conv.reduce((g, e) => { if (e.v < 0) g.out -= e.v; else g.inc += e.v; return g; }, { out: 0, inc: 0 });
   const lines = ["# Spending · " + (which ? MONTH[which.m - 1] + " " + which.y : "everything") + " (" + curInfo(show).code + ")", ""];
   if (which) {
-    const B = convert(budgetAt(budgets, which.y, which.m), "cad", show, R), g = sumOf(ix, which, "month");
+    const B = budgetAt(budgets, which.y, which.m), g = sumOf(ix, which, "month");
     lines.push("Spent " + m$(tot.out) + " · Income " + m$(tot.inc) + (B ? " · Budget " + m$(B) + " · Left " + (B - counted(g) < 0 ? "−" : "") + m$(B - counted(g)) : ""), "");
   } else lines.push(rows.length + " records · exported " + fmtDate(today), "");
   const outCats = new Map(), inCats = new Map();

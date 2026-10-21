@@ -163,3 +163,14 @@ test("import: an amount's own sign wins over the category; AUD is a currency", (
   assert.deepEqual(r.rows.map((x) => [x.c, x.v, x.cur || "cad"]), [["Food", 2000, "cad"], ["Extra", -5000, "cad"], ["Food", -1250, "aud"], ["Salary", 800000, "cny"], ["Food", -900, "cad"]]);
   assert.equal(r.added.length, 0);
 });
+
+test("budgets: pasted lines carry their currency forward; each converts on its own", () => {
+  const r = M.budgetsFromText("Prior 2000 (AUD)\n2018.08 5000 (RMB)\n2020.09 9,100\n2023-09 2720 (cad)\n2026.10 3580\n2021.13 5\nnope", "2017-11");
+  assert.deepEqual(r.list, [{ from: "2017-11", v: 200000, cur: "aud" }, { from: "2018-08", v: 500000, cur: "cny" }, { from: "2020-09", v: 910000, cur: "cny" }, { from: "2023-09", v: 272000 }, { from: "2026-10", v: 358000 }]);
+  assert.equal(r.bad, 2);
+  const R = { cad: 1, cny: 5, aud: 1.25 }, inCad = M.budgetsIn(r.list, "cad", R);
+  assert.equal(M.budgetAt(inCad, 2018, 1), 160000);
+  assert.equal(M.budgetAt(inCad, 2019, 5), 100000);
+  assert.equal(M.budgetAt(M.budgetsIn(r.list, "cny", R), 2019, 5), 500000, "seen in RMB, an RMB budget is untouched");
+  assert.equal(M.budgetAt(inCad, 2026, 11), 358000);
+});

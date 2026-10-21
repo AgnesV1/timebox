@@ -1175,11 +1175,11 @@ function archive_(before, now) {
 // Budgets（From 哪个月起 / Amount 每月多少）、Categories（Kind / Name / Budget：Base = 预算的底座、Not counted = 不算进预算 / Hidden）、
 // Deleted（藏起来：删掉的那几笔，给别的设备看）。表格里可以直接改、直接加行（没有 ID 的行脚本会补上）。
 // 网页发来 { since, put: [{id, d, v, c, n, u, cur?}], del: [{id, u}], budgets?, cats? }：v 是那种钱的分，负的 = 支出；cur 是哪种钱（cny / usd …，没有 = 加币）；
-// u 是改的时间，同一笔后改的算数。回 { now, rows: since 之后变过的那几笔（since = 0 就是全部）, dels, budgets, cats, curs: true（这版认币种） }。
+// u 是改的时间，同一笔后改的算数。回 { now, rows: since 之后变过的那几笔（since = 0 就是全部）, dels, budgets, cats, curs: true（这版认币种）, bcur: true（预算也带币种） }。
 // 旧表格没有 Currency 那一列：第一次同步时加在最后
 var SPEND = {
   tx: { sheet: 'Transactions', head: ['Date', 'Kind', 'Category', 'Note', 'Amount', 'Currency', 'ID', 'Updated', 'Synced'], hide: ['ID', 'Updated', 'Synced'] },
-  budgets: { sheet: 'Budgets', head: ['From', 'Amount'] },
+  budgets: { sheet: 'Budgets', head: ['From', 'Amount', 'Currency'] },
   cats: { sheet: 'Categories', head: ['Kind', 'Name', 'Budget', 'Hidden'] },
   dead: { sheet: 'Deleted', head: ['ID', 'At'] }
 };
@@ -1256,7 +1256,8 @@ function spendBudgets_(book) {
   return spendData_(tab).map(function (r) {
     var f = r[c.From], from = Object.prototype.toString.call(f) === '[object Date]' ? Utilities.formatDate(f, tz, 'yyyy-MM-dd').slice(0, 7) : String(f || '').trim().slice(0, 7);
     var v = Math.round(Number(String(r[c.Amount]).replace(/[^\d.]/g, '')) * 100);
-    return /^\d{4}-\d{2}$/.test(from) && v > 0 ? { from: from, v: v } : null;
+    var cur = c.Currency === undefined ? '' : spendCur_(r[c.Currency]);
+    return /^\d{4}-\d{2}$/.test(from) && v > 0 ? (cur ? { from: from, v: v, cur: cur } : { from: from, v: v }) : null;
   }).filter(Boolean).sort(function (a, b) { return a.from < b.from ? -1 : a.from > b.from ? 1 : 0; });
 }
 
@@ -1323,7 +1324,7 @@ function spend_(req) {
   if (log.length) dead.sh.getRange(dead.sh.getLastRow() + 1, 1, log.length, 2).setValues(log);
   if (gone.length) data = spendData_(tx);
   // 清单：发来了就整张换掉
-  if (Array.isArray(req.budgets)) spendWrite_(spendTab_(book, 'budgets'), req.budgets.map(function (b) { return [String(b.from), Number(b.v) / 100]; }));
+  if (Array.isArray(req.budgets)) spendWrite_(spendTab_(book, 'budgets'), req.budgets.map(function (b) { return [String(b.from), Number(b.v) / 100, SPEND_CUR[b.cur] || '']; }));
   if (Array.isArray(req.cats)) {
     spendWrite_(spendTab_(book, 'cats'), req.cats.map(function (x) { return [x.kind === 'in' ? 'Income' : 'Expense', toCell_('text', x.name), SPEND_ROLE_OUT[x.role] || '', x.hidden ? 'yes' : '']; }));
     cats = spendCats_(book);
@@ -1343,7 +1344,7 @@ function spend_(req) {
   // 删除记录只留 14 天
   var keep = spendData_(dead).filter(function (r) { return now - Number(r[1]) < KEEP_DELETED_DAYS * 864e5; });
   if (keep.length < spendData_(dead).length) spendWrite_(dead, keep);
-  return { ok: true, now: now, rows: rows, dels: dels, budgets: spendBudgets_(book), cats: cats, curs: true };
+  return { ok: true, now: now, rows: rows, dels: dels, budgets: spendBudgets_(book), cats: cats, curs: true, bcur: true };
 }
 
 // ================= 网页接口 =================

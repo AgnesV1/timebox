@@ -66,7 +66,7 @@ export function shownEntries() {
 }
 export const IX = () => { const list = shownEntries(); if (ixKey !== shKey || !ixCache) { ixCache = M.index(list, SP.cats()); ixKey = shKey; } return ixCache; };
 // 预算是按加币定的：换成看的那种
-export const budgetsShown = () => { const show = SP.show(); return show === "cad" ? SP.budgets() : SP.budgets().map((b) => ({ ...b, v: M.convert(b.v, "cad", show, RATES()) })); };
+export const budgetsShown = () => M.budgetsIn(SP.budgets(), SP.show(), RATES());
 // 一笔的金额：照记的那种钱写；和看的那种不一样时，后面小字是换算过的
 export const amtOf = (e) => M.signed(e.v, M.curOf(e));
 export const convOf = (e) => (M.curOf(e) === SP.show() ? "" : "≈ " + M.signed(M.convert(e.v, M.curOf(e), SP.show(), RATES())));
@@ -764,7 +764,7 @@ export function createView() {
     return [n ? n + " change" + (n === 1 ? "" : "s") + " waiting to sync" : "In your spending Sheet · synced", false];
   }
   function renderSet() {
-    const nE = visible("out").length, nI = visible("in").length, t = todayP(), b = M.budgetAt(SP.budgets(), t.y, t.m), [st, bad] = statusText();
+    const nE = visible("out").length, nI = visible("in").length, t = todayP(), b = M.budgetAt(budgetsShown(), t.y, t.m), [st, bad] = statusText();
     $("[data-setb]").innerHTML = '<div class="mn-grp"><button type="button" class="mn-li" data-sub="budget"><span class="grow">Budget</span><span class="mn-meta mn-num">' + (b ? M.money(b) + " / month" : "not set") + "</span>" + chevR + '</button><button type="button" class="mn-li" data-sub="cats"><span class="grow">Categories</span><span class="mn-meta">' + nE + " expense · " + nI + " income</span>" + chevR + "</button></div>" +
       '<div class="mn-grp"><button type="button" class="mn-li" data-sub="export"><span class="grow">Export</span><span class="mn-meta">.md</span>' + chevR + '</button><button type="button" class="mn-li" data-sub="import"><span class="grow">Import a month</span><span class="mn-meta">paste or .md</span>' + chevR + "</button></div>" +
       '<div class="mn-grp"><button type="button" class="mn-li" data-sub="currency"><span class="grow">Currency</span><span class="mn-meta">totals in ' + esc(curLabel(SP.show())) + " · adding in " + esc(curLabel(SP.inCur())) + "</span>" + chevR + "</button></div>" +
@@ -779,7 +779,7 @@ export function createView() {
       b.innerHTML = '<p class="mn-note">Each month uses the latest budget set on or before it. House is the base of the trapezoid; Bonds don\'t count against it.</p>' +
         (pts.length ? '<div class="mn-grp">' + pts.map((x) => {
           const p = M.parts(x.from + "-01"), ed = V.budEdit === x.from;
-          return '<div class="mn-li" data-bp="' + x.from + '"><span class="grow">From ' + M.MONTH[p.m - 1] + " " + p.y + "</span>" + (ed ? '<span class="mn-meta mn-num">$</span><input class="mn-tx mn-num" data-bpv value="' + (x.v / 100).toFixed(2) + '" inputmode="decimal" style="width:90px;text-align:right">' + '<button type="button" class="mn-act warn" data-bprm="' + x.from + '">Remove</button>' : '<span class="mn-num">' + M.money(x.v) + "</span>") + "</div>";
+          return '<div class="mn-li" data-bp="' + x.from + '"><span class="grow">From ' + M.MONTH[p.m - 1] + " " + p.y + "</span>" + (ed ? '<span class="mn-meta mn-num">' + esc(M.curInfo(x.cur).sym) + '</span><input class="mn-tx mn-num" data-bpv value="' + (x.v / 100).toFixed(2) + '" inputmode="decimal" style="width:90px;text-align:right">' + '<button type="button" class="mn-act warn" data-bprm="' + x.from + '">Remove</button>' : '<span class="mn-num">' + M.money(x.v, M.isCur(x.cur) ? x.cur : "cad") + "</span>") + "</div>";
         }).join("") + "</div>" : "") +
         (V.newBud ? '<div class="mn-grp"><div class="mn-li">' + btn("nbp", "left", "Earlier month", "mn-sm") + '<span class="grow" style="text-align:center">From ' + M.MONTH[V.newBud.m - 1] + " " + V.newBud.y + "</span>" + btn("nbn", "right", "Later month", "mn-sm") + '</div><div class="mn-li"><span class="grow mn-meta mn-13">Amount a month</span><span class="mn-meta mn-num">$</span><input class="mn-tx mn-num" data-nbv placeholder="3580.00" inputmode="decimal" style="width:90px;text-align:right"><button type="button" class="mn-act" data-act="nbs">Save</button></div></div>'
           : '<div class="mn-grp"><button type="button" class="mn-li act" data-act="nbo">+ New budget from a month</button></div>');
@@ -943,7 +943,7 @@ export function createView() {
     else if (act === "addcat") addCat();
     else if (act === "exp" || act === "exn") { V.expM = M.addMonths(V.expM.y, V.expM.m, act === "exp" ? -1 : 1); renderSub(); }
     else if (act === "exgo" || act === "exall") {
-      const which = act === "exgo" ? V.expM : null, md = M.toMarkdown(SP.entries(), SP.cats(), SP.budgets(), which, today());
+      const which = act === "exgo" ? V.expM : null, md = M.toMarkdown(SP.entries(), SP.cats(), SP.budgets(), which, today(), SP.show(), RATES());
       const pre = $("[data-mdp]");
       pre.hidden = false;
       pre.textContent = md.split("\n").slice(0, 18).join("\n") + (md.split("\n").length > 18 ? "\n…" : "");

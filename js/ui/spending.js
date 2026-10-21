@@ -35,7 +35,7 @@ export function createSpending() {
   root.innerHTML =
     '<header class="sp-head"><div class="sp-title"><h2 data-title></h2><p class="sp-status" data-status></p></div>' +
     '<div class="sp-tools">' + seg("mode", [["month", "Month"], ["year", "Year"]]) +
-    '<div class="sp-nav"><button type="button" class="sp-nb" data-act="prev" aria-label="Earlier" title="Earlier">‹</button><button type="button" class="sp-nb" data-act="now">Now</button><button type="button" class="sp-nb" data-act="next" aria-label="Later" title="Later">›</button></div>' +
+    '<div class="sp-nav"><button type="button" class="sp-nb" data-act="prev" aria-label="Earlier" title="Earlier">‹</button><button type="button" class="sp-nb sp-now" data-act="now" aria-label="Back to now" title="Back to now"><i></i></button><button type="button" class="sp-nb" data-act="next" aria-label="Later" title="Later">›</button></div>' +
     '<label class="sp-find">' + icon("search") + '<input type="search" data-q placeholder="Search" aria-label="Search notes, categories, amounts" autocomplete="off"><kbd>/</kbd></label>' +
     '<select class="sp-curs" data-show aria-label="Show totals in" title="Show totals in">' + M.CURS.map((c) => '<option value="' + c.k + '">' + c.code + "</option>").join("") + "</select>" +
     '<button type="button" class="sp-ic" data-act="set" aria-label="Spending settings" title="Settings">' + icon("settings") + "</button>" +
@@ -405,15 +405,18 @@ export function createSpending() {
   function setBody() {
     const t = todayP();
     if (SET.tab === "budget") {
-      const pts = SP.budgets().slice().reverse();
-      const months = Array.from({ length: 30 }, (_, i) => M.addMonths(t.y, t.m, 6 - i));
-      return '<p class="msub">Each month uses the latest budget set on or before it. Base categories (like House) are the bottom of the trapezoid; ones marked “not in budget” don\'t count against it.</p>' +
-        (pts.length ? '<table class="mtable"><thead><tr><th>From</th><th class="r">Per month</th><th></th></tr></thead><tbody>' + pts.map((x) => {
+      // 每个预算按当时用的那种钱记（澳洲那两年澳币、国内人民币、现在加币）；从哪个月起：年、月分开选，最早 2000 年
+      const pts = SP.budgets().slice().reverse(), curSel = (attr, k) => '<select ' + attr + ' aria-label="Currency">' + M.CURS.map((c) => '<option value="' + c.k + '"' + (c.k === k ? " selected" : "") + ">" + c.code + "</option>").join("") + "</select>";
+      const last = pts[0], years = Array.from({ length: t.y + 2 - 2000 }, (_, i) => t.y + 1 - i);
+      return '<p class="msub">Each month uses the latest budget set on or before it, in the currency you lived on then. Base categories (like House) are the bottom of the trapezoid; ones marked “not in budget” don\'t count against it.</p>' +
+        '<div class="sp-setrow"><label>From <select data-nby aria-label="Year">' + years.map((y) => '<option' + (y === t.y ? " selected" : "") + ">" + y + "</option>").join("") + '</select></label><select data-nbmo aria-label="Month">' + M.MONTH.map((n, i) => '<option value="' + (i + 1) + '"' + (i + 1 === t.m ? " selected" : "") + ">" + n + "</option>").join("") + "</select>" +
+        '<input class="num sp-bv" data-nbv inputmode="decimal" placeholder="3580.00" aria-label="Amount a month">' + curSel("data-nbc", last?.cur || "cad") + '<button type="button" class="btn" data-sact="nbs">Set budget</button></div>' +
+        '<details class="sp-paste"><summary>Paste several</summary><p class="msub">One per line: month, amount, and the currency when it changes — it carries on to the lines below. “Prior” is the one before all others.</p>' +
+        '<textarea data-bpaste rows="6" spellcheck="false" placeholder="Prior 2000 (AUD)&#10;2018.08 5000 (RMB)&#10;2020.09 9100&#10;2023.09 2720 (CAD)"></textarea><div class="sp-setrow"><button type="button" class="btn" data-sact="bpaste">Add these</button><span class="msub" data-bpr></span></div></details>' +
+        (pts.length ? '<table class="mtable"><thead><tr><th>From</th><th class="r">Per month</th><th></th><th></th></tr></thead><tbody>' + pts.map((x) => {
           const p = M.parts(x.from + "-01");
-          return "<tr><td>" + M.MONTH[p.m - 1] + " " + p.y + '</td><td class="r"><input class="num sp-bv" data-bpv="' + x.from + '" value="' + (x.v / 100).toFixed(2) + '" inputmode="decimal" aria-label="Budget from ' + M.MONTH[p.m - 1] + " " + p.y + '"></td><td class="r"><button type="button" class="link" data-sact="bprm" data-from="' + x.from + '">Remove</button></td></tr>';
-        }).join("") + "</tbody></table>" : '<p class="msub">No budget yet.</p>') +
-        '<div class="sp-setrow"><label>From <select data-nbm>' + months.map((q) => '<option value="' + M.ym(q.y, q.m) + '"' + (q.y === t.y && q.m === t.m ? " selected" : "") + ">" + M.MONTH[q.m - 1] + " " + q.y + "</option>").join("") + "</select></label>" +
-        '<label>$ <input class="num sp-bv" data-nbv inputmode="decimal" placeholder="3580.00" aria-label="Amount a month"></label><button type="button" class="btn" data-sact="nbs">Set budget</button></div>';
+          return "<tr><td>" + M.MONTH[p.m - 1] + " " + p.y + '</td><td class="r"><input class="num sp-bv" data-bpv="' + x.from + '" value="' + (x.v / 100).toFixed(2) + '" inputmode="decimal" aria-label="Budget from ' + M.MONTH[p.m - 1] + " " + p.y + '"></td><td>' + curSel('data-bcur="' + x.from + '"', x.cur || "cad") + '</td><td class="r"><button type="button" class="link" data-sact="bprm" data-from="' + x.from + '">Remove</button></td></tr>';
+        }).join("") + "</tbody></table>" : '<p class="msub">No budget yet.</p>');
     }
     if (SET.tab === "cats") {
       const all = SP.cats(), mine = all.filter((c) => c.kind === SET.catKind), cnt = new Map();
@@ -477,11 +480,23 @@ export function createSpending() {
       else if (act === "catk") { SET.catKind = b.dataset.v; renderSet(); }
       else if (act === "bprm") { const before = SP.budgets(); SP.setBudgets(before.filter((x) => x.from !== b.dataset.from)); renderSet(); toast("Budget removed", () => { SP.setBudgets(before); renderSet(); }); }
       else if (act === "nbs") {
-        const v = M.toCents(sheet.querySelector("[data-nbv]").value), from = sheet.querySelector("[data-nbm]").value;
+        const q = (s) => sheet.querySelector(s).value, v = M.toCents(q("[data-nbv]")), from = M.ym(+q("[data-nby]"), +q("[data-nbmo]")), cur = q("[data-nbc]");
         if (!(v > 0)) { sheet.querySelector("[data-nbv]").focus(); return; }
-        SP.setBudgets([...SP.budgets().filter((x) => x.from !== from), { from, v }].sort((a, c) => a.from.localeCompare(c.from)));
+        SP.setBudgets([...SP.budgets().filter((x) => x.from !== from), { from, v, cur }]);
         renderSet();
         toast("Budget saved");
+      }
+      else if (act === "bpaste") {
+        // Prior = 最早那一笔账的那个月（还没有账就 2000 年 1 月）
+        const first = SP.entries().reduce((m, e) => (e.d < m ? e.d : m), "9999"), prior = first < "9999" ? first.slice(0, 7) : "2000-01";
+        const r = M.budgetsFromText(sheet.querySelector("[data-bpaste]").value, prior), before = SP.budgets();
+        if (r.list.length) {
+          const by = new Map(before.map((x) => [x.from, x]));
+          for (const x of r.list) by.set(x.from, x);
+          SP.setBudgets([...by.values()]);
+          renderSet();
+          toast("Added " + r.list.length + (r.list.length === 1 ? " budget" : " budgets") + (r.bad ? " · " + r.bad + " line" + (r.bad === 1 ? "" : "s") + " skipped" : ""), () => { SP.setBudgets(before); renderSet(); });
+        } else sheet.querySelector("[data-bpr]").textContent = "Nothing to add — check the lines";
       }
       else if (act === "hide") { SP.setCats(SP.cats().map((c) => (c.name === b.dataset.c ? { ...c, hidden: !c.hidden } : c))); renderSet(); }
       else if (act === "cdel") { const before = SP.cats(); SP.setCats(before.filter((c) => c.name !== b.dataset.c)); renderSet(); toast("Deleted " + b.dataset.c, () => { SP.setCats(before); renderSet(); }); }
@@ -511,6 +526,8 @@ export function createSpending() {
       if (t.matches("[data-bpv]")) {
         const v = M.toCents(t.value);
         if (v > 0) { SP.setBudgets(SP.budgets().map((x) => (x.from === t.dataset.bpv ? { ...x, v } : x))); toast("Budget saved"); }
+      } else if (t.matches("[data-bcur]")) {
+        SP.setBudgets(SP.budgets().map((x) => (x.from === t.dataset.bcur ? { ...x, cur: t.value } : x))); toast("Budget saved");
       } else if (t.matches("[data-rn]")) {
         const from = t.dataset.rn, to = t.value.trim();
         if (!to || SP.cats().some((c) => c.name.toLowerCase() === to.toLowerCase() && c.name !== from)) { t.value = from; return; }

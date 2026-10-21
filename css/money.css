@@ -293,6 +293,9 @@
 .spend .sp-nav { display: inline-flex; align-items: center; }
 .spend .sp-nb { all: unset; padding: 4px 9px; border-radius: 999px; font: 600 13px/1.4 var(--body); color: #D8D4CB; cursor: pointer; transition: background .15s, opacity .15s; }
 .spend .sp-nb:disabled { opacity: .35; cursor: default; }
+/* 回到现在：一个小圆点（在别的时期时是实心青柠，已经在现在就淡掉） */
+.spend .sp-now { display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; }
+.spend .sp-now i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent, #CCFF00); }
 .spend .sp-find { display: inline-flex; align-items: center; gap: 7px; width: 210px; height: 32px; padding: 0 8px 0 11px; border-radius: 999px; background: rgba(255, 255, 255, .07); box-shadow: var(--mn-hair); color: var(--mn-mute); cursor: text; }
 .spend .sp-find .ic { width: 15px; height: 15px; flex: none; }
 .spend .sp-find input { all: unset; flex: 1; min-width: 0; font: 13px var(--body); color: var(--mn-ink); }
@@ -437,6 +440,9 @@
 .sp-set .sp-setrow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
 .sp-set .sp-setrow label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .sp-set .sp-bv { width: 110px; text-align: right; }
+.sp-set .sp-paste { margin: 4px 0 12px; }
+.sp-set .sp-paste summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); }
+.sp-set .sp-paste textarea { width: 100%; font: 13px/1.5 var(--num); }
 .sp-set .sp-cin { width: 100%; max-width: 240px; }
 .sp-set .mtable .sp-cin { margin-left: -10px; border-color: transparent; background: transparent; }   /* 改名框平时看着就是字，鼠标移上去、点进去才有框 */
 @media (hover: hover) { .sp-set .mtable .sp-cin:hover { border-color: var(--line); } }

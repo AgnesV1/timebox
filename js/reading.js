@@ -185,3 +185,16 @@ export function apply(res, sent) {
   save();
   emit();
 }
+
+// 阅读页右边「今年接下来想读的」该列哪几条（单子存在苦昼短的 Settings，见 js/store/readplan.js）：
+//   今年加的都列；之前加的、还没读完的跟到今年（from = 哪年加的）；之前就读完了的不再列。
+//   读完 = 阅读表格里记过同名的看完（finished(title)，带「年 月」）：今年读完的划掉，写哪个月（done = "Oct"）
+export function planView(items, finishedOf, year) {
+  const out = [];
+  for (const x of items) {
+    const f = finishedOf(x.title), fy = f ? Number(String(f.when).slice(0, 4)) : 0, mine = Number(x.y) || year;
+    if (f && fy && fy < year && mine < year) continue;
+    out.push({ ...x, done: f && fy === year ? String(f.when).slice(5).trim() || "✓" : "", from: mine < year && !(f && fy === year) ? mine : 0 });
+  }
+  return out;
+}

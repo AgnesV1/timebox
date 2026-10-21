@@ -107,11 +107,29 @@ const SHOTS = [
   { device: "desk", name: "spending-search", hash: "spending", act: async (page) => { await page.keyboard.press("/"); await page.keyboard.type("coffee"); await page.waitForTimeout(300); } },
   { device: "desk", name: "spending-year", hash: "spending", act: async (page) => { await tap('.spend [data-seg="mode"] [data-v="year"]')(page); await page.waitForTimeout(900); } },
   { device: "desk", name: "spending-set", hash: "spending", act: async (page) => { await tap('.spend [data-act="set"]')(page); await tap('#modal [data-sact="tab"][data-v="cats"]')(page); } },
+  { device: "desk", name: "reading", hash: "reading", act: seedReading },
+  { device: "desk", name: "reading-add", hash: "reading", act: async (page) => { await seedReading(page); await page.locator(".yl-in").click(); await page.waitForTimeout(300); } },
   { device: "desk", name: "settings", hash: "settings" },
   { device: "small", name: "projects", hash: "projects" },
   { device: "small", name: "spending", hash: "spending" },
   { device: "small", name: "spending-add", hash: "spending", act: async (page) => { await page.keyboard.press("n"); await page.waitForTimeout(300); await page.keyboard.type("12.5"); } }
 ];
+// 阅读页：连上假的阅读表格，右边「Rest of 今年」放四条（其中一条在假表格里已经记过看完，会被划掉；一条是去年加的）
+async function seedReading(page) {
+  await page.evaluate(async () => {
+    const store = await import("/js/store.js"), sync = await import("/js/sync.js"), y = Number(store.today().slice(0, 4));
+    if (!store.setting("reading")?.url) store.setSetting("reading", { url: "https://docs.google.com/spreadsheets/d/FAKE-READING-0000000000000000/edit" });
+    if (!store.readPlan().length) {
+      store.addReadPlan({ title: "Dune", tab: "Book" }, y);
+      store.addReadPlan({ title: "The Last Days Of Socrates", tab: "Book" }, y);
+      store.addReadPlan({ title: "Klara and the Sun", tab: "Book" }, y - 1);
+      store.addReadPlan({ title: "A very long title of a book that will not fit on one line in this narrow column" }, y);
+    }
+    await sync.sync();
+  });
+  await page.reload();
+  await page.waitForTimeout(1500);
+}
 const DEVICES = {
   phone: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
   desk: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },

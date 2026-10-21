@@ -1196,6 +1196,34 @@ body.phone .logtime input, body.phone .add input, body.phone .add select, body.p
 
 /* ---------- 阅读页 ---------- */
 .reading { max-width: 640px; }
+/* 电脑：左边原来那一栏，最右边「Rest of 今年」——今年接下来想读的（js/ui/reading.js 的 planHTML），滚的时候贴着顶。样子学备餐页的 Big buys */
+.read-cols { display: grid; grid-template-columns: minmax(0, 640px) minmax(260px, 320px); justify-content: space-between; gap: 0 40px; align-items: start; }
+@media (max-width: 1100px) { .read-cols { grid-template-columns: minmax(0, 640px); } .yl { position: static; margin-top: 8px; } }
+.yl { position: sticky; top: 16px; padding: 14px 14px 12px; border-radius: 16px; background: var(--surface); }
+.yl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.yl-head h3 { margin: 0; font: 700 14px var(--display); }
+.yl-list { margin: 0 0 10px; padding: 0; list-style: none; }
+.yl-row { position: relative; display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 4px 0 0; border-radius: 9px; font-size: 13.5px; transition: transform .2s var(--ease), background-color .15s; }
+.yl-row.drag { z-index: 2; background: var(--bg); box-shadow: var(--hard); transition: background-color .15s; }
+.yl-row:focus-visible { outline-offset: -2px; }
+.yl-grip { display: grid; place-content: center; gap: 2px; flex: none; width: 18px; height: 26px; cursor: grab; touch-action: none; opacity: .3; transition: opacity .15s; }
+.yl-grip i { display: block; width: 10px; height: 2px; border-radius: 1px; background: currentColor; }
+.yl-row:is(:hover, :focus-visible) .yl-grip { opacity: .8; }
+.yl-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.yl-tab { flex: none; padding: 1px 7px; border-radius: 999px; background: var(--tonal); font-size: 11px; font-weight: 600; color: var(--muted); }
+.yl-done, .yl-from { flex: none; font: 600 11px var(--num); color: var(--muted); }
+.yl-done { color: var(--ok); }
+.yl-row.done .yl-t { font-weight: 500; color: var(--muted); text-decoration: line-through; }
+.yl-x { flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 15px; line-height: 1; opacity: 0; }
+.yl-row:is(:hover, :focus-within) .yl-x { opacity: 1; }
+@media (hover: none) { .yl-x { opacity: 1; } }
+@media (hover: hover) { .yl-x:hover { color: var(--warn); } .yl-row:hover { background: var(--surface2); } }
+.yl-empty { margin: 4px 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.yl-in { width: 100%; padding: 7px 10px; font-size: 13px; }
+.yl-sugs:not(:empty) { display: grid; gap: 1px; margin-top: 6px; }
+.yl-sh { margin: 4px 2px 2px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.yl-sug { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 8px; border: 0; border-radius: 8px; background: none; text-align: left; font-size: 13px; font-weight: 600; color: var(--ink); }
+@media (hover: hover) { .yl-sug:hover { background: var(--surface2); } }
 .radd { display: grid; gap: 10px; }
 .radd .rtitle { width: 100%; padding: 10px 12px; border: var(--b-ctl); border-radius: 12px; background: var(--bg); font-size: 16px; font-weight: 600; }
 .radd textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font: inherit; resize: vertical; }

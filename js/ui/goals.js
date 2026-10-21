@@ -111,7 +111,8 @@ function northHTML() {
   phrases.forEach((p, i) => {
     h += esc(text.slice(from, p.start));
     const g = at.get(ids[i]);
-    h += g ? '<button type="button" class="ns-g' + (g.done ? " done" : "") + '" data-goal="' + esc(g.id) + '" data-act="ns-edit" data-i="' + i + '">' + esc(p.text) + "</button>"
+    // 用行内的 span（不是 button）：长的词跟着字一行行折下去，每一截都有框；Tab 能停、回车 / 空格能点（见下面的 keydown）
+    h += g ? '<span class="ns-g' + (g.done ? " done" : "") + '" role="button" tabindex="0" data-goal="' + esc(g.id) + '" data-act="ns-edit" data-i="' + i + '">' + esc(p.text) + "</span>"
       : '<span class="ns-g ghost">' + esc(p.text) + "</span>";
     from = p.end;
   });
@@ -215,6 +216,7 @@ export function initGoals(rerender) {
     grow(ta);
     canFrame(ta);
   }
+  on(document, "keydown", ".goals .ns-g[role=button]", (e, el) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } });
   // 按钮按下时别把输入框的选中弄丢
   on(document, "mousedown", '.goals [data-act="ns-frame"]', (e) => e.preventDefault());
   on(document, "input", ".goals .ns-in", (e, ta) => { grow(ta); canFrame(ta); });

@@ -94,7 +94,7 @@ const SHOTS = [
   { device: "desk", name: "projects", hash: "projects" },
   { device: "desk", name: "projects-hover", hash: "projects", act: hover('.goals .gl[data-goal="t1"] .gt', 1600) },
   { device: "desk", name: "projects-hover-plan", hash: "projects", act: hover('.pcard[data-project="seed-b2"] .psub', 1600) },
-  { device: "desk", name: "projects-drag", hash: "projects", act: dragLink('.goals .gl[data-goal="m2"] .gt', '.pcard[data-project="seed-port"] .psub') },
+  { device: "desk", name: "projects-drag", hash: "projects", act: dragLink('.goals .gl[data-goal="q2"] .gt', '.pcard[data-project="seed-port"] .psub') },
   { device: "desk", name: "projects-edit-goal", hash: "projects", act: tap('.goals .gl[data-goal="q1"] .gt') },
   { device: "desk", name: "projects-add-goal", hash: "projects", act: async (page) => { await hover('.goals [data-col="next"] h4', 300)(page); await tap('.goals [data-col="next"] .gplus')(page); await page.keyboard.type("Run 10k #Fitness"); } },
   { device: "desk", name: "projects-hover-north", hash: "projects", act: hover('.goals .ns-g[data-goal="n2"]', 1600) },

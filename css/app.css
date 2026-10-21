@@ -1655,7 +1655,7 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 @media (hover: none) { .ns h3 .link { opacity: 1; } }
 .ns-text { max-height: 34vh; margin: 0; overflow-y: auto; overscroll-behavior: contain; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; scrollbar-width: thin; }
 .ns-text.empty { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
-.ns-g { display: inline; margin: 0 1px; padding: 1px 4px; border: 1.5px solid var(--ink); border-radius: 5px; background: none; font: inherit; font-weight: 600; line-height: 1.35; color: inherit; text-align: left; -webkit-box-decoration-break: clone; box-decoration-break: clone; cursor: pointer; transition: background-color .15s; }
+.ns-g { display: inline; margin: 0 1px; padding: 1px 4px; border: 1.5px solid var(--ink); border-radius: 5px; font-weight: 600; -webkit-box-decoration-break: clone; box-decoration-break: clone; cursor: pointer; transition: background-color .15s; }
 .ns-g.done { color: var(--muted); text-decoration: line-through; }
 .ns-g.ghost { border-style: dashed; border-color: var(--muted); cursor: text; }
 @media (hover: hover) { .ns-g:hover { background: color-mix(in srgb, var(--accent) 40%, transparent); } }

@@ -165,9 +165,9 @@ export function createView() {
     '<div class="mn-pad" data-pad>' + ["1", "2", "3", "⌫", "4", "5", "6", "+", "7", "8", "9", "Add", ".", "0", "00"].map((k) => '<button type="button" class="mn-k' + (k === "Add" ? " add" : k === "⌫" || k === "+" ? " op" : "") + '" data-k="' + k + '">' + k + "</button>").join("") + "</div></section>";
   const cal = '<div class="mn-cal" data-cal><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' + btn("calp", "left", "Earlier month", "mn-sm") + '<span data-calt style="font-size:13px;font-weight:500"></span>' + btn("caln", "right", "Later month", "mn-sm") + '</div><div class="mn-cg wd mn-meta"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div><div class="mn-cg" data-calg></div></div>';
   const snackHTML = '<div class="mn-snack" role="status" aria-live="polite"><span data-snt></span><button type="button" class="mn-act" data-act="undo">Undo</button></div>';
-  // 面板（mn-inner）只有屏幕约 88% 高，底边是一道水面弧线；底下露出来的那条是 mn-veil（压暗的今天页，点了收起，见 island.js）。
+  // 一块幕布（mn-curtain）：面板（mn-inner）屏幕约 94% 高，下沿挂着带褶的下摆（mn-hem）；底下露出来的那一小条是 mn-veil（压暗的今天页，点了收起，见 island.js）。
   // 记一笔的面板、日历盖满整屏（数字键盘贴着屏幕底）
-  root.innerHTML = '<div class="mn-veil"></div><div class="mn-inner">' + home + pages + '<div class="mn-cdim" data-act="cclose"></div><section class="mn-csheet" aria-label="Charts"><div class="mn-cgrab" data-cgrab><span class="mn-grabber"></span><button type="button" class="mn-plain mn-done" data-act="cclose">Done</button></div>' + chartInner + "</section>" + snackHTML + "</div>" + sheet + cal;
+  root.innerHTML = '<div class="mn-veil"></div><div class="mn-curtain"><div class="mn-inner">' + home + pages + '<div class="mn-cdim" data-act="cclose"></div><section class="mn-csheet" aria-label="Charts"><div class="mn-cgrab" data-cgrab><span class="mn-grabber"></span><button type="button" class="mn-plain mn-done" data-act="cclose">Done</button></div>' + chartInner + "</section>" + snackHTML + '</div><div class="mn-hem" aria-hidden="true"><i></i></div></div>' + sheet + cal;
 
   const $ = (s) => root.querySelector(s);
   const homeEl = $('[data-pg="home"]'), rw = $(".mn-rw"), rail = $(".mn-rail"), hl = $(".mn-hl"), tl = $(".mn-tl"), list = $(".mn-list");
@@ -380,6 +380,13 @@ export function createView() {
   list.addEventListener("pointerup", listUp);
   list.addEventListener("pointercancel", listUp);
   list.addEventListener("scroll", () => { listEdges(); if (list.scrollTop > 4) setCol(true); else if (list.scrollTop <= 0 && !lp) setCol(false); });
+  // 流水滚得多快（每毫秒几像素，往下滚是正的）：发给 island.js，帷幕的下摆跟着摆一下
+  let scTop = 0, scAt = 0;
+  list.addEventListener("scroll", () => {
+    const t = performance.now(), v = (list.scrollTop - scTop) / Math.max(8, t - scAt);
+    scTop = list.scrollTop; scAt = t;
+    root.dispatchEvent(new CustomEvent("mn-scroll", { detail: v }));
+  }, { passive: true });
   list.addEventListener("wheel", (e) => { if (e.deltaY > 0) setCol(true); else if (list.scrollTop <= 0) setCol(false); }, { passive: true });
 
   // ---------- 记一笔 / 改 / 删 ----------

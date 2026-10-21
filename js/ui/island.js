@@ -1,10 +1,11 @@
 // 手机：在今天页顶上往下拉，记账面板像一滴水从灵动岛那里落下来（面板里面是 money.js 的手机版）。
 // 拉：手指落在屏幕上面 40% 里、页面滚在最顶上才算。岛下面长出一颗黑色玻璃水滴（带一点高光），越拉越长，和岛之间连着一截细颈
 //   （SVG 模糊再收边，几块黑融在一起）；拉约 90px 过线：细颈断开、「+」变蓝 = 松手就开；拉着往回推，细颈又连上，松手就缩回去。往下快速一甩也开。
-// 开：水滴往下落，面板跟在它后面像水一样从顶上流下来，底边是一道软的水面弧线（不是圆角卡片），停在屏幕约 88% 高——
-//   水滴正好落在水面停下的地方，被水面收进去。底下露出一条压暗的今天页，点它就收。里面的东西从上往下淡入，每块隔 20ms，不用模糊。
-// 收：点底下那条，或把底边的小横条往上推 → 水面退回岛里；这次记过 / 改过的话，岛上停一下「今天花了多少 ✓」，宽度跟着字。
-// 面板整块只动位置和透明度。灵动岛那一条本身归 iPhone（往下拉会开通知中心），网页收不到——所以要从页面顶上那一块开始拉。
+// 开：水滴往下落，面板像一块幕布从顶上落下来（落到底弹一下，甩开的有惯性），停在屏幕约 94% 高；下沿挂着带褶的下摆，
+//   幕布停住时下摆晚一拍，往下坠一下、来回摆两下才稳。底下露出一小条压暗的今天页，点它（或点下摆）就收。里面的东西从上往下淡入，每块隔 20ms。
+// 滑流水、拖底边的小横条时，下摆跟着速度斜一点、拉长一点，褶子横着漂一点，停下以后来回晃两下（一个弹簧，只写在 .mn-hem 上的三个变量）。
+// 收：点底下那条，或把底边的小横条往上推 → 幕布往上拉起来，下摆跟在后面先被拉长；这次记过 / 改过的话，岛上停一下「今天花了多少 ✓」，宽度跟着字。
+// 幕布整块只动位置；系统要求减少动态时不弹不摆。灵动岛那一条本身归 iPhone（往下拉会开通知中心），网页收不到——所以要从页面顶上那一块开始拉。
 
 import * as store from "../store.js";
 import * as M from "../money.js";
@@ -13,13 +14,16 @@ import { createView } from "./money.js";
 
 // 和 money.js 同一套：进场快出来慢慢停稳（不冲过头），出场干脆、越走越快；小东西用只冲过头一点点的弹簧
 const ENTER = "cubic-bezier(.16, 1, .3, 1)", EXIT = "cubic-bezier(.4, 0, 1, 1)", FALL = "cubic-bezier(.45, 0, .85, .55)";
+// 幕布落下：一个冲过头约 3% 再回来的弹簧（有重量的布落到底弹一下）
+const DROP = "linear(0, .03, .104, .205, .318, .433, .542, .642, .73, .805, .866, .915, .953, .982, 1.002, 1.016, 1.024, 1.029, 1.03, 1.029, 1.027, 1.024, 1.021, 1.017, 1.014, 1.011, 1.008, 1.006, 1.004, 1.003, 1.001, 1.001, 1)";
 const SPR = "linear(0, .029, .099, .192, .296, .399, .498, .588, .668, .737, .795, .844, .883, .915, .939, .959, .973, .984, .992, .997, 1.001, 1.003, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1)";
 const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ARM = 80;        // 拉过这么多就算要开（加上开始的 10px，手指大约走 90px）
-const LEVEL = 0.88;    // 水面停在屏幕多高
-const OPEN_MS = 480, CLOSE_MS = 300;
+const LEVEL = 0.94;    // 幕布停在屏幕多高（和 css/money.css 的 .mn-curtain 一样）
+const OPEN_MS = 640, CLOSE_MS = 340;
+const HIDE = "translateY(calc(-100% - 40px))";   // 收着：整块（连下摆）在屏幕上面
 
-let view = null, panel = null, inner = null, veil = null, goo = null, top = null, neck = null, blob = null, drop = null, plus = null, live = null;
+let view = null, panel = null, inner = null, curtain = null, hem = null, veil = null, goo = null, top = null, neck = null, blob = null, drop = null, plus = null, live = null;
 let state = "closed", phoneOK = () => false, pageTop = () => true;
 
 function safeTop() {
@@ -48,7 +52,18 @@ function build() {
   panel = view.el;
   document.body.appendChild(panel);
   inner = panel.querySelector(".mn-inner");
+  curtain = panel.querySelector(".mn-curtain");
+  hem = panel.querySelector(".mn-hem");
   veil = panel.querySelector(".mn-veil");
+  // 滑流水：下摆跟着速度斜、拉长、褶子漂；停下来（一小会儿没再滚）就回到 0，弹簧来回晃两下
+  let still = 0;
+  panel.addEventListener("mn-scroll", (e) => {
+    const v = e.detail || 0;
+    HEM.to.shift += v * 9;
+    hemTo({ sway: Math.max(-4, Math.min(4, -v * 1.6)), stretch: Math.min(0.3, Math.abs(v) * 0.09) });
+    clearTimeout(still);
+    still = setTimeout(() => hemTo({ sway: 0, stretch: 0 }), 140);
+  });
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.setAttribute("aria-hidden", "true");
   svg.style.position = "absolute";
@@ -75,24 +90,61 @@ function build() {
   // 收起：底边的小横条，点一下 / 往上推
   const grab = panel.querySelector("[data-grab]");
   let g = null;
-  grab.addEventListener("pointerdown", (e) => { if (state !== "open") return; g = { y: e.clientY, d: 0, t: [[e.clientY, performance.now()]] }; grab.setPointerCapture(e.pointerId); inner.style.transition = "none"; });
+  grab.addEventListener("pointerdown", (e) => { if (state !== "open") return; g = { y: e.clientY, d: 0, t: [[e.clientY, performance.now()]] }; grab.setPointerCapture(e.pointerId); curtain.style.transition = "none"; });
   grab.addEventListener("pointermove", (e) => {
     if (!g) return;
     g.t.push([e.clientY, performance.now()]); if (g.t.length > 4) g.t.shift();
-    const dy = e.clientY - g.y;
+    const dy = e.clientY - g.y, a = g.t[0], b = g.t[g.t.length - 1], v = (b[0] - a[0]) / Math.max(8, b[1] - a[1]);
     g.d = dy < 0 ? dy : 8 * Math.log(1 + dy / 8);   // 往下拉有阻力
-    inner.style.transform = "translateY(" + g.d + "px)";
+    curtain.style.transform = "translateY(" + g.d + "px)";
     veil.style.opacity = String(Math.max(0, Math.min(1, 1 + g.d / (innerHeight * LEVEL))));
+    hemTo({ stretch: Math.min(0.3, Math.abs(v) * 0.12), sway: Math.max(-3, Math.min(3, v * 2)) });   // 拖着走：下摆跟在后面被拉长
   });
   const up = () => {
     if (!g) return;
     const d = g.d, a = g.t[0], b = g.t[g.t.length - 1], v = (b[0] - a[0]) / Math.max(8, b[1] - a[1]);
     g = null;
+    hemTo({ stretch: 0, sway: 0 });
     if (Math.abs(d) < 6 || d < -70 || v < -0.45) close();
-    else { inner.style.transition = "transform .28s " + SPR; inner.style.transform = "none"; veil.style.transition = "opacity .28s"; veil.style.opacity = "1"; }
+    else { curtain.style.transition = "transform .28s " + SPR; curtain.style.transform = "none"; veil.style.transition = "opacity .28s"; veil.style.opacity = "1"; }
   };
   grab.addEventListener("pointerup", up);
   grab.addEventListener("pointercancel", up);
+}
+
+// ---------- 帷幕的下摆：一个弹簧 ----------
+// 三个量：sway（斜多少度）、stretch（多拉长多少，0.1 = 10%）、shift（褶子和下沿圆弧横着漂多少像素，26px 一个褶子）。
+// hemTo 改目标，hemKick 给一下速度；弹簧（k 120、阻尼 14，会来回晃两下）追过去，停稳了就不再跑 rAF。只写 .mn-hem 上的变量
+const HEM = { x: { sway: 0, stretch: 0, shift: 0 }, v: { sway: 0, stretch: 0, shift: 0 }, to: { sway: 0, stretch: 0, shift: 0 }, raf: 0, at: 0 };
+const KS = 120, CS = 14;
+function hemStep(now) {
+  const dt = Math.min(0.032, Math.max(0, (now - HEM.at) / 1000));
+  HEM.at = now;
+  let busy = false;
+  for (const k of ["sway", "stretch", "shift"]) {
+    HEM.v[k] += (KS * (HEM.to[k] - HEM.x[k]) - CS * HEM.v[k]) * dt;
+    HEM.x[k] += HEM.v[k] * dt;
+    if (Math.abs(HEM.to[k] - HEM.x[k]) > 0.002 || Math.abs(HEM.v[k]) > 0.01) busy = true;
+    else { HEM.x[k] = HEM.to[k]; HEM.v[k] = 0; }
+  }
+  // 褶子漂远了：整数个褶子（26px）一起减回来，看起来一样
+  if (Math.abs(HEM.x.shift) > 260) { const w = Math.trunc(HEM.x.shift / 26) * 26; HEM.x.shift -= w; HEM.to.shift -= w; }
+  hem.style.setProperty("--sway", HEM.x.sway.toFixed(2) + "deg");
+  hem.style.setProperty("--stretch", Math.max(0.6, 1 + HEM.x.stretch).toFixed(3));
+  hem.style.setProperty("--shift", HEM.x.shift.toFixed(1) + "px");
+  HEM.raf = busy ? requestAnimationFrame(hemStep) : 0;
+}
+function hemTo(to) {
+  if (!hem || quiet()) return;
+  Object.assign(HEM.to, to);
+  if (!HEM.raf) { HEM.at = performance.now(); HEM.raf = requestAnimationFrame(hemStep); }
+}
+function hemKick(v) { for (const k in v) HEM.v[k] += v[k]; hemTo({}); }
+function hemReset() {
+  cancelAnimationFrame(HEM.raf);
+  HEM.raf = 0;
+  for (const k of ["sway", "stretch", "shift"]) { HEM.x[k] = HEM.v[k] = HEM.to[k] = 0; }
+  hem?.style.removeProperty("--sway"); hem?.style.removeProperty("--stretch"); hem?.style.removeProperty("--shift");
 }
 
 // ---------- 拉 ----------
@@ -165,19 +217,22 @@ function open() {
   // 水滴脱开（融的那层收掉），往下落到水面停下的地方；面板跟在后面流下来，同一条曲线，最后正好接上
   goo.hidden = true;
   const fall = H * LEVEL - (at.y + at.h);
-  if (quiet()) { drop.classList.remove("on"); inner.style.transition = "none"; inner.style.transform = "none"; veil.style.transition = "none"; veil.style.opacity = "1"; }
+  if (quiet()) { drop.classList.remove("on"); curtain.style.transition = "none"; curtain.style.transform = "none"; veil.style.transition = "none"; veil.style.opacity = "1"; }
   else {
     drop.style.transition = "none";
     drop.classList.add("falling");
-    drop.animate([{ transform: "none", opacity: 1 }, { transform: "translateY(" + fall * 0.6 + "px) scale(.92, 1.12)", opacity: 1, offset: 0.55 }, { transform: "translateY(" + fall + "px) scale(1.25, .55)", opacity: 0 }], { duration: OPEN_MS, easing: FALL, fill: "forwards" });
-    inner.style.transition = "none";
-    inner.style.transform = "translateY(-101%)";
-    void inner.offsetWidth;
-    inner.style.transition = "transform " + OPEN_MS + "ms " + ENTER;
-    inner.style.transform = "none";
+    drop.animate([{ transform: "none", opacity: 1 }, { transform: "translateY(" + fall * 0.6 + "px) scale(.92, 1.12)", opacity: 1, offset: 0.55 }, { transform: "translateY(" + fall + "px) scale(1.25, .55)", opacity: 0 }], { duration: OPEN_MS * 0.75, easing: FALL, fill: "forwards" });
+    curtain.style.transition = "none";
+    curtain.style.transform = HIDE;
+    void curtain.offsetWidth;
+    curtain.style.transition = "transform " + OPEN_MS + "ms " + DROP;
+    curtain.style.transform = "none";
+    // 落的时候下摆被风兜着往上缩一点；落到底（弹簧最低那一下，约 55% 处）下摆接着往下坠、来回摆两下
+    hemTo({ stretch: -0.12, sway: 0 });
+    setTimeout(() => { hemTo({ stretch: 0 }); hemKick({ stretch: 2.2, sway: 34 }); }, OPEN_MS * 0.5);
     veil.style.transition = "opacity " + OPEN_MS + "ms";
     veil.style.opacity = "1";
-    [...inner.querySelectorAll(".mn-home > *")].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateY(-8px)" }, { opacity: 1, transform: "none" }], { duration: 360, delay: 140 + i * 20, easing: ENTER, fill: "backwards" }));
+    [...inner.querySelectorAll(".mn-home > *")].forEach((el, i) => el.animate([{ opacity: 0, transform: "translateY(-8px)" }, { opacity: 1, transform: "none" }], { duration: 360, delay: 160 + i * 20, easing: ENTER, fill: "backwards" }));
   }
   settleApp(".42s");
   setTimeout(() => {
@@ -195,14 +250,16 @@ function close() {
   state = "closing";
   const dur = quiet() ? 10 : CLOSE_MS;
   if (!quiet()) inner.querySelectorAll(".mn-home > *").forEach((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: "forwards" }));
-  inner.style.transition = "transform " + dur + "ms " + EXIT;
-  inner.style.transform = "translateY(-101%)";
+  curtain.style.transition = "transform " + dur + "ms " + EXIT;
+  curtain.style.transform = HIDE;
+  hemTo({ stretch: 0.28, sway: 0 });   // 往上拉：下摆跟在后面，先被拉长
   veil.style.transition = "opacity " + dur + "ms";
   veil.style.opacity = "0";
   setTimeout(() => {
     panel.classList.remove("on");
     inner.querySelectorAll(".mn-home > *").forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
     view.hide();
+    hemReset();
     state = "closed";
     if (view.tookChange()) showLive(); else statusBar(false);
   }, dur + 20);

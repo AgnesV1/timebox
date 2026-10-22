@@ -1,6 +1,6 @@
 // 记账的界面（手机）：从今天页顶上拉下来的那块面板（外壳和下拉手势在 island.js）。电脑上的 Spending 页是网页的排法，在 js/ui/spending.js，
 // 它也用这里导出的几样：金额的小数缩小（cents）、滚着变的数字（roll）、短金额（kfmt）、图表（chartView）。
-// 主页：Year / Month / Day → 能拖的柱状时间轴（停在中间那格就是选中的；超了橙、正常蓝、有收入底下一个青绿点）→ 类别小标签（点了筛下面的流水）→
+// 主页：‹ 期间 ›（标题在两个箭头正中，下面一行支出 / 收入）→ Year / Month / Day → 能拖的柱状时间轴（停在中间那格就是选中的；超了橙、正常蓝、有收入底下一个青绿点）→ 类别小标签（点了筛下面的流水）→
 // 流水（点一笔改、往左滑删）→ 推荐 → Add a new transaction。往上拉流水时柱子压成小点。
 // 图表：梯形图（House 是底座、预算是浅天蓝底、实线是花的、虚线是照现在的速度）、五个小方块、两个 Breakdown（点开看那一类的每一笔），
 // 自己一套 Month / Year 和前后翻；从底下升上来的一页，先停在半高。
@@ -106,6 +106,8 @@ function tracker() {
 export const kfmt = (c) => { const a = Math.abs(c) / 100, sgn = c < 0 ? "−" : "", sym = M.curInfo(M.showing()).sym; return sgn + sym + (a >= 1000 ? (a / 1000).toFixed(a >= 10000 ? 0 : 1) + "k" : Math.round(a)); };
 const pie = (p, cls = "") => '<svg class="mn-pie ' + cls + '" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="currentColor" fill-opacity=".2"/><circle cx="7" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="6" stroke-dasharray="' + (Math.max(0, Math.min(1, p)) * 18.85).toFixed(2) + ' 18.85" transform="rotate(-90 7 7)"/></svg>';
 const btn = (act, ic, label, cls = "") => '<button type="button" class="mn-ic ' + cls + '" data-act="' + act + '" aria-label="' + label + '" title="' + label + '">' + icon(ic) + "</button>";
+// 回到现在：标题后面一颗钴蓝小点，不在当前那一期才出来（和电脑上标题后的小圆点一样）；挂在标题右边外面，标题照样居中
+const nowDot = (act, label) => '<button type="button" class="mn-now" data-act="' + act + '" aria-label="' + label + '" title="' + label + '"><i></i></button>';
 const back = '<button type="button" class="mn-ic" data-act="back" aria-label="Back">' + icon("left") + "</button>";
 const chevR = '<svg class="ic mn-cr" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
 export const periodTitle = (p, mode) => (mode === "day" ? M.fmtDate(M.iso(p.y, p.m, p.d)) : mode === "month" ? M.MONTH[p.m - 1] + " " + p.y : String(p.y));
@@ -185,9 +187,11 @@ export function createView() {
 
   const home = '<section class="mn-pg mn-home" data-pg="home">' +
     '<div class="mn-hdr">' + btn("set", "settings", "Settings") + btn("chart", "chart", "Charts") + btn("find", "search", "Search") + "</div>" +
-    '<div class="mn-thead"><div><h2 class="mn-h1" data-title></h2><div class="mn-num mn-13" style="margin-top:3px;display:flex;align-items:center"><span class="mn-rn" data-to></span><span style="display:inline-block;width:12px"></span><span class="mn-rn" data-ti style="color:var(--mn-green)"></span>' +
+    // ‹ 期间 ›：标题在两个箭头正中间，下面一行是这一期的支出 / 收入
+    '<div class="mn-thead">' + btn("prev", "left", "Earlier", "mn-sm") + '<div class="mn-tmid"><span class="mn-tw"><h2 class="mn-h1" data-title></h2>' + nowDot("reset", "Back to today") + "</span>" +
+    '<div class="mn-num mn-13 mn-tsub"><span class="mn-rn" data-to></span><span style="display:inline-block;width:12px"></span><span class="mn-rn" data-ti style="color:var(--mn-green)"></span>' +
     '<button type="button" class="mn-curb" data-act="showcur" aria-label="Show totals in another currency" title="Show totals in"><span data-showc></span>' + icon("down") + "</button></div></div>" +
-    '<div class="mn-nav">' + btn("reset", "reset", "Back to today", "mn-sm mn-rst") + btn("prev", "left", "Earlier", "mn-sm") + btn("next", "right", "Later", "mn-sm") + "</div></div>" +
+    btn("next", "right", "Later", "mn-sm") + "</div>" +
     '<div class="mn-seg" data-seg="mode" style="margin-top:14px"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button><button type="button" data-v="day">Day</button></div>' +
     '<div class="mn-tl"><span class="mn-hl"></span><div class="mn-rw"><div class="mn-rail"></div></div></div>' +
     '<div class="mn-hs mn-chips"></div>' +
@@ -200,9 +204,8 @@ export function createView() {
     '<section class="mn-pg off" data-pg="find"><div class="mn-hdr" style="gap:6px">' + back + '<input class="mn-tx" data-q placeholder="Search notes, categories, amounts" autocomplete="off" style="flex:1;padding:6px 0;border-bottom:1px solid var(--mn-line)"></div><div class="mn-vs" data-fres style="flex:1;margin-top:8px"></div></section>';
   // 图表：从底下升上来的那一页
   const cseg = '<div class="mn-seg" data-seg="cmode"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button></div>';
-  const cnav = '<div class="mn-nav">' + btn("creset", "reset", "Back to this month", "mn-sm mn-rst") + btn("cprev", "left", "Earlier", "mn-sm") + btn("cnext", "right", "Later", "mn-sm") + "</div>";
   const chartBody = '<div class="mn-cbody mn-vs"><svg class="mn-chart" data-chart viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Spending against the budget"></svg><div class="mn-hs mn-cards"></div><div class="mn-bks"><div data-xb></div><div data-ib></div></div></div>';
-  const chartInner = '<div class="mn-thead"><h2 class="mn-h1" data-ctitle></h2>' + cnav + "</div>" + cseg.replace('class="mn-seg"', 'class="mn-seg" style="margin-top:14px"') + chartBody;
+  const chartInner = '<div class="mn-thead">' + btn("cprev", "left", "Earlier", "mn-sm") + '<div class="mn-tmid"><span class="mn-tw"><h2 class="mn-h1" data-ctitle></h2>' + nowDot("creset", "Back to this month") + "</span></div>" + btn("cnext", "right", "Later", "mn-sm") + "</div>" + cseg.replace('class="mn-seg"', 'class="mn-seg" style="margin-top:14px"') + chartBody;
   const sheet = '<div class="mn-scrim" data-act="sclose"></div><section class="mn-sheet" aria-label="Transaction">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;height:30px"><span data-sht style="font-size:15px;font-weight:500"></span><div style="display:flex;align-items:center;gap:6px"><button type="button" class="mn-act warn" data-act="sdel" hidden>Delete</button>' + btn("sclose", "close", "Close", "mn-sm") + "</div></div>" +
     '<div class="mn-seg" data-seg="skind" style="margin-top:8px"><i></i><button type="button" data-v="out">Expense</button><button type="button" data-v="in">Income</button></div>' +
@@ -347,8 +350,13 @@ export function createView() {
   const goTo = (i) => rw.scrollTo({ left: Math.max(0, Math.min(V.items.length - 1, i)) * V.cw, behavior: quiet() ? "auto" : "smooth" });
 
   // ---------- 主页：标题、类别小标签、流水、推荐 ----------
+  // 换了一期（点箭头、拖时间轴）：标题顺着方向滑一下；换 Year / Month / Day 不滑
+  let shownAt = null;
   function renderTitle() {
-    $("[data-title]").textContent = periodTitle(V.cur, V.mode);
+    const h = $("[data-title]"), at = { mode: V.mode, k: (V.cur.y || 0) * 1e4 + (V.cur.m || 0) * 100 + (V.cur.d || 0) };
+    h.textContent = periodTitle(V.cur, V.mode);
+    if (shownAt && shownAt.mode === at.mode && shownAt.k !== at.k && !quiet()) h.animate([{ transform: "translateX(" + (at.k > shownAt.k ? 10 : -10) + "px)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 280, easing: ENTER });
+    shownAt = at;
     $("[data-showc]").textContent = curLabel(SP.show());
     $('[data-act="reset"]').classList.toggle("on", !M.samePeriod(V.cur, todayP(), V.mode));
     const g = M.sumOf(IX(), V.cur, V.mode);

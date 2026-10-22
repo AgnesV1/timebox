@@ -100,6 +100,8 @@ const SHOTS = [
   { device: "phone", name: "ledger-open", hash: "today", act: async (page) => { await pullTo(115, true, 330)(page); } },
   { device: "phone", name: "ledger-scroll", hash: "today", act: async (page) => { await pullLedger(page); const b = await page.locator(".mn-phone .mn-list").boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + 60); for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, 140); await page.waitForTimeout(16); } await page.waitForTimeout(70); } },
   { device: "phone", name: "ledger-add", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="add"]')(page); for (const k of ["1", "2", ".", "5", "+", "8"]) await tap('.mn-phone [data-k="' + k + '"]')(page); } },
+  { device: "phone", name: "ledger-past", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="prev"]')(page); await page.waitForTimeout(700); await tap('.mn-phone [data-act="prev"]')(page); await page.waitForTimeout(900); } },
+  { device: "phone", name: "ledger-day", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-seg="mode"] [data-v="day"]')(page); await page.waitForTimeout(700); await tap('.mn-phone [data-act="prev"]')(page); await page.waitForTimeout(900); } },
   { device: "phone", name: "ledger-chart", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="chart"]')(page); await page.waitForTimeout(600); } },
   { device: "phone", name: "ledger-cats", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="set"]')(page); await tap('.mn-phone [data-sub="cats"]')(page); } },
   { device: "desk", name: "today", hash: "today" },

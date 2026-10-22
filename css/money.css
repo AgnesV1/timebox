@@ -25,11 +25,18 @@
 .mn .mn-ic .ic { width: 21px; height: 21px; }
 .mn .mn-ic.mn-sm { width: 28px; height: 28px; color: #B9B5AC; }
 .mn .mn-ic.mn-sm .ic { width: 17px; height: 17px; }
-.mn .mn-rst { opacity: 0; transform: scale(.5); pointer-events: none; transition: opacity .2s, transform .28s var(--mn-spring); }
-.mn .mn-rst.on { opacity: 1; transform: none; pointer-events: auto; }
+/* 回到现在的小点：挂在标题右边外面（不占位，标题照样正中），不在当前那一期才弹出来 */
+.mn .mn-now { all: unset; position: absolute; left: calc(100% - 4px); top: 50%; display: grid; place-items: center; width: 28px; height: 28px; margin-top: -14px; cursor: pointer; opacity: 0; transform: scale(.5); pointer-events: none; transition: opacity .2s, transform .28s var(--mn-spring); }
+.mn .mn-now i { width: 7px; height: 7px; border-radius: 50%; background: var(--mn-blue); }
+.mn .mn-now.on { opacity: 1; transform: none; pointer-events: auto; }
+.mn .mn-now:active i { transform: scale(.8); }
+.mn .mn-now:focus-visible { outline: 1.5px solid var(--mn-blue); outline-offset: -4px; border-radius: 50%; }
 .mn .mn-hdr { flex: none; display: flex; align-items: center; justify-content: space-between; height: 34px; }
-.mn .mn-thead { flex: none; display: flex; align-items: flex-end; justify-content: space-between; margin-top: 8px; }
-.mn .mn-nav { display: flex; align-items: center; margin-bottom: 2px; }
+.mn .mn-thead { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; margin-top: 8px; }
+.mn .mn-thead > .mn-ic { margin-top: -1px; }   /* 箭头和标题那一行齐 */
+.mn .mn-tmid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.mn .mn-tw { position: relative; max-width: 100%; }
+.mn .mn-tsub { margin-top: 3px; display: flex; align-items: center; justify-content: center; }
 
 /* 分段开关：选中的那块滑过去 */
 .mn .mn-seg { position: relative; flex: none; display: flex; padding: 3px; border-radius: 11px; background: var(--mn-fill); box-shadow: var(--mn-hair); }

@@ -194,6 +194,56 @@ export function matchNorth(phrases, north) {
   return { ids, left: north.filter((g) => !used.has(g.id)) };
 }
 
+// 悬停画线时，连着的词被 North star 那个三行的框挡住了：框里暂时只放「重点」（js/ui/links.js 的 focusNorth）。
+// keep = 要留的词（parseNorth 的下标）；level：
+//   "sentence" = 带着这些词的那几句；"clause" = 那几小段（按逗号、冒号切；破折号不切，它常常就是引出那个词的），
+//   pad = 每一小段再往前多带几段（前文比后文更能说明这个词是什么）；"word" = 只列这几个词（她说连着两三个词的时候就这样）。
+// 不会切在框里面（框里的词可以带逗号）。返回一段段：{ text }（原文，空白收成一个空格）、{ i }（第几个词，框里的别的词也照样给）、
+//   { gap: true }（省掉的地方，画成 …）、{ sep: true }（只列词时词和词之间，画成 ·）
+const SENTENCE = /[.!?;]+["'”’)]*\s+|[。！？；]+["'”’）」]*|\n+/g;
+const CLAUSE = /[.!?;,:]+["'”’)]*\s+|[。！？；，、：]+["'”’）」]*|\n+/g;
+export function northFocus(text, phrases, keep, level = "sentence", pad = 0) {
+  const s = String(text ?? ""), want = [...new Set(keep)].filter((i) => phrases[i]).sort((a, b) => a - b);
+  if (!want.length) return [];
+  if (level === "word") return want.flatMap((i, k) => (k ? [{ sep: true }, { i }] : [{ i }]));
+  const inside = (at) => phrases.some((p) => at > p.start && at < p.end);
+  const cuts = [0];
+  for (const m of s.matchAll(level === "clause" ? CLAUSE : SENTENCE)) {
+    const at = m.index + m[0].length;
+    if (!inside(m.index) && at > cuts[cuts.length - 1] && at < s.length) cuts.push(at);
+  }
+  cuts.push(s.length);
+  const units = cuts.slice(0, -1).map((a, k) => ({ a, b: cuts[k + 1] }));
+  const kept = units.map(() => false);
+  units.forEach((u, k) => {
+    if (want.some((i) => phrases[i].start >= u.a && phrases[i].start < u.b)) for (let j = Math.max(0, k - pad); j <= k; j++) kept[j] = true;
+  });
+  // 挨着的几段连成一截；截和截之间、开头结尾省掉的地方是 …
+  const runs = [];
+  kept.forEach((on, k) => {
+    if (!on) return;
+    const last = runs[runs.length - 1];
+    if (last && last.to === k - 1) last.to = k;
+    else runs.push({ from: k, to: k });
+  });
+  const out = [];
+  runs.forEach((r, n) => {
+    const a = units[r.from].a, b = units[r.to].b, before = n > 0 || r.from > 0, after = r.to < units.length - 1;
+    const part = [];
+    let at = a;
+    phrases.forEach((p, i) => { if (p.start >= a && p.start < b) { part.push({ text: s.slice(at, p.start) }, { i }); at = p.end; } });
+    part.push({ text: s.slice(at, b) });
+    for (const x of part) if (x.text !== undefined) x.text = x.text.replace(/\s+/g, " ");
+    part[0].text = part[0].text?.replace(/^\s+/, "") ?? part[0].text;
+    const end = part[part.length - 1];
+    end.text = end.text.replace(after ? /[\s,，、:：;；—–-]+$/ : /\s+$/, "");
+    if (before) out.push({ gap: true });
+    out.push(...part.filter((x) => x.text === undefined || x.text));
+    if (after && n === runs.length - 1) out.push({ gap: true });
+  });
+  return out;
+}
+
 // 这一段该显示（和打开来改）的字：存过的那段；没存过就用现有的 North star 目标一条一行拼起来。
 // 文字里对不上的目标（别的设备上新加的、从年份那栏搬过来的）补在最后，一条都不藏
 export function northText(stored, goals) {

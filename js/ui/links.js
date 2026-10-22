@@ -1,7 +1,9 @@
 // Projects 页（电脑）上「谁为谁服务」的连线。页面上盖一层 SVG，鼠标点得穿；只在悬停、拖的时候画。
 // 悬停一条目标 / North star 里框出来的词 / 一个项目的头 / 一张计划卡（停一下，路过不算）：跟它有关的线一条条从它这儿飞出去（每条隔 40ms），
 //   用键盘（Tab）停在它们上面也一样（不出拖的把手——拖本来就要鼠标）；Esc、焦点离开 Projects 页就收起，
-//   画完以后，线上一道流光一直朝「为了谁」那头跑：计划 / 项目 → 目标 → 上级 → … → North star。没关系的目标、卡片淡下去。
+//   画完以后，线上一道流光一直朝「为了谁」那头跑：计划 / 项目 → 目标 → 上级 → … → North star。没关系的目标、卡片淡下去，
+//   连着的目标和 North star 里的词涂上青柠荧光笔（她 10-21 从三个样子里挑的）。连着的都要看得见：折在「+N more」里的露出来，
+//   右栏滚走了的滚过去（悬停的在左边时），North star 那三行里被挡住的词，框里暂时换成那一句 / 那一小段 / 只列词（focusNorth）。
 //   目标：往上一路到顶，往下是挂在它下面的（一层层）和为它们服务的项目、计划；
 //   计划：它连着的目标（自己没连的，看它所在的项目连着的），再一路往上；项目：它连着的，加上它下面自己连了目标的计划。
 // 线就是两头直接连的一条三次贝塞尔，斜着飞过去，压着字也没关系（只在鼠标停着的时候有）：
@@ -22,6 +24,7 @@ import * as store from "../store.js";
 import * as G from "../goals.js";
 import * as GR from "../groups.js";
 import * as E from "../engine.js";
+import { esc } from "../dom.js";
 
 const NODE = ".goals .gl[data-goal], .goals .ns-g[data-goal], .pgroup[data-group] > .pg-top:not(.editing), .pcard[data-project], .g-rep[data-project]";
 const fine = matchMedia("(hover: hover) and (pointer: fine)");
@@ -51,7 +54,8 @@ function keyOf(el) {
   return el.dataset.project ? G.planRef(el.dataset.project) : "";
 }
 
-// 页面上代表它的元素。目标折在「+N more」里（画着但藏着，.fold）：平时用那个按钮代替，拖着连线时那一段整段展开、就是它自己；
+// 页面上代表它的元素。目标折在「+N more」里（画着但藏着，.fold）：平时用那个按钮代替，悬停时露出来了（.lk-unfold）、拖着连线时那一段整段展开，就是它自己；
+// North star 里的词：框里换成了重点（.ns-focus）就是那里面的那个；
 // 切到了 Ideas：用「Goals」那个按钮。收进往期的目标不会问到这里（related 已经越过它们）
 function elOf(key, cols) {
   const root = page();
@@ -60,8 +64,8 @@ function elOf(key, cols) {
   if (key.startsWith("goal:")) {
     const id = CSS.escape(key.slice(5)), col = cols.get(key.slice(5));
     const gl = q('.goals .gl[data-goal="' + id + '"]');
-    if (gl && (!gl.classList.contains("fold") || root.classList.contains("lk-drag"))) return gl;
-    return q('.goals .ns-g[data-goal="' + id + '"]') ||
+    if (gl && (!gl.classList.contains("fold") || gl.classList.contains("lk-unfold") || root.classList.contains("lk-drag"))) return gl;
+    return q('.goals .ns-focus [data-fgoal="' + id + '"]') || q('.goals .ns-g[data-goal="' + id + '"]') ||
       (col && (q('.goals [data-col="' + col + '"] .gmore') || q('.goals [data-col="' + col + '"] h4'))) || q('.goals .rail-tabs [data-v="goals"]');
   }
   if (key.startsWith("g:")) return q('.pgroup[data-group="' + CSS.escape(key.slice(2)) + '"] > .pg-top:not(.editing)');
@@ -241,7 +245,7 @@ function boxOf(el) {
 function endOf(el) {
   const b = boxOf(el);
   let y = el.classList.contains("pcard") ? Math.min((b.t + b.b) / 2, b.t + 14) : (b.t + b.b) / 2, clip = false;
-  const sc = el.closest(".rail-body, .ns-text");
+  const sc = el.closest(".rail-body, .ns-text, .ns-focus");
   if (sc) {
     const r = rectOf(sc), lo = r.t + 5, hi = r.b - 5;
     if (y < lo || y > hi) { y = clamp(y, lo, hi); clip = true; }
@@ -289,7 +293,12 @@ function paint(key, { fly = true } = {}) {
   const base = colorOf(key);
   const lit = new Set([key]), keep = new Set();
   let n = 0, streaks = 0;
-  for (const e of related(key).sort((a, b) => a.at - b.at)) {
+  // 先让连着的看得见（都在量位置之前）：折在「+N more」里的露出来；North star 里被挡住的词换成重点（悬停的就是 North star 里的词时不换，它本来就看得见）
+  const list = related(key).sort((a, b) => a.at - b.at), ends = new Set([key, ...list.flatMap((e) => [e.from, e.to])]);
+  const north = new Set(goals.filter((g) => g.span === "north").map((g) => "goal:" + g.id));
+  unfold(root, ends, cur?.el);
+  focusNorth(root, north.has(key) ? [] : [...ends].filter((k) => north.has(k)).map((k) => k.slice(5)));
+  for (const e of list) {
     const a = elOf(e.from, cols), b = elOf(e.to, cols);
     if (!a || !b || a === b) continue;
     lit.add(e.from); lit.add(e.to);
@@ -318,16 +327,100 @@ function paint(key, { fly = true } = {}) {
   }
   for (const [id, x] of edges) if (!keep.has(id)) drop(id, x);
   fit();
-  // 有关系的亮着，别的淡下去（一条线都没有的时候不淡）
+  // 有关系的亮着（css 给目标和 North star 的词涂荧光笔），别的淡下去（一条线都没有的时候不淡）
   root.querySelectorAll(".lk-on, .lk-has").forEach((el) => el.classList.remove("lk-on", "lk-has"));
+  const rows = [];
   if (keep.size) {
     for (const k of lit) {
       const el = elOf(k, cols);
       el?.classList.add("lk-on");
       el?.closest(".pgroup")?.classList.add("lk-has");
+      if (el?.classList.contains("gl")) rows.push(el);
     }
-  }
+  } else { unfocusNorth(root); unfold(root, new Set(), null); }
   root.classList.toggle("lk-dim", Boolean(keep.size));
+  if (fly && rows.length) reveal(root, cur?.el, rows);
+}
+
+// ---------- 悬停时，连着的要看得见（她 10-21 说的：连到了哪个词、哪几条目标，现在会被挡住） ----------
+
+// 折在「+N more」里的连着的目标：露出来（.lk-unfold），「+N more」跟着改数、全露出来了就藏起来。
+// 悬停的就在右栏里时，只放开它下面的——上面的放开会把它往下挤，鼠标底下就换成了别的一条。ends 空 = 全收回去
+function unfold(root, ends, el) {
+  const body = root.querySelector(".goals .rail-body"), inRail = Boolean(el && body?.contains(el)), want = new Set();
+  for (const k of ends) {
+    if (!k.startsWith("goal:")) continue;
+    const gl = root.querySelector('.goals .gl.fold[data-goal="' + CSS.escape(k.slice(5)) + '"]');
+    if (gl && (!inRail || el.compareDocumentPosition(gl) & Node.DOCUMENT_POSITION_FOLLOWING)) want.add(gl);
+  }
+  for (const gl of root.querySelectorAll(".goals .gl.lk-unfold")) if (!want.has(gl)) gl.classList.remove("lk-unfold");
+  for (const gl of want) gl.classList.add("lk-unfold");
+  for (const b of root.querySelectorAll('.goals .gcol .gmore[data-act="g-more"]')) {
+    const col = b.closest(".gcol"), all = col.querySelectorAll(".gl.fold").length, out = col.querySelectorAll(".gl.fold.lk-unfold").length;
+    b.dataset.t ??= b.textContent;
+    b.textContent = out ? "+" + (all - out) + " more" : b.dataset.t;
+    b.hidden = out > 0 && out === all;
+  }
+}
+
+// 这个词在那段字的框里整个看得见（折了行的话，最后一截也要在框里）
+function shows(box, el) {
+  const rs = el?.getClientRects();
+  if (!rs?.length) return false;
+  const r = box.getBoundingClientRect();
+  return rs[0].top >= r.top - 1 && rs[rs.length - 1].bottom <= r.bottom + 1;
+}
+
+// North star 那段平时只露三行。连着的词有被挡住的（在第三行下面、被滚走了、折了行露一半）：框里暂时换成重点——
+//   只连着一个词：那一句；一句放不下就那一小段（先带上前面一小段），再放不下就只剩这个词；连着两三个词：只列这几个词（她说的）。
+// 盖在原来那段字上面，一样大（下面的目标不跳）；原来那段藏起来（也不接鼠标），线走开就换回来（unfocusNorth）
+function focusNorth(root, ids) {
+  const ns = root.querySelector(".goals .ns"), txt = ns?.querySelector(".ns-text:not(.empty)");
+  if (!txt || !ids.length || ids.every((id) => shows(txt, txt.querySelector('.ns-g[data-goal="' + CSS.escape(id) + '"]')))) { unfocusNorth(root); return; }
+  const sig = [...ids].sort().join(" "), place = (el) => Object.assign(el.style, { top: txt.offsetTop + "px", left: txt.offsetLeft + "px", width: txt.clientWidth + "px", height: txt.clientHeight + "px" });
+  let ov = ns.querySelector(".ns-focus");
+  if (ov?.dataset.k === sig) { place(ov); return; }   // 已经换好了（滚动、窗口变了以后再画一遍）：只跟着挪
+  const text = store.northStar(), phrases = G.parseNorth(text), north = store.goals().filter((g) => g.span === "north");
+  const at = G.matchNorth(phrases, north).ids, byId = new Map(north.map((g) => [g.id, g]));
+  const keep = phrases.map((p, i) => i).filter((i) => ids.includes(at[i]));
+  if (!keep.length) { unfocusNorth(root); return; }
+  if (!ov) {
+    ov = document.createElement("div");
+    ov.className = "ns-focus";
+    ov.setAttribute("aria-hidden", "true");
+    ns.appendChild(ov);
+  }
+  place(ov);
+  // 框里的词和原来那段一个样子（.ns-g），只是不接鼠标、带的是 data-fgoal（不算能悬停、能连的那种）
+  const word = (i) => { const g = byId.get(at[i]); return (g ? '<span class="ns-g' + (g.done ? " done" : "") + '" data-fgoal="' + esc(g.id) + '">' : '<span class="ns-g ghost">') + esc(phrases[i].text) + "</span>"; };
+  const html = (parts) => parts.map((x) => (x.gap ? '<span class="ns-gap">…</span>' : x.sep ? '<span class="ns-sep">·</span>' : x.i !== undefined ? word(x.i) : esc(x.text))).join("");
+  for (const [level, pad] of keep.length > 1 ? [["word"]] : [["sentence"], ["clause", 1], ["clause"], ["word"]]) {
+    ov.innerHTML = html(G.northFocus(text, phrases, keep, level, pad));
+    if (ov.scrollHeight <= ov.clientHeight + 1) break;
+  }
+  ov.dataset.k = sig;
+  ns.classList.add("focus");
+}
+
+function unfocusNorth(root) {
+  root?.querySelector(".goals .ns-focus")?.remove();
+  root?.querySelector(".goals .ns.focus")?.classList.remove("focus");
+}
+
+// 右栏滚走了、看不见的连着的目标：悬停的在左边（计划卡、项目名）时，右栏滚过去（刚飞出去那一下，一次）。
+// 都放得下就挪最少的那一点；放不下就让最上面那条贴着顶。悬停的就在右栏里时不滚（不然它从鼠标底下跑掉）
+function reveal(root, el, rows) {
+  const body = root.querySelector(".goals .rail-body");
+  if (!body || !el || body.contains(el)) return;
+  const r = body.getBoundingClientRect(), top = r.top + 10, bottom = r.bottom - 10;
+  let lo = Infinity, hi = -Infinity;
+  for (const x of rows) {
+    if (!body.contains(x)) continue;
+    const b = x.getBoundingClientRect();
+    lo = Math.min(lo, b.top); hi = Math.max(hi, b.bottom);
+  }
+  if (lo === Infinity || (lo >= top && hi <= bottom)) return;
+  body.scrollBy({ top: hi - lo > bottom - top || lo < top ? lo - top : hi - bottom, behavior: still.matches ? "auto" : "smooth" });
 }
 
 // 原来就画着的：只挪位置（页面重画、滚动、窗口变了），不重飞。长短变得多了才换流光的节奏（换了会跳一下）
@@ -388,8 +481,10 @@ function open(key, el, kb = false) {
 
 // 线收起来（now：马上拿掉，不淡出）
 function clearLines(now) {
-  page()?.classList.remove("lk-dim");
-  page()?.querySelectorAll(".lk-on, .lk-has").forEach((el) => el.classList.remove("lk-on", "lk-has"));
+  const root = page();
+  root?.classList.remove("lk-dim");
+  root?.querySelectorAll(".lk-on, .lk-has").forEach((el) => el.classList.remove("lk-on", "lk-has"));
+  if (root) { unfocusNorth(root); unfold(root, new Set(), null); }
   if (!layer) return;
   cutX.classList.remove("on");
   const clear = () => { for (const [id, x] of edges) { edges.delete(id); x.g.remove(); } fit(); svg.classList.remove("out"); };

@@ -71,7 +71,7 @@ function rowHTML(x, k, dflt, fold = false) {
   const field = edit?.id === g.id ? edit.field : "";
   const text = field === "text"
     ? '<input class="gt-in" data-g="text" data-keep="goal-' + id + '" value="' + esc(g.text + (tag ? " #" + tag : "")) + '" aria-label="Goal">'
-    : '<button type="button" class="gt" data-act="g-text" title="' + esc(g.text) + '">' + esc(g.text) + "</button>";
+    : '<button type="button" class="gt" data-act="g-text" title="' + esc(g.text) + '"><span class="gtx">' + esc(g.text) + "</span></button>";   // .gtx：悬停画线时荧光笔只涂字那一截
   const opts = k.tags.some((t) => low(t) === low(tag)) || !tag ? k.tags : [...k.tags, tag];
   // 标签和某个项目同名：只画一个色点（那个项目的颜色），名字放在 title 里——栏很窄，字要留给目标本身；自己写的标签没有颜色，照旧显示字
   const hue = k.colors[low(tag)];

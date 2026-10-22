@@ -71,6 +71,9 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   **Goals, projects and plans can be linked** to say what each thing is for: rest the mouse on a goal, a framed phrase in the North star, a project name or a plan card
   (or Tab onto it with the keyboard), and the related links fly out one by one (a direct curve between the two ends — crossing text is fine, they only show while you're there).
   A **streak** of light keeps running along each line towards "what it's for" (plan → goal → parent goal → … → North star), and the dot at that end bounces when it arrives. By day it's ink with pink and blue printed slightly off-register; at night it's the project's neon colour.
+  Everything linked is marked with a lime highlighter (the goals' names and the North star's framed words) and the rest fades, and it's all brought into view:
+  if a linked word is hidden below the North star's three lines, the box shows the sentence it's in until you move away (a shorter part of it if the sentence doesn't fit;
+  with two or more linked words, only the words); linked goals folded behind "+N more" show; and when you're resting on something on the left, the goals column scrolls to the linked goals.
   Drag the small circle that appears onto another goal, plan or project to link them; the × in the middle of a line unlinks. While you drag, the North star paragraph opens in full
   and sections folded behind "+N more" show all their goals, so everything can be dropped on.
   Goals in Past are out of the picture: a line that would go through one goes straight to the next goal up that's still showing (a plan linked to last month's goal is drawn to that goal's parent).

@@ -1680,17 +1680,24 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 @container (max-width: 640px) { .pj-wrap { grid-template-columns: minmax(0, 1fr); } .goals.pj-rail { position: relative; top: 0; order: -1; max-height: none; margin-bottom: 18px; } }
 .goals .hint { margin: 10px 2px 4px; }
 /* North star：一段字，框出来的词是一条条目标（括号只在改的时候看得到） */
-.ns { flex: none; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.ns { position: relative; flex: none; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .ns h3 { display: flex; align-items: center; gap: 6px; height: 22px; margin: 0 0 4px; font: 700 13px var(--display); }
 .ns h3 .link { margin-left: auto; font-size: 12px; opacity: 0; transition: opacity .15s; }
 .ns:hover h3 .link, .ns h3 .link:focus-visible { opacity: 1; }
 @media (hover: none) { .ns h3 .link { opacity: 1; } }
 /* 平时只露前三行（她嫌整段太大），里面还能滚；底下还有字的时候（.more，js/ui/goals.js 量的）最后那一截淡出。
    拖连线的时候（.projects.lk-drag）放开到原来的 34vh，框出来的词都露出来、放得上去；悬停画线时不放开（会挪位置），藏着的词照旧压在边上画成空心点 */
-.ns-text { max-height: calc(1.75em * 3 + 2px); margin: 0; overflow-y: auto; overscroll-behavior: contain; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; scrollbar-width: none; }   /* 不做展开的过渡：拖连线时要马上量到展开后的位置 */
+.ns-text { max-height: calc(1.75em * 3 + 2px); margin: 0; overflow-y: auto; overscroll-behavior: contain; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; scrollbar-width: none; transition: opacity .16s; }   /* 不做展开的过渡：拖连线时要马上量到展开后的位置 */
 .ns-text::-webkit-scrollbar { display: none; }
 .ns-text.more { -webkit-mask-image: linear-gradient(#000 calc(100% - 1.5em), transparent); mask-image: linear-gradient(#000 calc(100% - 1.5em), transparent); }
 .projects.lk-drag .ns-text { max-height: 34vh; -webkit-mask-image: none; mask-image: none; }
+/* 悬停画线时连着的词被这三行挡住了（js/ui/links.js 的 focusNorth）：盖一层一样大的 .ns-focus，里面只放那一句 / 那一小段 / 那几个词；
+   原来那段藏起来（visibility，鼠标也不接），线走开就拿掉这一层、原来那段淡回来 */
+.ns.focus .ns-text { visibility: hidden; opacity: 0; }
+.ns-focus { position: absolute; margin: 0; overflow: hidden; font-size: 13.5px; line-height: 1.75; overflow-wrap: anywhere; pointer-events: none; animation: ns-focus .16s ease both; }
+.ns-focus .ns-gap { margin: 0 .3em; color: var(--muted); }
+.ns-focus .ns-sep { margin: 0 .4em; color: var(--muted); }
+@keyframes ns-focus { from { opacity: 0; } }
 .ns-text.empty { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .ns-g { display: inline; margin: 0 1px; padding: 1px 4px; border: 1.5px solid var(--ink); border-radius: 5px; font-weight: 600; -webkit-box-decoration-break: clone; box-decoration-break: clone; cursor: pointer; transition: background-color .15s; }
 .ns-g.done { color: var(--muted); text-decoration: line-through; }
@@ -1726,7 +1733,9 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 [data-theme="dark"] .gcol.drop-on { background: rgba(204, 255, 0, .08); box-shadow: inset 0 0 0 1px var(--accent); }
 .gl input[type="checkbox"] { flex-shrink: 0; width: 12px; height: 12px; margin: 0; padding: 0; accent-color: var(--ink); }
 [data-theme="dark"] .gl input[type="checkbox"] { accent-color: var(--accent); }
-.gt { flex: 1 1 auto; min-width: 0; padding: 0; border: 0; background: none; text-align: left; font: inherit; line-height: inherit; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; }
+.gt { flex: 1 1 auto; min-width: 0; margin: 0 -2px; padding: 0 2px; border: 0; background: none; text-align: left; font: inherit; line-height: inherit; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; }
+/* 字那一截（悬停画线时荧光笔涂它）：左右各多两像素的边，负 margin 抵掉，字不挪；.gt 也是这样，荧光笔的边才不会被它的 overflow 剪掉 */
+.gtx { margin: 0 -2px; padding: 0 2px; border-radius: 3px; transition: background-color .15s, color .15s; }
 .gt-in { flex: 1 1 calc(100% - 20px); min-width: 0; padding: 2px 6px; border: var(--b-ctl); border-radius: 6px; font-size: 12.5px; }
 .gl.done .gt { color: var(--muted); text-decoration: line-through; }
 .gl.ahead .gt { color: var(--muted); }
@@ -1753,7 +1762,9 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .goals .gwhen select { padding: 1px 17px 1px 6px; border-radius: 6px; background-position: right 4px center; background-size: 9px; font: 600 11px var(--num); }
 /* 一段多出来的折成「+2 more」；标题旁的「+」鼠标移到这一段才出来，点了才出加一条的框 */
 .gmore { display: block; height: 19px; margin-left: 18px; padding: 0; border: 0; background: none; font: 600 11px var(--num); color: var(--muted); }
-/* 「+N more」折起来的那几条：画着但藏着，拖连线时（.projects.lk-drag）整段露出来、「+N more」藏起来 */
+/* 「+N more」折起来的那几条：画着但藏着，拖连线时（.projects.lk-drag）整段露出来、「+N more」藏起来；
+   悬停画线时只露出连着的那几条（.lk-unfold，js/ui/links.js 的 unfold，「+N more」跟着改数） */
+.projects .goals .gl.fold.lk-unfold { display: flex; animation: ns-focus .2s ease both; }
 .gl.fold { display: none; }
 .projects.lk-drag .goals .gl.fold { display: flex; }
 .projects.lk-drag .goals .gmore { display: none; }
@@ -1869,6 +1880,12 @@ html.fx-off .lk-dot { animation: none; }
 .projects.lk-dim .goals :is(.gl, .ns-g):not(.lk-on), .projects.lk-dim .pgroup:not(.lk-has), .projects.lk-dim .pgroup.lk-has :is(.pcard, .g-rep):not(.lk-on),
 .projects.lk-drag .goals :is(.gl, .ns-g):not(.lk-can, .lk-src), .projects.lk-drag .pcard:not(.lk-can, .lk-src), .projects.lk-drag .g-rep:not(.lk-can, .lk-src),
 .projects.lk-drag .pg-top:not(.lk-can, .lk-src) h3 { opacity: .35; }
+/* 连着的：青柠荧光笔（她 10-21 从三个样子里挑的甲）——目标只涂字那一截（.gtx），North star 里的词整个框涂满；North star 里不是词的字变灰、底下不淡出。
+   夜里和 .chip.on 一样：淡青柠底 + 青柠字 + 一圈光 */
+.projects.lk-dim .goals .gl.lk-on .gtx, .projects.lk-dim .goals .ns-g.lk-on { background: var(--accent); color: var(--accent-ink); }
+[data-theme="dark"] .projects.lk-dim .goals .gl.lk-on .gtx, [data-theme="dark"] .projects.lk-dim .goals .ns-g.lk-on { background: rgba(204, 255, 0, .16); color: var(--accent); box-shadow: 0 0 12px rgba(204, 255, 0, .35); }
+.projects.lk-dim .goals :is(.ns-text, .ns-focus) { color: var(--muted); }
+.projects.lk-dim .goals .ns-text.more { -webkit-mask-image: none; mask-image: none; }
 .lk-can { outline: 1.5px dashed color-mix(in srgb, var(--ink) 45%, transparent); outline-offset: 2px; border-radius: 6px; }
 .pcard.lk-can { outline-offset: 4px; border-radius: 14px; }
 .lk-snap { outline: 2px solid var(--ink); }

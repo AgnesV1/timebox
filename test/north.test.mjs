@@ -27,6 +27,26 @@ test("the text to show: the saved one, or the goals one per line; goals missing 
   assert.equal(G.northText("", []), "");
 });
 
+test("hover focus: the sentence, the clause or only the words around the linked phrases, never cut inside a frame", () => {
+  const text = "What I'm steering by: [A steady, curious life] — slow mornings to read and write, work that keeps teaching me something, and [French as a second home]. Money is a tool, not the point.";
+  const p = G.parseNorth(text);
+  const show = (parts) => parts.map((x) => (x.gap ? "…" : x.sep ? "·" : x.i !== undefined ? "[" + p[x.i].text + "]" : x.text)).join("|");
+  assert.equal(show(G.northFocus(text, p, [1], "sentence")),
+    "What I'm steering by: |[A steady, curious life]| — slow mornings to read and write, work that keeps teaching me something, and |[French as a second home]|.|…",
+    "the whole first sentence, other frames in it included; the sentence after it is left out");
+  assert.equal(show(G.northFocus(text, p, [1], "clause")), "…|and |[French as a second home]|.|…", "the comma inside a frame doesn't cut it");
+  assert.equal(show(G.northFocus(text, p, [1], "clause", 1)), "…|work that keeps teaching me something, and |[French as a second home]|.|…", "pad brings the clause before it");
+  assert.equal(show(G.northFocus(text, p, [0], "clause")), "…|[A steady, curious life]| — slow mornings to read and write|…", "a trailing comma before … goes");
+  assert.equal(show(G.northFocus(text, p, [1, 0], "word")), "[A steady, curious life]|·|[French as a second home]", "only the words, in order");
+  assert.deepEqual(G.northFocus(text, p, [], "sentence"), []);
+  assert.deepEqual(G.northFocus(text, p, [7], "word"), [], "an index that isn't there is ignored");
+  const zh = "这几年想清楚的事：[A steady, curious life]，以及 [Live quietly]。\n\nWork should pay for the life. Keep learning — [French], writing.";
+  const q = G.parseNorth(zh);
+  const showZh = (parts) => parts.map((x) => (x.gap ? "…" : x.sep ? "·" : x.i !== undefined ? "[" + q[x.i].text + "]" : x.text)).join("|");
+  assert.equal(showZh(G.northFocus(zh, q, [1], "sentence")), "这几年想清楚的事：|[A steady, curious life]|，以及 |[Live quietly]|。|…", "Chinese full stops and blank lines end sentences");
+  assert.equal(showZh(G.northFocus(zh, q, [2], "sentence")), "…|Keep learning — |[French]|, writing.", "the last sentence: … only before it");
+});
+
 test("store: saving the paragraph creates, renames, reorders and deletes North star goals in one undoable step", async () => {
   console.warn = () => {};
   const store = await import("../js/store.js?north");

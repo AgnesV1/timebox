@@ -659,12 +659,14 @@ export function createView() {
     const g = c.used, B = c.B, cmp = M.compare(IX(), budgetsShown(), p, mode, today()), pct = cmp.cur.leftPct, bal = cmp.cur.balance;
     const since = (mode === "year" ? "Earlier years" : "6 mo") + (cmp.cutText ? " " + cmp.cutText : "");
     const pctText = (x) => Math.round(x * 100) + "%";
-    const show = { left: [pct === null ? "—" : (pct < 0 ? "−" : "") + pctText(Math.abs(pct)), pct !== null && pct < 0 ? "var(--mn-orange)" : "", pctText, pct === null ? (B ? "All base" : "No budget yet") : kfmt(cmp.cur.left) + " of " + kfmt(cmp.cur.room)],
-      expense: ["−" + M.money(g.out), "", kfmt, ""], income: ["+" + M.money(g.inc), "var(--mn-green)", kfmt, ""], balance: [(bal < 0 ? "−" : "+") + M.money(bal), "", kfmt, ""] };
-    const blown = pct !== null && pct < 0;
+    // Budget Left：剩下的钱 · 剩下几成（她 10-22 要的；方块宽度跟着字走，长了自己变宽）；超了两个都是负的、橙色。下面一行小字 = 一共能花多少（预算 − House）
+    const blown = pct !== null && pct < 0, left = cmp.cur.left;
+    const leftHTML = pct === null ? "—" : cents((left < 0 ? "−" : "") + M.money(Math.abs(left))) + '<span class="mn-kp">' + (pct < 0 ? "−" : "") + pctText(Math.abs(pct)) + "</span>";
+    const show = { left: [leftHTML, blown ? "var(--mn-orange)" : "", pctText, pct === null ? (B ? "All base" : "No budget yet") : "of " + kfmt(cmp.cur.room)],
+      expense: [cents("−" + M.money(g.out)), "", kfmt, ""], income: [cents("+" + M.money(g.inc)), "var(--mn-green)", kfmt, ""], balance: [cents((bal < 0 ? "−" : "+") + M.money(bal)), "", kfmt, ""] };
     for (const [k, , key] of CARDS) {
       const el = box.querySelector('[data-card="' + k + '"]'), [value, col, fmt, note] = show[k], v = el.querySelector(".v"), dot = el.querySelector(".mn-range > b"), small = el.querySelector(".mn-meta:last-child");
-      v.innerHTML = k === "left" ? esc(value) : cents(value);
+      v.innerHTML = value;
       v.style.color = col;
       el.title = since;
       const r = cmp.range[key], x = cmp.cur[key];

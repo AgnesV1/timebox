@@ -44,7 +44,7 @@ export function createSpending() {
     '<div class="sp-addw" data-add></div>' +
     '<section class="sp-kpis" data-kpis aria-label="This period at a glance">' + [["out", "Spent"], ["inc", "Income"], ["bal", "Balance"], ["left", "Budget left"]].map(([k, l]) =>
       // 线和点只建一次：换期时点从原处弹簧滑到新位置（重画就没有过渡了）
-      '<div class="sp-kpi" data-k="' + k + '"><span class="sp-kl">' + l + '</span><span class="sp-kv mn-num mn-rn"></span><div class="sp-kb"><div class="mn-track mn-range"><b hidden></b></div></div><span class="sp-ks mn-num"></span></div>').join("") + "</section>" +
+      '<div class="sp-kpi" data-k="' + k + '"><span class="sp-kl">' + l + '</span><span class="sp-kvw"><span class="sp-kv mn-num mn-rn"></span><span class="sp-kp mn-num mn-rn"></span></span><div class="sp-kb"><div class="mn-track mn-range"><b hidden></b></div></div><span class="sp-ks mn-num"></span></div>').join("") + "</section>" +
     '<div class="sp-body"><div class="sp-main">' +
     '<figure class="sp-chart"><figcaption><div><h3 data-ctitle></h3><p class="sp-lede" data-pace></p></div><div class="sp-legend" data-legend aria-hidden="true"></div></figcaption>' +
     '<svg class="mn-chart" data-chart role="img" aria-label="Spending against the budget"></svg></figure>' +
@@ -95,10 +95,13 @@ export function createSpending() {
     // 范围线：之前六个月（年 = 往年）最低到最高，点 = 这一期落在哪儿。橙色只标超了预算的（她 10-22 说的）：
     // Budget left 是负的时候那个数和 Budget left、Spent 的点；结余是负的、比平时花得多都不标
     const blown = pct !== null && pct < 0;
-    const cell = (k, value, { color = "", money = true, key, fmt = kfmt, small = "" }) => {
-      const el = root.querySelector('[data-k="' + k + '"]'), v = el.querySelector(".sp-kv"), tr = el.querySelector(".mn-track"), dot = tr.querySelector("b");
+    // extra = 跟在数后面的那一截（Budget left 的「· 69%」），一样滚着变
+    const cell = (k, value, { color = "", money = true, key, fmt = kfmt, small = "", extra = "" }) => {
+      const el = root.querySelector('[data-k="' + k + '"]'), v = el.querySelector(".sp-kv"), kp = el.querySelector(".sp-kp"), tr = el.querySelector(".mn-track"), dot = tr.querySelector("b");
       roll(v, value, money);
-      v.style.color = color;
+      if (extra) roll(kp, extra);
+      else { kp.textContent = ""; delete kp.dataset.v; }
+      v.style.color = kp.style.color = color;
       const r = key && cmp.range[key], x = cmp.cur[key];
       if (!r || x === null || x === undefined) {
         dot.hidden = true;
@@ -116,9 +119,10 @@ export function createSpending() {
     cell("out", "−" + M.money(g.out), { key: "expense" });
     cell("inc", "+" + M.money(g.inc), { color: "var(--mn-green)", key: "income" });
     cell("bal", (bal < 0 ? "−" : "+") + M.money(bal), { key: "balance" });
-    // 预算还剩几成：不算 House（底座）和 Bonds；提前记的未来那几笔也算在里面
-    cell("left", pct === null ? "—" : (pct < 0 ? "−" : "") + pctText(Math.abs(pct)), { money: false, color: blown ? "var(--mn-orange)" : "", key: "leftPct", fmt: pctText,
-      small: pct === null ? (B ? "Budget is all base" : "No budget yet") : kfmt(cmp.cur.left) + " of " + kfmt(cmp.cur.room) });
+    // 预算还剩多少钱 · 几成（她 10-22 要的）：不算 House（底座）和 Bonds；提前记的未来那几笔也算在里面。小字 = 一共能花多少（预算 − House）
+    const left = cmp.cur.left;
+    cell("left", pct === null ? "—" : (left < 0 ? "−" : "") + M.money(Math.abs(left)), { money: pct !== null, color: blown ? "var(--mn-orange)" : "", key: "leftPct", fmt: pctText,
+      extra: pct === null ? "" : (pct < 0 ? "−" : "") + pctText(Math.abs(pct)), small: pct === null ? (B ? "Budget is all base" : "No budget yet") : "of " + kfmt(cmp.cur.room) });
   }
 
   // ---------- 图表 ----------

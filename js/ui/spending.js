@@ -5,7 +5,7 @@
 //   左边：图表（梯形图，鼠标移上去看每天的读数）→ 流水表（月 = 按天分组；年、搜索 = 按月分组，多一列日期；金额靠右、等宽；
 //     鼠标移到一行出 Edit / ×，点一行就在原地改）
 //   + Add（按 N）：页头下面展开一行直接打字（不用滚到流水那里）：Tab 跳格、回车存（存完这一行就收起来，要接着记再按 N）、Esc 或点到外面（还没打字的话）收起；
-//     底下一排推荐，点了直接记上
+//     底下一排推荐，点了直接记上。类别那个下拉分两组 Expense / Income：选了收入那组的就是收入（左边 − 跟着变 +）；点 − / + 也能换过去
 //   右边（贴着顶）：By category，Expense / Income；每类一行：名字、金额、占比，底下一条按金额长的细线；点一类 = 流水只看这一类，再点取消
 //   齿轮：苦昼短自己的弹窗（Budget | Categories | Currency | Export | Import），功能和手机上的一样
 //   币种：每一笔是记的那种钱（金额那一格照原样写，换算过的小字在下面）；页头的 CAD ▾ = 总数换成哪种看（这台电脑自己的）；记一笔那一行金额后面能换币种，换了就一直用它
@@ -185,17 +185,20 @@ export function createSpending() {
     return list;
   }
   const firstCat = (kind) => { const l = visible(kind); return kind === "out" ? (l.includes("Food") ? "Food" : l[Math.min(1, l.length - 1)] || "") : l[0] || ""; };
+  const signHTML = () => '<button type="button" class="sp-sign' + (F.kind === "in" ? " in" : "") + '" data-act="sign" aria-label="' + (F.kind === "in" ? "Income — switch to an expense" : "Expense — switch to income") + '" title="' + (F.kind === "in" ? "Income" : "Expense") + ' — click to switch">' + (F.kind === "in" ? "+" : "−") + "</button>";
   function formInner(e) {
     const cats = catsFor(F.kind, e);
     if (!cats.includes(F.cat)) F.cat = cats.includes(firstCat(F.kind)) ? firstCat(F.kind) : cats[0] || "";
+    // 下拉里两组都列上：收入不用先找到左边那格才看得见
+    const groups = [["out", "Expense"], ["in", "Income"]].map(([k, l]) => [k, l, k === F.kind ? cats : catsFor(k, e)]).filter((g) => g[2].length);
     const used = M.notesOf(SP.entries(), F.cat), t = todayP();
     const view = V.mode === "year" ? (V.cur.y === t.y ? { y: t.y, m: t.m } : null) : { y: V.cur.y, m: V.cur.m };
     const recs = e ? [] : M.recommend(SP.entries(), SP.cats(), view, today());
     return '<div class="sp-fl">' +
-      '<button type="button" class="sp-sign' + (F.kind === "in" ? " in" : "") + '" data-act="sign" aria-label="' + (F.kind === "in" ? "Income — switch to an expense" : "Expense — switch to income") + '" title="Expense or income">' + (F.kind === "in" ? "+" : "−") + "</button>" +
+      signHTML() +
       '<input class="sp-fi sp-f-amt mn-num" data-f="v" inputmode="decimal" autocomplete="off" placeholder="0.00" value="' + esc(F.v) + '" aria-label="Amount (12.50+8 adds up)" title="12.50+8 adds up">' +
       '<select class="sp-fi sp-f-cur" data-f="cur" aria-label="Currency" title="Currency — new records keep using the one you pick">' + M.CURS.map((c) => '<option value="' + c.k + '"' + (c.k === F.cur ? " selected" : "") + ">" + c.code + "</option>").join("") + "</select>" +
-      '<select class="sp-fi sp-f-cat" data-f="c" aria-label="Category">' + cats.map((c) => "<option" + (c === F.cat ? " selected" : "") + ">" + esc(c) + "</option>").join("") + "</select>" +
+      '<select class="sp-fi sp-f-cat" data-f="c" aria-label="Category">' + groups.map(([k, l, list]) => '<optgroup label="' + l + '">' + list.map((c) => '<option value="' + esc(c) + '" data-k="' + k + '"' + (k === F.kind && c === F.cat ? " selected" : "") + ">" + esc(c) + "</option>").join("") + "</optgroup>").join("") + "</select>" +
       '<input class="sp-fi sp-f-note" data-f="n" autocomplete="off" placeholder="' + esc(used[0] ? "e.g. " + used[0] : "Note") + '" value="' + esc(F.n) + '" aria-label="Note">' +
       '<input class="sp-fi sp-f-date" type="date" data-f="d" value="' + esc(F.d) + '" aria-label="Date">' +
       '<span class="sp-fb">' + (e ? '<button type="button" class="sp-link warn" data-act="fdel">Delete</button>' : "") + '<button type="button" class="sp-link" data-act="cancel">Cancel</button>' +
@@ -216,6 +219,8 @@ export function createSpending() {
     if (!f) return;
     const val = (k) => f.querySelector('[data-f="' + k + '"]')?.value ?? "";
     Object.assign(F, { v: val("v"), cat: val("c") || F.cat, n: val("n"), d: val("d") || F.d, cur: val("cur") || F.cur });
+    const k = f.querySelector('[data-f="c"]')?.selectedOptions[0]?.dataset.k;   // 是支出还是收入，照选中的那个类别在哪一组
+    if (k) F.kind = k;
   }
   function renderTable() {
     readForm();
@@ -287,7 +292,7 @@ export function createSpending() {
     readForm();
     const s = sumOfAmount(F.v), err = $("[data-ferr]");
     if (!(s > 0)) { if (err) err.textContent = "Type an amount first"; focusAmount(); return; }
-    if (!F.cat) { if (err) err.textContent = "Add a category in Settings first"; return; }
+    if (!F.cat) { if (err) err.textContent = "Add " + (F.kind === "in" ? "an income" : "a") + " category in Settings first"; return; }
     if (!/^\d{4}-\d\d-\d\d$/.test(F.d)) { if (err) err.textContent = "Pick a date"; return; }
     const v = Math.round(s * 100) * (F.kind === "out" ? -1 : 1), row = { d: F.d, v, c: F.cat, n: F.n.trim(), cur: F.cur }, id = V.edit;
     if (id && id !== "new") {
@@ -403,6 +408,9 @@ export function createSpending() {
     if (e.target.matches('.sp-form [data-f="cur"]')) { F.cur = e.target.value; if (V.edit === "new") SP.setInCur(F.cur); wantRate(F.cur); return; }
     if (!e.target.matches('.sp-form [data-f="c"]')) return;
     F.cat = e.target.value;
+    // 选了另一组的类别：支出 / 收入跟着换，只换左边那格（打了的数、备注不动）
+    const k = e.target.selectedOptions[0]?.dataset.k, sign = $(".sp-form .sp-sign");
+    if (k && k !== F.kind) { F.kind = k; if (sign) sign.outerHTML = signHTML(); }
     const used = M.notesOf(SP.entries(), F.cat), note = $('.sp-form [data-f="n"]');
     if (note) note.placeholder = used[0] ? "e.g. " + used[0] : "Note";
   });

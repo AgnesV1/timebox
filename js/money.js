@@ -67,10 +67,6 @@ export const kindOf = (cats, name) => (cats.find((c) => c.name === name) || {}).
 export const keyOf = (p, mode) => (mode === "day" ? iso(p.y, p.m, p.d) : mode === "month" ? ym(p.y, p.m) : String(p.y));
 export const samePeriod = (a, b, mode) => keyOf(a, mode) === keyOf(b, mode);
 export function inPeriod(e, p, mode) { return e.d.startsWith(mode === "day" ? iso(p.y, p.m, p.d) : mode === "month" ? ym(p.y, p.m) : String(p.y)); }
-export function isFuture(p, mode, today) {
-  const t = parts(today);
-  return mode === "day" ? ord(p.y, p.m, p.d) > ord(t.y, t.m, t.d) : mode === "month" ? ord(p.y, p.m) > ord(t.y, t.m) : p.y > t.y;
-}
 
 const blank = () => ({ out: 0, inc: 0, base: 0, outside: 0, n: 0, nOut: 0, nIn: 0, cat: {}, cnt: {} });
 export const EMPTY = Object.freeze(blank());
@@ -145,11 +141,12 @@ export function yearBudget(budgets, y, today) {
 export function budgetOf(ix, budgets, p, mode, today) {
   return mode === "month" ? budgetAt(budgets, p.y, p.m) : mode === "year" ? yearBudget(budgets, p.y, today) : allowance(ix, budgets, p.y, p.m);
 }
-// 超了没有：日 = 底座和不算的以外，比每天的额度；月 / 年 = 算进预算的花销比预算。没定预算就永远不算超
+// 超了没有（标橙色）：月 / 年 = 算进预算的花销比预算；日 = 那个月到这一天为止一共算进预算的花销，超过这个月的预算没有。
+// 她 2026-10-22 说的：没超预算就别标橙色——某一天比每天的额度花得多不算超。没定预算就永远不算超
 export function isOver(ix, budgets, p, mode, today) {
-  const g = sumOf(ix, p, mode), B = budgetOf(ix, budgets, p, mode, today);
-  if (!B) return false;
-  return mode === "day" ? g.out - g.base - g.outside > B : counted(g) > B;
+  if (mode === "day") { const B = budgetAt(budgets, p.y, p.m); return B > 0 && counted(upTo(ix, p.y, p.m, p.d)) > B; }
+  const B = budgetOf(ix, budgets, p, mode, today);
+  return B > 0 && counted(sumOf(ix, p, mode)) > B;
 }
 
 // 图表的刻度：往上取一个好读的整数
@@ -170,7 +167,8 @@ export function monthChart(ix, budgets, y, m, today, { house = true } = {}) {
   const rate = last ? cv[last] / last : 0;
   const val = (d) => (d <= last ? base + cv[d] : base + cv[last] + ahead[d] + rate * (d - last));
   const pace = (d) => (B ? base + Math.max(0, B - base) * d / N : 0);
-  return { n: N, B, base, last, isCur, val, pace, top: niceMax(Math.max(B, val(N), base) * 1.04 || 100), used: g, home: (isCur ? t.d : N) - 1, house };
+  // over(d)：到那天一共的超过这个月的预算了（图上读数的点这时才是橙的；比斜着的预算线高不算超）
+  return { n: N, B, base, last, isCur, val, pace, over: (d) => B > 0 && val(d) > B, top: niceMax(Math.max(B, val(N), base) * 1.04 || 100), used: g, home: (isCur ? t.d : N) - 1, house };
 }
 
 // 年度图：按天画一整年（能拖到任意一天），每一笔落在它自己那天（她 2026-10 要的：不再把整月的 House 堆在 1 号）。
@@ -183,7 +181,7 @@ export function dayOfYear(y, m, d) { let n = d; for (let k = 1; k < m; k++) n +=
 export function dateOfDay(y, i) { let m = 1; while (m < 12 && i > dim(y, m)) { i -= dim(y, m); m++; } return iso(y, m, i); }
 export function yearChart(ix, budgets, y, today, { house = true } = {}) {
   const t = parts(today), n = daysIn(y), last = y > t.y ? 0 : y === t.y ? dayOfYear(t.y, t.m, t.d) : n;
-  const val = [0], bud = [0], base = [0], ahead = [0];
+  const val = [0], bud = [0], base = [0], ahead = [0], cap = [0];
   let i = 0, run = 0, budRun = 0, baseRun = 0, lastBase = 0, B = 0;
   for (let m = 1; m <= 12; m++) {
     const N = dim(y, m), Bm = budgetAt(budgets, y, m), g = sumOf(ix, { y, m }, "month"), started = i + 1 <= last;
@@ -204,10 +202,12 @@ export function yearChart(ix, budgets, y, today, { house = true } = {}) {
       bud[i] = Bm ? budRun : bud[i - 1];
       if (!Bm) budRun = bud[i];   // 没定预算的月份：预算线停着不涨
     }
+    for (let k = i - N + 1; k <= i; k++) cap[k] = bud[i];   // 这个月里每一天：到这个月底为止的预算（算超没超用它）
   }
   const rate = last ? val[last] / last : 0;
   const v = (k) => (k <= last ? val[k] : val[last] + ahead[k] + rate * (k - last));
-  return { n, B, last, isCur: y === t.y, val: v, budgetLine: bud, baseLine: base, house,
+  // over(k)：到那天一共的超过到那个月底为止的预算了（读数的点这时才是橙的）
+  return { n, B, last, isCur: y === t.y, val: v, budgetLine: bud, baseLine: base, house, over: (k) => cap[k] > 0 && v(k) > cap[k],
     top: niceMax(Math.max(bud[n], v(n), base[n]) * 1.04 || 100), used: sumOf(ix, { y }, "year"), home: (last || n) - 1, dateOf: (k) => dateOfDay(y, k) };
 }
 

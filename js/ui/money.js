@@ -112,7 +112,8 @@ const back = '<button type="button" class="mn-ic" data-act="back" aria-label="Ba
 const chevR = '<svg class="ic mn-cr" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
 export const periodTitle = (p, mode) => (mode === "day" ? M.fmtDate(M.iso(p.y, p.m, p.d)) : mode === "month" ? M.MONTH[p.m - 1] + " " + p.y : String(p.y));
 
-// 图表：梯形图（House 是底座、预算是浅天蓝底、实线是花的、虚线是照现在的速度）+ 鼠标 / 手指移上去的读数（竖线、橙点，上面哪天、下面到那天一共多少）。
+// 图表：梯形图（House 是底座、预算是浅天蓝底、实线是花的、虚线是照现在的速度）+ 鼠标 / 手指移上去的读数（竖线、圆点，上面哪天、下面到那天一共多少）。
+// 圆点平时是钴蓝，到那天一共花的超了预算才是橙的（c.over；她 10-22 说没超预算就别标橙色）。
 // 手机的图表页和电脑的 Spending 页共用。draw 按给的宽高画（viewBox = 像素，字不跟着缩放），返回这一期的数（monthChart / yearChart）。
 // house: false = 只看 House（底座类别）以外的花销和预算。点一下（按下抬起没挪、不到半秒；拖着是看读数）交给 onTap：
 //   完整的时候点在 House 那块上面 = "rest"（切到只看 House 以外），点在 House 那块里 = "house"（不切）；只看的时候点哪儿都是 "any"（回到完整的）
@@ -139,7 +140,7 @@ export function chartView(svg, { onTap = null } = {}) {
     if (c.isCur && c.last && c.last < c.n) h0 += '<path class="fc" d="M' + pts[c.last - 1].x + " " + pts[c.last - 1].y + " L" + pts[c.n - 1].x + " " + pts[c.n - 1].y + '" fill="none" stroke="#F2EEE6" stroke-opacity=".5" stroke-width="1.4" stroke-dasharray="4 4"/>';
     const xl = mode === "month" ? [[1, M.MON[p.m - 1] + " 1"], [Math.ceil(c.n / 2), M.MON[p.m - 1] + " " + Math.ceil(c.n / 2)], [c.n, M.MON[p.m - 1] + " " + c.n]] : [[1, "Jan"], [M.dayOfYear(p.y, 7, 1), "Jul"], [c.n, "Dec"]];
     h0 += '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y0 + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".14"/>' + xl.map(([i, txt], k) => '<text x="' + X(i) + '" y="' + (H - 5) + '" text-anchor="' + (k === 0 ? "start" : k === 2 ? "end" : "middle") + '">' + txt + "</text>").join("") +
-      '<line data-csl y1="' + (Y1 - 14) + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".35" style="pointer-events:none"/><circle data-csp r="4.5" fill="var(--mn-orange)" stroke="#000" stroke-width="1.5" style="pointer-events:none"/>' +
+      '<line data-csl y1="' + (Y1 - 14) + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".35" style="pointer-events:none"/><circle data-csp r="4.5" fill="var(--mn-blue)" stroke="#000" stroke-width="1.5" style="pointer-events:none"/>' +
       // 读数在竖线右边：上面是哪天，下面是到那天一共多少（靠右边放不下就挪到左边）
       '<g data-lab style="pointer-events:none"><text data-lt class="mn-ax" y="' + (Y1 - 4) + '" style="font-size:11px;fill:#8C8CA0"></text><text data-lv class="mn-ax" y="' + (Y1 + 12) + '" style="font-size:13px;fill:#F2EEE6"></text></g>';
     svg.innerHTML = h0;
@@ -173,6 +174,7 @@ export function chartView(svg, { onTap = null } = {}) {
     if (!lt) return;
     lt.textContent = CS.dateOf(i) + (i + 1 > CS.c.last ? " · trend" : "");
     svg.querySelector("[data-lv]").textContent = M.money(CS.c.val(i + 1));
+    svg.querySelector("[data-csp]").setAttribute("fill", CS.c.over(i + 1) ? "var(--mn-orange)" : "var(--mn-blue)");
     cplace(ci);
   }
   const ctick = () => { ci += (ct - ci) * 0.18; if (Math.abs(ct - ci) < 0.005) ci = ct; cplace(ci); craf = ci === ct ? 0 : requestAnimationFrame(ctick); };
@@ -218,7 +220,9 @@ export function createView() {
     '<div class="mn-tl"><span class="mn-hl"></span><div class="mn-rw"><div class="mn-rail"></div></div></div>' +
     '<div class="mn-hs mn-chips"></div>' +
     '<div class="mn-lw"><div class="mn-list mn-vs"></div>' + blur.replace("mn-pblur", "mn-pblur top") + blur.replace("mn-pblur", "mn-pblur bot") + "</div>" +
-    '<div class="mn-foot"><div class="mn-recw" hidden><span class="mn-meta" style="flex:none">Recommended</span><div class="mn-hs mn-recs"></div></div>' +
+    // 底栏：左边推荐的几笔，右下角一个圆的「+」记一笔（她 10-22 要回来的；今天页的 Spend 也留着）
+    '<div class="mn-foot"><div class="mn-frow"><div class="mn-recw" hidden><span class="mn-meta" style="flex:none">Recommended</span><div class="mn-hs mn-recs"></div></div>' +
+    '<button type="button" class="mn-fab" data-act="add" aria-label="Add a transaction" title="Add a transaction">' + icon("plus") + "</button></div>" +
     '<div class="mn-grab" data-grab aria-label="Close"><span class="mn-grabber"></span></div></div></section>';
   const pages = '<section class="mn-pg off" data-pg="set"><div class="mn-hdr">' + back + '<span style="font-size:15px;font-weight:500">Settings</span><span style="width:32px"></span></div><div class="mn-vs" data-setb style="flex:1;margin-top:14px"></div></section>' +
     '<section class="mn-pg off" data-pg="sub"><div class="mn-hdr">' + back + '<span data-subt style="font-size:15px;font-weight:500"></span><span style="width:32px"></span></div><div class="mn-vs" data-subb style="flex:1;margin-top:14px"></div></section>' +
@@ -298,8 +302,9 @@ export function createView() {
   }
   let cap = 1;
   function barOf(it) {
-    const g = M.sumOf(IX(), it, V.mode), fut = M.isFuture(it, V.mode, today());
-    return { h: fut || !g.out ? 4 : 6 + Math.min(1, g.out / cap) * 34, cls: fut || !g.out ? "" : M.isOver(IX(), budgetsShown(), it, V.mode, today()) ? "over" : "ok", inc: g.inc > 0 };
+    // 提前记的（日期还没到的那几期）也照常画（她 10-22 说的）；没花钱的是一道短横线。橙色 = 超了预算（M.isOver：日 = 那个月到这天为止超了）
+    const g = M.sumOf(IX(), it, V.mode);
+    return { h: !g.out ? 4 : 6 + Math.min(1, g.out / cap) * 34, cls: !g.out ? "" : M.isOver(IX(), budgetsShown(), it, V.mode, today()) ? "over" : "ok", inc: g.inc > 0 };
   }
   function measureCap() {
     const vals = V.items.map((it) => M.sumOf(IX(), it, V.mode).out).filter((v) => v > 0).sort((a, b) => a - b);
@@ -645,8 +650,9 @@ export function createView() {
   }
 
   // 四个小方块：一样的四行（名字 / 数 / 一条线 / 小字），所以对得齐。线 = 之前六个月（年模式 = 之前几年）这个数的范围，
-  // 点 = 这次落在哪儿（这个月的话，之前的也只算到同一天）。方块只建一次，换期只挪点（弹着滑过去）、换数
-  const CARDS = [["left", "Budget Left", "leftPct", "low"], ["expense", "Expense", "expense", "high"], ["income", "Income", "income", "low"], ["balance", "Balance", "balance", "low"]];
+  // 点 = 这次落在哪儿（这个月的话，之前的也只算到同一天）。方块只建一次，换期只挪点（弹着滑过去）、换数。
+  // 橙色只标超了预算的（她 10-22 说的）：Budget Left 是负的时候那个数和 Budget Left、Expense 的点；结余是负的、比平时花得多都不标
+  const CARDS = [["left", "Budget Left", "leftPct"], ["expense", "Expense", "expense"], ["income", "Income", "income"], ["balance", "Balance", "balance"]];
   function cards(c, mode, p) {
     const box = $(".mn-cards");
     if (!box.querySelector("[data-card]")) box.innerHTML = CARDS.map(([k, label]) => '<div class="mn-card" data-card="' + k + '"><span class="mn-meta">' + label + '</span><span class="mn-num v"></span><div class="mn-track mn-range"><b hidden></b></div><span class="mn-num mn-meta"></span></div>').join("");
@@ -654,8 +660,9 @@ export function createView() {
     const since = (mode === "year" ? "Earlier years" : "6 mo") + (cmp.cutText ? " " + cmp.cutText : "");
     const pctText = (x) => Math.round(x * 100) + "%";
     const show = { left: [pct === null ? "—" : (pct < 0 ? "−" : "") + pctText(Math.abs(pct)), pct !== null && pct < 0 ? "var(--mn-orange)" : "", pctText, pct === null ? (B ? "All base" : "No budget yet") : kfmt(cmp.cur.left) + " of " + kfmt(cmp.cur.room)],
-      expense: ["−" + M.money(g.out), "", kfmt, ""], income: ["+" + M.money(g.inc), "var(--mn-green)", kfmt, ""], balance: [(bal < 0 ? "−" : "+") + M.money(bal), bal < 0 ? "var(--mn-orange)" : "", kfmt, ""] };
-    for (const [k, , key, worse] of CARDS) {
+      expense: ["−" + M.money(g.out), "", kfmt, ""], income: ["+" + M.money(g.inc), "var(--mn-green)", kfmt, ""], balance: [(bal < 0 ? "−" : "+") + M.money(bal), "", kfmt, ""] };
+    const blown = pct !== null && pct < 0;
+    for (const [k, , key] of CARDS) {
       const el = box.querySelector('[data-card="' + k + '"]'), [value, col, fmt, note] = show[k], v = el.querySelector(".v"), dot = el.querySelector(".mn-range > b"), small = el.querySelector(".mn-meta:last-child");
       v.innerHTML = k === "left" ? esc(value) : cents(value);
       v.style.color = col;
@@ -664,7 +671,7 @@ export function createView() {
       if (!r || x === null || x === undefined) { dot.hidden = true; small.textContent = note || (mode === "year" ? "No earlier years" : "No history yet"); continue; }
       const span = r[1] - r[0], pos = span ? (x - r[0]) / span : 0.5;
       dot.hidden = false;
-      dot.classList.toggle("over", worse === "high" ? x > r[1] : x < r[0]);
+      dot.classList.toggle("over", blown && (k === "left" || k === "expense"));
       dot.style.left = (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + "%";
       small.textContent = note || fmt(r[0]) + "–" + fmt(r[1]);
     }

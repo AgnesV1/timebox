@@ -230,10 +230,12 @@ press and drag the minutes on the left to reorder (the phone has no ↑ ↓; the
 - Phone: pull down from the top of Today (with the page scrolled to the top) — a drop grows under the Dynamic Island; at about 90px the neck snaps and the "+" turns blue, and letting go drops the panel like a curtain
   (with a small bounce at the bottom). It stops at about 94% of the screen with a hem of a few soft waves along its lower edge; scrolling the list makes the waves drift and sway before settling. Tap the strip of Today still showing below (or the hem),
   or push the small bar at the bottom up, and the curtain rises again (if you added anything, the island shows today's total for a moment).
-  Inside: Year / Month / Day, a draggable bar timeline, category chips, the list (tap to edit, swipe left to delete) and suggestions.
-  To add a transaction, tap **Spend** at the bottom right of the add-task box on Today: the entry sheet rises from the bottom without the curtain — expense / income, category, date (today), note, currency
+  Inside: Year / Month / Day, a draggable bar timeline, category chips, the list (tap to edit, swipe left to delete) and suggestions, with a round **+** at the bottom right to add a transaction.
+  The bars include records dated ahead (upcoming), drawn like any other. A bar is orange only when over budget: a month or year over its budget, a day once the month's budget has run out by then
+  (a day bigger than the daily share isn't orange).
+  To add a transaction from Today, tap **Spend** at the bottom right of the add-task box: the entry sheet rises from the bottom without the curtain — expense / income, category, date (today), note, currency
   and a large number pad that also takes `12.5+8`. After Add it slides away, the island shows today's total for a moment and the toast has Undo; tapping the dimmed page or ✕ closes it without saving.
-  Tapping a record in the list opens the same sheet to edit it.
+  The + in the panel and tapping a record in the list open the same sheet.
   The chart icon at the top raises the charts to half height (the period and timeline stay visible); drag up for full height, down to close.
 - Computer: Spending is one large translucent black board laid out like a web page: the period and sync status at the top, with Month / Year, ‹ Now ›, search (`/`), the currency to show totals in, the gear and `+ Add` (N) on the right;
   a row of five numbers below (Spent, Income, Balance, Budget used, Budget left, with a thin line for the range of the previous six months); then the chart and the transaction table on the left (a month is grouped by day; a year and search results by month),
@@ -241,6 +243,8 @@ press and drag the minutes on the left to reorder (the phone has no ↑ ↓; the
 - **Charts (phone and computer)**: the line is spending added up day by day, House on the day it was paid — the year chart too, so each month's rent is a step; months not recorded yet assume
   the latest month's House on the 1st. The shaded areas are House and the budget (House plus each day's share of the rest). Tap or click the part above House to see only the other spending
   against the budget minus House (the title or a line under the chart says so); tap anywhere to go back. The charts always open showing everything.
+  The dot that reads the line is blue, and orange only once the spending has passed the budget (the month's; in the year chart, the budget up to the end of that month).
+  Orange means over budget and nothing else: a negative balance or a month higher than usual isn't orange (the small range lines under the numbers mark where it falls, in blue).
 - **Currencies**: each record keeps the currency it was paid in (CAD, RMB, USD, EUR, GBP, JPY, HKD). Pick it next to the amount; new records keep using that currency until you change it (per device).
   Totals, charts, categories and the budget are shown in one currency — CAD by default, switchable per device (the `CAD ⌄` next to the totals). Rows show the original amount with the converted one underneath.
   Rates are in Settings → Currency (`1 CAD = …`): type them, or Use today's rates to fetch the European Central Bank's (via frankfurter.dev, only when you ask, or once when you first pick a currency with no rate). A currency with no rate yet uses a rough one, marked "rough". Budgets are set in CAD.

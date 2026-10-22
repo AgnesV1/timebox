@@ -98,6 +98,13 @@
 .mn .mn-empty { padding: 40px 0; text-align: center; font-size: 13px; color: var(--mn-mute); }
 .mn .mn-foot { flex: none; padding-top: 10px; border-top: 1px solid var(--mn-line); }
 .mn .mn-recw { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+/* 底栏一行：推荐的几笔占左边（横着滚），右下角一个圆的「+」记一笔（js/ui/money.js 的 data-act="add"）——和数字键盘的 Add 一个颜色 */
+.mn .mn-frow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.mn .mn-frow .mn-recw { flex: 1; min-width: 0; margin-bottom: 0; }
+.mn .mn-fab { all: unset; flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin-left: auto; border-radius: 50%; background: var(--mn-pri); color: var(--mn-pri-ink); cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14); transition: transform .28s var(--mn-spring); }
+.mn .mn-fab .ic { width: 22px; height: 22px; stroke-width: 2.2; }
+.mn .mn-fab:active { transform: scale(.94); transition-duration: .12s; }
+.mn .mn-fab:focus-visible { outline: 1.5px solid var(--mn-blue); outline-offset: 2px; }
 .mn .mn-recw[hidden] { display: none; }
 .mn .mn-big { all: unset; display: block; width: 100%; height: 44px; border-radius: 13px; background: var(--mn-pri); color: var(--mn-pri-ink); text-align: center; line-height: 44px; font-size: 15px; font-weight: 500; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14); transition: transform .28s var(--mn-spring); }
 .mn .mn-big:active { transform: scale(.97); transition-duration: .12s; }

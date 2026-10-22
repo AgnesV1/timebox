@@ -196,6 +196,8 @@ async function seedSpending(page) {
       if (rnd() < 0.03) rows.push({ d: date, v: -Math.round(1500 + rnd() * 4000), c: "Health", n: "pharmacy" });
       if (rnd() < 0.03) rows.push({ d: date, v: Math.round(5000 + rnd() * 20000), c: "Extra", n: "" });
     }
+    // 提前记下的（日期还没到，upcoming）：三天后的一张票、下个月一号的房租——柱子照常画
+    rows.push({ d: day(-3), v: -6800, c: "Entertainment", n: "concert" }, { d: new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10), v: -145000, c: "House", n: "rent" });
     SP.addMany(rows);
     SP.setBudgets([{ from: day(150).slice(0, 7), v: 358000 }]);
   });

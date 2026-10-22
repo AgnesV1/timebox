@@ -31,15 +31,37 @@ test("a month uses the latest budget set on or before it", () => {
   assert.equal(M.yearBudget(budgets, 2026, "2026-10-16"), 358000 * 8 + 303500 + 358000);
 });
 
-test("over budget: a day compares what's outside House and Bonds with the daily allowance", () => {
+test("over budget (orange) only once the month's budget is used up: a day bigger than the daily allowance isn't over", () => {
   const ix = M.index(rows, cats);
   const al = M.allowance(ix, budgets, 2026, 10);
   assert.equal(Math.round(al), Math.round((358000 - 145000) / 31));
-  assert.equal(M.isOver(ix, budgets, { y: 2026, m: 10, d: 2 }, "day", "2026-10-16"), false);   // the deposit doesn't count
   const big = M.index([...rows, e("2026-10-05", -9000, "Clothes")], cats);
-  assert.equal(M.isOver(big, budgets, { y: 2026, m: 10, d: 5 }, "day", "2026-10-16"), true);
+  assert.equal(M.isOver(big, budgets, { y: 2026, m: 10, d: 5 }, "day", "2026-10-16"), false, "$90 on one day is more than the daily allowance, but the month is fine");
+  const blown = M.index([...rows, e("2026-10-05", -220000, "Clothes"), e("2026-10-06", -500, "Food")], cats);
+  assert.equal(M.isOver(blown, budgets, { y: 2026, m: 10, d: 4 }, "day", "2026-10-16"), false);
+  assert.equal(M.isOver(blown, budgets, { y: 2026, m: 10, d: 5 }, "day", "2026-10-16"), true, "rent + the rest so far went past $3,580 that day");
+  assert.equal(M.isOver(blown, budgets, { y: 2026, m: 10, d: 6 }, "day", "2026-10-16"), true, "and every day after it");
+  const bonds = M.index([...rows, e("2026-10-05", -300000, "Bonds")], cats);
+  assert.equal(M.isOver(bonds, budgets, { y: 2026, m: 10, d: 5 }, "day", "2026-10-16"), false, "Bonds stay out of the budget");
   assert.equal(M.isOver(ix, budgets, { y: 2026, m: 10 }, "month", "2026-10-16"), false);
+  assert.equal(M.isOver(blown, budgets, { y: 2026, m: 10 }, "month", "2026-10-16"), true);
   assert.equal(M.isOver(ix, [], { y: 2026, m: 10 }, "month", "2026-10-16"), false);   // no budget, never orange
+  assert.equal(M.isOver(blown, [], { y: 2026, m: 10, d: 5 }, "day", "2026-10-16"), false);
+});
+
+test("the chart's reading dot is orange only past the budget: the month's, or in a year the budget up to that month's end", () => {
+  const blown = M.index([...rows, e("2026-10-05", -220000, "Clothes")], cats);
+  const c = M.monthChart(blown, budgets, 2026, 10, "2026-10-16");
+  assert.equal(c.over(4), false, "above the slanted budget line isn't over yet");
+  assert.equal(c.over(5), true);
+  assert.equal(M.monthChart(M.index(rows, cats), budgets, 2026, 10, "2026-10-16").over(16), false);
+  const y = M.yearChart(blown, budgets, 2026, "2026-10-16"), day = (m, d) => M.dayOfYear(2026, m, d);
+  assert.equal(y.over(day(9, 30)), false);
+  assert.equal(y.over(day(10, 5)), false, "Jan–Oct budgets add up to far more than what's been spent");
+  const huge = M.yearChart(M.index([...rows, e("2026-10-05", -3500000, "Clothes")], cats), budgets, 2026, "2026-10-16");
+  assert.equal(huge.over(day(9, 30)), false, "September is judged against the budget up to September's end");
+  assert.equal(huge.over(day(10, 4)), false);
+  assert.equal(huge.over(day(10, 5)), true, "past everything budgeted up to the end of October");
 });
 
 test("the month chart starts at the base, adds the rest day by day, and trends to the month end", () => {

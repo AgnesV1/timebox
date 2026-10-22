@@ -92,8 +92,10 @@ export function createSpending() {
     const g = c.used, B = c.B, bal = cmp.cur.balance, pct = cmp.cur.leftPct;
     const since = (mode === "year" ? "earlier years" : "the last six months") + (cmp.cutText ? ", " + cmp.cutText : "");
     const pctText = (x) => Math.round(x * 100) + "%";
-    // 范围线：之前六个月（年 = 往年）最低到最高，点 = 这一期落在哪儿
-    const cell = (k, value, { color = "", money = true, key, worse, fmt = kfmt, small = "" }) => {
+    // 范围线：之前六个月（年 = 往年）最低到最高，点 = 这一期落在哪儿。橙色只标超了预算的（她 10-22 说的）：
+    // Budget left 是负的时候那个数和 Budget left、Spent 的点；结余是负的、比平时花得多都不标
+    const blown = pct !== null && pct < 0;
+    const cell = (k, value, { color = "", money = true, key, fmt = kfmt, small = "" }) => {
       const el = root.querySelector('[data-k="' + k + '"]'), v = el.querySelector(".sp-kv"), tr = el.querySelector(".mn-track"), dot = tr.querySelector("b");
       roll(v, value, money);
       v.style.color = color;
@@ -104,18 +106,18 @@ export function createSpending() {
         el.querySelector(".sp-ks").textContent = small || (mode === "year" ? "No earlier years yet" : "No history yet");
         return;
       }
-      const span = r[1] - r[0], pos = span ? (x - r[0]) / span : 0.5, bad = worse === "high" ? x > r[1] : x < r[0];
+      const span = r[1] - r[0], pos = span ? (x - r[0]) / span : 0.5;
       dot.hidden = false;
-      dot.classList.toggle("over", bad);
+      dot.classList.toggle("over", blown && (k === "left" || k === "out"));
       dot.style.left = (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + "%";
       tr.title = "Lowest to highest over " + since;
       el.querySelector(".sp-ks").textContent = (small ? small + " · " : "") + "usually " + fmt(r[0]) + "–" + fmt(r[1]);
     };
-    cell("out", "−" + M.money(g.out), { key: "expense", worse: "high" });
-    cell("inc", "+" + M.money(g.inc), { color: "var(--mn-green)", key: "income", worse: "low" });
-    cell("bal", (bal < 0 ? "−" : "+") + M.money(bal), { color: bal < 0 ? "var(--mn-orange)" : "", key: "balance", worse: "low" });
+    cell("out", "−" + M.money(g.out), { key: "expense" });
+    cell("inc", "+" + M.money(g.inc), { color: "var(--mn-green)", key: "income" });
+    cell("bal", (bal < 0 ? "−" : "+") + M.money(bal), { key: "balance" });
     // 预算还剩几成：不算 House（底座）和 Bonds；提前记的未来那几笔也算在里面
-    cell("left", pct === null ? "—" : (pct < 0 ? "−" : "") + pctText(Math.abs(pct)), { money: false, color: pct !== null && pct < 0 ? "var(--mn-orange)" : "", key: "leftPct", worse: "low", fmt: pctText,
+    cell("left", pct === null ? "—" : (pct < 0 ? "−" : "") + pctText(Math.abs(pct)), { money: false, color: blown ? "var(--mn-orange)" : "", key: "leftPct", fmt: pctText,
       small: pct === null ? (B ? "Budget is all base" : "No budget yet") : kfmt(cmp.cur.left) + " of " + kfmt(cmp.cur.room) });
   }
 

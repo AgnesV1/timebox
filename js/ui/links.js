@@ -51,14 +51,17 @@ function keyOf(el) {
   return el.dataset.project ? G.planRef(el.dataset.project) : "";
 }
 
-// 页面上代表它的元素。目标折在「+N more」里：用那个按钮代替；做完的没列出来：用那一段的标题；切到了 Ideas：用「Goals」那个按钮
+// 页面上代表它的元素。目标折在「+N more」里（画着但藏着，.fold）：平时用那个按钮代替，拖着连线时那一段整段展开、就是它自己；
+// 切到了 Ideas：用「Goals」那个按钮。收进往期的目标不会问到这里（related 已经越过它们）
 function elOf(key, cols) {
   const root = page();
   if (!root) return null;
   const q = (sel) => root.querySelector(sel);
   if (key.startsWith("goal:")) {
     const id = CSS.escape(key.slice(5)), col = cols.get(key.slice(5));
-    return q('.goals .gl[data-goal="' + id + '"]') || q('.goals .ns-g[data-goal="' + id + '"]') ||
+    const gl = q('.goals .gl[data-goal="' + id + '"]');
+    if (gl && (!gl.classList.contains("fold") || root.classList.contains("lk-drag"))) return gl;
+    return q('.goals .ns-g[data-goal="' + id + '"]') ||
       (col && (q('.goals [data-col="' + col + '"] .gmore') || q('.goals [data-col="' + col + '"] h4'))) || q('.goals .rail-tabs [data-v="goals"]');
   }
   if (key.startsWith("g:")) return q('.pgroup[data-group="' + CSS.escape(key.slice(2)) + '"] > .pg-top:not(.editing)');
@@ -66,35 +69,41 @@ function elOf(key, cols) {
   return q('.pcard[data-project="' + id + '"]') || q('.g-rep[data-project="' + id + '"]');
 }
 
-// 一条线 { id, from, to, at, rev }：from 为 to 服务（虚线往 to 流）；at = 离悬停的那个第几层（飞出去的先后）；rev = 悬停的在 to 那头，从那头开始画
+// 一条线 { id, from, to, at, rev }：from 为 to 服务（虚线往 to 流）；at = 离悬停的那个第几层（飞出去的先后）；rev = 悬停的在 to 那头，从那头开始画。
+// 过了期、收进往期的目标当它不在（她说每个月上个月一消失，路径就该跟着变）：经过它的线越过它，接到它往上第一条还在的——
+// 挂在它下面的算挂在那一条下面，为它服务的计划 / 项目也算为那一条服务（js/goals.js 的 visibleSet / lift）
 function related(key) {
   const goals = store.goals(), byId = new Map(goals.map((g) => [g.id, g]));
+  const vis = G.visibleSet(goals, store.today()), lift = (id) => (id ? G.lift(goals, id, vis, byId)?.id || "" : "");
   const out = new Map();
   const add = (from, to, at, rev) => { if (from !== to && !out.has(from + ">" + to)) out.set(from + ">" + to, { id: from + ">" + to, from, to, at, rev }); };
-  const up = (id, at) => { const chain = G.chainUp(goals, id); for (let i = 0; i + 1 < chain.length; i++) add("goal:" + chain[i].id, "goal:" + chain[i + 1].id, at + i, false); };
+  const up = (id, at) => { const chain = G.chainUp(goals, id, vis); for (let i = 0; i + 1 < chain.length; i++) add("goal:" + chain[i].id, "goal:" + chain[i + 1].id, at + i, false); };
   const refs = (g) => (Array.isArray(g?.by) ? g.by : []);
+  const lifted = (list) => [...new Set(list.map((g) => lift(g.id)).filter(Boolean))];
   if (key.startsWith("goal:")) {
     const id = key.slice(5);
-    if (!byId.has(id)) return [];
+    if (!vis.has(id)) return [];
     up(id, 0);
+    const home = new Map(goals.map((g) => [g.id, lift(g.id)]));            // 每条目标算在哪一条还在的上（还在的就是它自己）
+    const parent = new Map(goals.map((g) => [g.id, lift(g.up)]));          // 越过收掉的以后，它的上级
     const level = new Map([[id, 0]]), queue = [id];
     while (queue.length) {
       const pid = queue.shift(), at = level.get(pid);
-      for (const r of refs(byId.get(pid))) add(r, "goal:" + pid, at, true);
-      for (const g of goals) if (g.up === pid && !level.has(g.id)) { level.set(g.id, at + 1); add("goal:" + g.id, "goal:" + pid, at, true); queue.push(g.id); }
+      for (const g of goals) if (home.get(g.id) === pid) for (const r of refs(g)) add(r, "goal:" + pid, at, true);
+      for (const g of goals) if (vis.has(g.id) && g.id !== pid && parent.get(g.id) === pid && !level.has(g.id)) { level.set(g.id, at + 1); add("goal:" + g.id, "goal:" + pid, at, true); queue.push(g.id); }
     }
     return [...out.values()];
   }
-  let from = key, list = G.servedBy(goals, key);
-  if (!list.length && key.startsWith("p:")) {   // 计划自己没连：看它所在的项目连着的
+  let from = key, list = lifted(G.servedBy(goals, key));
+  if (!list.length && key.startsWith("p:")) {   // 计划自己没连（或者连的都收进往期了）：看它所在的项目连着的
     const p = store.get("projects", key.slice(2));
-    if (p?.group) { from = G.groupRef(p.group); list = G.servedBy(goals, from); }
+    if (p?.group) { from = G.groupRef(p.group); list = lifted(G.servedBy(goals, from)); }
   }
-  for (const g of list) { add(from, "goal:" + g.id, 0, false); up(g.id, 1); }
+  for (const gid of list) { add(from, "goal:" + gid, 0, false); up(gid, 1); }
   if (key.startsWith("g:")) {
     for (const p of store.all("projects")) {
       if ((p.group || "") !== key.slice(2) || !E.isActive(p)) continue;
-      for (const g of G.servedBy(goals, G.planRef(p.id))) { add(G.planRef(p.id), "goal:" + g.id, 1, false); up(g.id, 2); }
+      for (const gid of lifted(G.servedBy(goals, G.planRef(p.id)))) { add(G.planRef(p.id), "goal:" + gid, 1, false); up(gid, 2); }
     }
   }
   return [...out.values()];
@@ -276,7 +285,7 @@ function paint(key, { fly = true } = {}) {
   if (!root) return;
   const goals = store.goals();
   const cols = new Map();
-  for (const col of G.board(goals, store.today(), { showDone: true }).cols) for (const x of col.items) cols.set(x.goal.id, col.key);
+  for (const col of G.board(goals, store.today()).cols) for (const x of col.items) cols.set(x.goal.id, col.key);
   const base = colorOf(key);
   const lit = new Set([key]), keep = new Set();
   let n = 0, streaks = 0;
@@ -496,7 +505,11 @@ function startDrag(e) {
     if (k && canLink(goals, from, k)) { can.set(n, k); n.classList.add("lk-can"); }
   }
   el.classList.add("lk-src");
+  // 右栏展开（css：North star 那段放开、各段折起来的目标露出来），能连的才都看得到、放得上去。
+  // 拖的那一条在右栏里：展开以后它会往下挪——把右栏往下滚同样多，它就留在手指底下
+  const body = page()?.querySelector(".goals .rail-body"), top0 = el.getBoundingClientRect().top, scroll0 = body?.scrollTop || 0;
   page()?.classList.add("lk-drag");
+  if (body?.contains(el)) body.scrollTop += el.getBoundingClientRect().top - top0;
   dragSvg = document.createElementNS(NS, "svg");
   dragSvg.setAttribute("class", "lk-drag-svg");
   dragSvg.setAttribute("aria-hidden", "true");
@@ -506,7 +519,7 @@ function startDrag(e) {
   live.style.setProperty("--c", glow(colorOf(from)) || "var(--accent)");
   live.style.setProperty("--sl", ".22"); live.style.setProperty("--sg", String(RUN - 0.22)); live.style.setProperty("--sd", ".9s"); live.style.setProperty("--sdl", "0s"); live.style.setProperty("--hd", Math.round(((1.3 - 0.22) / RUN - 0.05) * 900) + "ms");
   document.body.appendChild(dragSvg);
-  drag = { from, el, can, target: null, id: e.pointerId, x: e.clientX, y: e.clientY, raf: 0 };
+  drag = { from, el, can, target: null, id: e.pointerId, x: e.clientX, y: e.clientY, raf: 0, body, scroll0 };
   handle.setPointerCapture(e.pointerId);
   handle.addEventListener("pointermove", dragMove);
   handle.addEventListener("pointerup", dragEnd);
@@ -555,7 +568,7 @@ function autoScroll() {
 
 function dragEnd(e) {
   if (!drag) return;
-  const { from, el, can, target: t } = drag;
+  const { from, el, can, target: t, body, scroll0 } = drag;
   handle.removeEventListener("pointermove", dragMove);
   handle.removeEventListener("pointerup", dragEnd);
   handle.removeEventListener("pointercancel", dragEnd);
@@ -565,6 +578,7 @@ function dragEnd(e) {
   for (const n of can.keys()) n.classList.remove("lk-can", "lk-snap");
   el.classList.remove("lk-src");
   page()?.classList.remove("lk-drag");
+  if (body?.isConnected) body.scrollTop = scroll0;   // 收回去：右栏回到拖之前的样子
   handle.classList.remove("drag", "on");
   const line = dragSvg;
   dragSvg = null;

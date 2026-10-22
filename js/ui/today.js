@@ -26,6 +26,7 @@ import { withHTML, taskMeetHTML, withText, takeWith } from "./friends.js";
 import { choreHTML } from "./chores.js";
 import { scoreHTML } from "./scores.js";
 import { quadHTML } from "./quads.js";
+import { openEntry } from "./island.js";
 
 const openDesc = new Set();
 const logOpen = new Set();   // 已经有计时记录、又点了「+ time」要再补一段的任务
@@ -118,8 +119,8 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
   const run = store.timer();
   const running = run?.taskId === t.id;
   const want = open && !phone ? askFinished(t) : undefined;
-  // 展开那一行多两个小箭头：往上 / 往下挪一格（按住分钟数拖的不用拖的做法；电脑上 Alt+↑↓ 也行）
-  const k = tasks.indexOf(t), mv = open && tasks.length > 1 ? '<span class="row-mv">' +
+  // 电脑上展开那一行多两个小箭头：往上 / 往下挪一格（按住分钟数拖的不用拖的做法；Alt+↑↓ 也行）。手机上不要（她说左边按住就能拖）
+  const k = tasks.indexOf(t), mv = open && !phone && tasks.length > 1 ? '<span class="row-mv">' +
     '<button type="button" class="chip mv" data-act="row-move" data-to="-1" aria-label="Move up" title="Move up (Alt+↑)"' + (k > 0 ? "" : " disabled") + ">↑</button>" +
     '<button type="button" class="chip mv" data-act="row-move" data-to="1" aria-label="Move down" title="Move down (Alt+↓)"' + (k < tasks.length - 1 ? "" : " disabled") + ">↓</button></span>" : "";
   const chips = '<div class="chips' + (open ? "" : " hov") + '">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
@@ -240,7 +241,9 @@ function addHTML(c, d, phone = false) {
     (phone ? '<label class="deep-tog" title="Save it to Ideas instead of adding a task"><input type="checkbox" name="idea" data-keep="add-idea-' + d + '"><span>Idea</span></label>' : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
       '<option value="weekdays">↻ Weekdays</option><option value="weekly">↻ Every ' + WEEKDAYS[weekday(d)] + "</option></select>" +
       '<select name="for" aria-label="For how long">' + R.LENGTHS.map(([v, l]) => '<option value="' + v + '"' + (v === R.DEFAULT_LENGTH ? " selected" : "") + ">for " + l + "</option>").join("") + "</select>") +
-    "</div>" + (phone ? "" : '<div class="idea-pick" data-idea-pick="' + d + '">' + pickHTML(d, document.querySelector('[data-keep="add-title-' + d + '"]')?.value || "") + "</div>") + "</form>";
+    "</div>" + (phone ? "" : '<div class="idea-pick" data-idea-pick="' + d + '">' + pickHTML(d, document.querySelector('[data-keep="add-title-' + d + '"]')?.value || "") + "</div>") + "</form>" +
+    // 手机：右下角记一笔（她要的）——点了从底下升起记账面板里那张记一笔的（js/ui/island.js 的 openEntry），不用先往下拉开记账
+    (phone ? '<div class="add-spendw"><button type="button" class="add-spend" data-act="spend-new" aria-label="Add a transaction" title="Add a transaction">' + icon("spending") + "<span>Spend</span></button></div>" : "");
 }
 
 // ---------- 手机：选项目 ----------
@@ -293,6 +296,30 @@ export function dayParts(c, d) {
 }
 
 // ---------- 手机 ----------
+
+// 展开那一行的「For …」链放不下一行：自己往左滚（跑马灯，她要的「点开后就滚动播放」）。内容包进一条轨道，里面两份
+// （第二份只给眼睛看，读屏和 Tab 都跳过），轨道一圈往左挪正好一份的宽，接着从头来，看起来一直在转；开头停一下（css 关键帧的前 12%），
+// 速度按宽度算（约 28px 一秒）；手指按住就停。系统要求减少动态：不滚，照旧能横着拖着看。main.js 每次重画完调一次
+const MQ_SPEED = 28;
+export function marquees(root = document) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for (const p of root.querySelectorAll(".phone-day .row.open .chain:not(.ch-more):not(.mq)")) {
+    if (p.scrollWidth <= p.clientWidth + 2) continue;
+    const one = document.createElement("span");
+    one.className = "ch-copy";
+    one.append(...p.childNodes);
+    const two = one.cloneNode(true);
+    two.setAttribute("aria-hidden", "true");
+    two.querySelectorAll("button, [tabindex]").forEach((x) => { x.tabIndex = -1; });
+    const track = document.createElement("span");
+    track.className = "ch-track";
+    track.append(one, two);
+    p.append(track);
+    p.classList.add("mq");
+    p.scrollLeft = 0;
+    p.style.setProperty("--mq-dur", Math.max(6, one.getBoundingClientRect().width / MQ_SPEED / 0.88).toFixed(1) + "s");
+  }
+}
 
 const PHONE_SPAN = 5;
 
@@ -380,6 +407,12 @@ function refocusRow(id, act, to) {
 }
 
 export function initToday(rerender) {
+  // 跑马灯：手指按住那一条就停，松开接着滚
+  on(document, "pointerdown", ".phone-day .chain.mq", (e, p) => p.classList.add("hold"));
+  const unhold = () => document.querySelectorAll(".chain.mq.hold").forEach((p) => p.classList.remove("hold"));
+  addEventListener("pointerup", unhold);
+  addEventListener("pointercancel", unhold);
+
   on(document, "click", ".dayview [data-act]", (e, el) => {
     const act = el.dataset.act, id = rowId(el);
     // 换日子：往后翻列表往左滑，往前翻往右滑
@@ -396,6 +429,7 @@ export function initToday(rerender) {
       showDate(d); rerender();
     };
     if (act === "pj-pick") { openPicker(el, rerender); return; }
+    if (act === "spend-new") { openEntry(); return; }
     if (act !== "edit" && !act.startsWith("day-")) animateNext();
     if (act === "status") {
       logOpen.delete(id);

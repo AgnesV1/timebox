@@ -54,9 +54,10 @@ export function createSpending() {
 
   const $ = (s) => root.querySelector(s);
   // mode：Month / Year；cur：看的是哪一期；filt：右边点了的那一类；side：右边看支出还是收入；q：搜索；edit：正在改的那一笔（"new" = 新记一笔）
-  const V = { mode: "month", cur: todayP(), filt: null, side: "out", q: "", edit: null, all: false };
+  const V = { mode: "month", cur: todayP(), filt: null, side: "out", q: "", edit: null, all: false, nohouse: false };   // nohouse：图只看 House 以外
   const F = { kind: "out", cat: "", d: today(), v: "", n: "", cur: "cad" };   // 正在填的那一行（页面重画时先读回来，填到一半不丢）
-  const chart = chartView($("[data-chart]"));
+  // 图表：点 House 上面那块 = 只看 House 以外（花销和预算都不含 House）；只看的时候点哪儿都回来。每次进这一页都是完整的（show）
+  const chart = chartView($("[data-chart]"), { onTap: (where) => { V.nohouse = where === "rest"; renderChart(false); } });
   let shown = false, fresh = null;
 
   // ---------- 分段开关：选中的那块滑过去 ----------
@@ -121,15 +122,16 @@ export function createSpending() {
   // ---------- 图表 ----------
   function renderChart(animate) {
     const svg = $("[data-chart]"), W = Math.max(320, Math.round(svg.clientWidth || 640)), H = Math.round(Math.max(200, Math.min(300, W * 0.34)));
-    const c = chart.draw({ mode: V.mode, p: V.cur, w: W, h: H, animate });
+    const c = chart.draw({ mode: V.mode, p: V.cur, w: W, h: H, animate, house: !V.nohouse });
     const name = V.mode === "month" ? M.MONTH[V.cur.m - 1] : String(V.cur.y), end = V.mode === "month" ? M.MON[V.cur.m - 1] + " " + c.n : "Dec 31";
-    $("[data-ctitle]").textContent = "Spending in " + name;
+    const baseNames = SP.cats().filter((x) => x.role === "base").map((x) => x.name).join(", ") || "House";
+    $("[data-ctitle]").textContent = "Spending in " + name + (V.nohouse ? " · without " + baseNames : "");
     const sofar = c.last ? c.val(c.last) : 0, budget = c.B ? " of a <b>" + esc(M.money(c.B)) + "</b> budget" : "";
     $("[data-pace]").innerHTML = !c.last ? "Nothing spent yet" + (c.B ? " · budget <b>" + esc(M.money(c.B)) + "</b>" : "")
       : c.isCur && c.last < c.n ? "<b>" + esc(M.money(sofar)) + "</b> so far; at this pace <b>" + esc(M.money(c.val(c.n))) + "</b> by " + end + budget
         : "<b>" + esc(M.money(sofar)) + "</b> in all" + budget;
     const base = SP.cats().filter((x) => x.role === "base").map((x) => x.name).join(", ") || "Base";
-    $("[data-legend]").innerHTML = '<span><i class="ln"></i>Spent</span>' + (c.isCur ? '<span><i class="tr"></i>Trend</span>' : "") + (c.B ? '<span><i class="bd"></i>Budget</span>' : "") + '<span><i class="hs"></i>' + esc(base) + "</span>";
+    $("[data-legend]").innerHTML = '<span><i class="ln"></i>Spent</span>' + (c.isCur ? '<span><i class="tr"></i>Trend</span>' : "") + (c.B ? '<span><i class="bd"></i>Budget</span>' : "") + (V.nohouse ? '<span class="sp-back">Click the chart to show everything</span>' : '<span><i class="hs"></i>' + esc(base) + "</span>");
     return c;
   }
 
@@ -601,6 +603,7 @@ export function createSpending() {
   // 每次进 Spending 页：数从头滚、图表画一遍
   function show() {
     shown = true;
+    V.nohouse = false;   // 每次进来图都是完整的（包括 House）
     requestAnimationFrame(() => { lastW = root.clientWidth; render(true); });
   }
   const focusSearch = () => { const q = $("[data-q]"); q.focus(); q.select(); };

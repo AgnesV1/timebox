@@ -1134,11 +1134,10 @@ body:has(#main :is(input, textarea, select):focus) #toast { bottom: calc(22px + 
 [data-theme="light"] .row .chip.mv:not(.on) { background: transparent; }
 @media (hover: hover) { .chip.mv:not(:disabled):hover { background: var(--tonal); color: var(--ink); } }
 /* 手机：展开那一行的 Done / Delay / Drop 是小药丸：26px 高、12px 字、宽度跟字、靠左（她说再小一点、字也小点）；
-   看着小，点的范围往上下各多 7px，还是好按；↑ ↓ 靠右 */
+   看着小，点的范围往上下各多 7px，还是好按。手机上没有 ↑ ↓（按住左边的分钟数拖） */
 body.phone .row.open .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 9px; }
 body.phone .row.open .chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 26px; padding: 0 11px; font-size: 12px; }
 body.phone .row.open .chip::after { content: ""; position: absolute; inset: -7px -2px; }
-body.phone .row.open .chip.mv { min-width: 26px; padding: 0 6px; font-size: 14px; }
 body.phone .tm { padding-top: 0; padding-bottom: 0; }
 body.phone .tm-x { width: 32px; height: 32px; font-size: 17px; }
 body.phone .tm.sum, body.phone .tm.more-time { min-height: 32px; }
@@ -1153,6 +1152,11 @@ body.phone .tm.sum, body.phone .tm.more-time { min-height: 32px; }
 body.phone .dk-deep { min-width: 38px; min-height: 38px; justify-content: center; padding: 0 10px; }
 body.phone .dk-deep span { display: none; }
 body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
+/* 手机：加任务那一块右下角的 Spend（js/ui/today.js），和 ◆ Deep / Idea 一样的淡底小签，带钱包图标 */
+.add-spendw { display: flex; justify-content: flex-end; margin-top: 8px; }
+.add-spend { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 13px 0 11px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 700; color: var(--ink); }
+.add-spend .ic { width: 17px; height: 17px; }
+.add-spend:active { transform: scale(.96); }
 /* 手机：加任务时选项目 = 一个淡底小签（和 ◆ Deep 一样），带那个项目的色点；点了从它那里长出一个下拉（js/ui/today.js 的 openPicker） */
 .pj-pick { display: inline-flex; align-items: center; gap: 7px; max-width: 58%; min-height: 38px; padding: 0 10px 0 12px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 700; color: var(--muted); }
 .pj-pick.set { color: var(--ink); }
@@ -1675,15 +1679,18 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .goals.pj-rail { position: sticky; top: 16px; display: flex; flex-direction: column; min-width: 0; max-height: calc(100vh - 32px); padding: 12px 14px 0; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); }
 @container (max-width: 640px) { .pj-wrap { grid-template-columns: minmax(0, 1fr); } .goals.pj-rail { position: relative; top: 0; order: -1; max-height: none; margin-bottom: 18px; } }
 .goals .hint { margin: 10px 2px 4px; }
-.gfoot { margin: 8px 0 0; }
-.gfoot .link { font-size: 12px; }
 /* North star：一段字，框出来的词是一条条目标（括号只在改的时候看得到） */
 .ns { flex: none; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .ns h3 { display: flex; align-items: center; gap: 6px; height: 22px; margin: 0 0 4px; font: 700 13px var(--display); }
 .ns h3 .link { margin-left: auto; font-size: 12px; opacity: 0; transition: opacity .15s; }
 .ns:hover h3 .link, .ns h3 .link:focus-visible { opacity: 1; }
 @media (hover: none) { .ns h3 .link { opacity: 1; } }
-.ns-text { max-height: 34vh; margin: 0; overflow-y: auto; overscroll-behavior: contain; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; scrollbar-width: thin; }
+/* 平时只露前三行（她嫌整段太大），里面还能滚；底下还有字的时候（.more，js/ui/goals.js 量的）最后那一截淡出。
+   拖连线的时候（.projects.lk-drag）放开到原来的 34vh，框出来的词都露出来、放得上去；悬停画线时不放开（会挪位置），藏着的词照旧压在边上画成空心点 */
+.ns-text { max-height: calc(1.75em * 3 + 2px); margin: 0; overflow-y: auto; overscroll-behavior: contain; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; scrollbar-width: none; }   /* 不做展开的过渡：拖连线时要马上量到展开后的位置 */
+.ns-text::-webkit-scrollbar { display: none; }
+.ns-text.more { -webkit-mask-image: linear-gradient(#000 calc(100% - 1.5em), transparent); mask-image: linear-gradient(#000 calc(100% - 1.5em), transparent); }
+.projects.lk-drag .ns-text { max-height: 34vh; -webkit-mask-image: none; mask-image: none; }
 .ns-text.empty { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .ns-g { display: inline; margin: 0 1px; padding: 1px 4px; border: 1.5px solid var(--ink); border-radius: 5px; font-weight: 600; -webkit-box-decoration-break: clone; box-decoration-break: clone; cursor: pointer; transition: background-color .15s; }
 .ns-g.done { color: var(--muted); text-decoration: line-through; }
@@ -1737,7 +1744,6 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .goals .gtag.none { background: transparent; box-shadow: inset 0 0 0 1.5px var(--muted); }
 .gdue { padding: 0 1px; border: 0; background: none; font: 600 11px var(--num); color: var(--muted); white-space: nowrap; }
 @media (hover: hover) { .gdue:hover { color: var(--ink); text-decoration: underline; } }
-.gl.late .gdue { color: var(--warn); }
 .gdue.dflt { max-width: 0; padding: 0; overflow: hidden; opacity: 0; }   /* 平时不占地方，字能多露一点 */
 .gl:hover .gdue.dflt, .gdue.dflt:focus { max-width: 64px; padding: 0 1px; opacity: 1; }
 .gx { width: 14px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; opacity: 0; }
@@ -1747,6 +1753,28 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .goals .gwhen select { padding: 1px 17px 1px 6px; border-radius: 6px; background-position: right 4px center; background-size: 9px; font: 600 11px var(--num); }
 /* 一段多出来的折成「+2 more」；标题旁的「+」鼠标移到这一段才出来，点了才出加一条的框 */
 .gmore { display: block; height: 19px; margin-left: 18px; padding: 0; border: 0; background: none; font: 600 11px var(--num); color: var(--muted); }
+/* 「+N more」折起来的那几条：画着但藏着，拖连线时（.projects.lk-drag）整段露出来、「+N more」藏起来 */
+.gl.fold { display: none; }
+.projects.lk-drag .goals .gl.fold { display: flex; }
+.projects.lk-drag .goals .gmore { display: none; }
+
+/* 往期：最底下一行 Past + 季度下拉 + 做完了几条；展开后一小组一小组（年 / 季 / 三个月），一条一行，比上面淡一点 */
+.gpast { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.gpast-h { display: flex; align-items: center; gap: 8px; height: 26px; }
+.gpast-t { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; font: 700 12px var(--display); color: var(--ink); }
+.gpast-t::before { content: ""; width: 6px; height: 6px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(-45deg); transition: transform .2s var(--ease); }
+.gpast.open .gpast-t::before { transform: rotate(45deg) translate(-1px, -1px); }
+.goals .gpast-h select { padding: 1px 18px 1px 7px; border-radius: 6px; background-position: right 5px center; background-size: 9px; font: 600 11.5px var(--num); }
+.gpast-h .msub { margin-left: auto; font: 600 11px var(--num); }
+.gpast h5 { margin: 8px 0 1px; font: 700 10.5px var(--num); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.gpast ul { margin: 0; padding: 0; list-style: none; }
+.gh { position: relative; display: flex; align-items: center; gap: 6px; height: 22px; font-size: 12.5px; color: var(--muted); }
+.gh input[type="checkbox"] { flex-shrink: 0; width: 12px; height: 12px; margin: 0; padding: 0; accent-color: var(--ink); }
+[data-theme="dark"] .gh input[type="checkbox"] { accent-color: var(--accent); }
+.gh-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh.done .gh-t { text-decoration: line-through; }
+.gh-w { flex-shrink: 0; font: 600 11px var(--num); }
+.gh:hover .ggrip, .gh .ggrip:focus-visible, .gh .ggrip.open { opacity: 1; }
 @media (hover: hover) { .gmore:hover { color: var(--ink); text-decoration: underline; } }
 .gplus { display: grid; place-items: center; flex-shrink: 0; width: 17px; height: 17px; padding: 0 0 1px; border: 0; border-radius: 50%; background: none; color: var(--muted); font: 500 15px/1 var(--num); opacity: 0; transition: opacity .15s, background-color .15s; }
 .gcol:hover .gplus, .gplus:focus-visible, .gplus[aria-expanded="true"] { opacity: 1; }
@@ -1873,6 +1901,14 @@ html.fx-off .lk-dot { animation: none; }
 .phone-day .chain::-webkit-scrollbar { display: none; }
 .phone-day .chain > * { flex-shrink: 0; }
 .phone-day .chain span:not(.ch-for) { max-width: none; overflow: visible; }
+/* 放不下一行的自己往左滚（跑马灯，js/ui/today.js 的 marquees）：轨道里两份接着，一圈挪一份的宽、开头停一下；手指按住停（.hold）。
+   这时候不再横着拖，两头都淡出。系统要求减少动态时动画全停（上面那条全局规则），轨道停在开头 */
+.phone-day .chain.mq { overflow: hidden; padding-right: 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 22px), transparent); }
+.phone-day .chain .ch-track { display: flex; flex-shrink: 0; color: inherit; animation: ch-mq var(--mq-dur, 12s) linear infinite; }
+.phone-day .chain .ch-copy { display: flex; flex-shrink: 0; align-items: baseline; gap: 0 6px; padding-right: 36px; color: inherit; }
+.phone-day .chain .ch-copy > * { flex-shrink: 0; }
+.phone-day .chain.mq.hold .ch-track { animation-play-state: paused; }
+@keyframes ch-mq { 0%, 12% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
 .chain .ch-fold { padding: 0 4px; border: 0; border-radius: 6px; background: var(--tonal); font: inherit; line-height: 1.2; color: var(--ink); }
 body.phone .chain { font-size: 13px; }
 .task-editor .chains, .project-editor .chains { margin: 6px 0 2px; }

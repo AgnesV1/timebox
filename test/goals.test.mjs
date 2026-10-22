@@ -1,10 +1,10 @@
-// 目标板：栏目跟着今天滚、过期的滚进当前栏、做完的过了期就收起来
+// 目标板：栏目跟着今天滚；过了那一期的目标（做没做完都一样）收进往期，连线和链条越过它们
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as G from "../js/goals.js";
 
 const g = (id, span, due, extra = {}) => ({ id, text: id, tag: "", span, due, done: "", order: 1, ...extra });
-const colsOf = (b) => Object.fromEntries(b.cols.map((c) => [c.key, c.items.map((x) => x.goal.id + (x.late ? "!" : "") + (x.ahead ? "+" : "") + (x.done ? "✓" : ""))]));
+const colsOf = (b) => Object.fromEntries(b.cols.map((c) => [c.key, c.items.map((x) => x.goal.id + (x.ahead ? "+" : "") + (x.done ? "✓" : ""))]));
 
 test("columns are worked out from today and roll over the year", () => {
   const oct = G.columns("2026-10-11");
@@ -20,29 +20,48 @@ test("columns are worked out from today and roll over the year", () => {
 test("a goal sits in the column of its own kind and period", () => {
   const goals = [g("m", "month", "2026-10"), g("q", "quarter", "2026-11"), g("nq", "quarter", "2027-02"), g("y", "year", "2026-06"), g("y28", "year", "2028-12"), g("odd", "decade", "2029-01")];
   assert.deepEqual(colsOf(G.board(goals, "2026-10-11")), { month: ["m"], quarter: ["q"], next: ["nq"], year: ["y"], y2027: [], y2028: ["y28"], y2029: ["odd"], y2030: [], north: [] });
-  // 到了一月：下个季度那条自己变成这个季度的，2028 还在 2028
+  // 到了一月：下个季度那条自己变成这个季度的，2028 还在 2028；去年的月、季、年目标都收进往期了
   const jan = colsOf(G.board(goals, "2027-01-03"));
-  assert.deepEqual(jan.quarter, ["q!", "nq"]);
-  assert.deepEqual(jan.month, ["m!"]);
-  assert.deepEqual(jan.year, ["y!"]);
+  assert.deepEqual(jan.quarter, ["nq"]);
+  assert.deepEqual(jan.month, []);
+  assert.deepEqual(jan.year, []);
   assert.deepEqual(jan.y2028, ["y28"]);
 });
 
-test("unfinished ones roll forward, finished ones drop off once their period is over", () => {
+test("once its period is over a goal leaves the board, finished or not", () => {
   const goals = [g("late", "month", "2026-09"), g("old", "month", "2026-09", { done: "2026-09" }), g("now", "month", "2026-10", { done: "2026-10" }), g("open", "month", "2026-10"), g("dec", "month", "2026-12"), g("far", "year", "2040-01"), g("q3", "quarter", "2027-08")];
   const b = G.board(goals, "2026-10-11");
-  assert.equal(b.hidden, 1);
-  assert.deepEqual(colsOf(b).month, ["late!", "open", "dec+", "now✓"], "not done first (by month), done last");
+  assert.equal(b.old, 2);
+  assert.deepEqual(colsOf(b).month, ["open", "dec+", "now✓"], "not done first (by month), done last; September's are gone");
   assert.deepEqual(colsOf(b).y2030, ["far+"], "further than the last year waits in the last year");
   assert.deepEqual(colsOf(b).next, ["q3+"]);
   const item = (id) => b.cols.flatMap((c) => c.items).find((x) => x.goal.id === id);
-  assert.equal(item("late").when, "Sep");
   assert.equal(item("now").when, "Oct", "a finished one shows the month it was finished");
   assert.equal(item("far").when, "Jan 2040");
   assert.equal(item("q3").when, "Aug");
-  const all = G.board(goals, "2026-10-11", { showDone: true });
-  assert.equal(all.hidden, 0);
-  assert.ok(colsOf(all).month.includes("old✓"));
+  assert.equal(G.isOld(g("x", "month", "2026-09"), "2026-10-01"), true);
+  assert.equal(G.isOld(g("x", "quarter", "2026-09"), "2026-10-01"), true, "Q3 is over on October 1");
+  assert.equal(G.isOld(g("x", "quarter", "2026-11"), "2026-10-01"), false);
+  assert.equal(G.isOld(g("x", "year", "2025-12"), "2026-01-01"), true);
+  assert.equal(G.isOld(g("x", "year", "2026-03"), "2026-12-31"), false, "a year goal lasts the whole year");
+  assert.equal(G.isOld(g("x", "north", ""), "2030-01-01"), false);
+  assert.equal(G.isOld(g("x", "month", ""), "2030-01-01"), false, "no due date, never old");
+});
+
+test("past goals are grouped by quarter with that year's goals, newest first", () => {
+  const goals = [
+    g("jul", "month", "2026-07", { done: "2026-07" }), g("aug", "month", "2026-08"), g("q3", "quarter", "2026-09", { done: "2026-09" }),
+    g("sepToo", "month", "2026-09"), g("oct", "month", "2026-10"), g("y26", "year", "2026-12"),
+    g("mar25", "month", "2025-03"), g("y25", "year", "2025-12", { done: "2025-11" }), g("y24", "year", "2024-12"), g("north", "north", "")
+  ];
+  const p = G.past(goals, "2026-11-02");
+  assert.deepEqual(p.map((x) => x.label), ["2026 Q4", "2026 Q3", "2025 Q1", "2024 Q4"], "October is over in November; 2024 had only a year goal, so it sits in Q4");
+  const q3 = p.find((x) => x.label === "2026 Q3");
+  assert.deepEqual(q3.quarter.map((x) => x.id), ["q3"]);
+  assert.deepEqual(q3.months.map((x) => x.label + ":" + x.items.map((y) => y.id).join(",")), ["Jul:jul", "Aug:aug", "Sep:sepToo"]);
+  assert.deepEqual(q3.year.map((x) => x.id), ["y26"], "that year's goals come along, this year's too");
+  assert.deepEqual(p.find((x) => x.label === "2025 Q1").year.map((x) => x.id), ["y25"]);
+  assert.deepEqual(G.past(goals, "2026-07-15").map((x) => x.label), ["2025 Q1", "2024 Q4"], "nothing from this year is old yet in July");
 });
 
 test("text and tag are typed together", () => {
@@ -98,6 +117,28 @@ test("chains: up through the parents, no loops, served by projects and plans", (
   assert.deepEqual(G.goalsFor(goals, {}), []);
   const chains = G.chainsFor(goals, G.goalsFor(goals, { planId: "exam" }));
   assert.deepEqual(chains.map((c) => c.map((x) => x.id).join(">")), ["q>b2>life"], "Pass B2 is already part of the longer chain");
+});
+
+test("chains and links skip goals whose period is over, joining the next one up", () => {
+  const goals = [
+    { id: "life", text: "Live in French", span: "north" },
+    { id: "b2", text: "Pass B2", span: "year", due: "2026-12", up: "life" },
+    { id: "q3", text: "Mock 60+", span: "quarter", due: "2026-09", up: "b2", by: ["p:exam"] },
+    { id: "sep", text: "Module 3", span: "month", due: "2026-09", up: "q3", by: ["p:mod"] },
+    { id: "oct", text: "Module 4", span: "month", due: "2026-10", up: "sep" },
+    { id: "gone", text: "Old and alone", span: "month", due: "2026-08", by: ["p:alone", "g:Build"] },
+    { id: "now", text: "Build thing", span: "month", due: "2026-10", by: ["g:Build"] }
+  ];
+  const vis = G.visibleSet(goals, "2026-10-11");
+  assert.deepEqual([...vis].sort(), ["b2", "life", "now", "oct"]);
+  assert.equal(G.lift(goals, "sep", vis).id, "b2", "September's goal and Q3's both went to the past: up to the year goal");
+  assert.equal(G.lift(goals, "gone", vis), null);
+  assert.deepEqual(G.chainUp(goals, "oct", vis).map((x) => x.id), ["oct", "b2", "life"], "October's goal now hangs straight off the year goal");
+  assert.deepEqual(G.chainUp(goals, "oct").map((x) => x.id), ["oct", "sep", "q3", "b2", "life"], "without vis nothing is skipped");
+  assert.deepEqual(G.goalsFor(goals, { planId: "exam" }, vis).map((x) => x.id), ["b2"], "a plan serving an old goal serves the next one up");
+  assert.deepEqual(G.goalsFor(goals, { planId: "mod", group: "Build" }, vis).map((x) => x.id), ["b2"]);
+  assert.deepEqual(G.goalsFor(goals, { planId: "alone", group: "Build" }, vis).map((x) => x.id), ["now"], "nothing left above its only goal: falls back to the project's");
+  assert.deepEqual(G.chainsFor(goals, G.goalsFor(goals, { planId: "exam" }, vis), vis).map((c) => c.map((x) => x.id).join(">")), ["b2>life"]);
 });
 
 test("store: link, parent, rename, delete, and the old far year moves to North star once", async () => {

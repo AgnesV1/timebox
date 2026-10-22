@@ -42,7 +42,9 @@ Item 0 comes first every time. Item 7 collects what the 2026-10 round (streaming
   - Tapping the strip of Today still showing below pulls the curtain back up
   - The `CAD ⌄` next to the totals switches the currency; adding a record in RMB shows `−¥…` with the converted amount underneath
 - Tapping these inputs never zooms the page: Why?, Details, the ledger's note / search / category rename / rate fields
-- Today's opened row: Done / Delay / Drop are small but easy to hit; ↑ ↓ move the row
+- Today's opened row: Done / Delay / Drop are small but easy to hit; pressing the minutes on the left and dragging reorders; a long For … chain scrolls smoothly and stops while held
+- Spend (bottom right of the add-task box): the sheet rises from the bottom, the number pad is easy to hit, Add closes it and the island shows today's total; tapping the dimmed page closes it
+- Ledger charts: tapping above House shows the rest on its own, tapping again comes back
 - Adding a task: the project chip opens a dropdown below it that doesn't jump when the keyboard closes; the chosen project shows on the chip
 - With Reduce Motion on in Settings: no swaying, no bouncing, only fades
 
@@ -102,6 +104,7 @@ Item 0 comes first every time. Item 7 collects what the 2026-10 round (streaming
 
 ## 4. ✅ Every drag has a way that needs no drag (WCAG 2.2, 2.5.7)
 > 2026-10-20 `3b2203a` (the look of the phone's ↑ ↓ in `4c08f35` and `6089f70`). Every row of the table below now says "yes".
+> 2026-10-21: the owner asked for the phone's ↑ ↓ to go — on the phone, dragging the minutes is the way to reorder; the computer keeps ↑ ↓ and Alt+↑↓.
 
 **Why**: where dragging is the only way, a trackpad, an unsteady hand or a keyboard can't do it. WCAG 2.2 asks for a single-click alternative to every drag, ideally keyboard-operable too.
 
@@ -111,7 +114,7 @@ Item 0 comes first every time. Item 7 collects what the 2026-10 round (streaming
 | Pool items and Regular plans onto the calendar | `js/ui/dnd.js`, `js/ui/calendar.js` lines 119–131 | Yes: click, or Tab to it and press Enter, for a "Put on…" menu of every day shown |
 | Meals: a Box onto a day, copying a day, a grocery into a Box | the comment at the top of `js/ui/dnd.js`, `js/ui/meals.js` | Yes: click a Box for "Put on…" (each day + each rough-plan week), and a day's editor could always add Boxes; copying a day = "Same as another day" in that day's editor; click a grocery for "Add to…" (each Box + A new box), and the Box editor could always add groceries |
 | Matrix notes to another box | `js/ui/quads.js` line 333 | Yes: open a note; the new move button next to ✓ picks one of the other three boxes |
-| Phone Today: press and drag the minutes to reorder | `js/ui/today.js` line 514 | Yes: ↑ ↓ on the right of the opened row (phone and computer), Alt+↑↓ on the computer |
+| Phone Today: press and drag the minutes to reorder | `js/ui/today.js` (the `[data-drag-row]` pointerdown handler) | Computer: ↑ ↓ on the right of the opened row and Alt+↑↓. Phone: dragging only, by the owner's choice (2026-10-21) |
 | Projects links (dragging the small circle) | `js/ui/links.js` | Yes: Serves in the plan editor, Part of when editing a goal |
 | Reading's right box order | `js/ui/reading.js` | Yes: Alt+↑↓ |
 

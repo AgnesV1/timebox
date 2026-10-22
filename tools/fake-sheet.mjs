@@ -82,7 +82,9 @@ console.log("→ current:", g.logs.join(" | "));
     plan("seed-port", "Portfolio site", "Build", "#FF3EA5", add(40), [["Case study: timebox", 240], ["Landing page", 180]]),
     plan("seed-q4", "Q4 report", "Work", "#FF8A00", add(25), [["Numbers", 120], ["Deck", 180]])
   ];
-  const goal = (id, text, span, due, up, by = [], tag = "") => ({ key: "goal:" + id, value: { text, tag, span, due, done: "", order: id.length + text.length, up, by }, updated: 4 });
+  const goal = (id, text, span, due, up, by = [], tag = "", done = "") => ({ key: "goal:" + id, value: { text, tag, span, due, done, order: id.length + text.length, up, by }, updated: 4 });
+  // 上个月、上一季：已经过期、收进往期的那几条（做完的、没做完的都有）；B2 exam 还连着它们，悬停时线要越过它们接到还在的那一条
+  const pm = m === 1 ? { y: y - 1, m: 12 } : { y, m: m - 1 }, pq = q === 1 ? { y: y - 1, q: 4 } : { y, q: q - 1 };
   const goals = [
     goal("n1", "A steady, curious life", "north", "", ""),
     goal("n2", "French as a second home", "north", "", ""),
@@ -95,7 +97,10 @@ console.log("→ current:", g.logs.join(" | "));
     goal("q2", "Ship the Q4 report on time", "quarter", ym(y, q * 3), "", ["p:seed-q4"], "Work"),
     goal("q3", "Launch the portfolio", "quarter", q === 4 ? ym(y + 1, 3) : ym(y, q * 3 + 3), "y2", ["p:seed-port"], "Build"),
     goal("m1", "Finish Module #4", "month", ym(y, m), "q1", m4 ? ["p:" + m4.id] : []),
-    goal("m2", "See friends every two weeks", "month", ym(y, m), "n1", ["g:Friends"], "Friends")
+    goal("m2", "See friends every two weeks", "month", ym(y, m), "n1", ["g:Friends"], "Friends"),
+    goal("q0", "Mock exam ≥ 60 / 100", "quarter", ym(pq.y, pq.q * 3), "t1", ["p:seed-b2"], "", ym(pq.y, pq.q * 3)),
+    goal("m0", "Finish Module #3", "month", ym(pm.y, pm.m), Math.ceil(pm.m / 3) === q && pm.y === y ? "q1" : "q0", ["p:seed-b2"], "", ym(pm.y, pm.m)),
+    goal("m9", "Read two French novels", "month", ym(pm.y, pm.m), "t1", [], "Leisure")
   ];
   // 今天页：展开第一条看「For B2 exam → …」；第二条不展开，截悬停的样子用（哪天都有这两条，不管 Gym 那天排没排）
   const tasks = [{ id: "seed-t-b2", date: T, title: "Listening drills", est: 45, order: 0, projectId: "seed-b2", itemId: "seed-b2-i0", updated: 4 },

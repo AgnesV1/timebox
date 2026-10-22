@@ -89,18 +89,40 @@ test("money and dates read the way the page shows them", () => {
   assert.equal(M.addDaysISO("2026-03-01", -1), "2026-02-28");
 });
 
-test("the year chart goes day by day: each month starts with its House, budget months join up", () => {
+test("the year chart goes day by day: every record on its own day, House too; the budget grows with House paid plus a daily allowance", () => {
   const ix = M.index(rows, cats), c = M.yearChart(ix, budgets, 2026, "2026-10-16");
   assert.equal(c.n, 365);
   assert.equal(c.last, M.dayOfYear(2026, 10, 16));
-  const aug1 = M.dayOfYear(2026, 8, 1), oct3 = M.dayOfYear(2026, 10, 3);
+  const aug1 = M.dayOfYear(2026, 8, 1), aug20 = M.dayOfYear(2026, 8, 20), oct3 = M.dayOfYear(2026, 10, 3);
   assert.equal(c.val(aug1 - 1), 0);
-  assert.equal(c.val(aug1), 145000 + 6500);   // the whole month's House (rent + internet) counts from the 1st, like the month chart
+  assert.equal(c.val(aug1), 145000, "the rent lands on the 1st; the internet bill isn't there yet");
+  assert.equal(c.val(aug20), 145000 + 6500, "the internet bill lands on the 20th, the day it was paid");
   const aug = M.sumOf(ix, { y: 2026, m: 8 }, "month"), sep = M.sumOf(ix, { y: 2026, m: 9 }, "month");
   assert.equal(c.val(oct3), M.counted(aug) + M.counted(sep) + 145000 + 2315 + 899);   // the deposit doesn't count
-  assert.equal(c.budgetLine[M.dayOfYear(2026, 9, 30)], 358000 * 8 + 303500);
+  assert.equal(c.baseLine[aug20] - c.baseLine[aug1 - 1], 151500, "House is a running total by day");
+  const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 0.01, msg + ": " + a + " vs " + b);   // 每天的额度是小数，加起来差一点点
+  near(c.budgetLine[M.dayOfYear(2026, 9, 30)], 358000 * 8 + 303500, "each month's budget is all there by its last day");
+  near(c.budgetLine[aug1], 358000 * 7 + 145000 + Math.max(0, 358000 - 151500) / 31, "paying the rent raises the budget the same day");
+  assert.equal(c.B, M.yearBudget(budgets, 2026, "2026-10-16"));
   assert.equal(M.dateOfDay(2026, oct3), "2026-10-03");
   assert.ok(c.val(365) > c.val(c.last));
+});
+
+test("without House: both charts leave out the base categories and the budget is what's left after them", () => {
+  const ix = M.index(rows, cats);
+  const y = M.yearChart(ix, budgets, 2026, "2026-10-16", { house: false });
+  assert.equal(y.val(M.dayOfYear(2026, 8, 1)), 0, "no rent");
+  assert.equal(y.val(M.dayOfYear(2026, 10, 3)), 2315 + 899);
+  assert.equal(y.baseLine[365], 0);
+  assert.ok(Math.abs(y.budgetLine[M.dayOfYear(2026, 9, 30)] - (358000 * 7 + (358000 - 151500) + (303500 - 151500))) < 0.01);
+  assert.equal(y.B, 358000 * 7 + (358000 - 151500) + (303500 - 151500) + (358000 - 145000));
+  const m = M.monthChart(ix, budgets, 2026, 10, "2026-10-16", { house: false });
+  assert.equal(m.base, 0);
+  assert.equal(m.val(1), 0);
+  assert.equal(m.val(3), 2315 + 899);
+  assert.equal(m.B, 358000 - 145000);
+  assert.equal(m.pace(31), 358000 - 145000);
+  assert.equal(M.monthChart(ix, budgets, 2026, 10, "2026-10-16").val(3), 145000 + 2315 + 899, "the full chart is unchanged");
 });
 
 test("cards compare with the previous six months, cut at the same day for the current month", () => {

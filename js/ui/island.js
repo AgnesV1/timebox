@@ -11,6 +11,7 @@ import * as store from "../store.js";
 import * as M from "../money.js";
 import * as SP from "../spend.js";
 import { createView, IX } from "./money.js";
+import { toast } from "./common.js";
 
 // 和 money.js 同一套：进场快出来慢慢停稳（不冲过头），出场干脆、越走越快；小东西用只冲过头一点点的弹簧
 const ENTER = "cubic-bezier(.16, 1, .3, 1)", EXIT = "cubic-bezier(.4, 0, 1, 1)", FALL = "cubic-bezier(.45, 0, .85, .55)";
@@ -87,6 +88,21 @@ function build() {
   live.innerHTML = '<span class="t"></span><svg viewBox="0 0 18 18" aria-hidden="true"><circle class="ring" cx="9" cy="9" r="6.5"/><path class="ok" d="M5.6 9.2l2.2 2.2 4.4-4.6"/></svg>';
   document.body.appendChild(live);
   veil.addEventListener("click", () => close());
+  // 今天页点 Spend 出来的那张：收起（存了、点了变暗的地方、✕）等它滑下去再把整块藏回去；记上的那笔在今天页上弹提示条
+  panel.addEventListener("mn-sheet", () => {
+    if (state !== "entry") return;
+    setTimeout(() => {
+      if (state !== "entry" || view.sheetOpen()) return;
+      panel.classList.remove("on", "entry");
+      state = "closed";
+      if (view.tookChange()) showLive();
+    }, 300);
+  });
+  panel.addEventListener("mn-added", (e) => {
+    if (state !== "entry" || !e.detail) return;
+    const x = e.detail;
+    toast("Added " + x.c + " " + M.money(x.v, M.curOf(x)), () => SP.remove(x.id));
+  });
   // 收起：底边的小横条，点一下 / 往上推
   const grab = panel.querySelector("[data-grab]");
   let g = null;
@@ -324,6 +340,19 @@ export function initIsland({ isPhone, onToday }) {
   addEventListener("pointermove", (e) => { if (mouse && e.pointerType === "mouse" && onMove(e.clientX, e.clientY)) e.preventDefault(); });
   addEventListener("pointerup", (e) => { if (mouse && e.pointerType === "mouse") { mouse = false; onEnd(); } });
   addEventListener("keydown", (e) => { if (e.key === "Escape" && state === "open" && !view.sheetOpen()) close(); });
+}
+
+// 今天页加任务那一块右下角的 Spend（手机）：不落幕布，只从底下升起记一笔的那张（和面板里改一笔的是同一张，.mn-scrim / .mn-sheet 本来就挂在幕布外面）。
+// 记上了：今天页弹提示条（能撤销），收起以后岛上停一下今天花了多少；面板已经开着就在面板里开
+export function openEntry() {
+  build();
+  if (state === "open") { view.startNew(); return; }
+  if (state !== "closed") return;
+  ST = safeTop();
+  state = "entry";
+  panel.classList.add("on", "entry");
+  view.reset();
+  view.startNew();
 }
 
 export const refreshIsland = () => { if (view && state !== "closed") view.refresh(); };

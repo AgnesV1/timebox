@@ -59,18 +59,24 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
 
 **Computer**
 - `Projects`: goals live in the **right-hand column** (it sticks to the top as you scroll). From top to bottom:
-  - **North star**: a paragraph that always stays at the top. Put `[ ]` around words (or select some and click **Frame as goal**) and each framed phrase is a North star goal;
+  - **North star**: a paragraph that always stays at the top. Normally only its first three lines show (scroll inside it for the rest; a fade at the bottom means there's more).
+    Put `[ ]` around words (or select some and click **Frame as goal**) and each framed phrase is a North star goal;
     click the paragraph to edit, ⌘↵ or clicking outside saves. Rewording inside a frame keeps the same goal (its parent and links stay); removing the frame deletes that goal (undo in the toast).
   - **Goals | Ideas**: Goals are stacked by time: This month, This quarter, Next quarter, This year, Next year, then three more years (in 2026 that's 2028, 2029, 2030; they move with the date).
-    Each goal has a tag, the month you mean to finish it, and once ticked, the month you actually did — both can be clicked and changed. Sections roll forward with the date, and unfinished overdue goals roll into the current one;
+    Each goal has a tag, the month you mean to finish it, and once ticked, the month you actually did — both can be clicked and changed. Sections roll forward with the date.
+    Once a goal's month / quarter / year is over, finished or not, it leaves these sections for **Past** at the bottom: pick a quarter (`2026 Q3`) and open it to see that quarter's goals,
+    its three months' goals and that year's goals, ticked or not, with "N of M done". You can still tick one there (it counts as done in the month it was due), or drag an unfinished one back to a current section by its grip;
     inside a section goals are ordered by their tag's project order (Build first, untagged last). A small grip shows on the left of a goal when you hover it: drag it to another section to give the goal that section's default due date (or click the grip to pick a section; undo in the toast).
     Ideas is the idea pool described below; switching to it keeps the North star paragraph in view.
   **Goals, projects and plans can be linked** to say what each thing is for: rest the mouse on a goal, a framed phrase in the North star, a project name or a plan card
   (or Tab onto it with the keyboard), and the related links fly out one by one (a direct curve between the two ends — crossing text is fine, they only show while you're there).
   A **streak** of light keeps running along each line towards "what it's for" (plan → goal → parent goal → … → North star), and the dot at that end bounces when it arrives. By day it's ink with pink and blue printed slightly off-register; at night it's the project's neon colour.
-  Drag the small circle that appears onto another goal, plan or project to link them; the × in the middle of a line unlinks.
+  Drag the small circle that appears onto another goal, plan or project to link them; the × in the middle of a line unlinks. While you drag, the North star paragraph opens in full
+  and sections folded behind "+N more" show all their goals, so everything can be dropped on.
+  Goals in Past are out of the picture: a line that would go through one goes straight to the next goal up that's still showing (a plan linked to last month's goal is drawn to that goal's parent).
   Goal onto goal = make it the parent (one parent per goal). Without dragging: Part of when editing a goal's text, Serves in the plan editor.
-  A plan with no goal of its own counts its project's goals. On Today, an opened task shows what it's for under its title: For plan → goal → parent → …
+  A plan with no goal of its own counts its project's goals. On Today, an opened task shows what it's for under its title: For plan → goal → parent → … (skipping goals in Past, like the lines);
+  on the phone, a chain too long for one line scrolls by itself like a marquee (hold it to pause).
   Below, each project tracks something different (the Watch column in Settings → Projects changes it): **Build** tracks plan progress (bar, health, timeline);
   **Fitness** checks whether the last 7 days reached 3 hours, **Leisure** whether the last 7 days of Relax stayed within the weekly range (5–20 hours by default) —
   each is one line, red when short, with a count on the Projects item in the sidebar; **Work / Chores** track nothing and just list their plans.
@@ -213,18 +219,25 @@ Offline, entries wait on the device and go out once you're back online.
   The first time, Start with examples shows what it looks like (a few Toronto stores, rough CAD prices); one click on the Groceries tab removes them.
 
 **Phone**: see tasks, time them, mark results, add tasks, add to the reading log. The top row is the five days before and after today; tap a day to see it.
-Only the opened row has Done / Delay / Drop (other rows just show their status on the right), plus ↑ ↓ on the right to move it up or down; after Done you enter how long and when it ended, Delay and Drop ask for a reason;
-press and drag the minutes on the left to reorder; add tasks at the bottom of the list ("Gym 40" — a trailing number is minutes). The project is a small chip; tapping it opens a dropdown of projects with their plans. Planning and settings happen on the computer.
+Only the opened row has Done / Delay / Drop (other rows just show their status on the right); after Done you enter how long and when it ended, Delay and Drop ask for a reason;
+press and drag the minutes on the left to reorder (the phone has no ↑ ↓; the computer keeps them, plus Alt+↑↓); add tasks at the bottom of the list ("Gym 40" — a trailing number is minutes). The project is a small chip; tapping it opens a dropdown of projects with their plans.
+**Spend** at the bottom right of the add-task box records a transaction (see Spending below). Planning and settings happen on the computer.
 
 **Spending (phone and computer)**: records are kept on the device; paste a spending Sheet link in Settings on the computer and it syncs with that Sheet, and both sides can add and edit.
 - Phone: pull down from the top of Today (with the page scrolled to the top) — a drop grows under the Dynamic Island; at about 90px the neck snaps and the "+" turns blue, and letting go drops the panel like a curtain
   (with a small bounce at the bottom). It stops at about 94% of the screen with a hem of a few soft waves along its lower edge; scrolling the list makes the waves drift and sway before settling. Tap the strip of Today still showing below (or the hem),
   or push the small bar at the bottom up, and the curtain rises again (if you added anything, the island shows today's total for a moment).
-  Inside: Year / Month / Day, a draggable bar timeline, category chips, the list (tap to edit, swipe left to delete), suggestions, and Add a new transaction (a number pad that also takes `12.5+8`).
+  Inside: Year / Month / Day, a draggable bar timeline, category chips, the list (tap to edit, swipe left to delete) and suggestions.
+  To add a transaction, tap **Spend** at the bottom right of the add-task box on Today: the entry sheet rises from the bottom without the curtain — expense / income, category, date (today), note, currency
+  and a large number pad that also takes `12.5+8`. After Add it slides away, the island shows today's total for a moment and the toast has Undo; tapping the dimmed page or ✕ closes it without saving.
+  Tapping a record in the list opens the same sheet to edit it.
   The chart icon at the top raises the charts to half height (the period and timeline stay visible); drag up for full height, down to close.
 - Computer: Spending is one large translucent black board laid out like a web page: the period and sync status at the top, with Month / Year, ‹ Now ›, search (`/`), the currency to show totals in, the gear and `+ Add` (N) on the right;
   a row of five numbers below (Spent, Income, Balance, Budget used, Budget left, with a thin line for the range of the previous six months); then the chart and the transaction table on the left (a month is grouped by day; a year and search results by month),
   and By category on the right (click one to show only that category). `+ Add` opens a row under the header to type straight in (Tab between fields, Enter saves and closes the row, Esc or clicking outside an empty row closes it; N again for the next one). Click a row in the table to edit it in place; hovering shows Edit / × (both can be undone).
+- **Charts (phone and computer)**: the line is spending added up day by day, House on the day it was paid — the year chart too, so each month's rent is a step; months not recorded yet assume
+  the latest month's House on the 1st. The shaded areas are House and the budget (House plus each day's share of the rest). Tap or click the part above House to see only the other spending
+  against the budget minus House (the title or a line under the chart says so); tap anywhere to go back. The charts always open showing everything.
 - **Currencies**: each record keeps the currency it was paid in (CAD, RMB, USD, EUR, GBP, JPY, HKD). Pick it next to the amount; new records keep using that currency until you change it (per device).
   Totals, charts, categories and the budget are shown in one currency — CAD by default, switchable per device (the `CAD ⌄` next to the totals). Rows show the original amount with the converted one underneath.
   Rates are in Settings → Currency (`1 CAD = …`): type them, or Use today's rates to fetch the European Central Bank's (via frankfurter.dev, only when you ask, or once when you first pick a currency with no rate). A currency with no rate yet uses a rough one, marked "rough". Budgets are set in CAD.

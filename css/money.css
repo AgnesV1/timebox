@@ -152,6 +152,10 @@
 .mn .mn-irow .n { color: #B9B5AC; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 记一笔 / 改一笔：手机上是从底下弹上来的面板 + 数字键盘 */
+/* 图：电脑上鼠标停在点得动的地方（完整的时候 House 上面那块；只看 House 以外的时候哪儿都行）是手指形光标；手机图下面一行小字说怎么回来 */
+.mn .mn-chart.mn-tap { cursor: pointer; }
+.mn .mn-cnote { margin: 4px 0 0; }
+.spend .sp-legend .sp-back { color: var(--mn-mute); }
 .mn .mn-scrim { position: absolute; inset: 0; z-index: 40; background: #000; opacity: 0; pointer-events: none; transition: opacity .3s; }
 .mn .mn-scrim.on { opacity: .55; pointer-events: auto; }
 .mn .mn-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 41; padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px)); border-radius: 26px 26px 0 0;
@@ -166,11 +170,12 @@
 .mn .mn-amt .cur { margin-right: 3px; font-size: 17px; font-weight: 400; color: var(--mn-mute); }
 .mn .mn-amt .zero { color: #3A3A48; }
 .mn .mn-amt .in { display: inline-block; animation: mn-rin .28s var(--mn-enter); }
-.mn .mn-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
-.mn .mn-k { all: unset; display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 12px; font: 400 19px "JetBrains Mono", monospace; cursor: pointer; transition: background .25s, transform .28s var(--mn-spring); }
+/* 数字键盘：她说大一点好按——52px 高、24px 字（今天页 Spend 点出来的、面板里改一笔的，都是这一张） */
+.mn .mn-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.mn .mn-k { all: unset; display: flex; align-items: center; justify-content: center; height: 52px; border-radius: 14px; font: 400 24px "JetBrains Mono", monospace; cursor: pointer; transition: background .25s, transform .28s var(--mn-spring); }
 .mn .mn-k:active { background: rgba(255, 255, 255, .1); transform: scale(.93); transition-duration: .06s; }   /* 数字键盘按得快：按下的反馈比别处更快 */
-.mn .mn-k.op { font-size: 16px; color: var(--mn-mute); }
-.mn .mn-k.add { grid-row: span 2; height: auto; border-radius: 13px; background: var(--mn-pri); color: var(--mn-pri-ink); font: 500 15px "Space Grotesk", sans-serif; }
+.mn .mn-k.op { font-size: 20px; color: var(--mn-mute); }
+.mn .mn-k.add { grid-row: span 2; height: auto; border-radius: 15px; background: var(--mn-pri); color: var(--mn-pri-ink); font: 500 17px "Space Grotesk", sans-serif; }
 .mn .mn-act { all: unset; font-size: 13px; color: var(--mn-blue); cursor: pointer; }
 .mn .mn-act.warn { color: #E8674A; }
 
@@ -255,6 +260,8 @@
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 14' preserveAspectRatio='none'%3E%3Cpath d='M0 7Q27.5 15 55 7T110 7' fill='none' stroke='white' stroke-opacity='.16' stroke-width='1.6'/%3E%3C/svg%3E") var(--shift, 0px) 0 / 110px 14px repeat-x, #000;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 14' preserveAspectRatio='none'%3E%3Cpath d='M0 0V7Q27.5 15 55 7T110 7V0Z'/%3E%3C/svg%3E") var(--shift, 0px) 0 / 110px 14px repeat-x;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 14' preserveAspectRatio='none'%3E%3Cpath d='M0 0V7Q27.5 15 55 7T110 7V0Z'/%3E%3C/svg%3E") var(--shift, 0px) 0 / 110px 14px repeat-x; }
+/* 今天页点 Spend 出来的（.entry）：幕布不落，只有底下那张记一笔的升上来，后面压暗的是今天页 */
+.mn-phone.entry .mn-curtain, .mn-phone.entry .mn-veil { visibility: hidden; }
 .mn-phone .mn-pg { background: transparent; }
 .mn-phone .mn-pg:not(.mn-home) { background: #000; }
 .mn-phone .mn-home, .mn-phone .mn-pg { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }

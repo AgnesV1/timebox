@@ -72,6 +72,12 @@ const dragLink = (from, to) => async (page) => {
   for (let i = 1; i <= 12; i++) { await page.mouse.move(h.x + (t.x + t.width / 2 - h.x) * i / 12, h.y + (t.y + t.height / 2 - h.y) * i / 12); await page.waitForTimeout(16); }
   await page.waitForTimeout(300);
 };
+// 记账的图：点一下 House 那块上面（图的中间、上面四分之一处）= 只看 House 以外
+async function tapChartAbove(page, sel) {
+  const b = await page.locator(sel).first().boundingBox();
+  await page.mouse.click(b.x + b.width * 0.5, b.y + b.height * 0.25);
+  await page.waitForTimeout(500);
+}
 // 手机：从今天页顶上往下拉（island.js 也认鼠标），拉过线松手
 async function pullLedger(page) {
   await page.mouse.move(195, 140);
@@ -99,10 +105,15 @@ const SHOTS = [
   { device: "phone", name: "ledger", hash: "today", act: pullLedger },
   { device: "phone", name: "ledger-open", hash: "today", act: async (page) => { await pullTo(115, true, 330)(page); } },
   { device: "phone", name: "ledger-scroll", hash: "today", act: async (page) => { await pullLedger(page); const b = await page.locator(".mn-phone .mn-list").boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + 60); for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, 140); await page.waitForTimeout(16); } await page.waitForTimeout(70); } },
-  { device: "phone", name: "ledger-add", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="add"]')(page); for (const k of ["1", "2", ".", "5", "+", "8"]) await tap('.mn-phone [data-k="' + k + '"]')(page); } },
+  // 记一笔：今天页加任务那一块右下角的 Spend（记账面板里已经没有那个按钮了），升起来的就是记账里那张
+  { device: "phone", name: "today-spend", hash: "today", act: async (page) => { await tap(".dayview .add-spend")(page); await page.waitForTimeout(300); } },
+  { device: "phone", name: "ledger-add", hash: "today", act: async (page) => { await tap(".dayview .add-spend")(page); for (const k of ["1", "2", ".", "5", "+", "8"]) await tap('.mn-phone [data-k="' + k + '"]')(page); } },
   { device: "phone", name: "ledger-past", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="prev"]')(page); await page.waitForTimeout(700); await tap('.mn-phone [data-act="prev"]')(page); await page.waitForTimeout(900); } },
   { device: "phone", name: "ledger-day", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-seg="mode"] [data-v="day"]')(page); await page.waitForTimeout(700); await tap('.mn-phone [data-act="prev"]')(page); await page.waitForTimeout(900); } },
   { device: "phone", name: "ledger-chart", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="chart"]')(page); await page.waitForTimeout(600); } },
+  { device: "phone", name: "ledger-chart-rest", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="chart"]')(page); await page.waitForTimeout(600); await tapChartAbove(page, ".mn-phone .mn-chart"); } },
+  { device: "phone", name: "ledger-chart-year", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="chart"]')(page); await page.waitForTimeout(600); await tap('.mn-phone [data-seg="cmode"] [data-v="year"]')(page); await page.waitForTimeout(900); } },
+  { device: "phone", name: "ledger-chart-year-rest", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="chart"]')(page); await page.waitForTimeout(600); await tap('.mn-phone [data-seg="cmode"] [data-v="year"]')(page); await page.waitForTimeout(900); await tapChartAbove(page, ".mn-phone .mn-chart"); } },
   { device: "phone", name: "ledger-cats", hash: "today", act: async (page) => { await pullLedger(page); await tap('.mn-phone [data-act="set"]')(page); await tap('.mn-phone [data-sub="cats"]')(page); } },
   { device: "desk", name: "today", hash: "today" },
   { device: "desk", name: "today-hover", hash: "today", act: hover(".today-main .row:not(.open) .task") },
@@ -117,6 +128,8 @@ const SHOTS = [
   { device: "desk", name: "projects-hover-north", hash: "projects", act: hover('.goals .ns-g[data-goal="n2"]', 1600) },
   { device: "desk", name: "projects-north-edit", hash: "projects", act: async (page) => { await tap('.goals .ns-g[data-goal="n2"]')(page); await page.keyboard.press("Control+End"); await page.keyboard.type(" Write every week.", { delay: 5 }); await page.keyboard.down("Shift"); for (let i = 0; i < 17; i++) await page.keyboard.press("ArrowLeft"); await page.keyboard.up("Shift"); await page.waitForTimeout(200); } },
   { device: "desk", name: "projects-ideas", hash: "projects", act: tap('.goals [data-act="rail-tab"][data-v="ideas"]') },
+  // 往期：最底下那一行点开（上个月、上一季过期的目标都在这里）。上一张切到了 Ideas（记在这台设备上），先切回 Goals
+  { device: "desk", name: "projects-past", hash: "projects", act: async (page) => { await tap('.goals [data-act="rail-tab"][data-v="goals"]')(page); await page.locator('.goals [data-act="past-toggle"]').first().scrollIntoViewIfNeeded(); await tap('.goals [data-act="past-toggle"]')(page); await page.locator(".goals .gpast").first().scrollIntoViewIfNeeded(); await page.waitForTimeout(200); } },
   { device: "desk", name: "plan-editor", hash: "projects", act: tap('.pcard[data-project="seed-b2"] .pname') },
   { device: "desk", name: "stats", hash: "stats" },
   { device: "desk", name: "spending", hash: "spending" },
@@ -125,6 +138,9 @@ const SHOTS = [
   { device: "desk", name: "spending-filter", hash: "spending", act: async (page) => { await tap(".spend .sp-cat:nth-child(2)")(page); await page.mouse.move(5, 5); await page.waitForTimeout(200); } },
   { device: "desk", name: "spending-search", hash: "spending", act: async (page) => { await page.keyboard.press("/"); await page.keyboard.type("coffee"); await page.waitForTimeout(300); } },
   { device: "desk", name: "spending-year", hash: "spending", act: async (page) => { await tap('.spend [data-seg="mode"] [data-v="year"]')(page); await page.waitForTimeout(900); } },
+  // 点 House 上面那块：只看 House 以外（月、年各一张）
+  { device: "desk", name: "spending-rest", hash: "spending", act: async (page) => { await page.waitForTimeout(400); await tapChartAbove(page, ".spend .mn-chart"); await page.mouse.move(5, 5); } },
+  { device: "desk", name: "spending-year-rest", hash: "spending", act: async (page) => { await tap('.spend [data-seg="mode"] [data-v="year"]')(page); await page.waitForTimeout(900); await tapChartAbove(page, ".spend .mn-chart"); await page.mouse.move(5, 5); } },
   { device: "desk", name: "spending-set", hash: "spending", act: async (page) => { await tap('.spend [data-act="set"]')(page); await tap('#modal [data-sact="tab"][data-v="cats"]')(page); } },
   { device: "desk", name: "reading", hash: "reading", act: seedReading },
   { device: "desk", name: "reading-add", hash: "reading", act: async (page) => { await seedReading(page); await page.locator(".yl-in").click(); await page.waitForTimeout(300); } },

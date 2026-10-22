@@ -69,12 +69,12 @@ export function badgeOf(t) {
   return p ? { name: p.name || "", color: p.color || "" } : t.group ? { name: t.group, color: store.groupByName(t.group)?.color || "" } : null;
 }
 
-// 「For B2 exam → Mock exam → Pass B2 → … → ✦ North star 里那条」：这件事是为了什么。
+// 「For B2 exam → Mock exam → Pass B2 → … → ✦ North star 里那条」：这件事是为了什么（过了期、收进往期的目标不在链上，接到往上第一条还在的）。
 // 第一个是它的计划（没有计划、或者是循环小事的，是项目），带那个颜色；后面是它服务的目标，一层层往上（计划自己没连目标的，用它所在项目连着的，见 js/goals.js）。
 // 连着几个目标就几行，最多 max 行，多的写「+N more」。fold：一条链超过这么多个目标时，只留前面几个和最后一个，中间折成「⋯」（手机上省地方，点了展开）
 export function chainHTML({ planId = "", group = "", head = null, max = 2, fold = 0 } = {}) {
-  const goals = store.goals();
-  const chains = goals.length && head?.name ? G.chainsFor(goals, G.goalsFor(goals, { planId, group })) : [];
+  const goals = store.goals(), vis = goals.length ? G.visibleSet(goals, store.today()) : null;   // 收进往期的目标越过去（js/goals.js）
+  const chains = goals.length && head?.name ? G.chainsFor(goals, G.goalsFor(goals, { planId, group }, vis), vis) : [];
   if (!chains.length) return "";
   const step = (g) => '<i aria-hidden="true">→</i><span' + (g.span === "north" ? ' class="ch-star"' : "") + ' title="' + esc(g.text) + '">' + esc(g.text) + "</span>";
   const line = (ch) => '<p class="chain"><span class="ch-for">For</span><b style="--pc:' + esc(head.color || "var(--c-None)") + '">' + esc(head.name) + "</b>" +

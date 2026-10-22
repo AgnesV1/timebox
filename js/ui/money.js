@@ -113,14 +113,16 @@ const chevR = '<svg class="ic mn-cr" viewBox="0 0 24 24" aria-hidden="true"><pat
 export const periodTitle = (p, mode) => (mode === "day" ? M.fmtDate(M.iso(p.y, p.m, p.d)) : mode === "month" ? M.MONTH[p.m - 1] + " " + p.y : String(p.y));
 
 // 图表：梯形图（House 是底座、预算是浅天蓝底、实线是花的、虚线是照现在的速度）+ 鼠标 / 手指移上去的读数（竖线、橙点，上面哪天、下面到那天一共多少）。
-// 手机的图表页和电脑的 Spending 页共用。draw 按给的宽高画（viewBox = 像素，字不跟着缩放），返回这一期的数（monthChart / yearChart）
-export function chartView(svg) {
-  let CS = null, ct = 0, ci = 0, craf = 0;
-  function draw({ mode, p, w, h, animate = false, delay = 0 }) {
+// 手机的图表页和电脑的 Spending 页共用。draw 按给的宽高画（viewBox = 像素，字不跟着缩放），返回这一期的数（monthChart / yearChart）。
+// house: false = 只看 House（底座类别）以外的花销和预算。点一下（按下抬起没挪、不到半秒；拖着是看读数）交给 onTap：
+//   完整的时候点在 House 那块上面 = "rest"（切到只看 House 以外），点在 House 那块里 = "house"（不切）；只看的时候点哪儿都是 "any"（回到完整的）
+export function chartView(svg, { onTap = null } = {}) {
+  let CS = null, ct = 0, ci = 0, craf = 0, tap = null;
+  function draw({ mode, p, w, h, animate = false, delay = 0, house = true }) {
     const W = w, H = h;
     svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     const ix = IX(), bud = budgetsShown();
-    const c = mode === "month" ? M.monthChart(ix, bud, p.y, p.m, today()) : M.yearChart(ix, bud, p.y, today());
+    const c = mode === "month" ? M.monthChart(ix, bud, p.y, p.m, today(), { house }) : M.yearChart(ix, bud, p.y, today(), { house });
     const X0 = 4, X1 = W - 4, Y0 = H - 22, Y1 = 26;
     const X = (i) => X0 + (i - 1) / Math.max(1, c.n - 1) * (X1 - X0), Y = (v) => Y0 - v / c.top * (Y0 - Y1);
     const pts = Array.from({ length: c.n }, (_, i) => ({ x: X(i + 1), y: Y(c.val(i + 1)) }));
@@ -130,7 +132,7 @@ export function chartView(svg) {
       h0 = (c.B ? '<path class="ar" d="M' + X0 + " " + Y(c.pace(1)) + " L" + X1 + " " + Y(c.B) + " L" + X1 + " " + Y0 + " L" + X0 + " " + Y0 + 'Z" fill="var(--mn-bud)"/>' : "") +
         (c.base ? '<path class="ar" d="M' + X0 + " " + Y(c.base) + " H" + X1 + " V" + Y0 + " H" + X0 + 'Z" fill="var(--mn-base)"/>' : "");
     } else {
-      h0 = (c.budgetLine[c.n] ? '<path class="ar" d="' + poly(c.budgetLine.slice(1)) + '" fill="var(--mn-bud)"/>' : "") + '<path class="ar" d="' + poly(c.baseLine.slice(1)) + '" fill="var(--mn-base)"/>';
+      h0 = (c.budgetLine[c.n] ? '<path class="ar" d="' + poly(c.budgetLine.slice(1)) + '" fill="var(--mn-bud)"/>' : "") + (c.baseLine[c.n] ? '<path class="ar" d="' + poly(c.baseLine.slice(1)) + '" fill="var(--mn-base)"/>' : "");
     }
     h0 += [c.top, c.top / 2].map((v) => '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#fff" stroke-opacity=".07"/><text class="mn-ax" x="6" y="' + (Y(v) + 12) + '">' + esc(M.curInfo(M.showing()).sym) + Math.round(v / 100).toLocaleString("en-US") + "</text>").join("");
     if (c.last) h0 += '<path class="ln" pathLength="1" d="' + pts.slice(0, c.last).map((q, i) => (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1)).join(" ") + '" fill="none" stroke="#F2EEE6" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>';
@@ -147,7 +149,10 @@ export function chartView(svg) {
       svg.querySelectorAll(".fc").forEach((q) => q.animate([{ opacity: 0 }, { opacity: 0, offset: 0.65 }, { opacity: 1 }], { duration: 1000 + delay * 1000 }));
       svg.querySelector("[data-lab]").animate([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 900 + delay * 1000 });
     }
-    CS = { c, pts, mode, p, W, dateOf: (i) => (mode === "month" ? M.MON[p.m - 1] + " " + (i + 1) : (() => { const q = M.parts(c.dateOf(i + 1)); return M.MON[q.m - 1] + " " + q.d; })()) };
+    // House 那块的上沿（这一天）：点在它上面算点到「House 以外那一块」
+    const baseY = (i) => Y(mode === "month" ? c.base : c.baseLine[i + 1] || 0), hasBase = mode === "month" ? c.base > 0 : c.baseLine[c.n] > 0;
+    CS = { c, pts, mode, p, W, H, house, hasBase, baseY, dateOf: (i) => (mode === "month" ? M.MON[p.m - 1] + " " + (i + 1) : (() => { const q = M.parts(c.dateOf(i + 1)); return M.MON[q.m - 1] + " " + q.d; })()) };
+    svg.classList.remove("mn-tap");
     ct = ci = Math.min(c.n - 1, c.home);
     cread(ci);
     svg.classList.add("mn-st");
@@ -173,9 +178,26 @@ export function chartView(svg) {
   const ctick = () => { ci += (ct - ci) * 0.18; if (Math.abs(ct - ci) < 0.005) ci = ct; cplace(ci); craf = ci === ct ? 0 : requestAnimationFrame(ctick); };
   const caim = (i) => { if (i !== ct) { ct = i; cread(i); } if (!craf) craf = requestAnimationFrame(ctick); };
   const cnear = (e) => { const r = svg.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * CS.W, P = CS.pts; const k = Math.round((vx - P[0].x) / Math.max(1e-6, P[P.length - 1].x - P[0].x) * (P.length - 1)); return Math.max(0, Math.min(P.length - 1, k)); };
-  svg.addEventListener("pointermove", (e) => CS && caim(cnear(e)));
-  svg.addEventListener("pointerdown", (e) => CS && caim(cnear(e)));
-  svg.addEventListener("pointerleave", () => CS && caim(Math.min(CS.c.n - 1, CS.c.home)));
+  // 点在哪：完整的时候分 House 上面 / House 里；只看 House 以外的时候哪儿都一样。没有 House 的这一期不切
+  const regionAt = (e) => {
+    if (!CS.house) return "any";
+    const r = svg.getBoundingClientRect(), py = (e.clientY - r.top) / r.height * CS.H;
+    return CS.hasBase && py < CS.baseY(cnear(e)) ? "rest" : "house";
+  };
+  svg.addEventListener("pointermove", (e) => {
+    if (!CS) return;
+    caim(cnear(e));
+    if (onTap && e.pointerType === "mouse") svg.classList.toggle("mn-tap", regionAt(e) !== "house");   // 电脑上：点得动的地方手指形光标
+  });
+  svg.addEventListener("pointerdown", (e) => { tap = { x: e.clientX, y: e.clientY, t: performance.now() }; if (CS) caim(cnear(e)); });
+  svg.addEventListener("pointerup", (e) => {
+    const t = tap;
+    tap = null;
+    if (!t || !CS || !onTap || Math.hypot(e.clientX - t.x, e.clientY - t.y) > 6 || performance.now() - t.t > 450) return;
+    const where = regionAt(e);
+    if (where !== "house") onTap(where);
+  });
+  svg.addEventListener("pointerleave", () => { svg.classList.remove("mn-tap"); if (CS) caim(Math.min(CS.c.n - 1, CS.c.home)); });
   return { draw };
 }
 
@@ -197,14 +219,14 @@ export function createView() {
     '<div class="mn-hs mn-chips"></div>' +
     '<div class="mn-lw"><div class="mn-list mn-vs"></div>' + blur.replace("mn-pblur", "mn-pblur top") + blur.replace("mn-pblur", "mn-pblur bot") + "</div>" +
     '<div class="mn-foot"><div class="mn-recw" hidden><span class="mn-meta" style="flex:none">Recommended</span><div class="mn-hs mn-recs"></div></div>' +
-    '<button type="button" class="mn-big" data-act="add">Add a new transaction</button>' +
     '<div class="mn-grab" data-grab aria-label="Close"><span class="mn-grabber"></span></div></div></section>';
   const pages = '<section class="mn-pg off" data-pg="set"><div class="mn-hdr">' + back + '<span style="font-size:15px;font-weight:500">Settings</span><span style="width:32px"></span></div><div class="mn-vs" data-setb style="flex:1;margin-top:14px"></div></section>' +
     '<section class="mn-pg off" data-pg="sub"><div class="mn-hdr">' + back + '<span data-subt style="font-size:15px;font-weight:500"></span><span style="width:32px"></span></div><div class="mn-vs" data-subb style="flex:1;margin-top:14px"></div></section>' +
     '<section class="mn-pg off" data-pg="find"><div class="mn-hdr" style="gap:6px">' + back + '<input class="mn-tx" data-q placeholder="Search notes, categories, amounts" autocomplete="off" style="flex:1;padding:6px 0;border-bottom:1px solid var(--mn-line)"></div><div class="mn-vs" data-fres style="flex:1;margin-top:8px"></div></section>';
   // 图表：从底下升上来的那一页
   const cseg = '<div class="mn-seg" data-seg="cmode"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button></div>';
-  const chartBody = '<div class="mn-cbody mn-vs"><svg class="mn-chart" data-chart viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Spending against the budget"></svg><div class="mn-hs mn-cards"></div><div class="mn-bks"><div data-xb></div><div data-ib></div></div></div>';
+  const chartBody = '<div class="mn-cbody mn-vs"><svg class="mn-chart" data-chart viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Spending against the budget. Tap the part above House to see it on its own."></svg>' +
+    '<p class="mn-cnote mn-meta" data-cnote hidden></p><div class="mn-hs mn-cards"></div><div class="mn-bks"><div data-xb></div><div data-ib></div></div></div>';
   const chartInner = '<div class="mn-thead">' + btn("cprev", "left", "Earlier", "mn-sm") + '<div class="mn-tmid"><span class="mn-tw"><h2 class="mn-h1" data-ctitle></h2>' + nowDot("creset", "Back to this month") + "</span></div>" + btn("cnext", "right", "Later", "mn-sm") + "</div>" + cseg.replace('class="mn-seg"', 'class="mn-seg" style="margin-top:14px"') + chartBody;
   const sheet = '<div class="mn-scrim" data-act="sclose"></div><section class="mn-sheet" aria-label="Transaction">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;height:30px"><span data-sht style="font-size:15px;font-weight:500"></span><div style="display:flex;align-items:center;gap:6px"><button type="button" class="mn-act warn" data-act="sdel" hidden>Delete</button>' + btn("sclose", "close", "Close", "mn-sm") + "</div></div>" +
@@ -223,7 +245,7 @@ export function createView() {
 
   const $ = (s) => root.querySelector(s);
   const homeEl = $('[data-pg="home"]'), rw = $(".mn-rw"), rail = $(".mn-rail"), hl = $(".mn-hl"), tl = $(".mn-tl"), list = $(".mn-list");
-  const V = { mode: "month", cur: todayP(), filt: null, items: [], cw: 40, sel: 0, collapsed: false, stack: [], cmode: "month", cc: todayP(), bk: new Set(), fresh: null, chartOpen: false, sub: "", catKind: "out", budEdit: null, newBud: null, expM: null };
+  const V = { mode: "month", cur: todayP(), filt: null, items: [], cw: 40, sel: 0, collapsed: false, stack: [], cmode: "month", cc: todayP(), bk: new Set(), fresh: null, chartOpen: false, sub: "", catKind: "out", budEdit: null, newBud: null, expM: null, nohouse: false };
 
   // ---------- 分段开关 ----------
   function seg(name, val) {
@@ -453,6 +475,7 @@ export function createView() {
     changed = true;
     const e = SP.add({ ...x, id: V.fresh });
     snack("Added " + e.c + " " + M.money(e.v, M.curOf(e)), () => SP.remove(e.id));
+    root.dispatchEvent(new CustomEvent("mn-added", { detail: e }));   // 今天页点出来的那张：提示条在今天页上（面板里的看不见）
     return e;
   }
   function removeEntry(id) {
@@ -519,7 +542,8 @@ export function createView() {
     $(".mn-sheet").classList.add("on");
     requestAnimationFrame(() => renderSheet());
   }
-  function closeSheet() { closeCal(); closeCurMenu(); $(".mn-scrim").classList.remove("on"); $(".mn-sheet").classList.remove("on"); $("[data-snote]").blur(); }
+  // 收起来以后告诉外面一声（今天页点 Spend 出来的那张，island.js 靠它把整块藏回去）
+  function closeSheet() { closeCal(); closeCurMenu(); $(".mn-scrim").classList.remove("on"); $(".mn-sheet").classList.remove("on"); $("[data-snote]").blur(); root.dispatchEvent(new CustomEvent("mn-sheet", { detail: { open: false } })); }
   function saveSheet() {
     const s = ssum();
     if (!(s > 0)) {
@@ -600,13 +624,17 @@ export function createView() {
   const wantRate = (k) => { if (!M.rateSet(fx(), k)) fetchRates([k], true).catch(() => {}); };
 
   // ---------- 图表 ----------
-  const chart = chartView($("[data-chart]"));
+  // 图表：点 House 上面那块 = 只看 House 以外；只看的时候点哪儿都回来（每次打开图表页都是完整的，见 openChart）
+  const chart = chartView($("[data-chart]"), { onTap: (where) => { V.nohouse = where === "rest"; renderChart(false); } });
   function renderChart(animate, entering) {
     const mode = V.cmode, p = V.cc, t = todayP();
     $("[data-ctitle]").textContent = periodTitle(p, mode);
     $('[data-act="creset"]').classList.toggle("on", mode === "month" ? !(p.y === t.y && p.m === t.m) : p.y !== t.y);
     const d0 = entering ? 0.3 : 0;
-    const c = chart.draw({ mode, p, w: W, h: H, animate, delay: d0 });
+    const c = chart.draw({ mode, p, w: W, h: H, animate, delay: d0, house: !V.nohouse });
+    const note = $("[data-cnote]"), baseName = SP.cats().filter((x) => x.role === "base").map((x) => x.name).join(", ") || "House";
+    note.hidden = !V.nohouse;
+    note.textContent = V.nohouse ? "Without " + baseName + " · tap the chart to show everything" : "";
     cards(c, mode, p, d0);
     breakdown(mode, p);
     if (animate && !quiet()) {
@@ -695,6 +723,7 @@ export function createView() {
     if (V.chartOpen) return;
     V.chartOpen = true;
     V.cmode = V.mode === "year" ? "year" : "month";
+    V.nohouse = false;   // 每次打开都是完整的（包括 House）
     V.cc = { ...V.cur };
     V.bk = new Set();
     seg("cmode", V.cmode);

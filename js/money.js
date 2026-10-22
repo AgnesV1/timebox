@@ -159,9 +159,10 @@ export function niceMax(v) {
 }
 
 // 月度图：底座（这个月底座类别花的）+ 每天累加的其余花销（不算的那几类不算），预算 = 梯形（底座那一截 + 往上斜到预算）。
-// 今天以后的按到今天为止的平均速度画虚线
-export function monthChart(ix, budgets, y, m, today) {
-  const t = parts(today), N = dim(y, m), B = budgetAt(budgets, y, m), g = sumOf(ix, { y, m }, "month"), base = g.base;
+// 今天以后的按到今天为止的平均速度画虚线。house: false = 只看底座（House）以外：没有底座、线从 0 起，预算从 0 斜到「预算 − 底座」
+export function monthChart(ix, budgets, y, m, today, { house = true } = {}) {
+  const t = parts(today), N = dim(y, m), g = sumOf(ix, { y, m }, "month"), base = house ? g.base : 0;
+  const B = house ? budgetAt(budgets, y, m) : Math.max(0, budgetAt(budgets, y, m) - g.base);
   const isCur = y === t.y && m === t.m, last = ord(y, m) > ord(t.y, t.m) ? 0 : isCur ? t.d : N;
   // 今天以后的虚线 = 到今天的 + 已经提前记下的那几笔（落在它们那天）+ 照平均速度
   const cv = [0], ahead = [0];
@@ -169,40 +170,45 @@ export function monthChart(ix, budgets, y, m, today) {
   const rate = last ? cv[last] / last : 0;
   const val = (d) => (d <= last ? base + cv[d] : base + cv[last] + ahead[d] + rate * (d - last));
   const pace = (d) => (B ? base + Math.max(0, B - base) * d / N : 0);
-  return { n: N, B, base, last, isCur, val, pace, top: niceMax(Math.max(B, val(N), base) * 1.04 || 100), used: g, home: (isCur ? t.d : N) - 1 };
+  return { n: N, B, base, last, isCur, val, pace, top: niceMax(Math.max(B, val(N), base) * 1.04 || 100), used: g, home: (isCur ? t.d : N) - 1, house };
 }
 
-// 年度图：按天画一整年（能拖到任意一天）。每个月和月度图一样：月初先加上这个月的底座，再一天天加其余的（不算的那几类不算），
-// 预算 = 每个月一段梯形接起来（前面几个月的预算 + 这个月的底座，斜着升到这个月的预算）。今天以后按今年到今天的平均速度画虚线
+// 年度图：按天画一整年（能拖到任意一天），每一笔落在它自己那天（她 2026-10 要的：不再把整月的 House 堆在 1 号）。
+//   线 = 每天的（支出 − 不算的）一天天加起来；House 那一块 = House 一天天加起来；
+//   预算 = House 加起来 + 每天的额度（(这个月的预算 − 这个月的 House) ÷ 这个月的天数）加起来——House 付了预算也跟着涨，所以一月一号交了房租不算超。
+//   以后还没记 House 的月份照最近一个月的 House、算在月初那天。今天以后按今年到今天的平均速度画虚线（提前记下的落在它们那天）。
+//   house: false = 只看 House 以外：线、预算都不含 House，没有那一块，B 是「预算 − House」
 export const daysIn = (y) => (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0) ? 366 : 365);
 export function dayOfYear(y, m, d) { let n = d; for (let k = 1; k < m; k++) n += dim(y, k); return n; }
 export function dateOfDay(y, i) { let m = 1; while (m < 12 && i > dim(y, m)) { i -= dim(y, m); m++; } return iso(y, m, i); }
-export function yearChart(ix, budgets, y, today) {
+export function yearChart(ix, budgets, y, today, { house = true } = {}) {
   const t = parts(today), n = daysIn(y), last = y > t.y ? 0 : y === t.y ? dayOfYear(t.y, t.m, t.d) : n;
   const val = [0], bud = [0], base = [0], ahead = [0];
-  let done = 0, budDone = 0, baseDone = 0, i = 0, lastBase = 0;
+  let i = 0, run = 0, budRun = 0, baseRun = 0, lastBase = 0, B = 0;
   for (let m = 1; m <= 12; m++) {
-    const N = dim(y, m), B = budgetAt(budgets, y, m), g = sumOf(ix, { y, m }, "month"), started = i + 1 <= last;
-    const b = started ? g.base : lastBase;
-    if (started && g.base) lastBase = g.base;
-    let cv = 0;
+    const N = dim(y, m), Bm = budgetAt(budgets, y, m), g = sumOf(ix, { y, m }, "month"), started = i + 1 <= last;
+    const has = g.base > 0, b = has ? g.base : started ? 0 : lastBase;   // 这个月的 House：记了的照记的；以后还没记的照最近一个月的
+    if (has) lastBase = g.base;
+    const allow = Bm ? Math.max(0, Bm - b) / N : 0;                     // House 以外，每天的额度
+    if (y !== t.y || m <= t.m) B += house ? Bm : Math.max(0, Bm - b);   // 和 yearBudget 一样：今年算到这个月，别的年份算满十二个月
     for (let d = 1; d <= N; d++) {
       i++;
-      const x = sumOf(ix, { y, m, d }, "day"), k = x.out - x.base - x.outside;
-      if (i <= last) cv += k;
+      const x = sumOf(ix, { y, m, d }, "day"), hd = has ? x.base : d === 1 ? b : 0;
+      const k = x.out - x.outside - (house ? 0 : x.base);
+      if (i <= last) run += k;
       ahead[i] = ahead[i - 1] + (i > last ? k : 0);   // 提前记下的、今天以后的那几笔
-      val[i] = done + (started ? g.base : 0) + cv;
-      bud[i] = B ? budDone + b + Math.max(0, B - b) * d / N : budDone;
-      base[i] = baseDone + b;
+      val[i] = run;
+      baseRun += house ? hd : 0;
+      budRun += allow + (house ? hd : 0);
+      base[i] = baseRun;
+      bud[i] = Bm ? budRun : bud[i - 1];
+      if (!Bm) budRun = bud[i];   // 没定预算的月份：预算线停着不涨
     }
-    done += started ? counted(g) : 0;
-    budDone += B;
-    baseDone += b;
   }
   const rate = last ? val[last] / last : 0;
   const v = (k) => (k <= last ? val[k] : val[last] + ahead[k] + rate * (k - last));
-  return { n, B: yearBudget(budgets, y, today), last, isCur: y === t.y, val: v, budgetLine: bud, baseLine: base,
-    top: niceMax(Math.max(bud[n], v(n)) * 1.04 || 100), used: sumOf(ix, { y }, "year"), home: (last || n) - 1, dateOf: (k) => dateOfDay(y, k) };
+  return { n, B, last, isCur: y === t.y, val: v, budgetLine: bud, baseLine: base, house,
+    top: niceMax(Math.max(bud[n], v(n), base[n]) * 1.04 || 100), used: sumOf(ix, { y }, "year"), home: (last || n) - 1, dateOf: (k) => dateOfDay(y, k) };
 }
 
 // 五个小方块的那条线：和之前六个月（年模式 = 之前几年）比，这个数落在什么范围里。

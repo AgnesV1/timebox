@@ -132,6 +132,8 @@ const SHOTS = [
   { device: "desk", name: "projects-past", hash: "projects", act: async (page) => { await tap('.goals [data-act="rail-tab"][data-v="goals"]')(page); await page.locator('.goals [data-act="past-toggle"]').first().scrollIntoViewIfNeeded(); await tap('.goals [data-act="past-toggle"]')(page); await page.locator(".goals .gpast").first().scrollIntoViewIfNeeded(); await page.waitForTimeout(200); } },
   { device: "desk", name: "plan-editor", hash: "projects", act: tap('.pcard[data-project="seed-b2"] .pname') },
   { device: "desk", name: "stats", hash: "stats" },
+  // 点饼图里 Build 那一片（图例那一行也一样）：整页只看 Build、按计划拆开，饼图底下出 Clear
+  { device: "desk", name: "stats-pick", hash: "stats", act: tap(".stats .pie-li") },
   { device: "desk", name: "spending", hash: "spending" },
   { device: "desk", name: "spending-add", hash: "spending", act: async (page) => { await page.keyboard.press("n"); await page.waitForTimeout(300); await page.keyboard.type("12.5+8"); await page.keyboard.press("Tab"); } },
   { device: "desk", name: "spending-edit", hash: "spending", act: tap(".spend .sp-row:nth-child(3)") },

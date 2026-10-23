@@ -45,9 +45,11 @@ export const shownDate = () => viewDate || store.today();
 export function showDate(d) { viewDate = d === store.today() ? "" : d; }
 
 // 计时记录：「09:10–09:40 · 30m ×」；正在计时的那个显示走着的时间。点钟点那段 = 改头尾（忘了按 / 停晚了的补救）
-export function timeEditHTML(x) {
+// t = 这段时间的任务：给了就多一个 ◆ Deep（她 10-23 要的；Deep 记在整条任务上，打开 = 这条任务的时间都算深度）。Chores 那边不给
+export function timeEditHTML(x, t = null) {
   const k = (f) => 'name="' + f + '" value="' + esc(x[f]) + '" data-keep="tm-' + f + "-" + esc(x.id) + '"';
   return '<form class="tm-edit" data-tid="' + esc(x.id) + '" autocomplete="off"><input type="time" ' + k("from") + ' aria-label="From"><span>–</span><input type="time" ' + k("to") + ' aria-label="To">' +
+    (t ? '<button type="button" class="dk-deep' + (t.deep ? " on" : "") + '" data-act="tm-deep" aria-pressed="' + Boolean(t.deep) + '" title="Deep work: focused, one thing at a time (the whole task)">◆<span>Deep</span></button>' : "") +
     '<button type="submit" class="btn">Save</button><button type="button" class="link" data-act="time-edit-x">Cancel</button></form>';
 }
 export function timeEditing() { return timeEdit; }
@@ -60,7 +62,7 @@ function timesHTML(c, t, list, form) {
   const canLog = t.status === "done" || t.status === "delay";
   if (!list.length && !live) return "";
   return '<div class="times">' + (live ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : "") +
-    list.map((x) => (timeEdit === x.id && x.from ? timeEditHTML(x) : '<span class="tm">' + timeRangeHTML(x) + fmtMin(x.min) +
+    list.map((x) => (timeEdit === x.id && x.from ? timeEditHTML(x, t) : '<span class="tm">' + timeRangeHTML(x) + fmtMin(x.min) +
       '<button type="button" class="tm-x" data-act="time-del" data-tid="' + x.id + '" aria-label="Delete this time">×</button></span>')).join("") +
     (list.length > 1 ? '<span class="tm sum">= ' + fmtMin(store.timeTotal(t.id)) + "</span>" : "") +
     (canLog && !form ? '<button type="button" class="tm more-time" data-act="time-more">+ time</button>' : "") + "</div>";
@@ -438,6 +440,7 @@ export function initToday(rerender) {
       store.setStatus(id, el.dataset.s);
     } else if (act === "edit") openTaskEditor(id);
     else if (act === "time-del") store.deleteTime(el.dataset.tid);
+    else if (act === "tm-deep") { const t = store.get("tasks", id); if (t) { focus = id; store.updateTask(id, { deep: !t.deep }); } }
     else if (act === "time-edit") { timeEdit = el.dataset.tid; rerender(); requestAnimationFrame(() => setTimeout(() => document.querySelector(".tm-edit [name=from]")?.focus(), 0)); }
     else if (act === "time-edit-x") { timeEdit = ""; rerender(); }
     else if (act === "time-more") { logOpen.add(id); rerender(); }

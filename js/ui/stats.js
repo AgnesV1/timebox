@@ -313,6 +313,8 @@ function projectsHTML(c, s) {
 // 项目的颜色和圆盘是一套（js/ui/sun.js）：项目颜色的霓虹版（js/groups.js 的 neon），自己另选的颜色没有霓虹版就调亮（.boost）；
 // 白天底下垫一版错开的藏青，夜里发光（样子在 css 里的 .slice.ink）。
 // 右边的图例就是表格：名字、时长、占比。项目超过 6 个，后面的合成一片。
+// 没在筛选的时候，各项目那几片（和图例那一行）点得动：点了 = 整页只看这个项目、按它下面的计划拆开（就是上面「只看哪几个」只勾了它）；
+// 筛选着的时候饼图下面一行「Showing only Build · Clear」回到全部（她 10-23 要的，以后别的项目一样）
 
 const LIFE_COLOR = { sleep: "var(--k-sleep)", care: "var(--k-care)", chores: "var(--k-chores)" };
 const HATCH = "repeating-linear-gradient(45deg, var(--muted) 0 1.5px, var(--k-blank) 1.5px 5px)";
@@ -353,7 +355,9 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
   const lit = (x) => (neon(x.color) ? esc(neon(x.color)) : "oklch(from " + esc(x.color) + " calc(l + .12) calc(c * 1.9) h)");
   const color = (x) => (x.kind === "life" ? LIFE_COLOR[x.key] : x.kind === "blank" ? "var(--k-blank)" : x.kind === "rest" ? "url(#st-hatch)" : x.kind === "more" ? "var(--k-None)" : esc(neon(x.color) || x.color || "var(--c-None)"));
   const swatch = (x) => (x.kind === "rest" ? HATCH : ink(x) ? lit(x) : color(x));
-  tips.pie = parts.map((x) => ({ title: x.name, rows: [["of the whole period", fmtHours(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.unlogged ? [["usual housework", fmtHours(x.unlogged), "pl"]] : []), ...(x.deep > 0 ? [["deep", fmtHours(x.deep), "tide"]] : [])] }));
+  const pickable = (x) => !picks.size && x.kind === "project" && Boolean(x.name);
+  tips.pie = parts.map((x) => ({ title: x.name, rows: [["of the whole period", fmtHours(x.min) + " · " + share(x.min, pie.total), "sw", swatch(x)], ...(x.unlogged ? [["usual housework", fmtHours(x.unlogged), "pl"]] : []), ...(x.deep > 0 ? [["deep", fmtHours(x.deep), "tide"]] : []),
+    ...(pickable(x) ? [["to see only " + x.name, "Click", "pl"]] : [])] }));
   // 每片之间留一条缝（周长的 0.5% ≈ 2px）；pathLength = 100，所以长度直接写百分比
   let at = 0, under = "", mid = 100;   // mid = Untracked 正中（流光从这里往下扫）；没有 Untracked 就从 12 点
   const arcs = parts.map((x, i) => {
@@ -363,17 +367,24 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
     const dash = (v) => { const d = Math.max(0.2, v - (parts.length > 1 ? 0.5 : 0)); return d.toFixed(3) + " " + (100 - d).toFixed(3); };
     const where = ' r="42" pathLength="100" stroke-dasharray="' + dash(len) + '" stroke-dashoffset="' + (-start).toFixed(3) + '"';
     if (ink(x)) under += '<circle class="slice-sh"' + where + "/>";
-    return '<circle class="slice' + (ink(x) ? " ink" + (neon(x.color) ? "" : " boost") : "") + '" data-i="' + i + '"' + where + ' stroke="' + color(x) + '"' + (ink(x) ? ' style="--c:' + color(x) + '"' : "") + "/>" +
+    return '<circle class="slice' + (ink(x) ? " ink" + (neon(x.color) ? "" : " boost") : "") + (pickable(x) ? " pick" : "") + '" data-i="' + i + '"' + (pickable(x) ? ' data-act="pie-pick" data-g="' + esc(x.name) + '"' : "") + where + ' stroke="' + color(x) + '"' + (ink(x) ? ' style="--c:' + color(x) + '"' : "") + "/>" +
       (x.deep > 0 ? '<circle class="dring" r="53" pathLength="100" stroke-dasharray="' + dash((x.deep / shown) * 100) + '" stroke-dashoffset="' + (-start).toFixed(3) + '"/>' : "");
   }).join("");
   const hz = haze && haze.min >= 1 && shown > 0 ? haze : null;
   const hzTitle = "Shows, novels… taken in alongside other things, so it overlaps";
-  const legend = parts.map((x) => '<li title="' + esc(x.name + (x.unlogged ? " · includes " + fmtHours(x.unlogged) + " usual housework" : "") + (x.deep > 0 ? " · " + fmtHours(x.deep) + " deep" : "")) + '"><i style="background:' + swatch(x) + '"></i><span>' + esc(x.name) +
-    '</span><b class="num">' + fmtHours(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em></li>").join("") +
+  // 能点的那几行是按钮（键盘也能点）
+  const legend = parts.map((x) => {
+    const inner = '<i style="background:' + swatch(x) + '"></i><span>' + esc(x.name) + '</span><b class="num">' + fmtHours(x.min) + '</b><em class="num">' + share(x.min, pie.total) + "</em>";
+    const title = esc(x.name + (x.unlogged ? " · includes " + fmtHours(x.unlogged) + " usual housework" : "") + (x.deep > 0 ? " · " + fmtHours(x.deep) + " deep" : "") + (pickable(x) ? " · click to see only " + x.name : ""));
+    return pickable(x) ? '<li><button type="button" class="pie-li" data-act="pie-pick" data-g="' + esc(x.name) + '" title="' + title + '">' + inner + "</button></li>" : '<li title="' + title + '">' + inner + "</li>";
+  }).join("") +
     (hz ? '<li class="haze-li" title="' + esc(hzTitle) + '"><i class="haze-sw"></i><span>On the side</span><b class="num">~' + fmtHours(hz.min) + "</b><em>overlaps</em></li>" : "");
   const field = (k, label, unit, v) => "<label><span>" + label + '</span><input class="num" type="number" min="0" max="24" step="0.5" data-life="' + k + '" data-keep="life-' + k + '" value="' + (v ? Math.round(v / 6) / 10 : "") + '" placeholder="' + (k === "deepGoal" ? "none" : "0") + '"><em>' + unit + "</em></label>";
+  // 上个月的 On the side 还没填（填 0 也算填了）：Adjust 旁边一个红点（她 10-23 要的）
+  const sideDue = !store.sideFilled(S.sideMonths(c.today).slice(-2)[0]);
   return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">Each 24-hour day. Sleep and meals count but aren\'t drawn.' +
-    ' <button type="button" class="link" data-act="life-adjust" aria-expanded="' + adjust + '">' + (adjust ? "Done" : "Adjust") + "</button></p></div></header>" +
+    ' <button type="button" class="link" data-act="life-adjust" aria-expanded="' + adjust + '">' + (adjust ? "Done" : "Adjust") + "</button>" +
+    (sideDue ? '<i class="dsc-dot st-due" title="Last month\'s On the side isn\'t filled in" aria-label="Last month\'s On the side isn\'t filled in"></i>' : "") + "</p></div></header>" +
     // Adjust 一个月才开一次：几个默认值 + On the side 都收在这里面，平常不占地方
     (adjust ? '<div class="life-form">' + field("sleep", "Sleep", "h a day", life.sleep) + field("care", "Meals, dishes, shower", "h a day", life.care) +
       field("chores", "Chores you don't log", "h a weekend · in Chores", life.chores) + field("deepGoal", "Deep goal", "h a work day", life.deepGoal) + sideRowHTML(c) + "</div>" : "") +
@@ -384,6 +395,7 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
         '<div class="pie-c"><b class="num">' + fmtHours(pie.tracked) + "</b><span>logged</span>" + (pie.deep > 0 ? '<span class="num" title="Deep work">◆ ' + fmtHours(pie.deep) + "</span>" : "") + "</div></div>" +
         '<ul class="pie-legend">' + legend + "</ul></div>"
       : '<p class="empty">' + (s.days ? "Nothing logged in this period." : "This period hasn't started yet.") + "</p>") +
+    (picks.size ? '<p class="pie-only"><span>Showing only <b>' + esc(pickedNames(c).join(", ")) + '</b></span><button type="button" class="btn" data-act="pick-clear">Clear</button></p>' : "") +
     "</section>";
 }
 
@@ -391,10 +403,10 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
 function sideRowHTML(c) {
   const months = S.sideMonths(c.today), last = months[months.length - 2];
   if (!months.includes(sideMonth)) sideMonth = last;
-  const h = Math.round(store.sideOf(sideMonth) / 6) / 10;
+  const h = store.sideFilled(sideMonth) ? Math.round(store.sideOf(sideMonth) / 6) / 10 : "";
   return '<div class="ots-row" title="Shows, novels… taken in while doing something else. Drawn as a haze over Untracked">' +
     '<span>On the side in <select data-ots-m aria-label="Month">' + months.map((m) => '<option value="' + m + '"' + (m === sideMonth ? " selected" : "") + ">" + MONTHS[Number(m.slice(5, 7)) - 1] + "</option>").join("") + "</select></span>" +
-    '<input class="num" type="number" min="0" step="0.5" value="' + (h || "") + '" placeholder="0" data-ots-h data-keep="ots-h-' + sideMonth + '" aria-label="Hours that month"><em>h that month</em></div>';
+    '<input class="num" type="number" min="0" step="0.5" value="' + h + '" placeholder="0" data-ots-h data-keep="ots-h-' + sideMonth + '" aria-label="Hours that month"><em>h that month</em></div>';
 }
 
 // ---------- 时间表：项目 × 日子 ----------
@@ -432,11 +444,13 @@ function sheetHTML(c, s, by) {
 
 // ---------- 整页 ----------
 
+const pickedNames = (c) => [...picks].map((k) => (k === "none" ? "No project" : k.startsWith("g:") ? k.slice(2) : c.projects.find((p) => p.id === k.slice(2))?.name || ""));
+
 function headHTML(c, r) {
   // 只看哪几个：大类一个勾，下面缩进是它的计划，最后是哪都没挂的
   const box = (v, label, color, cls) => '<label class="mi ' + cls + '"><input type="checkbox" data-pick="' + esc(v) + '"' + (picks.has(v) ? " checked" : "") + ">" +
     (color ? '<i style="--dot:' + esc(color) + '"></i>' : "") + "<span>" + esc(label) + "</span></label>";
-  const chosen = [...picks].map((k) => (k === "none" ? "No project" : k.startsWith("g:") ? k.slice(2) : c.projects.find((p) => p.id === k.slice(2))?.name || ""));
+  const chosen = pickedNames(c);
   const filter = '<details class="st-pick"' + (pickOpen ? " open" : "") + '><summary class="' + (picks.size ? "on" : "") + '">' + esc(chosen.length ? chosen.slice(0, 2).join(", ") + (chosen.length > 2 ? " +" + (chosen.length - 2) : "") : "All projects") + "</summary>" +
     '<div class="menu st-pick-panel"><div class="ml">' + groupsOf(c.projects, { all: true }).map((g) =>
       (g.name ? box("g:" + g.name, g.name, c.groups.find((x) => x.name === g.name)?.color || g.subs[0]?.color, "top") : "") + g.subs.map((p) => box("p:" + p.id, p.name, p.color, g.name ? "in" : "")).join("")).join("") +
@@ -545,6 +559,7 @@ export function initStats(rerender) {
     } else if (act === "life-adjust") adjust = !adjust;
     else if (act === "deep-only") deepOnly = !deepOnly;
     else if (act === "pick-clear") picks.clear();
+    else if (act === "pie-pick") { picks.clear(); picks.add("g:" + el.dataset.g); hideTip(); }
     else if (act === "sheet-row") { const n = el.dataset.name; if (!sheetOpen.delete(n)) sheetOpen.add(n); }
     else if (act === "st-view") view[el.dataset.w] = el.dataset.v === "all" ? "all" : "build";
     if (anchor > T) anchor = T;
@@ -578,7 +593,8 @@ export function initStats(rerender) {
 
   // On the side：换月份 = 框里换成那个月的数；改小时 = 存（空 / 0 = 拿掉那个月）
   on(document, "change", ".stats [data-ots-m]", (e, el) => { sideMonth = el.value; rerender(); });
-  on(document, "change", ".stats [data-ots-h]", (e, el) => store.setSide(sideMonth, Math.max(0, Number(el.value) || 0) * 60));
+  // 空着 = 没填（拿掉那个月）；0 = 填了、那个月没有
+  on(document, "change", ".stats [data-ots-h]", (e, el) => { store.setSide(sideMonth, el.value.trim() === "" ? null : Math.max(0, Number(el.value) || 0) * 60); rerender(); });
   on(document, "pointerover", ".stats .col, .stats .hc, .stats .slice, .stats .hday", (e, col) => showTip(col));
   on(document, "pointerout", ".stats .col, .stats .hc, .stats .slice, .stats .hday", (e, col) => hideTip(col));
   on(document, "focusin", ".stats .col, .stats .hday", (e, col) => showTip(col));

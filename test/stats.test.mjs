@@ -260,7 +260,7 @@ test("on the side: one total a month, spread over its days, only ever a haze", (
   assert.deepEqual(S.sideMonths("2026-02-27"), ["2026-02", "2026-01", "2025-12"], "February's last three days; and across the year");
 });
 
-test("on the side in the store: one row a month; older rows of that month are folded in and replaced", async () => {
+test("on the side in the store: one row a month; older rows folded in; 0 counts as filled, empty takes it out", async () => {
   const store = await import("../js/store.js?side");
   store.setSetting("side:old1", { month: "2026-09", min: 600, kind: "show", full: true });   // 上一版的写法
   store.setSetting("side:old2", { month: "2026-09", min: 120 });
@@ -268,8 +268,13 @@ test("on the side in the store: one row a month; older rows of that month are fo
   store.setSide("2026-09", 900);
   assert.deepEqual(store.sides(), [{ month: "2026-09", min: 900 }]);
   assert.ok(!store.get("settings", "side:old1"), "the old row is gone");
+  assert.equal(store.sideFilled("2026-08"), false);
   store.setSide("2026-09", 0);
-  assert.deepEqual(store.sides(), []);
+  assert.deepEqual(store.sides(), [{ month: "2026-09", min: 0 }], "0 is an answer: that month had none");
+  assert.equal(store.sideFilled("2026-09"), true);
+  store.setSide("2026-09", null);
+  assert.deepEqual(store.sides(), [], "clearing the box takes the month out");
+  assert.equal(store.sideFilled("2026-09"), false);
 });
 
 test("the Chores task from the chore key counts its minutes, not as a done task", () => {

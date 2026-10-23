@@ -927,11 +927,15 @@ body.phone .settings .page-head { margin-top: 4px; }
 .pie-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .pie-head .lede { margin-bottom: 8px; }
 .pie-head .seg { flex-shrink: 0; }
-.pie-wrap { display: grid; grid-template-columns: minmax(120px, 150px) minmax(0, 1fr); align-items: center; gap: 14px; }
+/* 这张卡和左边的柱子图一样高：饼图和图例占满剩下的高度、竖着居中，饼图大一些（她 10-23 说右边比左边空很多） */
+.piecard { display: flex; flex-direction: column; }
+.pie-wrap { flex: 1; display: grid; grid-template-columns: minmax(150px, 210px) minmax(0, 1fr); align-items: center; gap: 18px; }
+.pie-head .lede .st-due { display: inline-block; margin-left: 5px; vertical-align: middle; }
 .pie { position: relative; aspect-ratio: 1; }
 .pie svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .slice { fill: none; stroke-width: 15; cursor: default; transition: stroke-width .15s; }
 .slice.hot { stroke-width: 18; }
+.slice.pick { cursor: pointer; }
 /* 项目那几片和圆盘上的色块一个画法：--c 是项目颜色的霓虹版（没有霓虹版的调亮）；白天底下垫一版错开的藏青（.slice-sh），夜里发光 */
 .slice.ink { stroke: var(--c); }
 .slice.ink.boost { stroke: oklch(from var(--c) calc(l + .12) calc(c * 1.9) h); }
@@ -942,8 +946,16 @@ body.phone .settings .page-head { margin-top: 4px; }
 .pie-c { position: absolute; top: 50%; left: 50%; display: grid; justify-items: center; width: 56%; transform: translate(-50%, -50%); text-align: center; font-size: 11.5px; line-height: 1.35; color: var(--muted); pointer-events: none; }
 .pie-c b { font-size: 16px; line-height: 1.15; letter-spacing: -.02em; color: var(--ink); }
 .pie-c span:last-child:not(:nth-child(2)) { margin-top: 2px; font-weight: 700; color: var(--ink); }
-.pie-legend { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
-.pie-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 34px; align-items: center; gap: 7px; }
+.pie-legend { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 13.5px; }
+.pie-legend li, .pie-legend .pie-li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 34px; align-items: center; gap: 7px; }
+/* 能点的那几行（点了只看这个项目）：整行一个按钮，样子和别的行一样，悬停时淡底 */
+.pie-legend li:has(> .pie-li) { display: block; }
+.pie-li { width: 100%; margin: -3px -6px; padding: 3px 6px; border: 0; border-radius: 7px; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; box-sizing: content-box; }
+@media (hover: hover) { .pie-li:hover { background: var(--surface); } }
+/* 只看某个项目的时候，饼图底下：Showing only Build · Clear */
+.pie-only { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.pie-only b { color: var(--ink); }
+.pie-only .btn { padding: 4px 12px; font-size: 12.5px; }
 .pie-legend i { width: 10px; height: 10px; border-radius: 3px; }
 .pie-legend span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pie-legend b { font-weight: 600; }
@@ -1151,6 +1163,9 @@ body.phone .tm.sum, body.phone .tm.more-time { min-height: 32px; }
 .dk-deep { min-height: 34px; flex-shrink: 0; }
 body.phone .dk-deep { min-width: 38px; min-height: 38px; justify-content: center; padding: 0 10px; }
 body.phone .dk-deep span { display: none; }
+/* 时间块改钟点那一小块里的 ◆ Deep（js/ui/today.js 的 timeEditHTML）：手机上也带字，不然只剩一个 ◆ 看不出是什么 */
+body.phone .tm-edit .dk-deep span { display: inline; }
+.tm-edit .dk-deep { min-height: 30px; padding: 4px 11px; }
 body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
 /* 手机：加任务那一块右下角的 Spend（js/ui/today.js），和 ◆ Deep / Idea 一样的淡底小签，带钱包图标 */
 .add-spendw { display: flex; justify-content: flex-end; margin-top: 8px; }

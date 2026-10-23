@@ -140,7 +140,7 @@ The old Partial and Later both count as Delay; running setup with this `Code.gs`
 old Done tasks with no time get one segment equal to their estimate (no clock times), so past numbers stay the same.
 Each segment is written in the task's `Times` cell ("09:10-09:40 30m; 20m"), and Actual min is their sum; time on a task with no status yet already counts towards today.
 Forgot the timer: type "Reading 14:00-15:10" in the add-task box (at least one time with a colon) and it's logged as a finished task; for another day, add it on that day in the calendar.
-Started or stopped late: while timing, click "Since 09:10" in the bar to set the real start; the ⏱ next to Stop stops at a given time; for a recorded segment, open the task and click its times to change them.
+Started or stopped late: while timing, click "Since 09:10" in the bar to set the real start; the ⏱ next to Stop stops at a given time; for a recorded segment, open the task and click its times to change them — the same little form has **◆ Deep**, which marks the whole task as deep work (phone and computer).
 
 **Chore key (same on computer and phone)**: a small round key at the top right of today's list starts timing housework; press again to stop. While timing, five emoji sort the segment —
 🍳 cooking, ☎️ email / calls / messages, 🗃️ paperwork / filing, 🪪 IDs and other must-dos, 🏠 housework and tidying; tap again to clear; none = unsorted.
@@ -160,7 +160,9 @@ To set yourself a target: Stats, under the pie → Adjust → Deep goal (hours p
     Projects are always ordered Build, Work, Friends, Leisure, Fitness, Chores (on Projects, in menus, the pie and the timesheet).
     The pie is a percentage of each 24-hour day: sleep 7h and eating, cooking, dishes and showering 3h (daily) are counted but not drawn or listed, and the rest fills the circle;
     a default 2h of housework each weekend goes into Chores (Adjust changes these numbers). The pie uses the dial's neon colours.
+    Click a project's slice (or its row in the legend) and the whole page shows only that project, split into its plans — the same as picking it in the project menu; **Clear** under the pie goes back to everything.
     **On the side** (also in Adjust): one total per month — shows, novels and podcasts while working out or commuting. You can fill the previous two months, plus the current month in its last three days.
+    Typing 0 counts as filled in (that month had none); an empty box means not filled in, and while last month is empty a red dot sits next to Adjust.
     It's spread over each day of that month and shows on the pie as a streak of light sweeping down from the middle of Untracked; it takes no time (it overlapped other things anyway).
   - **Plan** (how the plans went): how much got done, how many days held the line, how good the estimates were, planned vs actual per day and per project, reasons for unfinished work, and each plan's planned vs actual
 

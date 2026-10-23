@@ -17,16 +17,18 @@ export default function (core) {
     return [...by.entries()].map(([month, min]) => ({ month, min })).sort((a, b) => b.month.localeCompare(a.month));
   });
   const sideOf = (month) => sides().find((x) => x.month === month)?.min || 0;
+  // 那个月填过没有（填 0 也算填过；Stats 页 Adjust 旁边的红点看它）
+  const sideFilled = (month) => sides().some((x) => x.month === month);
 
-  // 某个月一共多少分钟（0 = 拿掉）
+  // 某个月一共多少分钟：null / 空 = 拿掉（算没填）；0 = 存一行 0（她说那个月就是没有）
   function setSide(month, min) {
     if (!MONTH_RE.test(String(month))) return;
-    const keep = Math.max(0, Math.round(Number(min) || 0));
+    const keep = min === null || min === "" || min === undefined ? null : Math.max(0, Math.round(Number(min) || 0));
     change(() => {
       for (const [key, r] of rowsOf()) if (r.value.month === month) drop("settings", key);
-      if (keep) put("settings", { id: "side:" + month, key: "side:" + month, value: { month, min: keep } });
+      if (keep !== null) put("settings", { id: "side:" + month, key: "side:" + month, value: { month, min: keep } });
     });
   }
 
-  return { sides, sideOf, setSide };
+  return { sides, sideOf, sideFilled, setSide };
 }

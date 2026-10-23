@@ -211,6 +211,9 @@ test("spend: Reload everything brings every record back as the sheet has it, kee
   const phone = await device(), mac = await device();
   const a = phone.add({ d: "2026-10-23", v: -195000, c: "House", n: "rent" });
   sync(phone);
+  // 拉取按「这个时刻及以后写过的」算（同一毫秒的也拉，宁多勿漏）：手机写进去和电脑第一次拉落在同一毫秒时，
+  // 电脑下一次普通同步会把这一行又拉回来（这条测试偶尔失败过）。中间等两毫秒
+  for (const t0 = Date.now(); Date.now() - t0 < 2;) { /* 等 */ }
   sync(mac);
   mac.get(a.id).d = "2026-10-22";   // 这台设备上存的是一天前的（旧脚本拉回来时差了一天）
   const pending = mac.add({ d: "2026-10-24", v: -500, c: "Food" });
@@ -221,4 +224,10 @@ test("spend: Reload everything brings every record back as the sheet has it, kee
   sync(mac);
   assert.equal(mac.get(a.id).d, "2026-10-23");
   assert.equal(mac.get(pending.id).d, "2026-10-24");
+});
+
+test("spend: ids stay unique even when thousands are made in the same millisecond", async () => {
+  const SP = await import("../js/spend.js?ids");
+  const ids = Array.from({ length: 20000 }, () => SP.newId());
+  assert.equal(new Set(ids).size, ids.length);
 });

@@ -21,7 +21,10 @@ const emit = (meta = {}) => listeners.forEach((fn) => fn(meta));
 export const subscribe = (fn) => listeners.add(fn);
 export const ver = () => version;
 
-export const newId = () => "x" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+// 一笔的 ID：时间 + 这台设备上数到第几笔 + 随机几位。一口气导入几千笔时同一毫秒里有几百笔，
+// 原来只靠 5 位随机字符偶尔会撞上（后一笔把前一笔顶掉，测试里几十次撞一次）；加上计数就不会了
+let seq = 0;
+export const newId = () => "x" + Date.now().toString(36) + (seq++).toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 
 export function entries() {
   if (listVer !== version || !listCache) { listCache = Object.values(S.entries); listVer = version; }

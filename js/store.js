@@ -344,9 +344,11 @@ function normalize(t, raw) {
   return r;
 }
 
+// 拉回来的：changed 数真正变了的行，一条都没变就 quiet（只刷同步状态那个小点，不整页重画——现在每 30 秒拉一次）
 export function applyPull(pull, now, { full = false } = {}) {
   if (!pull) return;
   rev++;
+  let changed = 0;
   for (const d of pull.deleted || []) {
     const r = S.data[d.table]?.[d.id];
     if (!r) continue;
@@ -354,6 +356,7 @@ export function applyPull(pull, now, { full = false } = {}) {
     if (S.pending[k] && (Number(r.updated) || 0) > (Number(d.at) || 0)) continue;
     delete S.data[d.table][d.id];
     delete S.pending[k];
+    changed++;
   }
   for (const t of TABLES) {
     const seen = new Set();
@@ -365,22 +368,24 @@ export function applyPull(pull, now, { full = false } = {}) {
         // 早上的线：表格里先到的份额为准，本机多出来的项目补上（留着待推送）
         const shares = { ...(cur.projects || {}), ...(row.projects || {}) };
         const extra = Object.keys(cur.projects || {}).some((p) => !(p in (row.projects || {})));
+        if (JSON.stringify(row.projects || {}) !== JSON.stringify(cur.projects || {}) || row.updated !== cur.updated) changed++;
         S.data.log[row.id] = { ...row, projects: shares, need: Object.values(shares).reduce((a, v) => a + (Number(v) || 0), 0), updated: extra ? cur.updated : row.updated };
         if (!extra) delete S.pending[k];
         continue;
       }
       if (cur && S.pending[k] && (Number(cur.updated) || 0) > (Number(row.updated) || 0)) continue;
+      if (!cur || JSON.stringify(cur) !== JSON.stringify(row)) changed++;
       S.data[t][row.id] = row;
       delete S.pending[k];
     }
     // 整表重拉时：表格里已经没有、本机也没改过的行，删掉（比如在表格里手动删了行）
-    if (full) for (const id of Object.keys(S.data[t])) if (!seen.has(id) && !S.pending[t + ":" + id]) delete S.data[t][id];
+    if (full) for (const id of Object.keys(S.data[t])) if (!seen.has(id) && !S.pending[t + ":" + id]) { delete S.data[t][id]; changed++; }
   }
   if (now) S.cursor = now;
   if (full) S.needFull = false;
   persist();
-  ctxCache = null;
-  emit({ pulled: true });
+  if (changed) ctxCache = null;
+  emit({ pulled: true, ...(changed ? {} : { quiet: true }) });
 }
 
 export function resetCursor() { S.cursor = 0; persist(); }

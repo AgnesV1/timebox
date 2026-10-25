@@ -147,23 +147,29 @@ export function apply(res, sent) {
     for (const id of Object.keys(S.put)) if (S.entries[id]) keep[id] = S.entries[id];
     S.entries = keep;
   }
+  // changed：真正变了几处（拉回来的和本机一样就不叫界面重画——现在每 30 秒拉一次）
+  let changed = full ? 1 : 0;
+  const was0 = JSON.stringify([S.budgets, S.cats]);
   for (const r of res.rows || []) {
     if (S.put[r.id] || S.del[r.id]) continue;
     // 旧脚本回来的没有币种：本机记着的那个留着
     const was = full ? null : S.entries[r.id];
-    S.entries[r.id] = withCur({ id: r.id, d: r.d, v: r.v, c: r.c, n: r.n || "", u: r.u || 0 }, oldScript ? (was?.cur || prev[r.id]) : r.cur);
+    const next = withCur({ id: r.id, d: r.d, v: r.v, c: r.c, n: r.n || "", u: r.u || 0 }, oldScript ? (was?.cur || prev[r.id]) : r.cur);
+    if (!was || JSON.stringify(was) !== JSON.stringify(next)) changed++;
+    S.entries[r.id] = next;
   }
-  for (const id of res.dels || []) if (!S.put[id]) delete S.entries[id];
+  for (const id of res.dels || []) if (!S.put[id] && S.entries[id]) { delete S.entries[id]; changed++; }
   // 清单：本机没有没发出去的改动就用表格里的；表格里还是空的（刚建好）就把本机的发过去
   // 旧的 Code.gs 回来的预算不带币种（没有 bcur）：本机记着的那个留着
   const bcur = Object.fromEntries(S.budgets.filter((b) => b.cur).map((b) => [b.from, b.cur]));
   if (Array.isArray(res.budgets)) { if (!S.bDirty) { if (res.budgets.length || !S.budgets.length) S.budgets = res.bcur ? res.budgets : res.budgets.map((b) => (bcur[b.from] ? { ...b, cur: bcur[b.from] } : b)); else S.bDirty = true; } }
   if (!res.bcur && S.budgets.some((b) => b.cur)) S.error = "Update Code.gs in your 苦昼短 Sheet to sync budget currencies";
   if (Array.isArray(res.cats)) { if (!S.cDirty) { if (res.cats.length) S.cats = res.cats; else S.cDirty = true; } }
+  if (JSON.stringify([S.budgets, S.cats]) !== was0) changed++;
   S.cursor = res.now || Date.now();
   if (full) { S.fullAt = Date.now(); S.wantFull = false; }
   save();
-  emit({ pulled: true, again: S.bDirty || S.cDirty });
+  emit({ pulled: true, again: S.bDirty || S.cDirty, ...(changed ? {} : { quiet: true }) });
 }
 
 // 时间轴从哪天画起：最早的那一笔（一笔都没有就是 null）

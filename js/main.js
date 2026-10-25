@@ -314,7 +314,8 @@ store.onUndo((label, before) => toast(label, () => store.undo(before)));
 reading.subscribe(() => { if (route() === "reading") render(); });
 // 记账：本机改了就同步；两边的界面各自刷新
 spend.subscribe((meta) => {
-  if (meta.dirty || meta.again) sync.queue();
+  if (meta.dirty) sync.soon(); else if (meta.again) sync.queue();
+  if (meta.quiet) return;   // 拉回来什么都没变
   if (desk && desk.el.isConnected) desk.refresh();
   refreshIsland();
   paintLefts();   // 今天页 Spend 左边的「… left」
@@ -338,7 +339,10 @@ document.addEventListener("visibilitychange", () => {
   else { tickDay(); syncThenLog(); }
 });
 addEventListener("online", () => syncThenLog());
-setInterval(() => { if (document.visibilityState === "visible") syncThenLog(); }, 120000);
+// 页面看得见的时候每 30 秒拉一次（她 10-25 要的：手机上改了，电脑这边没事就拉一下）；拉回来没变化不重画（store / spend 的 quiet）。
+// 点回这个窗口（focus）时离上次同步超过 10 秒也马上拉一次
+setInterval(() => { if (document.visibilityState === "visible") syncThenLog(); }, 30000);
+addEventListener("focus", () => { if (Date.now() - sync.lastAt > 10000) syncThenLog(); });
 setInterval(() => { tickDay(); tintSky(); }, 60000);   // 天色跟着钟点慢慢变（js/day.js 的 skyAt）
 
 // 侧栏的 Today 永远是今天：日历里点过某一天、或在今天页往前翻过，从这里回来都从今天看起（已经在今天页上也照样翻回今天）

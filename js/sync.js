@@ -55,6 +55,7 @@ const current = () => Number(store.local().serverVersion) >= VERSION;
 const stale = () => store.cursor() > 0 && Date.now() - store.cursor() > (KEEP_DELETED_DAYS - 1) * 864e5;
 
 // archive = { before }：顺便把这天以前的任务搬进表格的 Archive 页（见 Code.gs 的 archive_）
+export let lastAt = 0;   // 上次开始同步的时候（main.js 回到窗口时看隔了多久）
 export async function sync({ full = false, archive = null } = {}) {
   const { url, secret } = store.local();
   if (!url) {
@@ -63,7 +64,8 @@ export async function sync({ full = false, archive = null } = {}) {
   }
   if (busy) { again = true; return false; }
   busy = true;
-  queue.cancel();
+  lastAt = Date.now();
+  queue.cancel(); soon.cancel();
   set("Syncing…");
   let ok = false;
   try {
@@ -161,12 +163,18 @@ async function quarter(url, secret) {
 }
 
 export const queue = debounce(() => sync(), 2500);
+// 记账改了：0.6 秒就推（她 10-25 说手机上改了，电脑一直没反应——记完马上锁屏的话，2.5 秒等不到）
+export const soon = debounce(() => sync(), 600);
 
-// 页面切走或关掉：等不到 2.5 秒了，直接发出去。不确定一定送到，所以待推送的记录先留着，下次再推一遍
+// 页面切走或关掉：等不到了，直接发出去（任务那些表 + 记账排着的）。不确定一定送到，所以待推送的先留着，下次再推一遍
+// （表格按 id + 修改时间写，重复发不会出错）。记账的 since 设成现在：回应收不到，不用表格回一堆行
 export function beacon() {
   const { url, secret } = store.local();
-  if (!url || !current() || !store.hasPending() || !navigator.sendBeacon) return;
-  queue.cancel();
+  if (!url || !current() || !navigator.sendBeacon) return;
+  const sq = store.setting("spend")?.url ? spend.request() : null;
+  const money = sq && (sq.put.length || sq.del.length || sq.budgets || sq.cats);
+  if (!store.hasPending() && !money) return;
+  queue.cancel(); soon.cancel();
   const out = store.outgoing();
-  navigator.sendBeacon(url, new Blob([JSON.stringify({ secret, version: VERSION, push: { rows: out.rows, deletes: out.deletes } })], { type: "text/plain;charset=utf-8" }));
+  navigator.sendBeacon(url, new Blob([JSON.stringify({ secret, version: VERSION, push: { rows: out.rows, deletes: out.deletes }, ...(money ? { spend: { ...sq, since: Date.now() } } : {}) })], { type: "text/plain;charset=utf-8" }));
 }

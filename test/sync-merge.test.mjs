@@ -30,3 +30,15 @@ test("a later change from another device wins over an older local one", () => {
   store.applyPull({ tables: { tasks: [{ ...store.get("tasks", id), title: "Changed on the phone", updated: 5000 }] }, deleted: [] }, 5000);
   assert.equal(store.get("tasks", id).title, "Changed on the phone");
 });
+
+test("a pull that brings nothing new is quiet (no full redraw every 30 seconds)", () => {
+  at(1000);
+  const id = store.addTask({ title: "Same" });
+  store.pushed(store.outgoing());
+  const seen = [];
+  const off = store.subscribe((m) => seen.push(m));
+  store.applyPull({ tables: { tasks: [{ ...store.get("tasks", id) }] }, deleted: [] }, 2000);
+  store.applyPull({ tables: { tasks: [{ ...store.get("tasks", id), title: "Changed elsewhere", updated: 3000 }] }, deleted: [] }, 3000);
+  off?.();
+  assert.deepEqual(seen.map((m) => Boolean(m.quiet)), [true, false]);
+});

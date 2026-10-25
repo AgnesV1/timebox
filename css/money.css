@@ -139,8 +139,8 @@
 .mn .mn-cards { margin: 14px -16px 0; padding: 0 16px; }
 .mn .mn-card { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 11px 12px; border-radius: 12px; background: var(--mn-fill); box-shadow: var(--mn-hair); }   /* 宽度跟着里面的字走 */
 .mn .mn-card .v { font-size: 16px; font-weight: 500; white-space: nowrap; }
-/* Budget Left 那个数突出一点（她 10-25 要的）：大一号、浅钴蓝；超了照旧是橙的（js 里写在 style 上，盖过这里） */
-.mn .mn-card.mn-card-hl .v { font-size: 19px; font-weight: 600; color: #A9BDF5; }
+/* Budget Left 那个数突出一点（她 10-25 要的）：大一号、加粗、记账自己的钴蓝（= 正常）；超了照旧是橙的（js 里写在 style 上，盖过这里） */
+.mn .mn-card.mn-card-hl .v { font-size: 19px; font-weight: 600; color: var(--mn-blue); }
 /* Budget Left 那个数后面的「· 69%」（剩下几成） */
 .mn .mn-kp::before { content: "·"; margin: 0 .3em; color: var(--mn-mute); }
 /* 手机记账主页标题下面那一行最前面：这个月预算还剩多少，灰的（超了是橙的） */

@@ -291,7 +291,8 @@ Spending has its own Sheet: Transactions (Date, Kind, Category, Note, Amount, Cu
 ## How syncing works
 
 - Every record has an ID and a modified time; when two devices change the same record, the later change wins
-- Changes are pushed 2.5 seconds after you make them, again when you leave the page, and everything syncs again when you come back, reconnect, or every 2 minutes
+- Changes are pushed 2.5 seconds after you make them (spending: 0.6 seconds), again when you leave the page or lock the phone (spending included), and everything syncs again when you come back to the page or the window, reconnect, or every 30 seconds while the page is showing.
+  A sync that brings nothing new doesn't redraw the page
 - Everything is saved on the device first, so it works offline and goes out once you're back online
 - The Sheet is for looking and analysing, not planning: edits made directly in the Sheet only reach the device after
   "Reload everything from the Sheet" in Settings

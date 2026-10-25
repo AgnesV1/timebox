@@ -213,7 +213,8 @@ export function createView() {
     '<div class="mn-hdr">' + btn("set", "settings", "Settings") + btn("chart", "chart", "Charts") + btn("find", "search", "Search") + "</div>" +
     // ‹ 期间 ›：标题在两个箭头正中间，下面一行是这一期的支出 / 收入
     '<div class="mn-thead">' + btn("prev", "left", "Earlier", "mn-sm") + '<div class="mn-tmid"><span class="mn-tw"><h2 class="mn-h1" data-title></h2>' + nowDot("reset", "Back to today") + "</span>" +
-    '<div class="mn-num mn-13 mn-tsub"><span class="mn-rn" data-to></span><span style="display:inline-block;width:12px"></span><span class="mn-rn" data-ti style="color:var(--mn-green)"></span>' +
+    // 支出前面一截灰的：这个月预算还剩多少（她 10-24 要的；看年的时候不显示，没定预算也不显示；超了是负的、橙色）
+    '<div class="mn-num mn-13 mn-tsub"><span class="mn-tleft" data-tlw hidden><span class="mn-rn" data-tl></span> left<span style="display:inline-block;width:12px"></span></span><span class="mn-rn" data-to></span><span style="display:inline-block;width:12px"></span><span class="mn-rn" data-ti style="color:var(--mn-green)"></span>' +
     '<button type="button" class="mn-curb" data-act="showcur" aria-label="Show totals in another currency" title="Show totals in"><span data-showc></span>' + icon("down") + "</button></div></div>" +
     btn("next", "right", "Later", "mn-sm") + "</div>" +
     '<div class="mn-seg" data-seg="mode" style="margin-top:14px"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button><button type="button" data-v="day">Day</button></div>' +
@@ -389,6 +390,23 @@ export function createView() {
     const g = M.sumOf(IX(), V.cur, V.mode);
     roll($("[data-to]"), "−" + M.money(g.out));
     roll($("[data-ti]"), "+" + M.money(g.inc));
+    // 这个月（看某一天的时候是那天所在的月）预算还剩：预算 − 算进预算的花销（House 在两边都有，Bonds 不算），整数块钱，放得下
+    const B = V.mode === "year" ? 0 : M.budgetAt(budgetsShown(), V.cur.y, V.cur.m), wrap = $("[data-tlw]");
+    wrap.hidden = !B;
+    if (B) {
+      const left = B - M.counted(M.sumOf(IX(), { y: V.cur.y, m: V.cur.m }, "month")), sym = M.curInfo(M.showing()).sym;
+      roll($("[data-tl]"), (left < 0 ? "−" : "") + sym + Math.round(Math.abs(left) / 100).toLocaleString("en-US"));
+      wrap.classList.toggle("over", left < 0);
+    }
+    fitSub();
+  }
+  // 标题下面那一行（剩多少 · 支出 · 收入 · 币种）放不下：整行字缩小一点（最小 10px），不切掉数字
+  function fitSub() {
+    const sub = $(".mn-tsub"), room = sub.parentElement.clientWidth;
+    sub.style.fontSize = "";
+    if (!room) return;
+    const need = [...sub.children].reduce((w, el) => w + (el.hidden ? 0 : el.getBoundingClientRect().width), 0) + 4;
+    if (need > room) sub.style.fontSize = Math.max(10, 13 * room / need).toFixed(1) + "px";
   }
   function inView(e) { return M.inPeriod(e, V.cur, V.mode); }
   function renderChips() {

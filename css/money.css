@@ -36,7 +36,8 @@
 .mn .mn-thead > .mn-ic { margin-top: -1px; }   /* 箭头和标题那一行齐 */
 .mn .mn-tmid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
 .mn .mn-tw { position: relative; max-width: 100%; }
-.mn .mn-tsub { margin-top: 3px; display: flex; align-items: center; justify-content: center; }
+.mn .mn-tsub { margin-top: 3px; display: flex; align-items: center; justify-content: center; max-width: 100%; }
+.mn .mn-tsub > * { flex-shrink: 0; }
 
 /* 分段开关：选中的那块滑过去 */
 .mn .mn-seg { position: relative; flex: none; display: flex; padding: 3px; border-radius: 11px; background: var(--mn-fill); box-shadow: var(--mn-hair); }
@@ -140,6 +141,10 @@
 .mn .mn-card .v { font-size: 16px; font-weight: 500; white-space: nowrap; }
 /* Budget Left 那个数后面的「· 69%」（剩下几成） */
 .mn .mn-kp::before { content: "·"; margin: 0 .3em; color: var(--mn-mute); }
+/* 手机记账主页标题下面那一行最前面：这个月预算还剩多少，灰的（超了是橙的） */
+.mn .mn-tleft { color: var(--mn-mute); }
+.mn .mn-tleft.over { color: var(--mn-orange); }
+.mn .mn-tleft[hidden] { display: none; }
 .mn .mn-up { margin-left: 4px; padding: 0 5px; border-radius: 999px; background: rgba(255, 255, 255, .08); font: 600 9px/1.6 var(--num); letter-spacing: .07em; text-transform: uppercase; }   /* 提前记的、日期还没到（已经算进合计） */
 .mn .mn-track { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; }
 .mn .mn-track > i { display: block; height: 100%; width: 0; background: var(--mn-blue); transition: width .52s var(--mn-enter); }

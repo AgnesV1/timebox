@@ -213,7 +213,7 @@ export function createView() {
     '<div class="mn-hdr">' + btn("set", "settings", "Settings") + btn("chart", "chart", "Charts") + btn("find", "search", "Search") + "</div>" +
     // ‹ 期间 ›：标题在两个箭头正中间，下面一行是这一期的支出 / 收入
     '<div class="mn-thead">' + btn("prev", "left", "Earlier", "mn-sm") + '<div class="mn-tmid"><span class="mn-tw"><h2 class="mn-h1" data-title></h2>' + nowDot("reset", "Back to today") + "</span>" +
-    // 支出前面一截灰的：这个月预算还剩多少（她 10-24 要的；看年的时候不显示，没定预算也不显示；超了是负的、橙色）
+    // 支出前面一截灰的：当月（今天这个月，不管翻到哪一期）整个预算还剩多少（她 10-24 要的；没定预算不显示；超了是负的、橙色）
     '<div class="mn-num mn-13 mn-tsub"><span class="mn-tleft" data-tlw hidden><span class="mn-rn" data-tl></span> left<span style="display:inline-block;width:12px"></span></span><span class="mn-rn" data-to></span><span style="display:inline-block;width:12px"></span><span class="mn-rn" data-ti style="color:var(--mn-green)"></span>' +
     '<button type="button" class="mn-curb" data-act="showcur" aria-label="Show totals in another currency" title="Show totals in"><span data-showc></span>' + icon("down") + "</button></div></div>" +
     btn("next", "right", "Later", "mn-sm") + "</div>" +
@@ -390,11 +390,11 @@ export function createView() {
     const g = M.sumOf(IX(), V.cur, V.mode);
     roll($("[data-to]"), "−" + M.money(g.out));
     roll($("[data-ti]"), "+" + M.money(g.inc));
-    // 这个月（看某一天的时候是那天所在的月）预算还剩：预算 − 算进预算的花销（House 在两边都有，Bonds 不算），整数块钱，放得下
-    const B = V.mode === "year" ? 0 : M.budgetAt(budgetsShown(), V.cur.y, V.cur.m), wrap = $("[data-tlw]");
+    // 当月整个预算还剩：预算 − 这个月算进预算的花销（House 两边都有，Bonds 不算；提前记的、日期还没到的也算进去），整数块钱
+    const now = todayP(), B = M.budgetAt(budgetsShown(), now.y, now.m), wrap = $("[data-tlw]");
     wrap.hidden = !B;
     if (B) {
-      const left = B - M.counted(M.sumOf(IX(), { y: V.cur.y, m: V.cur.m }, "month")), sym = M.curInfo(M.showing()).sym;
+      const left = B - M.counted(M.sumOf(IX(), { y: now.y, m: now.m }, "month")), sym = M.curInfo(M.showing()).sym;
       roll($("[data-tl]"), (left < 0 ? "−" : "") + sym + Math.round(Math.abs(left) / 100).toLocaleString("en-US"));
       wrap.classList.toggle("over", left < 0);
     }

@@ -232,7 +232,7 @@ press and drag the minutes on the left to reorder (the phone has no ↑ ↓; the
 - Phone: pull down from the top of Today (with the page scrolled to the top) — a drop grows under the Dynamic Island; at about 90px the neck snaps and the "+" turns blue, and letting go drops the panel like a curtain
   (with a small bounce at the bottom). It stops at about 94% of the screen with a hem of a few soft waves along its lower edge; scrolling the list makes the waves drift and sway before settling. Tap the strip of Today still showing below (or the hem),
   or push the small bar at the bottom up, and the curtain rises again (if you added anything, the island shows today's total for a moment).
-  Under the period title: what's left of that month's budget in grey (orange once it's gone; not shown for a year or without a budget), then spent and income — the line shrinks a little rather than cut off digits.
+  Under the period title: what's left of the current month's whole budget in grey — always this month, whichever period you're looking at, records dated ahead included (orange once it's gone; hidden without a budget) — then that period's spent and income; the line shrinks a little rather than cut off digits.
   Inside: Year / Month / Day, a draggable bar timeline, category chips, the list (tap to edit, swipe left to delete) and suggestions, with a round **+** at the bottom right to add a transaction.
   The bars include records dated ahead (upcoming), drawn like any other. A bar is orange only when over budget: a month or year over its budget, a day once the month's budget has run out by then
   (a day bigger than the daily share isn't orange).

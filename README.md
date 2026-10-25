@@ -226,7 +226,7 @@ Offline, entries wait on the device and go out once you're back online.
 **Phone**: see tasks, time them, mark results, add tasks, add to the reading log. The top row is the five days before and after today; tap a day to see it.
 Only the opened row has Done / Delay / Drop (other rows just show their status on the right); after Done you enter how long and when it ended, Delay and Drop ask for a reason;
 press and drag the minutes on the left to reorder (the phone has no ↑ ↓; the computer keeps them, plus Alt+↑↓); add tasks at the bottom of the list ("Gym 40" — a trailing number is minutes). The project is a small chip; tapping it opens a dropdown of projects with their plans.
-**Spend** at the bottom right of the add-task box records a transaction (see Spending below). Planning and settings happen on the computer.
+**Spend** at the bottom right of the add-task box records a transaction (see Spending below); to its left, in grey, what's left of this month's budget (`$1,356 left`; still grey at $0, only past the budget does it turn red). Planning and settings happen on the computer.
 
 **Spending (phone and computer)**: records are kept on the device; paste a spending Sheet link in Settings on the computer and it syncs with that Sheet, and both sides can add and edit.
 - Phone: pull down from the top of Today (with the page scrolled to the top) — a drop grows under the Dynamic Island; at about 90px the neck snaps and the "+" turns blue, and letting go drops the panel like a curtain

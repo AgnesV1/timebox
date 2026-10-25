@@ -1168,7 +1168,11 @@ body.phone .tm-edit .dk-deep span { display: inline; }
 .tm-edit .dk-deep { min-height: 30px; padding: 4px 11px; }
 body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
 /* 手机：加任务那一块右下角的 Spend（js/ui/today.js），和 ◆ Deep / Idea 一样的淡底小签，带钱包图标 */
-.add-spendw { display: flex; justify-content: flex-end; margin-top: 8px; }
+.add-spendw { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 8px; }
+/* Spend 左边：当月预算还剩多少，灰的（正好 0 也是灰的）；超了才是警示色 */
+.add-left { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.add-left b { font-weight: 600; }
+.add-left.over { color: var(--warn); }
 .add-spend { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 13px 0 11px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 700; color: var(--ink); }
 .add-spend .ic { width: 17px; height: 17px; }
 .add-spend:active { transform: scale(.96); }

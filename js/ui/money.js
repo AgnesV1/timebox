@@ -67,6 +67,24 @@ export function shownEntries() {
 export const IX = () => { const list = shownEntries(); if (ixKey !== shKey || !ixCache) { ixCache = M.index(list, SP.cats()); ixKey = shKey; } return ixCache; };
 // 预算是按加币定的：换成看的那种
 export const budgetsShown = () => M.budgetsIn(SP.budgets(), SP.show(), RATES());
+// 当月整个预算还剩多少（她 10-24 要的）：预算 − 这个月算进预算的花销（House 两边都有，Bonds 不算；提前记的、日期还没到的也算），整数块钱。
+// 记账面板标题下面、手机今天页 Spend 左边都用它；没定预算 = null。正好 0 是灰的，超了（负的）才标橙
+export function monthLeft() {
+  const now = todayP(), B = M.budgetAt(budgetsShown(), now.y, now.m);
+  if (!B) return null;
+  const left = B - M.counted(M.sumOf(IX(), { y: now.y, m: now.m }, "month"));
+  return { text: (left < 0 ? "−" : "") + M.curInfo(M.showing()).sym + Math.round(Math.abs(left) / 100).toLocaleString("en-US"), over: left < 0 };
+}
+// 记一笔、同步回来以后：页面上所有「… left」（今天页 Spend 左边那个）换成新的数，不用整页重画
+export function paintLefts() {
+  const x = monthLeft();
+  for (const el of document.querySelectorAll("[data-mleft]")) {
+    el.hidden = !x;
+    if (!x) continue;
+    el.firstChild.textContent = x.text;
+    el.classList.toggle("over", x.over);
+  }
+}
 // 一笔的金额：照记的那种钱写；和看的那种不一样时，后面小字是换算过的
 export const amtOf = (e) => M.signed(e.v, M.curOf(e));
 export const convOf = (e) => (M.curOf(e) === SP.show() ? "" : "≈ " + M.signed(M.convert(e.v, M.curOf(e), SP.show(), RATES())));
@@ -390,14 +408,10 @@ export function createView() {
     const g = M.sumOf(IX(), V.cur, V.mode);
     roll($("[data-to]"), "−" + M.money(g.out));
     roll($("[data-ti]"), "+" + M.money(g.inc));
-    // 当月整个预算还剩：预算 − 这个月算进预算的花销（House 两边都有，Bonds 不算；提前记的、日期还没到的也算进去），整数块钱
-    const now = todayP(), B = M.budgetAt(budgetsShown(), now.y, now.m), wrap = $("[data-tlw]");
-    wrap.hidden = !B;
-    if (B) {
-      const left = B - M.counted(M.sumOf(IX(), { y: now.y, m: now.m }, "month")), sym = M.curInfo(M.showing()).sym;
-      roll($("[data-tl]"), (left < 0 ? "−" : "") + sym + Math.round(Math.abs(left) / 100).toLocaleString("en-US"));
-      wrap.classList.toggle("over", left < 0);
-    }
+    // 当月整个预算还剩（monthLeft）
+    const ml = monthLeft(), wrap = $("[data-tlw]");
+    wrap.hidden = !ml;
+    if (ml) { roll($("[data-tl]"), ml.text); wrap.classList.toggle("over", ml.over); }
     fitSub();
   }
   // 标题下面那一行（剩多少 · 支出 · 收入 · 币种）放不下：整行字缩小一点（最小 10px），不切掉数字

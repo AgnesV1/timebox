@@ -27,6 +27,7 @@ import { choreHTML } from "./chores.js";
 import { scoreHTML } from "./scores.js";
 import { quadHTML } from "./quads.js";
 import { openEntry } from "./island.js";
+import { monthLeft } from "./money.js";
 
 const openDesc = new Set();
 const logOpen = new Set();   // 已经有计时记录、又点了「+ time」要再补一段的任务
@@ -245,7 +246,8 @@ function addHTML(c, d, phone = false) {
       '<select name="for" aria-label="For how long">' + R.LENGTHS.map(([v, l]) => '<option value="' + v + '"' + (v === R.DEFAULT_LENGTH ? " selected" : "") + ">for " + l + "</option>").join("") + "</select>") +
     "</div>" + (phone ? "" : '<div class="idea-pick" data-idea-pick="' + d + '">' + pickHTML(d, document.querySelector('[data-keep="add-title-' + d + '"]')?.value || "") + "</div>") + "</form>" +
     // 手机：右下角记一笔（她要的）——点了从底下升起记账面板里那张记一笔的（js/ui/island.js 的 openEntry），不用先往下拉开记账
-    (phone ? '<div class="add-spendw"><button type="button" class="add-spend" data-act="spend-new" aria-label="Add a transaction" title="Add a transaction">' + icon("spending") + "<span>Spend</span></button></div>" : "");
+    // Spend 左边灰的：当月预算还剩多少（她 10-24 要的；没定预算不显示，超了才是橙的）。记了一笔以后 main.js 的 paintLefts 换数
+    (phone ? '<div class="add-spendw">' + ((x) => '<span class="add-left num' + (x?.over ? " over" : "") + '" data-mleft' + (x ? "" : " hidden") + "><b>" + esc(x?.text || "") + "</b> left</span>")(monthLeft()) + '<button type="button" class="add-spend" data-act="spend-new" aria-label="Add a transaction" title="Add a transaction">' + icon("spending") + "<span>Spend</span></button></div>" : "");
 }
 
 // ---------- 手机：选项目 ----------

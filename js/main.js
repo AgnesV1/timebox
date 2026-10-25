@@ -32,7 +32,7 @@ import { friendsHTML, initFriends, refreshFriendEditor, friendsDue } from "./ui/
 import { renderSun, initSun } from "./ui/sun.js";
 import { createSpending } from "./ui/spending.js";
 import { initIsland, refreshIsland, closeIsland } from "./ui/island.js";
-import { fxChanged } from "./ui/money.js";
+import { fxChanged, paintLefts } from "./ui/money.js";
 import { animateNext, animateSoft, takeTransition, nameParts, dusk, measurePills, placePills, glidePills, rollNumbers, titleIn, initEdgeGlow } from "./motion.js";
 import { lookAt, nextTurn } from "./day.js";
 
@@ -317,6 +317,7 @@ spend.subscribe((meta) => {
   if (meta.dirty || meta.again) sync.queue();
   if (desk && desk.el.isConnected) desk.refresh();
   refreshIsland();
+  paintLefts();   // 今天页 Spend 左边的「… left」
 });
 initIsland({ isPhone: () => phoneMQ.matches, onToday: () => route() === "today" && document.getElementById("modal").hidden });
 // 电脑上 Spending 页：按 N 记一笔，按 / 跳到搜索（正在打字的时候不算）

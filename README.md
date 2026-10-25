@@ -53,7 +53,9 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
 
 - A device that used the old version picks up its URL and secret automatically
 - A new device: on the computer, enter the Apps Script URL and secret in Settings; a new phone asks for them the first time and never again
-- Phone: open in Safari → Share → Add to Home Screen. Once installed it opens without a connection too
+- Phone: open in Safari → Share → Add to Home Screen. Once installed it opens without a connection too, and it opens at once: the page itself (scripts, styles, fonts) is kept on the device and used straight away, while your data syncs in the background as before.
+  A new version is fetched in the background; if you haven't touched the screen yet it switches over by itself, otherwise a "New version ready · Reload" toast waits for you. Nothing is locked while syncing — an edit made mid-sync is kept and sent next time.
+- Computer: a tab left open reloads itself once at 6:00 and once at 18:00 (new version, fresh sync), waiting while you're typing, in a dialog or have used it in the last two minutes. The phone can't do this: iPhone doesn't let a web page run while it's closed or in the background.
 
 ## 3. Day to day
 

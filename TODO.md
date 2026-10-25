@@ -17,7 +17,7 @@ Item 0 comes first every time. Item 7 collects what the 2026-10 round (streaming
 
 **Rules**
 - Interface text in English, code comments in Chinese, commit messages and docs in English
-- New JS files go into `SHELL` in `sw.js` (`test/sw.test.mjs` checks); when files the page uses change, bump `CACHE` in `sw.js`, or phones keep the old version
+- New JS files go into `SHELL` in `sw.js` (`test/sw.test.mjs` checks); when files the page uses change, bump `CACHE` in `sw.js` — since 2026-10-24 the page's files are served from that versioned cache without asking the network, so **without a bump no device ever gets the change**
 - Never change `SECRET = 'CHANGE_ME'` in `Code.gs`
 - The North star column has another name in the owner's mind that lives only in the owner's own Sheet. In the repository (code, docs, commit messages) it is always North star
 - Design follows `DESIGN.md` (and the comments at the top of `css/app.css` and `css/money.css`). Where another design skill disagrees, `DESIGN.md` wins

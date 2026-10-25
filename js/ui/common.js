@@ -192,10 +192,11 @@ export function tagFilterHTML(act, tags, counts, cur) {
 // ---------- 提示条（带撤销） ----------
 
 let toastTimer = 0;
-export function toast(msg, undoFn) {
+// label：按钮上的字（默认 Undo；新版提示用 Reload）
+export function toast(msg, undoFn, label = "Undo") {
   const box = document.getElementById("toast");
   if (!box) return;
-  box.innerHTML = "<span>" + esc(msg) + "</span>" + (undoFn ? '<button type="button">Undo</button>' : "");
+  box.innerHTML = "<span>" + esc(msg) + "</span>" + (undoFn ? '<button type="button">' + esc(label) + "</button>" : "");
   box.hidden = false;
   box.classList.remove("show", "out");
   void box.offsetWidth;

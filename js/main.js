@@ -358,8 +358,45 @@ on(document, "click", "#main .seg > button", () => animateSoft());
 initEdgeGlow();
 on(document, "click", "[data-act=side-toggle]", () => store.setLocal({ sideMin: !store.local().sideMin }));
 
-// 装到主屏后没网也能打开（只在 https 上，也就是 GitHub Pages）
-if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("./sw.js").catch(() => {});
+// 装到主屏后没网也能打开（只在 https 上，也就是 GitHub Pages）。网页本身用存着的那份秒开（sw.js）；
+// 新版装好、接管了（controllerchange）：打开以后还没碰过屏幕 / 键盘就直接刷新成新版，碰过了只弹一句、点 Reload 再刷（不打断正在做的）
+let touched = false;
+addEventListener("pointerdown", () => { touched = true; }, { capture: true, once: true });
+addEventListener("keydown", () => { touched = true; }, { capture: true, once: true });
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  const had = Boolean(navigator.serviceWorker.controller);   // 第一次装上不算「新版」
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!had) return;
+    if (!touched) { sync.beacon(); location.reload(); return; }
+    toast("New version ready", () => { sync.beacon(); location.reload(); }, "Reload");
+  });
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+
+// 电脑：标签页开着的话，每天 06:00、18:00 自己刷新一次（拿新版、整份重新同步；她说这两个钟点一般不在用）。
+// 到点时正在用（输入框里、弹层开着、在拖、两分钟内动过键盘鼠标）就等，每分钟再看，空下来再刷；一个时段只刷一次。
+// 手机做不到：iPhone 不让网页关着 / 在后台时跑代码，只能在打开时换新版（上面那段）
+let lastInput = Date.now();
+for (const ev of ["pointerdown", "keydown", "wheel"]) addEventListener(ev, () => { lastInput = Date.now(); }, { capture: true, passive: true });
+function reloadSlot(now = new Date()) {
+  const h = now.getHours();
+  if (h < 6) return "";
+  const day = now.getFullYear() + "-" + (now.getMonth() + 1) + "-" + now.getDate();
+  return day + (h >= 18 ? " 18" : " 06");
+}
+function autoReload() {
+  if (phoneMQ.matches) return;
+  const slot = reloadSlot(), seen = localStorage.getItem("kuzhouduan-reloaded") || "";
+  if (!seen) { localStorage.setItem("kuzhouduan-reloaded", slot); return; }   // 头一回：记下现在这个时段，从下一个时段开始
+  if (!slot || slot === seen) return;
+  const a = document.activeElement, busy = a?.matches?.("input, textarea, select, [contenteditable]") || !document.getElementById("modal")?.hidden ||
+    document.body.classList.contains("dragging") || Date.now() - lastInput < 120000;
+  if (busy) return;
+  localStorage.setItem("kuzhouduan-reloaded", slot);
+  sync.beacon();
+  location.reload();
+}
+setInterval(autoReload, 60000);
 
 render();
 // 早上的线要等表格里的数据拉下来再拍；连不上就 6 秒后用本机的

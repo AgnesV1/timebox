@@ -687,7 +687,7 @@ export function createView() {
   const CARDS = [["left", "Budget Left", "leftPct"], ["expense", "Expense", "expense"], ["income", "Income", "income"], ["balance", "Balance", "balance"]];
   function cards(c, mode, p) {
     const box = $(".mn-cards");
-    if (!box.querySelector("[data-card]")) box.innerHTML = CARDS.map(([k, label]) => '<div class="mn-card" data-card="' + k + '"><span class="mn-meta">' + label + '</span><span class="mn-num v"></span><div class="mn-track mn-range"><b hidden></b></div><span class="mn-num mn-meta"></span></div>').join("");
+    if (!box.querySelector("[data-card]")) box.innerHTML = CARDS.map(([k, label]) => '<div class="mn-card' + (k === "left" ? " mn-card-hl" : "") + '" data-card="' + k + '"><span class="mn-meta">' + label + '</span><span class="mn-num v"></span><div class="mn-track mn-range"><b hidden></b></div><span class="mn-num mn-meta"></span></div>').join("");
     const g = c.used, B = c.B, cmp = M.compare(IX(), budgetsShown(), p, mode, today()), pct = cmp.cur.leftPct, bal = cmp.cur.balance;
     const since = (mode === "year" ? "Earlier years" : "6 mo") + (cmp.cutText ? " " + cmp.cutText : "");
     const pctText = (x) => Math.round(x * 100) + "%";
@@ -763,6 +763,7 @@ export function createView() {
   function openChart() {
     if (V.chartOpen) return;
     V.chartOpen = true;
+    root.classList.add("mn-chart-on");   // 图表页开着：标题下面那截「… left」收起来（下面 Budget Left 方块里已经有了，她 10-25 说的）
     V.cmode = V.mode === "year" ? "year" : "month";
     V.nohouse = false;   // 每次打开都是完整的（包括 House）
     V.cc = { ...V.cur };
@@ -779,6 +780,7 @@ export function createView() {
   function closeChart() {
     if (!V.chartOpen) return;
     V.chartOpen = false;
+    root.classList.remove("mn-chart-on");
     sheetTo("", quiet() ? "" : ".26s", EXIT);
   }
   {

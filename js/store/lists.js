@@ -174,16 +174,16 @@ export default function (core) {
   }
   const planText = (planId) => { const s = planShape(planId); return s ? PT.format(s) : ""; };
 
-  // 粘贴：planId 空 = 新建（放进 group 这个项目）；有 = 按名字 / 代号更新那个计划。
+  // 粘贴：planId 空 = 新建（放进 group 这个项目，文字里没写计划名就用 name）；有 = 按名字 / 代号更新那个计划。
   // laterOf(分区名) = 预览里她勾的 Later（不给就按认出来的）。返回 { planId, gone: 新文字里没有的旧项 [{ id, title, used }] }
-  function pastePlan(text, { planId = "", group = "", laterOf = null } = {}) {
+  function pastePlan(text, { planId = "", group = "", laterOf = null, name = "" } = {}) {
     const parsed = PT.parse(text);
     if (!parsed.sections.length && !parsed.name) return null;
     const flat = parsed.sections.flatMap((s) => s.items.map((i) => ({ ...i, section: s.name, later: laterOf ? Boolean(laterOf(s.name)) : s.later })));
     let id = planId, gone = [];
     change(() => {
       if (!id) {
-        id = saveProject({ name: parsed.name || "New plan", group, kind: "regular", place: "pool", start: parsed.start, deadline: parsed.end, rule: { notes: parsed.notes, items: {} } });
+        id = saveProject({ name: parsed.name || name || "New plan", group, kind: "regular", place: "pool", start: parsed.start, deadline: parsed.end, rule: { notes: parsed.notes, items: {} } });
       }
       let p = get("projects", id);
       p = { ...p, name: parsed.name || p.name, start: parsed.start || p.start || "", deadline: parsed.end || p.deadline || "", rule: { ...(p.rule || {}), notes: parsed.notes } };

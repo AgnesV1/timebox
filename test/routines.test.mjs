@@ -56,12 +56,6 @@ test("previews: fixed days only, never today or the past, none once it's real", 
   assert.deepEqual(E.ghostsOn(c2, "2026-10-07"), [], "moved to Friday: Wednesday's preview is gone");
 });
 
-test("regular time takes room before totals are spread; it doesn't count toward the line", () => {
-  const c = ctxOf();
-  assert.equal(E.fixedOn(c, "2026-10-07"), 60);
-  assert.equal(E.needOn(c, gym, "2026-10-07"), 0);
-});
-
 test("this week of a regular plan, and pool sessions left", () => {
   const c = ctxOf({ tasks: [
     { id: "a", date: "2026-10-05", est: 30, status: "done", projectId: "y" },

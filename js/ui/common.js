@@ -3,6 +3,7 @@
 import * as E from "../engine.js";
 import * as G from "../goals.js";
 import * as store from "../store.js";
+import * as L from "../lists.js";
 import { esc } from "../dom.js";
 import { fmtMin, fmtHours, hoursOf } from "../dates.js";
 import { zebraFor } from "../patterns.js";
@@ -60,7 +61,8 @@ export function colorOf(t) {
 }
 
 // 加任务 / 改任务 / 补时间的下拉里能选的计划：在用的，不含循环小事（那是一条重复，不是能往下挂任务的计划）。keep = 任务现在挂着的那个，留着
-export const pickable = (projects, keep = "") => projects.filter((p) => (E.isActive(p) && !E.isRepeat(p)) || (keep && p.id === keep));
+// 加任务的下拉里列哪些计划：在用的，循环小事（固定星期几、Pool 里没东西）除外
+export const pickable = (projects, keep = "") => projects.filter((p) => (E.isActive(p) && (!E.isRepeat(p) || L.itemsOf(store.ctx(), p.id).length)) || (keep && p.id === keep));
 
 // 任务旁边那个小标签：计划的名字；直接挂在大类上的、还有循环小事的那一次（它直接算在大类上），是大类的名字
 export function badgeOf(t) {
@@ -124,10 +126,6 @@ export function stripHTML(c, d, tasks) {
     '<div class="stripmeta' + (over ? " over" : "") + '"><span>' + hoursOf(day.planned) + " / " + (day.cap ? fmtHours(day.cap) : "—") + " planned" + (over ? " · over" : "") + "</span><span>" + fmtHours(day.done) + " done</span></div>";
 }
 
-const HEALTH = { safe: "●", tight: "●", danger: "●", done: "✓", empty: "○", open: "○", waiting: "◷", dropped: "×" };
-export function healthPill(h) {
-  return '<span class="health h-' + h.level + '">' + (HEALTH[h.level] || "●") + " " + esc(h.text) + "</span>";
-}
 
 // ---------- emoji 记号（Restock 的标记、Ideas 的类别） ----------
 // tags = [[key, emoji, 名字]]。名字只在 title / aria-label 里，界面上只露 emoji。

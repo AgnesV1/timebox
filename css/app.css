@@ -645,38 +645,14 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
 .pname { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0; border: 0; background: none; font: 700 14.5px/1.25 var(--display); text-align: left; letter-spacing: -.01em; }
 .pname i { width: 12px; height: 12px; flex-shrink: 0; border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 1.5px var(--edge); }
 [data-theme="dark"] .pname i { box-shadow: 0 0 10px var(--pc); }
-.psub { margin: 4px 0 8px; font-size: 12px; color: var(--muted); }
-/* 看进度的卡：健康度那颗挪到第二行右边，卡窄了自己折到下一行（卡头只剩名字、Auto / Pool、Archive，不会被挤出去） */
-.pc-sub { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; margin: 4px 0 8px; }
-.pc-sub .psub { margin: 0; }
-.pbar { display: flex; height: 9px; border: var(--b); border-radius: 999px; background: var(--track); overflow: hidden; }
-.pbar .d { background: var(--pc); }
-.pbar .s { background: var(--zebra-tex) 0 0/20px 20px, var(--surface); opacity: .55; }
-.pnums { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
-.pnums b { color: var(--ink); }
+/* 卡片上的几行（2026-10-25 她挑的样子）：怎么出现 · 起止 · 花了多少 / 这周每项几次 / Pool 还剩几次 */
+.pcard .ls-l { margin: 3px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+.pcard header + .ls-l { margin-top: 6px; }
+.pcard .ls-l b { font: 600 12.5px var(--num); color: var(--ink); }
+.pcard .pweek { margin-top: 8px; }
 .health { flex-shrink: 0; padding: 3px 9px; border-radius: 999px; background: var(--surface); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
 .h-safe { color: var(--ok); }
-.h-tight { color: var(--c-Chore); }
 .h-danger { color: var(--warn); }
-.axis { position: relative; height: 28px; margin: 8px 2px 2px; }
-.axis i { position: absolute; top: 6px; height: 4px; border-radius: 4px; }
-.axis .track { left: 0; right: 0; background: var(--track); }
-.axis .done { left: 0; background: var(--ink); }
-[data-theme="dark"] .axis .done { background: var(--accent); }
-.axis .buffer { background: var(--zebra-tex) 0 0/14px 14px, var(--surface2); }
-.axis .mark { position: absolute; top: 1px; width: 2px; height: 14px; margin-left: -1px; border-radius: 2px; }
-.axis .now { background: var(--hot); }
-.axis .goal { background: var(--blue); }
-.axis .lab { position: absolute; top: 18px; font: 500 10.5px var(--num); color: var(--muted); }
-.axis .l { left: 0; }
-.axis .r { right: 0; }
-.mods { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.mod { padding: 2px 8px; border-radius: 999px; background: var(--surface); font-size: 11.5px; }
-.mod b { font-family: var(--num); }
-.calib { margin-top: 12px; font-size: 13px; }
-.calib p { margin: 0 0 8px; }
-.calib div { display: flex; gap: 6px; }
-.calib .btn { padding: 6px 12px; font-size: 12.5px; }
 
 /* ---------- 弹出层 ---------- */
 #modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px 24px; overflow: auto; background: rgba(11, 11, 11, .32); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
@@ -709,20 +685,44 @@ body.modal-open { overflow: hidden; }
 .swatches input:checked + i { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
 .sub { margin: 14px 0 8px; font: 700 14px var(--display); }
 .sub small { font: 500 12px var(--num); color: var(--muted); }
-.imod { margin-bottom: 12px; }
-.imod-head { margin-bottom: 4px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-.irow { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
-.irow input { padding: 6px 9px; font-size: 13.5px; }
-.irow input[data-if="title"] { flex: 1; }
-.irow input[data-if="est"] { width: 64px; text-align: center; }
-.irow .ist { width: 74px; font-size: 11px; color: var(--muted); }
-.irow.done input[data-if="title"] { text-decoration: line-through; color: var(--muted); }
-.iadd { margin-top: 8px; }
-.iadd textarea { width: 100%; resize: vertical; }
-.numbered { display: flex; gap: 6px; }
-.numbered input { min-width: 0; flex: 1; }
-.numbered input.num { flex: 0 0 56px; }
-.numbered .btn { padding: 0 10px; }
+/* 计划编辑框（2026-10-25）：右上角 Copy as text / Paste text；Notes 收成一行；Pool 按分区列，点一行展开改；粘贴整份先看认出了什么 */
+.ls-hd { display: flex; align-items: center; gap: 6px; margin: 0 40px 12px 0; }
+.ls-hd .sheet-title { margin: 0 auto 0 0; }
+.ls-hd .btn { padding: 5px 11px; font-size: 12.5px; }
+.ls-hd .btn.on { background: var(--accent); color: var(--accent-ink); }
+.ls-notes { display: block; width: 100%; margin: 2px 0 12px; padding: 7px 10px; border: 0; border-radius: 10px; background: var(--tonal); font-size: 12.5px; color: var(--muted); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ls-ph { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 2px; font: 700 14px var(--display); }
+.ls-ph small { font: 500 12px var(--num); color: var(--muted); }
+.ls-sec { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.ls-sec .chip { margin-left: auto; padding: 2px 9px; font-size: 11.5px; letter-spacing: 0; text-transform: none; }
+.ls-it { display: grid; grid-template-columns: minmax(0, 1fr) 52px 48px 128px; gap: 8px; align-items: baseline; padding: 5px 2px; border-top: 1px solid var(--line); font-size: 13.5px; cursor: pointer; }
+.ls-it.later { opacity: .45; }
+.ls-it.open { align-items: center; cursor: default; }
+.ls-it.open input { min-width: 0; padding: 5px 8px; font-size: 13px; }
+.ls-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-nt { margin-left: 6px; font-size: 11.5px; color: var(--muted); }
+.ls-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px var(--num); color: var(--muted); text-align: right; }
+@media (hover: hover) { .ls-it:not(.open):hover { background: var(--tonal); } }
+.ls-ex { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 10px; margin: 4px 0 8px; padding: 10px 10px 4px; border-radius: 12px; background: var(--tonal); }
+.ls-ex textarea { width: 100%; resize: vertical; font-size: 13px; }
+.ls-exf { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+.ls-exf .field { flex: 0 1 220px; }
+.ls-exf .hint { flex: 1; margin: 0; }
+.ls-add { margin-top: 12px; padding: 8px 10px; border: 1.5px dashed var(--line); border-radius: 12px; }
+.ls-add textarea { width: 100%; resize: vertical; }
+.ls-addr { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.ls-addr input { flex: 1; min-width: 0; }
+.ls-paste textarea { width: 100%; min-height: 180px; resize: vertical; font: 12.5px/1.5 var(--num); }
+.ls-pv, .ls-gone { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--tonal); }
+.ls-pv h4 { margin: 0 0 6px; font: 700 13px var(--display); }
+.ls-pv .r, .ls-gone .r { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; }
+.ls-pv .r > span:last-child { font: 500 12px var(--num); color: var(--muted); text-align: right; }
+.ls-pv .r .chip, .ls-gone .chip { padding: 2px 9px; font: 600 11.5px var(--body); }
+.ls-pv .tot { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); font-weight: 700; }
+.ls-pv .sheet-foot { margin-top: 10px; }
+.ls-gone { margin: 0 0 8px; }
+.ls-gone p { margin: 0 0 6px; font-size: 12.5px; }
+.ls-gone small { color: var(--muted); }
 
 /* ---------- 设置 ---------- */
 .settings { max-width: 720px; }
@@ -1224,7 +1224,6 @@ body.phone .logtime input, body.phone .add input, body.phone .add select, body.p
 .ev.ghost.proj { cursor: default; border-style: dashed; box-shadow: inset 0 0 0 1px var(--line); }
 .row.ghost { opacity: .5; pointer-events: none; }
 .row.ghost .bar { background: transparent; box-shadow: inset 0 0 0 1.5px var(--bar); }
-.ptag { flex-shrink: 0; margin-left: auto; padding: 2px 0; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .pweek { display: flex; align-items: center; gap: 4px; }
 .pweek i { flex: 0 1 14px; min-width: 10px; aspect-ratio: 1; border-radius: 4px; background: var(--track); }   /* 窄栏里 14 个方块一起缩一点，不把「last 14 days」挤到下一行 */
 .pweek i.s { box-shadow: inset 0 0 0 2px var(--pc); background: transparent; }

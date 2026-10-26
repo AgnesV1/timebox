@@ -573,46 +573,33 @@ export function addItems(projectId, module, titles, est) {
   change(() => titles.forEach((title) => put("items", { id: newId(), projectId, module: module || "", title, est: Number(est) || 0, origEst: null, order: ++order })));
 }
 
+// 改了名字：还没勾的那几次跟着改（带着的 #k 留着）
 export function updateItem(id, patch) {
   const i = get("items", id);
   if (!i) return;
   change(() => {
     put("items", { ...i, ...patch });
     if (patch.title !== undefined) {
-      all("tasks").filter((t) => t.itemId === id && !t.status && t.title === i.title).forEach((t) => put("tasks", { ...t, title: patch.title }));
+      for (const t of all("tasks")) {
+        if (t.itemId !== id || t.status) continue;
+        if (t.title === i.title) put("tasks", { ...t, title: patch.title });
+        else if (t.title.startsWith(i.title + " #")) put("tasks", { ...t, title: patch.title + t.title.slice(i.title.length) });
+      }
     }
   });
 }
 
+// 删一项：做过的那几次留着当记录（不再挂在这一项上），没动过的删掉；计划里它的设置一起拿掉
 export function deleteItem(id) {
+  const i = get("items", id), p = i && get("projects", i.projectId);
   change(() => {
     all("tasks").filter((t) => t.itemId === id).forEach((t) => (started(t) ? put("tasks", { ...t, itemId: "" }) : dropTask(t.id)));
     drop("items", id);
-  }, "Deleted item");
+    if (p?.rule?.items?.[id]) { const items = { ...p.rule.items }; delete items[id]; put("projects", { ...p, rule: { ...p.rule, items } }); }
+  }, "Deleted " + (i?.title || "item"));
 }
 
-// 按实际速度改这个模块剩下条目的估时（第一次改时记下原来的估时）
-export function applyCalibration(projectId, module) {
-  const p = get("projects", projectId);
-  if (!p) return;
-  const s = E.moduleStats(ctx(), p, module);
-  change(() => {
-    s.proposals.forEach(({ item, est }) => {
-      put("items", { ...item, origEst: item.origEst ?? item.est, est });
-      all("tasks").filter((t) => t.itemId === item.id && !t.status).forEach((t) => put("tasks", { ...t, est: Math.min(t.est, est) }));
-    });
-    put("projects", { ...get("projects", projectId), calib: { ...(p.calib || {}), [module]: s.samples.length } });
-  }, "Updated " + s.proposals.length + " estimates");
-}
-
-export function keepPlan(projectId, module) {
-  const p = get("projects", projectId);
-  if (!p) return;
-  const s = E.moduleStats(ctx(), p, module);
-  change(() => put("projects", { ...p, calib: { ...(p.calib || {}), [module]: s.samples.length } }));
-}
-
-// ---------- 容量、设置、早上的线 ----------
+// ---------- 容量、设置、今天该出现的 ----------
 
 // 某天单独改可用时间：存在 settings.capacity.overrides 里；清空 = 回到每周默认（记成 null，表格合并时才知道是清空了）
 export function setDayCapacity(date, min) {

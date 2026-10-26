@@ -12,7 +12,7 @@ import { esc, on, icon } from "../dom.js";
 import { addDays, addMonths, startOfWeek, startOfMonth, range, fmtShort, fmtMin, fmtHours, WEEKDAYS, MONTHS, MONTHS_LONG, weekday } from "../dates.js";
 import * as SC from "../scores.js";
 import { isPayday } from "../offdays.js";
-import { colorOf, lineInfo, badgeOf, projectOptions, groupsOf, toast } from "./common.js";
+import { colorOf, badgeOf, projectOptions, groupsOf, toast } from "./common.js";
 import { ideasPoolHTML } from "./ideas.js";
 import { showDate } from "./today.js";
 import { openTaskEditor } from "./editor.js";
@@ -42,7 +42,6 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
   const unscored = scores && SC.unscored(scores, store.scoreOf(d), d, c.today);
   const ghosts = E.ghostsOn(c, d);
   const sum = E.daySummary(c, d);
-  const line = d >= c.today || c.log[d] ? lineInfo(c, d).line : 0;
   const capOver = c.capacity.overrides[d] !== undefined;
   const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d);
   const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
@@ -57,7 +56,6 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
       : '<button type="button" class="cap num' + (capOver ? " set" : "") + '" data-act="cap" data-date="' + d + '" title="Available minutes this day — click to change">' + (sum.rest ? "rest" : fmtHours(sum.cap)) + "</button>") + "</div>" +
     '<button type="button" class="load-t" data-act="super-rest" data-date="' + d + '" aria-pressed="' + gold + '" title="' + (gold ? "Super rest day — click to clear" : "Mark as a super rest day") + '">' +
     '<span class="load' + (gold && !still ? " shine" : "") + '"><i style="width:' + loadPct + '%"></i></span></button>' +
-    (line && !month ? '<div class="ln num">line ' + fmtHours(line) + "</div>" : "") +
     all.join("");
   if (!month) {
     h += adding === d
@@ -85,15 +83,12 @@ export function calendarHTML(c) {
     body = '<div class="cal-scroll"><div class="month-head">' + heads + '</div><div class="month">' +
       range(s, addDays(s, 41)).map((d) => cellHTML(c, d, { month: true, outside: d.slice(0, 7) !== m0.slice(0, 7), scores, still })).join("") + "</div></div>";
   }
-  const { line, done } = lineInfo(c, c.today);
-  const scale = Math.max(line * 1.2, done, 60);
   return '<div class="calendar">' +
     '<header class="page-head"><div><h2>' + title + "</h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="cal-today">Today</button>' +
     '<button type="button" class="nav" data-act="cal-prev" aria-label="Previous">' + icon("left") + '</button><button type="button" class="nav" data-act="cal-next" aria-label="Next">' + icon("right") + "</button>" +
     '<span class="seg"><button type="button" data-act="cal-mode" data-mode="week"' + (week ? ' class="on"' : "") + '>Week</button><button type="button" data-act="cal-mode" data-mode="month"' + (!week ? ' class="on"' : "") + ">Month</button></span>" +
     '<button type="button" class="nav' + (store.local().pool ? " on" : "") + '" data-act="pool-toggle">' + icon("pool") + " Pool</button></div></header>" +
-    (line > 0 ? '<div class="lineband"><span>Today\'s line ' + fmtHours(line) + '</span><div class="meter"><div class="fill" style="width:' + Math.min(100, (done / scale) * 100) + '%"></div><i class="tick" style="left:' + Math.min(100, (line / scale) * 100) + '%"></i></div><em>' + fmtHours(done) + " done</em></div>" : "") +
     body + "</div>";
 }
 
@@ -132,18 +127,8 @@ export function poolHTML(c) {
     });
     h += "</section>";
   }));
-  h += ideasPoolHTML(c) + forecastHTML(c) + '<p class="pool-hint">Drag items onto a day, or click one to pick the day. Drag a task back here to unschedule it (or open it: Back to the pool).</p></div>';
+  h += ideasPoolHTML(c) + '<p class="pool-hint">Drag items onto a day, or click one to pick the day. Drag a task back here to unschedule it (or open it: Back to the pool).</p></div>';
   return h;
-}
-
-// 未来两周每天项目要多少时间 vs 当天容量
-function forecastHTML(c) {
-  const rows = E.forecast(c, 14);
-  if (!rows.some((r) => r.total > 0)) return "";
-  const max = Math.max(...rows.map((r) => Math.max(r.total, r.cap)), 60);
-  return '<section class="forecast"><h4>Next 14 days</h4><div class="fc">' + rows.map((r) =>
-    '<div class="fc-col' + (r.over ? " over" : "") + (r.rest ? " rest" : "") + '" title="' + fmtShort(r.date) + ": " + fmtHours(r.total) + (r.cap ? " of " + fmtHours(r.cap) : "") + '">' +
-    '<i class="cap" style="height:' + (r.cap / max) * 100 + '%"></i><i class="need" style="height:' + (r.total / max) * 100 + '%"></i><span>' + WEEKDAYS[weekday(r.date)][0] + "</span></div>").join("") + "</div></section>";
 }
 
 // ---------- 交互 ----------

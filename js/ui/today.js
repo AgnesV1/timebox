@@ -15,7 +15,7 @@ import * as reading from "../reading.js";
 import * as Meal from "../meals.js";
 import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
-import { heroHTML, stripHTML, billHTML, colorOf, badgeOf, projectOptions, pickable, pickTarget, segHTML, lineInfo, toast, STATUS, ballHTML, taskChainHTML, groupsOf } from "./common.js";
+import { heroHTML, stripHTML, colorOf, badgeOf, projectOptions, pickable, pickTarget, segHTML, toast, STATUS, ballHTML, taskChainHTML, groupsOf } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
 import { animateNext, slideDay } from "../motion.js";
@@ -168,7 +168,7 @@ function overdueHTML(c) {
   return '<section class="overdue"><div class="od-head"><b>' + od.length + " left behind</b><span>from earlier days</span>" +
     '<button type="button" class="link" data-act="od-toggle">' + (overdueOpen ? "Hide" : "Show") + "</button></div>" +
     (overdueOpen ? "<ul>" + od.map((t) => '<li><i style="background:' + colorOf(t) + '"></i><span>' + esc(t.title) + "</span><em>" + fmtShort(t.date) + " · " + t.est + "m</em></li>").join("") + "</ul>" : "") +
-    '<div class="od-actions"><button type="button" class="btn primary" data-act="spread">Spread them out</button><button type="button" class="btn" data-act="all-today">All to today</button></div></section>';
+    '<div class="od-actions"><button type="button" class="btn" data-act="all-today">All to today</button></div></section>';
 }
 
 // 三种提醒（电脑今天页右边）：上周成长 / Relax 的时间太少或太多；今明两天谁有生日、该问候谁；这台设备的存储快满了
@@ -290,7 +290,6 @@ export function dayParts(c, d) {
   return {
     hero: heroHTML(c, d),
     strip: stripHTML(c, d, all),
-    bill: isToday ? billHTML(E.yesterdayBill(c)) : "",
     notices: isToday ? noticesHTML(c) : "",
     overdue: isToday ? overdueHTML(c) : "",
     list: choreHTML(c, d) + '<div class="list" data-list="' + d + '">' + (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, false, openId)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">No tasks for this day.</div>') + ghostsHTML(c, d) + "</div>",
@@ -354,8 +353,7 @@ function phoneHTML(c) {
     // 选中的标记单独一个元素，压在选中那天的格子上（换天时它滑过去，见 js/motion.js 的 slideDay）
     '<i class="dmark" aria-hidden="true" style="--k:' + days.indexOf(d) + '"></i></nav>';
   const day = E.daySummary(c, d);
-  const { line, done } = lineInfo(c, d);
-  const lineText = line > 0 ? (done >= line - 1 ? "Line " + fmtHours(line) + " ✓" : "Line " + fmtHours(line) + " · " + fmtHours(line - done) + " to go") : "";
+  const lineText = day.rest ? "Rest day" : day.cap ? "box " + fmtHours(day.cap) : "";
   const meta = '<div class="stripmeta' + (day.cap > 0 && day.planned > day.cap ? " over" : "") + '"><span>' + hoursOf(day.done) + " / " + fmtHours(day.planned) + " done</span><span>" + lineText + "</span></div>";
   const bar = '<div class="strip">' + all.map(segHTML).join("") + "</div>";
   const toBuy = shopCount(c);   // 下次采购还剩几样（顶栏的 🛒）
@@ -376,7 +374,7 @@ export function todayHTML(c, phone) {
     '<header class="page-head"><div><h2>' + fmtDay(d) + " <small>" + (isToday ? "Today" : d < store.today() ? "Looking back" : "Looking ahead") + "</small></h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="day-prev" aria-label="Previous day">' + icon("left") + '</button><button type="button" class="nav" data-act="day-today">Today</button><button type="button" class="nav" data-act="day-next" aria-label="Next day">' + icon("right") + "</button></div></header>" +
     '<div class="today-grid"><div class="today-col"><div class="today-main">' + x.strip + x.list + x.add + "</div>" + (isToday ? quadHTML() : "") + "</div>" +
-    '<div class="today-side">' + x.hero + x.bill + x.notices + x.overdue + "</div>" + x.score + "</div></div>";
+    '<div class="today-side">' + x.hero + x.notices + x.overdue + "</div>" + x.score + "</div></div>";
 }
 
 // ---------- 交互（挂在 document 上，今天页和弹出的某一天都能用） ----------
@@ -464,7 +462,6 @@ export function initToday(rerender) {
     else if (act === "od-toggle") { overdueOpen = !overdueOpen; rerender(); }
     else if (act === "week-seen") store.setLocal({ weekSeen: el.dataset.week });
     else if (act === "open-ideas") { store.setLocal({ projSide: "ideas" }); location.hash = "projects"; }
-    else if (act === "spread") store.spreadOverdue();
     else if (act === "all-today") {
       const c = store.ctx();
       store.moveMany(c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isAutoTask(t)).map((t) => t.id), c.today);

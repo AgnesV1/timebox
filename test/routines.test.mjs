@@ -41,47 +41,25 @@ test("ids round-trip", () => {
   assert.equal(R.parseRoutineTaskId("plain-id"), null);
 });
 
-test("missed auto tasks are not spread as overdue", () => {
-  const ctx = { today: TODAY, projects: [], items: [], capacity: { default: 240 }, log: {}, tasks: [
-    { id: "rt:g:2026-10-02", date: "2026-10-02", est: 60, status: "" },
-    { id: "au:i1:2026-10-02", date: "2026-10-02", est: 60, status: "" },
-    { id: "x", date: "2026-10-02", est: 30, status: "" }
-  ] };
-  assert.deepEqual(E.planOverdue(ctx).map((m) => m.id), ["x"]);
-});
-
 const gym = { id: "g", name: "Gym", kind: "regular", place: "auto", status: "active", rule: { days: [0, 60, 0, 60, 0, 60, 0], start: "2026-10-01", end: "", skip: [] } };
 const yoga = { id: "y", name: "Yoga", kind: "regular", place: "pool", status: "active", rule: { perWeek: 3, min: 30, start: "2026-10-01", end: "" } };
 const b2 = { id: "b2", name: "B2", kind: "total", place: "auto", status: "active", deadline: "2026-10-16", early: 0 };
 const ctxOf = (over = {}) => ({ today: TODAY, weekStartsOn: "monday", projects: [gym, yoga, b2], items: [{ id: "i1", projectId: "b2", title: "Unit 1", est: 120, order: 1 }, { id: "i2", projectId: "b2", title: "Unit 2", est: 600, order: 2 }],
   tasks: [], capacity: { default: 240, weekly: null, overrides: {} }, log: {}, level: true, ...over });
 
-test("previews: regular days and projected shares, never today or the past, none once it's real", () => {
+test("previews: fixed days only, never today or the past, none once it's real", () => {
   const c = ctxOf();
   assert.deepEqual(E.ghostsOn(c, TODAY), []);
-  const wed = E.ghostsOn(c, "2026-10-07");
-  assert.deepEqual(wed.map((g) => g.kind + " " + g.title + " " + g.est), ["regular Gym 60", "total B2 " + wed[1].est]);
-  assert.ok(wed[1].est >= 5);
-  assert.deepEqual(E.ghostsOn(c, "2026-10-08").map((g) => g.title), ["B2"], "Thursday: no gym");
+  assert.deepEqual(E.ghostsOn(c, "2026-10-07").map((g) => g.kind + " " + g.title + " " + g.est), ["regular Gym 60"], "a total no longer shows a projected share");
+  assert.deepEqual(E.ghostsOn(c, "2026-10-08"), [], "Thursday: no gym");
   const c2 = ctxOf({ tasks: [{ id: "rt:g:2026-10-07", date: "2026-10-09", est: 60, status: "", projectId: "g" }] });
-  assert.deepEqual(E.ghostsOn(c2, "2026-10-07").map((g) => g.title), ["B2"], "moved to Friday: Wednesday's preview is gone");
+  assert.deepEqual(E.ghostsOn(c2, "2026-10-07"), [], "moved to Friday: Wednesday's preview is gone");
 });
 
 test("regular time takes room before totals are spread; it doesn't count toward the line", () => {
   const c = ctxOf();
   assert.equal(E.fixedOn(c, "2026-10-07"), 60);
   assert.equal(E.needOn(c, gym, "2026-10-07"), 0);
-  const c2 = ctxOf({ tasks: [{ id: "rt:g:2026-10-05", date: TODAY, est: 60, actual: 60, status: "done", projectId: "g" }, { id: "t", date: TODAY, est: 30, actual: 30, status: "done", projectId: "b2" }] });
-  assert.equal(E.doneOn(c2, TODAY), 30);
-});
-
-test("today's chunks for an auto total: by item order, minus what's already planned", () => {
-  const c = ctxOf({ tasks: [{ id: "m", date: TODAY, est: 20, status: "", projectId: "b2", itemId: "i1" }] });
-  const chunks = E.autoChunks(c, { b2: 150 }, ["b2"]);
-  assert.deepEqual(chunks.map((x) => x.id + " " + x.est), ["au:i1:" + TODAY + " 100", "au:i2:" + TODAY + " 30"]);
-  assert.deepEqual(E.autoChunks(c, { b2: 150 }, ["g"]), [], "only the plans asked for");
-  const done = ctxOf({ tasks: [{ id: "au:i1:" + TODAY, date: TODAY, est: 60, status: "", projectId: "b2", itemId: "i1" }] });
-  assert.deepEqual(E.autoChunks(done, { b2: 150 }, ["b2"]), [], "already there today");
 });
 
 test("this week of a regular plan, and pool sessions left", () => {
@@ -176,13 +154,9 @@ test("store: today's auto tasks appear once; deleting one doesn't bring it back"
   const p = store.saveProject({ name: "Thesis", kind: "total", place: "auto", deadline: addDays(t, 9), early: 0, total: 600 });
   const swim = R.routineTaskId(g, t);
   assert.equal(store.get("tasks", swim).est, 30, "regular: today's one is there");
-  const chunk = store.tasksOn(t).find((x) => x.projectId === p);
-  assert.ok(chunk && chunk.id.startsWith("au:"), "total: today's share is there");
-  assert.equal(store.get("items", chunk.itemId).est, 600, "one big item from the total");
-  store.deleteTask(chunk.id);
+  assert.equal(store.tasksOn(t).filter((x) => x.projectId === p).length, 0, "a total no longer gets a share of its own each day");
   store.deleteTask(swim);
-  store.ensureTodayLog();
-  assert.equal(store.tasksOn(t).filter((x) => x.projectId === p).length, 0, "the share stays deleted");
+  store.ensureToday();
   assert.equal(store.get("tasks", swim), null, "the regular one stays deleted (skip)");
 
   // 池里的规律计划：拖到某天排一次

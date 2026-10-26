@@ -1,12 +1,13 @@
 // 统计的计算：只算数，不碰页面。时间单位都是分钟。
 // 看的是一段时间（一周 / 一个月 / 一个季度 / 一年 / 自己选的两头）里：花了多少时间、其中多少是深度（Deep）、
-// 做完了多少、守住了几天安全线、估时准不准、各项目、星期几、没做完的原因；
+// 做完了多少、估时准不准、各项目、星期几、没做完的原因；
 // 时间去向（一天 24 小时：睡觉、吃饭洗澡、家务按默认值算，剩下 = 记下来的 + 没记的）、时间表（项目 × 日子）。
 // 只看某个项目 / 只看深度：页面先把 ctx.tasks 筛好再传进来，这里不用管。
 
 import { addDays, diffDays, range, weekday, startOfWeek, startOfMonth, startOfQuarter, addMonths, daysInMonth, isoOf } from "./dates.js";
 import * as E from "./engine.js";
 import * as GR from "./groups.js";
+import * as L from "./lists.js";
 import { parseTimes } from "./times.js";
 import { hourMinutes, isCommute, COMMUTE_BLOCKS } from "./day.js";
 
@@ -66,13 +67,15 @@ export function lifeOn(life, date) {
   return { sleep: life.sleep, care: life.care, chores: wd === 0 || wd === 6 ? life.chores / 2 : 0 };
 }
 
+const counts = (t) => !E.isChore(t) && !(L.isRow(t) && !t.status);
+
 export function summarize(ctx, from, to, { by = "group" } = {}) {
   const last = to < ctx.today ? to : ctx.today;
   const days = from <= last ? range(from, last) : [];
   const inRange = (d) => d >= from && d <= last;
   const all = ctx.tasks.filter((t) => t.date && inRange(t.date));
-  // Chore 键那条（E.isChore）只算分钟：它一直标着 Done，算进做完几条、完成率、估时、原因就不对了
-  const tasks = all.filter((t) => !E.isChore(t));
+  // 只算分钟、不算一条任务的：Chore 键那条（一直标着 Done）、计划的那一行（整块计时，结果在下面那几项上；以前标过状态的照旧算）
+  const tasks = all.filter(counts);
 
   const spentBy = {}, plannedBy = {}, deepBy = {}, wdBy = {};   // wdBy：每一行（大类 / 计划）在星期几各花了多少
   for (const t of all) {
@@ -93,8 +96,6 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
   // 完成率：可选的任务没做不算没完成
   const counted = tasks.filter((t) => !t.optional || t.status === "done").length;
   const active = days.filter((d) => (spentBy[d] || 0) > 0).length;
-  const lineDays = days.filter((d) => num(ctx.log?.[d]?.need) > 0);
-  const held = lineDays.filter((d) => E.doneOn(ctx, d) >= num(ctx.log[d].need) - 1).length;
   const timed = tasks.filter((t) => t.status === "done" && num(t.actual) > 0 && num(t.est) > 0);
   const accuracy = timed.length ? timed.reduce((a, t) => a + num(t.actual), 0) / timed.reduce((a, t) => a + num(t.est), 0) : null;
   const caps = days.map((d) => E.capacityFor(ctx.capacity, d)).filter((v) => v > 0);
@@ -102,7 +103,7 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
   // 按大类（或者按计划，见 rowOf）；哪都没挂的放最后
   const nameOf = (t) => rowOf(ctx, t, by).name;
   const byProject = [...new Set(all.map(nameOf))].map((name) => {
-    const mins = all.filter((t) => nameOf(t) === name), ts = mins.filter((t) => !E.isChore(t));
+    const mins = all.filter((t) => nameOf(t) === name), ts = mins.filter(counts);
     const tm = ts.filter((t) => t.status === "done" && num(t.actual) > 0 && num(t.est) > 0);
     return {
       name,
@@ -141,12 +142,12 @@ export function summarize(ctx, from, to, { by = "group" } = {}) {
   return {
     from, to, last, days: days.length, spent, planned, deep, done, counted, rate: counted ? done / counted : null,
     goal, goalDays: goalDays.length, goalHit,
-    active, lineDays: lineDays.length, held, accuracy, timed: timed.length,
+    active, accuracy, timed: timed.length,
     avgPlanned: days.length ? planned / days.length : 0,
     avgSpent: days.length ? spent / days.length : 0,
     avgCap: caps.length ? caps.reduce((a, v) => a + v, 0) / caps.length : 0,
     byProject, byWeekday, status, reasons, withoutReason: status.delay + status.drop - withReason,
-    daily: range(from, to).map((d) => ({ date: d, spent: spentBy[d] || 0, deep: deepBy[d] || 0, planned: plannedBy[d] || 0, line: num(ctx.log?.[d]?.need), goal: goalOn(d), future: d > ctx.today }))
+    daily: range(from, to).map((d) => ({ date: d, spent: spentBy[d] || 0, deep: deepBy[d] || 0, planned: plannedBy[d] || 0, goal: goalOn(d), future: d > ctx.today }))
   };
 }
 
@@ -155,25 +156,30 @@ export function weekly(daily, weekStartsOn) {
   const out = new Map();
   for (const x of daily) {
     const w = startOfWeek(x.date, weekStartsOn);
-    const g = out.get(w) || { date: w, spent: 0, deep: 0, planned: 0, line: 0, goal: 0, future: true };
-    g.spent += x.spent; g.deep += x.deep || 0; g.planned += x.planned; g.line += x.line; g.goal += x.goal || 0; g.future = g.future && x.future;
+    const g = out.get(w) || { date: w, spent: 0, deep: 0, planned: 0, goal: 0, future: true };
+    g.spent += x.spent; g.deep += x.deep || 0; g.planned += x.planned; g.goal += x.goal || 0; g.future = g.future && x.future;
     out.set(w, g);
   }
   return [...out.values()];
 }
 
-// 每个项目：计划多少、推进了多少、实际花了多少（全部 / 这段时间）
+// 每个计划：Pool 里做了几次 / 一共要几次（Later 的、Any 的不算总数）、一共花了多少、这段时间花了多少
 export function projectRows(ctx, from, last) {
   return ctx.projects.map((p) => {
-    const t = E.projectTotals(ctx, p);
+    let n = 0, done = 0;
+    for (const i of L.itemsOf(ctx, p.id)) {
+      const s = L.stateOf(ctx, i);
+      if (s.cfg.later) continue;
+      done += s.count.done;
+      if (s.cfg.n > 0) n += s.cfg.n;
+    }
     const ts = E.tasksOfProject(ctx, p.id);
     return {
-      p, planned: t.total, done: t.done, remaining: t.remaining,
+      p, n, done,
       spent: ts.reduce((a, x) => a + E.spentMin(x), 0),
-      spentHere: ts.filter((x) => x.date >= from && x.date <= last).reduce((a, x) => a + E.spentMin(x), 0),
-      health: E.health(ctx, p)
+      spentHere: ts.filter((x) => x.date >= from && x.date <= last).reduce((a, x) => a + E.spentMin(x), 0)
     };
-  }).filter((r) => r.planned || r.spent);
+  }).filter((r) => r.n || r.done || r.spent);
 }
 
 // ---------- 每周：成长 / Relax 够不够、是不是太多 ----------

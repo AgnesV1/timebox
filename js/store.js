@@ -506,16 +506,6 @@ export function unschedule(id) {
   return true;
 }
 
-export function spreadOverdue() {
-  const moves = E.planOverdue(ctx());
-  if (!moves.length) return 0;
-  change(() => moves.forEach((m) => {
-    const t = get("tasks", m.id);
-    if (t) put("tasks", { ...t, date: m.to, order: nextOrder(m.to) });
-  }), "Spread " + moves.length + " task" + (moves.length > 1 ? "s" : ""));
-  return moves.length;
-}
-
 // ---------- 计划和条目 ----------
 // 计划 = projects 表一行。kind：total（总时长 + 截止日）/ regular（规律）；place：auto（自动排到每天）/ pool（进任务池）
 
@@ -675,30 +665,12 @@ function regularsDueToday(c) {
   }).filter(Boolean);
 }
 
-// 拍今天的安全线快照（第一次打开时）；同时把今天的自动任务落成：规律的那一次、整块计划（Auto）今天的份额。
-// 整块的份额只在快照新拍、或新加进快照时排一次——删掉了就不会再长出来
-export function ensureTodayLog() {
-  const c = ctx();
-  const tl = E.todayLine(c);
-  const before = c.log[c.today]?.projects || {};
-  const fresh = Object.keys(tl.shares).filter((pid) => tl.fresh || !(pid in before));
-  const chunks = fresh.length ? E.autoChunks(c, tl.shares, fresh) : [];
-  const regs = regularsDueToday(c);
-  if (!tl.fresh && !tl.added && !chunks.length && !regs.length) return;
-  change(() => {
-    if (tl.fresh) put("log", { id: c.today, date: c.today, need: tl.line, projects: tl.shares });
-    else if (tl.added) put("log", { ...get("log", c.today), need: Object.values(tl.shares).reduce((a, v) => a + (Number(v) || 0), 0), projects: tl.shares });
-    chunks.forEach(putAuto);
-    regs.forEach(putAuto);
-  });
+// 今天该自己出现的：固定星期几的计划那天的那一次（还没有的）。打开时、换天时、刚建好 / 放回来一个这样的计划时各看一次
+export function ensureToday() {
+  const regs = regularsDueToday(ctx());
+  if (regs.length) change(() => regs.forEach(putAuto));
 }
-
-function autoToday(pid) {
-  ensureTodayLog();
-  const c = ctx();
-  const chunks = E.autoChunks(c, E.todayLine(c).shares, [pid]);
-  if (chunks.length) change(() => chunks.forEach(putAuto));
-}
+const autoToday = () => ensureToday();
 
 // 以后某天的预览变成真任务（拖动 / 点开它的时候）：返回任务 id
 export function materialize(key) {

@@ -12,7 +12,7 @@ import * as S from "../stats.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtHours, fmtShort, fmtDay, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf } from "../dates.js";
-import { healthPill, groupsOf } from "./common.js";
+import { groupsOf } from "./common.js";
 import { hourLabel } from "../day.js";
 import { neon } from "../groups.js";
 
@@ -102,16 +102,14 @@ function timeStrip(s, p, b, bp, name) {
 // 柱子 / 热力图右上角：Build | All
 const viewSeg = (which, name) => '<span class="seg">' + [["build", esc(name)], ["all", "All"]].map(([v, l]) => '<button type="button" data-act="st-view" data-w="' + which + '" data-v="' + v + '"' + (view[which] === v ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
 
-// Plan 页签：做完多少、守住几天线、估时准不准。只看某个项目时线不显示（线是按全部计划算的）
-function planKpis(s, p, filtered) {
+// Plan 页签：做完多少、估时准不准
+function planKpis(s, p) {
   const acc = s.accuracy;
   const accText = acc === null ? "Fill in Actual min on done tasks to see this"
     : Math.abs(acc - 1) < 0.05 ? "Your estimates are about right"
     : acc > 1 ? "Tasks take " + pct(acc - 1) + " longer than planned" : "Tasks take " + pct(1 - acc) + " less than planned";
-  const line = !filtered && s.lineDays;
-  return '<div class="kpis three">' +
+  return '<div class="kpis">' +
     tile("Tasks done", String(s.done), s.counted ? pct(s.rate) + " of " + s.counted + " planned" : "No tasks yet", delta(s.done, p.done, String)) +
-    tile("Line held", line ? s.held + " / " + s.lineDays : "—", filtered ? "Shown when you look at everything" : s.lineDays ? "days you reached the project line" : "Projects with deadlines set a line", line && p.lineDays ? delta(s.held / s.lineDays, p.held / p.lineDays, pct) : "") +
     tile("Estimates", acc === null ? "—" : acc.toFixed(2) + "×", accText + (s.timed ? " · " + s.timed + " timed" : "")) +
     "</div>";
 }
@@ -174,31 +172,29 @@ function timeTrendHTML(s, seg = "") {
     "</tbody></table></details></figure>";
 }
 
-// Plan 页签的柱子：每天做了多少（柱）、计划多少（底色）、当天的线（横线；只看某个项目时不画，线是按全部计划算的）
-function trendHTML(s, filtered) {
-  const { byWeek, rows: all } = trendRows(s);
-  const rows = filtered ? all.map((r) => ({ ...r, line: 0 })) : all;
-  const max = niceMax(Math.max(60, ...rows.map((r) => Math.max(r.spent, r.planned, r.line))));
+// Plan 页签的柱子：每天做了多少（柱）、计划多少（底色）
+function trendHTML(s) {
+  const { byWeek, rows } = trendRows(s);
+  const max = niceMax(Math.max(60, ...rows.map((r) => Math.max(r.spent, r.planned))));
   const h = (v) => Math.min(100, (v / max) * 100).toFixed(2) + "%";
   const unit = byWeek ? "week" : "day";
   const labels = axisLabels(rows, byWeek);
   tips.trend = rows.map((r) => ({
     title: byWeek ? "Week of " + fmtShort(r.date) : fmtDay(r.date),
-    rows: [["Done", fmtHours(r.spent), "dn"], ["Planned", fmtHours(r.planned), "pl"], ["Line", r.line ? fmtHours(r.line) : "—", "ln"]]
+    rows: [["Done", fmtHours(r.spent), "dn"], ["Planned", fmtHours(r.planned), "pl"]]
   }));
   const insight = s.days
     ? "On average you planned <b>" + fmtHours(s.avgPlanned) + "</b> and spent <b>" + fmtHours(s.avgSpent) + "</b> a day" + (s.avgCap ? ", with " + fmtHours(s.avgCap) + " available." : ".")
     : "This period hasn't started yet.";
   return '<figure class="card chart"><figcaption><div><h3>Planned and done, per ' + unit + "</h3><p>" + insight + "</p></div>" +
-    '<div class="legend"><span><i class="k dn"></i>Done</span><span><i class="k pl"></i>Planned</span>' + (filtered ? "" : '<span><i class="k ln"></i>Project line</span>') + "</div></figcaption>" +
+    '<div class="legend"><span><i class="k dn"></i>Done</span><span><i class="k pl"></i>Planned</span></div></figcaption>' +
     '<div class="plot">' + [1, 0.5, 0].map((f) => '<i class="grid" style="bottom:' + f * 100 + '%"><span class="num">' + (f ? fmtHours(max * f) : "0") + "</span></i>").join("") +
     '<div class="cols" data-chart="trend"' + dense(rows) + ">" + rows.map((r, i) =>
       '<div class="col' + (r.future ? " future" : "") + '" data-i="' + i + '" tabindex="0" aria-label="' + esc(tips.trend[i].title + ": " + fmtHours(r.spent) + " done of " + fmtHours(r.planned) + " planned") + '">' +
-      '<i class="pl" style="height:' + h(r.planned) + '"></i>' + (r.future ? "" : '<i class="dn" style="height:' + h(r.spent) + '"></i>') +
-      (r.line ? '<i class="ln" style="bottom:' + h(r.line) + '"></i>' : "") + "</div>").join("") + "</div></div>" +
+      '<i class="pl" style="height:' + h(r.planned) + '"></i>' + (r.future ? "" : '<i class="dn" style="height:' + h(r.spent) + '"></i>') + "</div>").join("") + "</div></div>" +
     '<div class="xaxis">' + labels.map((t) => "<span>" + t + "</span>").join("") + "</div>" +
-    '<details class="tview"><summary>Show as table</summary><table><thead><tr><th>' + (byWeek ? "Week of" : "Day") + "</th><th>Done</th><th>Planned</th><th>Line</th></tr></thead><tbody>" +
-    rows.filter((r) => !r.future).map((r) => "<tr><td>" + fmtShort(r.date) + '</td><td class="num">' + fmtHours(r.spent) + '</td><td class="num">' + fmtHours(r.planned) + '</td><td class="num">' + (r.line ? fmtHours(r.line) : "—") + "</td></tr>").join("") +
+    '<details class="tview"><summary>Show as table</summary><table><thead><tr><th>' + (byWeek ? "Week of" : "Day") + "</th><th>Done</th><th>Planned</th></tr></thead><tbody>" +
+    rows.filter((r) => !r.future).map((r) => "<tr><td>" + fmtShort(r.date) + '</td><td class="num">' + fmtHours(r.spent) + '</td><td class="num">' + fmtHours(r.planned) + "</td></tr>").join("") +
     "</tbody></table></details></figure>";
 }
 
@@ -293,17 +289,17 @@ function weeksHTML() {
 function projectsHTML(c, s) {
   const rows = S.projectRows(c, s.from, s.last);
   if (!rows.length) return "";
-  return '<section class="card wide"><h3>Projects</h3><p class="lede">Planned = all items; done = how much of the plan is finished; spent = the real time it took.</p>' +
-    '<div class="table-wrap"><table class="ptable"><thead><tr><th>Plan</th><th>Planned</th><th>Done</th><th>Spent</th><th>This period</th><th>Health</th></tr></thead><tbody>' +
+  const times = (r) => (r.n ? r.done + " / " + r.n : r.done ? String(r.done) : "—");
+  return '<section class="card wide"><h3>Plans</h3><p class="lede">Done = times ticked off in each plan\'s pool (out of how many it holds); spent = the time logged on it, all of it and in this period.</p>' +
+    '<div class="table-wrap"><table class="ptable"><thead><tr><th>Plan</th><th>Done</th><th>Spent</th><th>This period</th></tr></thead><tbody>' +
     groupsOf(rows.map((r) => r.p)).map((g) => {
       const rs = g.subs.map((p) => rows.find((r) => r.p === p));
       const sum = (k) => rs.reduce((a, r) => a + r[k], 0);
       const head = g.name && rs.length > 1
-        ? '<tr class="grow"><td>' + esc(g.name) + '</td><td class="num">' + fmtHours(sum("planned")) + '</td><td class="num">' + fmtHours(sum("done")) + '</td><td class="num">' + fmtHours(sum("spent")) + '</td><td class="num">' + fmtHours(sum("spentHere")) + "</td><td></td></tr>"
+        ? '<tr class="grow"><td>' + esc(g.name) + '</td><td class="num"></td><td class="num">' + fmtHours(sum("spent")) + '</td><td class="num">' + fmtHours(sum("spentHere")) + "</td></tr>"
         : "";
-      return head + rs.map((r) => '<tr' + (head ? ' class="nested"' : "") + '><td><span class="pdot" style="background:' + esc(r.p.color) + '"></span>' + (g.name && !head ? '<small class="gname">' + esc(g.name) + " · </small>" : "") + esc(r.p.name) + '</td><td class="num">' + fmtHours(r.planned) + '</td><td class="num">' + fmtHours(r.done) +
-        (r.planned ? " <small>" + pct(r.done / r.planned) + "</small>" : "") + '</td><td class="num">' + fmtHours(r.spent) +
-        (r.done > 0 && r.spent > 0 ? " <small>" + (r.spent / r.done).toFixed(2) + "×</small>" : "") + '</td><td class="num">' + fmtHours(r.spentHere) + "</td><td>" + (r.p.kind === "regular" ? '<span class="health h-regular">↻ Regular</span>' : healthPill(r.health)) + "</td></tr>").join("");
+      return head + rs.map((r) => '<tr' + (head ? ' class="nested"' : "") + '><td><span class="pdot" style="background:' + esc(r.p.color) + '"></span>' + (g.name && !head ? '<small class="gname">' + esc(g.name) + " · </small>" : "") + esc(r.p.name) +
+        '</td><td class="num">' + times(r) + '</td><td class="num">' + fmtHours(r.spent) + '</td><td class="num">' + fmtHours(r.spentHere) + "</td></tr>").join("");
     }).join("") +
     "</tbody></table></div></section>";
 }
@@ -476,7 +472,7 @@ export function statsHTML(c) {
   const prev = S.summarize(sc.c, p.from, p.to, { by: sc.by });
   let body;
   if (tab === "plan") {
-    body = planKpis(s, prev, sc.on) + trendHTML(s, sc.on) +
+    body = planKpis(s, prev) + trendHTML(s) +
       '<div class="stat-grid">' + projectHTML(s) + reasonsHTML(s) + "</div>" + projectsHTML(sc.c, s);
   } else {
     // 筛选之外记下来的时间：饼图里合成「Everything else」一片

@@ -18,7 +18,7 @@ test("period ranges and the one before", () => {
   assert.equal(S.shiftAnchor("month", "2026-01-31", 1), "2026-02-01");
 });
 
-test("summary: time, completion, line held, accuracy, projects, reasons", () => {
+test("summary: time, completion, accuracy, projects, reasons", () => {
   const t = (id, date, est, status, extra = {}) => ({ id, date, est, status, ...extra });
   const c = ctx({
     projects: [{ id: "p", name: "Module #4", group: "Main - French", color: "#f0f" }],
@@ -37,8 +37,6 @@ test("summary: time, completion, line held, accuracy, projects, reasons", () => 
   assert.equal(s.spent, 85);
   assert.equal(s.done, 1);
   assert.equal(s.counted, 4, "an optional task that wasn't done doesn't count");
-  assert.equal(s.held, 1);
-  assert.equal(s.lineDays, 2);
   assert.equal(s.accuracy, 1.25);
   assert.equal(s.active, 1);
   assert.deepEqual(s.status, { delay: 2, drop: 1 });

@@ -9,11 +9,9 @@
 //   - task:    {id, date, title, est, actual, status, projectId, itemId, optional}
 //              status: "" 待做 / done / delay / drop。状态只管「做完没有」：日历怎么画、完成率、Delay / Drop 的分析；
 //              花了多少时间只看记下的（actual = Times 加起来），和状态无关
-//   - log:     {date: {need, projects: {projectId: 分钟}}}   每天第一次打开时拍的安全线快照
 //
-// 计算链：任务完成 → 条目进度 → 项目剩余 → 按可用天数摊成每日需求（多个项目一起平摊）
-//        → 早上冻结成「今日安全线」→ 第二天对账（拖延账单）→ 真实速度 → 健康度
-// 规律计划不进这条链（没有总量），只占掉那天的一部分容量。
+// 今天的线、昨天的账、顺延这一套（照日有回响做的）2026-10-25 拿掉了：计划改成 Pool 里一项项拖（js/lists.js）。
+// 这里剩下的：单个任务的分钟、索引、每天的可用时间、日历格子的汇总和预览、规律计划这一周。
 
 import { addDays, diffDays, weekday, range, fmtShort, startOfWeek } from "./dates.js";
 import { ruleOf, dueOn, inRange } from "./routines.js";
@@ -22,7 +20,6 @@ export const CHUNK = 15;            // 多项目平摊时一块 15 分钟
 export const PACE_WINDOW = 14;      // 真实速度看最近两周
 export const MIN_PACE_RECORDS = 3;  // 至少 3 次完成才预测完成日
 export const MIN_KIND_SAMPLES = 2;  // 同一模块至少 2 个样本才建议改估时
-const NEAR = 5;                     // 差 5 分钟以内算持平
 
 const num = (v) => Number(v) || 0;
 const sum = (list, f) => list.reduce((a, x) => a + f(x), 0);
@@ -196,114 +193,6 @@ export function needOn(ctx, p, d) {
   return plan.dailyNeed;
 }
 
-export function lineOn(ctx, d) {
-  return sum(ctx.projects, (p) => needOn(ctx, p, d));
-}
-
-// 未来 n 天每天的项目需求，给「负载预览」用
-export function forecast(ctx, n = 14) {
-  return range(ctx.today, addDays(ctx.today, n - 1)).map((d) => {
-    const parts = ctx.projects.map((p) => ({ id: p.id, min: needOn(ctx, p, d) })).filter((x) => x.min > 0.5);
-    const total = sum(parts, (x) => x.min), cap = capacityFor(ctx.capacity, d);
-    return { date: d, parts, total, cap, rest: !isWorkDay(ctx.capacity, d), over: cap > 0 && total > cap + 1 };
-  });
-}
-
-// ---------- 今日安全线（早上冻结） ----------
-// 第一次打开时把每个项目今天该做多少记下来，白天做完任务目标线也不会跟着降。
-// 今天新建的项目，第一次有了非 0 的份额也补进快照里。
-
-export function morningShares(ctx) {
-  const out = {};
-  for (const p of ctx.projects) out[p.id] = Math.round(needOn(ctx, p, ctx.today));
-  return out;
-}
-
-export function todayLine(ctx) {
-  const entry = ctx.log?.[ctx.today];
-  if (!entry) {
-    const shares = morningShares(ctx);
-    return { line: sum(Object.values(shares), num), shares, fresh: true, added: false };
-  }
-  const shares = { ...(entry.projects || {}) };
-  let added = false;
-  for (const p of ctx.projects) {
-    if (Object.prototype.hasOwnProperty.call(shares, p.id)) continue;
-    const need = Math.round(needOn(ctx, p, ctx.today));
-    if (need > 0) { shares[p.id] = need; added = true; }
-  }
-  const line = sum(ctx.projects, (p) => num(shares[p.id]));
-  return { line, shares, fresh: false, added };
-}
-
-// 某天在整块计划上实际花了多少（规律的不算进安全线）
-export function doneOn(ctx, d) {
-  return sum(tasksOn(ctx, d).filter((t) => t.projectId && !isRegular(projectById(ctx, t.projectId))), spentMin);
-}
-
-// ---------- 拖延账单 / 连续稳妥 ----------
-// 昨天的快照和昨天实际做的比：每个项目单独算差额，摊到这个项目自己剩下的天里。
-
-export function yesterdayBill(ctx) {
-  const y = addDays(ctx.today, -1);
-  const entry = ctx.log?.[y];
-  if (!entry || !(num(entry.need) > 0)) return null;
-  const need = num(entry.need), done = doneOn(ctx, y), gap = done - need;
-  if (Math.abs(gap) < NEAR) return { kind: "met", need, done };
-  const parts = [];
-  for (const [pid, planned] of Object.entries(entry.projects || {})) {
-    const p = projectById(ctx, pid);
-    if (!p) continue;
-    const doneHere = sum(tasksOn(ctx, y).filter((t) => t.projectId === pid), spentMin);
-    const diff = doneHere - num(planned);
-    if (Math.abs(diff) < NEAR) continue;
-    const plan = projectPlan(ctx, p);
-    const days = plan.deadline && !plan.overdue && plan.remaining > 0.5 ? plan.days.length : 0;
-    if (!days) continue;
-    parts.push({ project: p, diff, days, perDay: -diff / days });
-  }
-  if (!parts.length) return gap >= NEAR ? { kind: "met", need, done } : null;
-  const net = sum(parts, (x) => x.diff);
-  const days = Math.max(...parts.map((x) => x.days));
-  const perDay = sum(parts, (x) => x.perDay);
-  if (net >= NEAR) return { kind: "ahead", need, done, extra: net, lessPerDay: -perDay, days, parts: parts.sort((a, b) => b.diff - a.diff) };
-  if (net > -NEAR) return { kind: "met", need, done };
-  return { kind: done > 0.5 ? "short" : "rest", need, done, short: -net, extraPerDay: perDay, days, parts: parts.sort((a, b) => a.diff - b.diff) };
-}
-
-// 今天已经超过早上的线：多出来的让之后每天轻多少
-export function todayAhead(ctx) {
-  const entry = ctx.log?.[ctx.today];
-  if (!entry || !(num(entry.need) > 0)) return null;
-  const extra = doneOn(ctx, ctx.today) - num(entry.need);
-  if (extra < NEAR) return null;
-  const tomorrow = addDays(ctx.today, 1);
-  let days = 0;
-  for (const pid of Object.keys(entry.projects || {})) {
-    const p = projectById(ctx, pid);
-    if (!p) continue;
-    const plan = projectPlan(ctx, p, tomorrow);
-    if (plan.deadline && !plan.overdue && plan.remaining > 0.5) days = Math.max(days, plan.days.length);
-  }
-  return days ? { extra, days, lessPerDay: extra / days } : null;
-}
-
-// 连续达标的天数：到昨天为止往回数，今天达标了也算上；那天不需要做项目的不打断
-export function streak(ctx) {
-  const log = ctx.log || {};
-  let n = 0;
-  const today = log[ctx.today];
-  if (today && num(today.need) > 0 && doneOn(ctx, ctx.today) >= num(today.need) - 1) n += 1;
-  for (let k = 1; k <= 366; k += 1) {
-    const d = addDays(ctx.today, -k), e = log[d];
-    if (!e) break;
-    if (!(num(e.need) > 0)) continue;
-    if (doneOn(ctx, d) >= num(e.need) - 1) n += 1;
-    else break;
-  }
-  return n;
-}
-
 // ---------- 按模块校准估时 ----------
 // 同一模块里做完的任务填了实际时间，就能算出「实际 ÷ 预计」。样本够了、差得多了，
 // 建议把这个模块还没开始的条目按这个比例改估时；用户点了才改，点「保持」就等下一个样本再问。
@@ -408,39 +297,6 @@ export function health(ctx, p) {
   return out("danger", "Too much · " + need);
 }
 
-// ---------- 过期没做的任务：一键顺延（重复任务不算） ----------
-// 每件挪到「最空、又不超过它项目目标日」的那天，越早越好；目标日早的先排。只返回计划，不改数据。
-
-export function planOverdue(ctx) {
-  const cap = ctx.capacity;
-  const overdue = ctx.tasks.filter((t) => isOpen(t) && t.date && t.date < ctx.today && !isAutoTask(t));
-  const load = {};
-  for (const t of ctx.tasks) if (isOpen(t) && t.date >= ctx.today) load[t.date] = (load[t.date] || 0) + num(t.est);
-  const limitOf = (t) => {
-    const p = t.projectId ? projectById(ctx, t.projectId) : null;
-    if (p && p.deadline && isActive(p)) {
-      const pf = addDays(p.deadline, -earlyDays(p));
-      return pf >= ctx.today ? pf : p.deadline >= ctx.today ? p.deadline : ctx.today;
-    }
-    return addDays(ctx.today, 6);
-  };
-  const order = overdue.map((t) => ({ t, limit: limitOf(t) }))
-    .sort((a, b) => a.limit.localeCompare(b.limit) || a.t.date.localeCompare(b.t.date));
-  const moves = [];
-  for (const { t, limit } of order) {
-    const est = num(t.est);
-    let best = ctx.today, bestScore = -Infinity;
-    for (const d of range(ctx.today, limit)) {
-      if (!isWorkDay(cap, d)) continue;
-      const score = capacityFor(cap, d) - (load[d] || 0) - est - diffDays(ctx.today, d) * 10;
-      if (score > bestScore) { bestScore = score; best = d; }
-    }
-    load[best] = (load[best] || 0) + est;
-    moves.push({ id: t.id, from: t.date, to: best });
-  }
-  return moves;
-}
-
 // ---------- 日历格子用的汇总 ----------
 
 export function daySummary(ctx, d) {
@@ -458,41 +314,14 @@ export function poolItems(ctx) {
 
 // ---------- 自动排：今天落成任务、以后画预览 ----------
 
-const round5u = (v) => Math.round(v / 5) * 5;
-// 整块计划（Auto）今天的份额拆成任务：按条目顺序，一条一段，ID = au:<条目>:<日期>。
-// shares = 今天早上的快照；pids = 要排的计划；那天已经手动排了的先扣掉
-export function autoChunks(ctx, shares, pids) {
-  const out = [];
-  for (const p of ctx.projects) {
-    if (!pids.includes(p.id) || !isActive(p) || isRegular(p) || !isAuto(p)) continue;
-    const today = tasksOn(ctx, ctx.today).filter((t) => t.projectId === p.id);
-    if (today.some((t) => String(t.id).startsWith("au:"))) continue;
-    let need = round5u(num(shares[p.id]) - sum(today.filter(isPlanned), (t) => num(t.est)));
-    for (const item of itemsOf(ctx, p.id)) {
-      if (need < 5) break;
-      const left = itemState(ctx, item).unscheduled;
-      if (left < 5) continue;
-      const est = Math.min(need, Math.round(left));
-      out.push({ id: "au:" + item.id + ":" + ctx.today, date: ctx.today, title: item.title, est, projectId: p.id, itemId: item.id, deep: Boolean(p.rule?.deep) });
-      need -= est;
-    }
-  }
-  return out;
-}
-
-// 以后某天（不含今天）的预览：规律计划那天的那一次（还没落成的）、整块计划预计的份额
+// 以后某天（不含今天）的预览：固定星期几的计划那天的那一次（还没落成的）
 export function ghostsOn(ctx, d) {
   if (d <= ctx.today) return [];
   const out = [];
   for (const p of ctx.projects) {
-    if (!isActive(p) || !isAuto(p)) continue;
-    if (isRegular(p)) {
-      const id = "rt:" + p.id + ":" + d, est = dueOn(ruleOf(p), d);
-      if (est && !hasTask(ctx, id)) out.push({ key: id, kind: "regular", plan: p, title: p.name, est, date: d });
-    } else {
-      const left = needOn(ctx, p, d) - sum(tasksOn(ctx, d).filter((t) => t.projectId === p.id && isOpen(t)), (t) => num(t.est));
-      if (left >= 5) out.push({ key: "au:" + p.id + ":" + d, kind: "total", plan: p, title: p.name, est: round5u(left), date: d });
-    }
+    if (!isActive(p) || !isAuto(p) || !isRegular(p)) continue;
+    const id = "rt:" + p.id + ":" + d, est = dueOn(ruleOf(p), d);
+    if (est && !hasTask(ctx, id)) out.push({ key: id, kind: "regular", plan: p, title: p.name, est, date: d });
   }
   return out;
 }

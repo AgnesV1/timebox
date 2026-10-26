@@ -105,7 +105,6 @@ test("project plan: buffer in use, overdue, not started, no deadline", () => {
   assert.equal(E.needOn(c, c.projects[0], TODAY), 0);
   c = ctx({ projects: [{ id: "p1" }], items });
   assert.equal(E.projectPlan(c, c.projects[0]).noDeadline, true);
-  assert.equal(E.lineOn(c, TODAY), 0);
 });
 
 test("levelling: keeps totals, stays inside each window, evens the load", () => {
@@ -118,62 +117,9 @@ test("levelling: keeps totals, stays inside each window, evens the load", () => 
   assert.equal(total(plans.a), 480);
   assert.equal(total(plans.b), 600);
   assert.ok(Object.keys(plans.a).every((d) => d <= "2026-10-08"));
-  const days = D.range(TODAY, "2026-10-14").map((d) => E.lineOn(c, d));
+  const days = D.range(TODAY, "2026-10-14").map((d) => c.projects.reduce((a, p) => a + E.needOn(c, p, d), 0));
   assert.ok(Math.max(...days) - Math.min(...days) <= 30, "daily totals within 30 min: " + days.join(","));
   assert.equal(Math.round(days.reduce((x, y) => x + y, 0)), 1080);
-});
-
-test("today's line is frozen in the morning; new projects add their share", () => {
-  const projects = [{ id: "p1", deadline: "2026-10-09" }];
-  const items = [{ id: "i1", projectId: "p1", est: 300 }];
-  let c = ctx({ projects, items });
-  const first = E.todayLine(c);
-  assert.equal(first.fresh, true);
-  assert.equal(first.line, 60);
-  const log = { [TODAY]: { need: first.line, projects: first.shares } };
-  c = ctx({ projects, items, log, tasks: [{ id: "t", date: TODAY, est: 60, status: "done", projectId: "p1", itemId: "i1" }] });
-  assert.equal(E.todayLine(c).line, 60, "finishing work does not lower today's line");
-  c = ctx({ projects: [...projects, { id: "p2", deadline: "2026-10-06" }], items: [...items, { id: "i2", projectId: "p2", est: 100 }], log });
-  const t = E.todayLine(c);
-  assert.equal(t.added, true);
-  assert.ok(t.line > 60);
-});
-
-test("yesterday's bill: short, ahead, rest, met", () => {
-  const y = "2026-10-04";
-  const base = {
-    capacity: { default: 240 },
-    projects: [{ id: "p1", deadline: "2026-10-14" }],
-    items: [{ id: "i1", projectId: "p1", est: 1000 }],
-    log: { [y]: { need: 100, projects: { p1: 100 } } }
-  };
-  const done = (min, actual = min) => [{ id: "t", date: y, est: min, status: "done", actual, projectId: "p1", itemId: "i1" }];   // 只看记下的时间
-  let b = E.yesterdayBill(ctx({ ...base, tasks: done(40) }));
-  assert.equal(b.kind, "short");
-  assert.equal(b.short, 60);
-  assert.equal(b.days, 10);
-  assert.equal(Math.round(b.extraPerDay), 6);
-  b = E.yesterdayBill(ctx({ ...base, tasks: done(100, 150) }));
-  assert.equal(b.kind, "ahead");
-  assert.equal(b.extra, 50);
-  b = E.yesterdayBill(ctx({ ...base, tasks: [] }));
-  assert.equal(b.kind, "rest");
-  b = E.yesterdayBill(ctx({ ...base, tasks: done(100, 102) }));
-  assert.equal(b.kind, "met");
-  assert.equal(E.yesterdayBill(ctx({ ...base, log: {} })), null);
-});
-
-test("streak counts met days and skips days with nothing due", () => {
-  const p = [{ id: "p1", deadline: "2026-12-01" }];
-  const log = {
-    "2026-10-01": { need: 60, projects: { p1: 60 } },
-    "2026-10-02": { need: 60, projects: { p1: 60 } },
-    "2026-10-03": { need: 0, projects: { p1: 0 } },
-    "2026-10-04": { need: 60, projects: { p1: 60 } }
-  };
-  const t = (d, est) => ({ id: d, date: d, est, actual: est, status: "done", projectId: "p1" });
-  const c = ctx({ projects: p, log, tasks: [t("2026-10-01", 20), t("2026-10-02", 60), t("2026-10-04", 70)] });
-  assert.equal(E.streak(c), 2);
 });
 
 test("module calibration suggests new estimates after two slow samples", () => {
@@ -212,19 +158,3 @@ test("pace, projected finish and health", () => {
   assert.equal(E.health(ctx({ projects: [{ id: "p1" }], items }), { id: "p1" }).level, "open");
 });
 
-test("overdue spread never passes the project's planned finish", () => {
-  const c = ctx({
-    capacity: { default: 120 },
-    projects: [{ id: "p1", deadline: "2026-10-08", early: 1 }],
-    tasks: [
-      { id: "x", date: "2026-10-02", est: 60, status: "", projectId: "p1" },
-      { id: "y", date: "2026-10-03", est: 60, status: "" },
-      { id: "z", date: TODAY, est: 100, status: "" }
-    ]
-  });
-  const moves = E.planOverdue(c);
-  const mx = moves.find((m) => m.id === "x");
-  assert.ok(mx.to >= TODAY && mx.to <= "2026-10-07");
-  assert.notEqual(mx.to, TODAY, "today is already full");
-  assert.equal(moves.length, 2);
-});

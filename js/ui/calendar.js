@@ -1,15 +1,18 @@
-// 日历（电脑）：周视图 / 月视图，右边是任务池。
-// 把任务池里的条目拖到某天就排进去；日历里的任务拖到别的天就挪过去，拖回任务池就撤回。
-// 自动排的计划在以后的日子里画成淡色预览：规律的那一次可以拖走 / 点开（这时才变成真任务），整块的预计份额只看。
-// 格子里的日程永远全部显示（名字完整换行）；格子有最小宽度，放不下就左右滑。格子顶上的小开关标「通勤日」。
+// 日历（电脑）：周视图 / 月视图，右边是 Pool。
+// 把 Pool 里的一项拖到某天 = 那天这个计划下面多一条；计划名本身拖过去 = 那天这个计划空的一行（Swimming 这种）。
+// 一个计划那天是一张便利贴（她 2026-10-25 挑的乙）：计划名 + 那天的几项小字接着排，鼠标停上去展开成一行一项（每一项能单独拖到别的天）；
+// 整张拖到别的天 = 那天还没勾的几项一起挪，拖回 Pool = 回去；点它 = 到今天页的那一天。别的任务照旧一张一张，拖到别的天就挪过去，拖回 Pool 就撤回。
+// 固定星期几的计划在以后的日子里画成淡色预览：可以拖走 / 点开（这时才变成真任务）。
+// 格子里的日程永远全部显示（不折叠）；月视图只画这个月占到的那几周，便利贴排得紧一点，尽量一屏看完。格子有最小宽度，放不下就左右滑。格子顶上的小开关标「通勤日」。
 // 上班那一层（js/offdays.js）：发薪日日期后面一个小 $；请假、公众假日日期旁边一个很小的 💤（工作日鼠标移上来能点）；
 // 点顶上那条进度条 = 超级休息日，整条变金色。都只是标记，不改可用时间、不影响排计划。
 // 点日期 = 到今天页的那一天；从打分开始日起、过完了还没打满分的日子，日期旁边一个红点（js/scores.js）。
 
 import * as store from "../store.js";
 import * as E from "../engine.js";
+import * as L from "../lists.js";
 import { esc, on, icon } from "../dom.js";
-import { addDays, addMonths, startOfWeek, startOfMonth, range, fmtShort, fmtMin, fmtHours, WEEKDAYS, MONTHS, MONTHS_LONG, weekday } from "../dates.js";
+import { addDays, addMonths, diffDays, startOfWeek, startOfMonth, daysInMonth, range, fmtShort, fmtHours, WEEKDAYS, MONTHS_LONG, weekday } from "../dates.js";
 import * as SC from "../scores.js";
 import { isPayday } from "../offdays.js";
 import { colorOf, badgeOf, projectOptions, groupsOf, toast } from "./common.js";
@@ -31,10 +34,20 @@ function chipHTML(t) {
 }
 
 function ghostHTML(g) {
-  const reg = g.kind === "regular";
-  return '<div class="ev ghost' + (reg ? "" : " proj") + '"' + (reg ? ' data-drag="ghost:' + esc(g.key) + '" data-act="open-ghost" data-key="' + esc(g.key) + '"' : "") +
-    ' style="--c:' + esc(g.plan.color) + '" title="' + esc(g.title + (reg ? " · repeats" : " · projected share")) + '">' +
-    '<span class="t">' + (reg ? '<i class="rt">↻</i>' : "") + esc(g.title) + '</span><span class="m num">' + g.est + "</span></div>";
+  return '<div class="ev ghost" data-drag="ghost:' + esc(g.key) + '" data-act="open-ghost" data-key="' + esc(g.key) + '" style="--c:' + esc(g.plan.color) + '" title="' + esc(g.title + " · repeats") + '">' +
+    '<span class="t"><i class="rt">↻</i>' + esc(g.title) + '</span><span class="m num">' + g.est + "</span></div>";
+}
+
+// 一个计划那天的那一张：计划名，后面是那天的几项（做了的划掉）；停上去展开成一行一项，每一项能单独拖走
+function blockHTML(b, d) {
+  const plan = b.plan, lines = b.lines.slice().sort((x, y) => (Number(x.order) || 0) - (Number(y.order) || 0));
+  const li = (t, drag) => '<span class="li' + (t.status === "done" || t.status === "delay" ? " dn" : t.status === "drop" ? " dp" : "") + '"' + (drag ? ' data-drag="task:' + t.id + '"' : "") + ">" + esc(t.title) + "</span>";
+  const spent = b.row ? E.spentMin(b.row) : 0;
+  const allDone = lines.length > 0 && lines.every((t) => t.status === "done");
+  return '<div class="ev blk' + (allDone ? " st-done" : "") + '" data-drag="blk:' + esc(plan.id) + "|" + d + '" data-act="open-day" data-date="' + d + '" style="--c:' + esc(plan.color || "var(--c-None)") + '" title="' +
+    esc(plan.name + (lines.length ? " · " + lines.length + " thing" + (lines.length > 1 ? "s" : "") : "") + (spent ? " · " + fmtHours(spent) + " logged" : "")) + '">' +
+    '<span class="t"><span class="bt">' + esc(plan.name) + "</span>" + lines.map((t) => li(t, false)).join("") + "</span>" +
+    (lines.length ? '<div class="full"><span class="bt">' + esc(plan.name) + "</span>" + lines.map((t) => li(t, !t.status)).join("") + "</div>" : "") + "</div>";
 }
 
 function cellHTML(c, d, { month = false, outside = false, scores = null, still = false } = {}) {
@@ -45,7 +58,7 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
   const capOver = c.capacity.overrides[d] !== undefined;
   const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d);
   const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
-  const all = [...tasks.map(chipHTML), ...ghosts.map(ghostHTML)];
+  const all = [...L.dayBlocks(c, tasks).map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d))), ...ghosts.map(ghostHTML)];
   const loadPct = sum.cap ? Math.min(100, (sum.planned / sum.cap) * 100) : 0;
   let h = '<div class="' + cls + '" data-drop="day:' + d + '">' +
     '<div class="cell-head"><span class="dn-w"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"' + (unscored ? ' title="Not scored yet"' : "") + "><span>" + (month ? "" : WEEKDAYS[wd]) + "</span><b>" + Number(d.slice(8)) + "</b>" + (isPayday(d) ? '<span class="payday" title="Payday">$</span>' : "") + (unscored ? '<i class="dsc-dot" aria-label="Not scored yet"></i>' : "") + "</button>" +
@@ -78,10 +91,12 @@ export function calendarHTML(c) {
   } else {
     const m0 = startOfMonth(anchor);
     const s = startOfWeek(m0, weekStart());
+    // 只画这个月占到的那几周（多半是 5 周），不再固定画 6 周
+    const weeks = Math.ceil((diffDays(s, addDays(m0, daysInMonth(m0) - 1)) + 1) / 7);
     title = MONTHS_LONG[Number(m0.slice(5, 7)) - 1] + " " + m0.slice(0, 4);
     const heads = range(s, addDays(s, 6)).map((d) => "<span>" + WEEKDAYS[weekday(d)] + "</span>").join("");
     body = '<div class="cal-scroll"><div class="month-head">' + heads + '</div><div class="month">' +
-      range(s, addDays(s, 41)).map((d) => cellHTML(c, d, { month: true, outside: d.slice(0, 7) !== m0.slice(0, 7), scores, still })).join("") + "</div></div>";
+      range(s, addDays(s, weeks * 7 - 1)).map((d) => cellHTML(c, d, { month: true, outside: d.slice(0, 7) !== m0.slice(0, 7), scores, still })).join("") + "</div></div>";
   }
   return '<div class="calendar">' +
     '<header class="page-head"><div><h2>' + title + "</h2></div>" +
@@ -92,43 +107,36 @@ export function calendarHTML(c) {
     body + "</div>";
 }
 
-// ---------- 任务池 ----------
-
+// ---------- Pool ----------
+// 每个在用的计划一组：计划名本身能拖（= 那天这个计划空的一行；Pool 里没东西的计划就靠它），下面按分区列还能拖的项：
+// 大概多久 · 还剩几次 · 这周排了几次 / 每周大概几次；勾了一半回了 Pool 的那次写着剩几步，拖它就接着做。
+// 点一下或 Tab 过来按回车 = 挑哪天（js/ui/dnd.js 的菜单）。最上面一格加东西进某个计划的 Pool（一行一条，和粘贴同一套写法）
 export function poolHTML(c) {
-  const projects = c.projects.filter((p) => E.isActive(p) && !E.isRegular(p));   // 条目只挂在整块计划上
-  const list = E.poolItems(c);
-  const regs = E.poolRegulars(c);
-  const subs = projects.map((p) => ({ p, items: list.filter((x) => x.item.projectId === p.id) })).filter((g) => g.items.length);
-  const total = list.reduce((a, x) => a + x.state.unscheduled, 0);
-  let h = '<div class="pool-inner" data-drop="pool"><header class="pool-head"><div><h3>Pool</h3><p>' + (list.length ? list.length + " items · " + fmtHours(total) + " to place" : "Drag onto a day to plan it") + '</p></div>' +
+  const groups = L.pool(c);
+  const left = groups.reduce((a, g) => a + g.items.reduce((b, x) => b + (Number.isFinite(x.count.left) ? x.count.left : 0), 0), 0);
+  let h = '<div class="pool-inner" data-drop="pool"><header class="pool-head"><div><h3>Pool</h3><p>' +
+    (groups.length ? groups.length + " plan" + (groups.length > 1 ? "s" : "") + (left ? " · " + left + " to place" : "") : "Plans and their pools land here") + "</p></div>" +
     '<button type="button" class="icon-btn" data-act="pool-toggle" aria-label="Hide pool">' + icon("close") + "</button></header>";
-  if (projects.length) {
-    h += '<form class="pool-add" autocomplete="off"><select name="project" aria-label="Plan">' + projectOptions(projects, "", null, false) + "</select>" +
-      '<div class="row2"><input name="title" data-keep="pool-add" placeholder="New item"><input name="est" class="num" type="number" value="45" min="5" step="5" aria-label="Minutes"><button class="btn cta" type="submit">' + icon("plus") + "</button></div></form>";
-  }
-  if (!projects.length) h += '<p class="empty">Make a plan first — its items land here.</p><a class="btn" href="#projects">Projects</a>';
-  else if (!subs.length && !regs.length) h += '<p class="empty">Everything is on the calendar ✓</p>';
-  // 规律计划（Pool）：这周还剩几次，拖一次排一次
-  if (regs.length) {
-    h += '<section class="pg"><div class="pg-head"><i></i><span>This week</span></div>' + regs.map((x) =>
-      '<div class="pi" data-drag="regular:' + x.plan.id + '" role="button" tabindex="0" aria-haspopup="listbox" style="--c:' + esc(x.plan.color) + '"><i class="g"></i><span>↻ ' + esc(x.plan.name) + '</span><b class="num">' + x.min + "m · " + x.left + " left</b></div>").join("") + "</section>";
-  }
-  // 项目 → 子项目 → 模块
+  if (!groups.length) return h + '<p class="empty">Make a plan first.</p><a class="btn" href="#projects">Projects</a>' + ideasPoolHTML(c) + "</div>";
+  h += '<form class="pool-add" autocomplete="off"><select name="project" aria-label="Plan">' + projectOptions(groups.map((g) => g.plan), "", null, false) + "</select>" +
+    '<div class="row2"><input name="title" data-keep="pool-add" placeholder="L5 shadowing · 20min · ×18" aria-label="Add to the pool"><button class="btn cta" type="submit" aria-label="Add to the pool">' + icon("plus") + "</button></div></form>";
   let lastGroup = null;
-  groupsOf(subs.map((x) => x.p)).forEach((g) => g.subs.forEach((p) => {
-    const { items } = subs.find((x) => x.p === p);
-    if (g.name !== lastGroup) { lastGroup = g.name; if (g.name) h += '<div class="pg-group">' + esc(g.name) + "</div>"; }
-    h += '<section class="pg"><div class="pg-head" style="--pc:' + esc(p.color) + '"><i></i><span>' + esc(p.name) + "</span><em>" + fmtHours(items.reduce((a, x) => a + x.state.unscheduled, 0)) + "</em></div>";
+  groupsOf(groups.map((g) => g.plan)).forEach((pg) => pg.subs.forEach((p) => {
+    const { items } = groups.find((g) => g.plan === p);
+    if (pg.name !== lastGroup) { lastGroup = pg.name; if (pg.name) h += '<div class="pg-group">' + esc(pg.name) + "</div>"; }
+    const min = items.reduce((a, x) => a + (Number(x.item.est) || 0) * (Number.isFinite(x.count.left) ? x.count.left : 0), 0);
+    h += '<section class="pg"><div class="pg-head pg-plan" data-drag="plan:' + esc(p.id) + '" role="button" tabindex="0" aria-haspopup="listbox" title="Drag onto a day: ' + esc(p.name) + ' that day" style="--pc:' + esc(p.color) + '"><i></i><span>' + esc(p.name) + "</span><em>" + (items.length ? (min ? fmtHours(min) : items.length + " left") : "any day") + "</em></div>";
     let mod = null;
-    items.forEach(({ item, state }) => {
-      if ((item.module || "") !== mod) { mod = item.module || ""; if (mod) h += '<div class="pg-mod">' + esc(mod) + "</div>"; }
-      const part = state.progress > 0 || state.scheduled > 0;
-      h += '<div class="pi" data-drag="item:' + item.id + '" role="button" tabindex="0" aria-haspopup="listbox" style="--c:' + esc(p.color) + '"><i class="g"></i><span>' + esc(item.title) + '</span><b class="num">' + fmtMin(state.unscheduled) + (part ? " left" : "") + "</b></div>";
-    });
+    for (const x of items) {
+      if ((x.item.module || "") !== mod) { mod = x.item.module || ""; if (mod) h += '<div class="pg-mod">' + esc(mod) + "</div>"; }
+      const carry = x.count.carry[0];
+      const label = carry ? L.titleFor(x.item, x.cfg, carry.k) + " · " + carry.steps.length + " step" + (carry.steps.length > 1 ? "s" : "") + " left" : x.item.title;
+      const meta = [L.sizeOf(x.item.est), x.cfg.n > 1 ? x.count.left + " left" : x.cfg.n === 0 ? "any" : "", x.cfg.perWeek ? "wk " + x.week.placed + "/" + x.cfg.perWeek : ""].filter(Boolean).join(" · ");
+      h += '<div class="pi" data-drag="item:' + esc(x.item.id) + '" role="button" tabindex="0" aria-haspopup="listbox" style="--c:' + esc(p.color) + '" title="' + esc(x.cfg.note || "") + '"><i class="g"></i><span>' + esc(label) + '</span><b class="num">' + esc(meta) + "</b></div>";
+    }
     h += "</section>";
   }));
-  h += ideasPoolHTML(c) + '<p class="pool-hint">Drag items onto a day, or click one to pick the day. Drag a task back here to unschedule it (or open it: Back to the pool).</p></div>';
-  return h;
+  return h + ideasPoolHTML(c) + '<p class="pool-hint">Drag an item onto a day, or click it to pick the day; it joins that plan\'s row there. Drag a plan\'s name for just its row. Drag something back here to put it back.</p></div>';
 }
 
 // ---------- 交互 ----------
@@ -196,8 +204,8 @@ export function initCalendar(rerender) {
     e.preventDefault();
     const f = new FormData(form);
     const title = String(f.get("title") || "").trim();
-    if (!title) return;
-    store.addItems(String(f.get("project")), "", [title], Number(f.get("est")) || 45);
+    if (!title || !f.get("project")) return;
+    store.addPoolLines(String(f.get("project")), "", title);
     form.querySelector("[name=title]").value = "";
   });
 }
@@ -205,13 +213,16 @@ export function initCalendar(rerender) {
 export function handleDrop(payload, target) {
   const i = payload.indexOf(":");
   const kind = payload.slice(0, i), id = payload.slice(i + 1);   // 重复任务的 id 里也有冒号
+  const [planId, from] = kind === "blk" ? id.split("|") : [];
   if (target === "pool") {
-    if (kind === "task" && !store.unschedule(id)) toast("Only unstarted tasks that came from the pool can go back");
+    if (kind === "blk") store.blockToPool(planId, from);
+    else if (kind === "task" && !store.unschedule(id)) toast("Only things from a plan's pool can go back");
     return;
   }
   const date = target.slice(4);
-  if (kind === "task") store.moveTask(id, date);
-  else if (kind === "item") store.scheduleItem(id, date);
-  else if (kind === "regular") store.placeRegular(id, date);
+  if (kind === "task") { const t = store.get("tasks", id); if (t && L.isLine(t)) store.moveLine(id, date); else store.moveTask(id, date); }
+  else if (kind === "blk") store.moveBlock(planId, from, date);
+  else if (kind === "item") { if (!store.placeItem(id, date)) toast("Nothing of that left in the pool"); }
+  else if (kind === "plan" || kind === "regular") store.ensureRow(id, date);
   else if (kind === "ghost") { const tid = store.materialize(id); if (tid) store.moveTask(tid, date); }
 }

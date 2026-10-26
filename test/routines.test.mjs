@@ -56,7 +56,7 @@ test("previews: fixed days only, never today or the past, none once it's real", 
   assert.deepEqual(E.ghostsOn(c2, "2026-10-07"), [], "moved to Friday: Wednesday's preview is gone");
 });
 
-test("this week of a regular plan, and pool sessions left", () => {
+test("this week of a regular plan", () => {
   const c = ctxOf({ tasks: [
     { id: "a", date: "2026-10-05", est: 30, status: "done", projectId: "y" },
     { id: "b", date: "2026-10-08", est: 30, status: "", projectId: "y" },
@@ -65,7 +65,6 @@ test("this week of a regular plan, and pool sessions left", () => {
   ] });
   assert.deepEqual(E.regularWeek(c, yoga), { target: 3, placed: 2, done: 1, left: 1 });
   assert.deepEqual(E.regularWeek(c, gym), { target: 3, placed: 1, done: 1, left: 2 });
-  assert.deepEqual(E.poolRegulars(c).map((x) => x.plan.id + " " + x.left + " " + x.min), ["y 1 30"]);
 });
 
 test("store: repeating makes a plan; only the first day is a task; edit, re-plan, delete", async () => {

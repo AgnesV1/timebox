@@ -5,7 +5,6 @@
 
 import { todayIso, addDays, fmtShort } from "./dates.js";
 import * as E from "./engine.js";
-import * as L from "./lists.js";
 import * as R from "./routines.js";
 import * as GR from "./groups.js";
 import * as OD from "./offdays.js";
@@ -422,7 +421,7 @@ export function addTask(fields) {
   change(() => {
     const itemId = fields.projectId && fields.itemId === undefined ? itemFor(fields.projectId, fields.title, fields.est) : fields.itemId || "";
     const plan = fields.projectId && get("projects", fields.projectId);
-    const row = plan && !itemId && !fields.id ? L.rowOn(ctx(), plan.id, date) : null;
+    const row = plan && !itemId && !fields.id ? rowOf(plan.id, date) : null;
     if (row) { id = row.id; return; }
     put("tasks", {
       id, title: "", est: 30, actual: null, status: "", reason: "", optional: false, deep: planDeep(fields.projectId), projectId: "", group: "", times: "", desc: "",
@@ -810,7 +809,7 @@ export const { scores, scoreOf, scoreSetup, scoreCells, setScore, setScoreNote }
 
 export const { quads, quadOf, quadBoard, addQuad, moveQuad, editQuad, doneQuad, deleteQuad, restoreQuad, adoptQuads } = quadStore(core);
 
-export const { itemCfg, setItemCfg, setPlanNotes, setSectionLater, ensureRow, placeItem, tickLine, tickStep, backToPool, settleLists, addPoolLines, planShape, planText, pastePlan, adoptLists } = listStore(core);
+export const { itemCfg, setItemCfg, setPlanNotes, setSectionLater, rowOf, ensureRow, placeItem, moveLine, moveBlock, blockToPool, tickLine, tickStep, backToPool, settleLists, addPoolLines, planShape, planText, pastePlan, adoptLists } = listStore(core);
 
 export const { goals, saveGoal, deleteGoal, setParent, linkGoal, renameGoalRef, ensureNorthStar, northStar, saveNorth } = goalStore(core);
 export const { readPlan, addReadPlan, moveReadPlan, removeReadPlan } = readPlanStore(core);

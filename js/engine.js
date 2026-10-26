@@ -25,12 +25,6 @@ const sum = (list, f) => list.reduce((a, x) => a + f(x), 0);
 // 实际花掉的时间：只看记下的（计时器、补记的那几段加起来），标没标、标的什么都一样
 export const spentMin = (t) => num(t.actual);
 
-// 推进了多少计划：标了 Done 的算整条做完（满预计，做得比预计快也能结掉）；没标 Done 的按记下的时间算，不超过预计
-export function planMin(t) {
-  if (t.status === "done") return num(t.est);
-  return Math.min(num(t.actual), num(t.est));
-}
-
 // 还算不算那天的计划：Delay、Drop 的不算（记下的时间照样算花了）
 export const isPlanned = (t) => t.status !== "delay" && t.status !== "drop";
 
@@ -54,26 +48,22 @@ const memo = new WeakMap();
 function idx(ctx) {
   let m = memo.get(ctx);
   if (m) return m;
-  m = { byItem: new Map(), byDate: new Map(), byProject: new Map(), items: new Map(), projects: new Map(), itemsOf: new Map(), taskIds: new Set(), cache: {} };
+  m = { byDate: new Map(), byProject: new Map(), projects: new Map(), taskIds: new Set() };
   const push = (map, key, v) => { if (!key) return; let l = map.get(key); if (!l) map.set(key, (l = [])); l.push(v); };
-  for (const t of ctx.tasks) { push(m.byItem, t.itemId, t); push(m.byDate, t.date, t); push(m.byProject, t.projectId, t); m.taskIds.add(t.id); }
-  for (const i of ctx.items) { m.items.set(i.id, i); push(m.itemsOf, i.projectId, i); }
+  for (const t of ctx.tasks) { push(m.byDate, t.date, t); push(m.byProject, t.projectId, t); m.taskIds.add(t.id); }
   for (const p of ctx.projects) m.projects.set(p.id, p);
   memo.set(ctx, m);
   return m;
 }
 
 export const projectById = (ctx, id) => idx(ctx).projects.get(id) || null;
-export const itemById = (ctx, id) => idx(ctx).items.get(id) || null;
 export const tasksOn = (ctx, d) => idx(ctx).byDate.get(d) || [];
-export const tasksOfItem = (ctx, id) => idx(ctx).byItem.get(id) || [];
 export const tasksOfProject = (ctx, id) => idx(ctx).byProject.get(id) || [];
-export const itemsOf = (ctx, pid) => idx(ctx).itemsOf.get(pid) || [];
 export const hasTask = (ctx, id) => idx(ctx).taskIds.has(id);
 
 // ---------- 每日容量 ----------
 // capacity = { default: 420, weekly: [周日..周六] 或 null, overrides: {"2026-10-03": 120} }
-// 某天容量 0 = 休息日，不往这天摊任务
+// 某天容量 0 = 休息日
 
 export function capacityFor(cap, d) {
   if (cap?.overrides && Object.prototype.hasOwnProperty.call(cap.overrides, d)) return num(cap.overrides[d]);
@@ -91,20 +81,6 @@ export function isWorkDay(cap, d) {
   return !anyCapacity(cap) || capacityFor(cap, d) > 0;
 }
 
-// ---------- 条目和项目的进度 ----------
-
-export function itemState(ctx, item) {
-  const est = num(item.est);
-  let progress = 0, scheduled = 0;
-  for (const t of tasksOfItem(ctx, item.id)) {
-    progress += planMin(t);
-    if (isOpen(t)) scheduled += num(t.est) - planMin(t);
-  }
-  progress = Math.min(progress, est);
-  const remaining = Math.max(est - progress, 0);
-  return { est, progress, remaining, scheduled, unscheduled: Math.max(remaining - scheduled, 0), done: est > 0 && remaining < 0.5 };
-}
-
 // ---------- 日历格子用的汇总 ----------
 
 export function daySummary(ctx, d) {
@@ -112,15 +88,7 @@ export function daySummary(ctx, d) {
   return { planned: sum(ts.filter(isPlanned), (t) => num(t.est)), done: sum(ts, spentMin), cap: capacityFor(ctx.capacity, d), rest: !isWorkDay(ctx.capacity, d), count: ts.length };
 }
 
-// 任务池：放在池里的整块计划还没排进日历的条目（自动排的不进池）
-export function poolItems(ctx) {
-  return ctx.items
-    .filter((i) => { const p = projectById(ctx, i.projectId); return p && isActive(p) && !isAuto(p); })
-    .map((i) => ({ item: i, state: itemState(ctx, i) }))
-    .filter((x) => x.state.unscheduled >= 0.5);
-}
-
-// ---------- 自动排：今天落成任务、以后画预览 ----------
+// ---------- 固定星期几：以后的预览、这一周 ----------
 
 // 以后某天（不含今天）的预览：固定星期几的计划那天的那一次（还没落成的）
 export function ghostsOn(ctx, d) {
@@ -141,11 +109,4 @@ export function regularWeek(ctx, p, d = ctx.today) {
   const target = isAuto(p) ? range(ws, we).filter((x) => dueOn(r, x)).length : (inRange(r, we) || inRange(r, ws) ? num(r.perWeek) : 0);
   const placed = ts.filter(isPlanned).length;
   return { target, placed, done: ts.filter((t) => t.status === "done").length, left: Math.max(0, target - placed) };
-}
-
-// 任务池里的规律计划（Pool）：这周还剩几次没排
-export function poolRegulars(ctx) {
-  return ctx.projects.filter((p) => isActive(p) && isRegular(p) && !isAuto(p))
-    .map((p) => ({ plan: p, min: num(ruleOf(p).min), left: regularWeek(ctx, p).left }))
-    .filter((x) => x.left > 0);
 }

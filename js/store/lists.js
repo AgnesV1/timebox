@@ -5,6 +5,7 @@
 
 import * as L from "../lists.js";
 import * as PT from "../plantext.js";
+import { fmtShort } from "../dates.js";
 
 const FROM = "lists-from";   // 换成这套的那天：过了那天回 Pool 只管这天以后的
 
@@ -44,11 +45,14 @@ export default function (core) {
 
   // ---------- 每天那一行 ----------
 
+  // 那天这个计划的那一行（直接看数据，不走 ctx：同一次改动里刚建的也找得到）
+  const rowOf = (planId, date) => all("tasks").filter((t) => t.date === date && t.projectId === planId && L.isRow(t)).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))[0] || null;
+
   // 那天这个计划的那一行；没有就建一条（ID pd:<计划>:<日期>，generated：哪台设备真改过都比它新）
   function ensureRow(planId, date) {
     const p = get("projects", planId);
     if (!p) return "";
-    const hit = L.rowOn(ctx(), planId, date);
+    const hit = rowOf(planId, date);
     if (hit) return hit.id;
     const id = L.rowId(planId, date, (x) => Boolean(get("tasks", x)));
     change(() => put("tasks", { id, date, title: p.name, est: Number(p.rule?.min) || 0, actual: null, status: "", reason: "", optional: false, deep: planDeep(planId),
@@ -112,6 +116,39 @@ export default function (core) {
     const keep = L.hasTime(t) || L.stepsOf(t.desc).steps.some((s) => s.done);
     change(() => (keep ? put("tasks", { ...t, status: "delay", reason: L.BACK }) : dropTask(id)), "Back to the pool");
     return true;
+  }
+
+  // 那天这个计划的那一行空了（没记时间、没写字、没标状态、下面没项，也不是固定星期几自己出现的那次）：删掉
+  function dropEmptyRow(planId, date) {
+    const here = all("tasks").filter((t) => t.date === date && t.projectId === planId);
+    const row = here.find((t) => L.isRow(t));
+    if (!row || row.status || L.hasTime(row) || String(row.desc || "").trim() || L.isRoutine(row) || here.some((t) => t.itemId)) return;
+    dropTask(row.id);
+  }
+
+  // 一项挪到别的天：那天的那一行跟着建好；原来那天的那一行空了就删
+  function moveLine(id, date) {
+    const t = get("tasks", id);
+    if (!t || t.date === date) return;
+    change(() => {
+      put("tasks", { ...t, date, order: nextOrder(date) });
+      if (t.projectId) { ensureRow(t.projectId, date); dropEmptyRow(t.projectId, t.date); }
+    }, "Moved to " + fmtShort(date));
+  }
+  // 日历里整张拖到别的天：那天还没勾的几项一起挪（勾了的、记过的时间留在原来那天）
+  function moveBlock(planId, from, to) {
+    if (!from || !to || from === to) return;
+    const lines = all("tasks").filter((t) => t.date === from && t.projectId === planId && t.itemId && !t.status);
+    change(() => {
+      for (const t of lines) put("tasks", { ...t, date: to, order: nextOrder(to) });
+      ensureRow(planId, to);
+      dropEmptyRow(planId, from);
+    }, "Moved " + (get("projects", planId)?.name || "it") + " to " + fmtShort(to));
+  }
+  // 整张拖回 Pool：那天没勾的几项回去，那一行空了就删
+  function blockToPool(planId, date) {
+    const lines = all("tasks").filter((t) => t.date === date && t.projectId === planId && t.itemId && !t.status);
+    change(() => { lines.forEach((t) => backToPool(t.id)); dropEmptyRow(planId, date); }, "Back to the pool");
   }
 
   // 过了那天：没勾的回 Pool、勾了一半的留记录、空着的那一行删掉（打开时、拉完表格、换天时各看一次）
@@ -228,5 +265,5 @@ export default function (core) {
     return fix.length > 0;
   }
 
-  return { itemCfg, setItemCfg, setPlanNotes, setSectionLater, ensureRow, placeItem, tickLine, tickStep, backToPool, settleLists, addPoolLines, planShape, planText, pastePlan, adoptLists };
+  return { itemCfg, setItemCfg, setPlanNotes, setSectionLater, rowOf, ensureRow, placeItem, moveLine, moveBlock, blockToPool, tickLine, tickStep, backToPool, settleLists, addPoolLines, planShape, planText, pastePlan, adoptLists };
 }

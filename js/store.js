@@ -5,6 +5,7 @@
 
 import { todayIso, addDays, fmtShort } from "./dates.js";
 import * as E from "./engine.js";
+import * as L from "./lists.js";
 import * as R from "./routines.js";
 import * as GR from "./groups.js";
 import * as OD from "./offdays.js";
@@ -21,6 +22,7 @@ import mealStore from "./store/meals.js";
 import ideaStore from "./store/ideas.js";
 import scoreStore from "./store/scores.js";
 import quadStore from "./store/quads.js";
+import listStore from "./store/lists.js";
 
 const KEY = "kuzhouduan-v1";
 const OLD_KEY = "timebox-v1";
@@ -400,27 +402,33 @@ function nextOrder(date) {
   return tasksOn(date).reduce((m, t) => Math.max(m, Number(t.order) || 0), 0) + 1;
 }
 
-// 直接在某天加项目任务时，要挂到一个条目上计划才会前进：同名条目、或者项目只有一个大块条目（老表迁移来的那种）
-// 就挂上去；都没有就新建一个条目，算作计划外多做的
+// 直接在某天加计划上的任务：名字和计划一样（或空着）= 那天的那一行（整块计时，不挂项）；
+// 和 Pool 里哪一项同名就挂上那一项；都不是就在 Pool 里新建一项（分区 Added），算这一次
 function itemFor(projectId, title, est) {
   const items = all("items").filter((i) => i.projectId === projectId);
   const key = (s) => String(s || "").trim().toLowerCase();
-  const hit = items.find((i) => key(i.title) === key(title)) || (items.length === 1 && items[0].est > 120 ? items[0] : null);
+  if (!key(title) || key(title) === key(get("projects", projectId)?.name)) return "";
+  const hit = items.find((i) => key(i.title) === key(title));
   if (hit) return hit.id;
   const id = newId();
   put("items", { id, projectId, module: "Added", title, est: Number(est) || 0, origEst: null, order: items.reduce((m, i) => Math.max(m, Number(i.order) || 0), 0) + 1 });
   return id;
 }
 
+// 挂在计划上的：那天的那一行已经有了就不再建第二条（返回原来那条）；挂了项的，顺手把那天的那一行建好（计时在它身上）
 export function addTask(fields) {
-  const id = fields.id || newId();   // 给了 id 就用它（Chore 键那条每天固定是 chore-日期）
+  let id = fields.id || newId();   // 给了 id 就用它（Chore 键那条每天固定是 chore-日期）
   const date = fields.date || today();
   change(() => {
-    const itemId = fields.projectId && !fields.itemId ? itemFor(fields.projectId, fields.title, fields.est) : fields.itemId || "";
+    const itemId = fields.projectId && fields.itemId === undefined ? itemFor(fields.projectId, fields.title, fields.est) : fields.itemId || "";
+    const plan = fields.projectId && get("projects", fields.projectId);
+    const row = plan && !itemId && !fields.id ? L.rowOn(ctx(), plan.id, date) : null;
+    if (row) { id = row.id; return; }
     put("tasks", {
       id, title: "", est: 30, actual: null, status: "", reason: "", optional: false, deep: planDeep(fields.projectId), projectId: "", group: "", times: "", desc: "",
-      ...fields, date, itemId, order: nextOrder(date)
+      ...fields, title: fields.title || plan?.name || "", date, itemId, order: nextOrder(date)
     });
+    if (plan && itemId) ensureRow(plan.id, date);
   });
   return id;
 }
@@ -485,32 +493,16 @@ export function deleteTask(id) {
   }, "Deleted");
 }
 
-// 从任务池拖到某天：小条目整块排进去；大块的（比如 600 分钟的总任务）按每天该做的量切一块
-export function scheduleItem(itemId, date) {
-  const item = get("items", itemId);
-  if (!item) return;
-  const c = ctx();
-  const st = E.itemState(c, item);
-  if (st.unscheduled < 0.5) return;
-  let est = st.unscheduled;
-  if (est > 120) {
-    const p = get("projects", item.projectId);
-    const need = p ? E.projectPlan(c, p).dailyNeed : 0;
-    est = need ? Math.min(120, Math.max(15, Math.round(need / 15) * 15)) : 60;
-  }
-  const id = newId();
-  change(() => put("tasks", {
-    id, date, title: item.title, est: Math.round(est), actual: null, status: "", reason: "",
-    optional: false, deep: planDeep(item.projectId), projectId: item.projectId, itemId, times: "", desc: "", order: nextOrder(date)
-  }), "Scheduled");
-  return id;
-}
-
-// 拖回任务池：只有从条目来的、还没开始的任务能拖回去
+// 从 Pool 拖一项到某天（见 js/store/lists.js 的 placeItem）
+export const scheduleItem = (itemId, date) => placeItem(itemId, date);
+// 拖回 Pool：项回去（勾了一半的留记录）；那一行没动过（没记时间、没标状态）就删掉，那天它下面没勾的项一起回去
 export function unschedule(id) {
   const t = get("tasks", id);
-  if (!t || !t.itemId || started(t)) return false;
-  change(() => dropTask(id), "Back to pool");
+  if (!t) return false;
+  if (t.itemId) return backToPool(id);
+  if (!t.projectId || started(t)) return false;
+  const lines = all("tasks").filter((x) => x.date === t.date && x.projectId === t.projectId && x.itemId && x.status !== "done");
+  change(() => { lines.forEach((x) => backToPool(x.id)); dropTask(id); }, "Back to the pool");
   return true;
 }
 
@@ -721,12 +713,8 @@ export function materialize(key) {
   return key;
 }
 
-// 任务池里的规律计划（Pool）拖到某天：排一次
-export function placeRegular(pid, date) {
-  const p = get("projects", pid);
-  if (!p) return "";
-  return addTask({ date, title: p.name, est: Number(p.rule?.min) || 30, projectId: pid, optional: Boolean(p.rule?.optional), deep: Boolean(p.rule?.deep) });
-}
+// Pool 里的计划自己拖到某天：那天的那一行（已经有了就是那一条）
+export const placeRegular = (pid, date) => ensureRow(pid, date);
 
 // ---------- 大类（界面上的 Project）和它下面的计划 ----------
 // 大类清单在 Settings 的 groups 里（见 js/groups.js）；计划的 group、直接挂在大类上的任务的 group 存的都是大类的名字
@@ -825,7 +813,7 @@ export const forgetStorage = () => { usage = null; };
 // 上面的函数也会用到它们（删任务要问是不是重复的那一次、标状态要看计了多久）：都是调用时才用，这时已经接好了。
 
 const core = { all, get, entries: (t) => Object.entries(S.data[t]), put, drop, change, memo, newId, today, setting, prefs, byOrder,
-  groupFor, colorFor, nextPlanOrder, nextOrder, started, dropTask, addTask, updateTask, deleteTask };
+  groupFor, colorFor, nextPlanOrder, nextOrder, started, dropTask, addTask, updateTask, deleteTask, ctx, planDeep, saveProject };
 
 const tm = timerStore(core);
 export const { timer, timeOf, hasTime, timeTotal, clockOf, clockNow, startTimer, stopTimer, setTimerStart, setTimerTag, discardTimer, logTime, addLogged, tagTime, editTime, deleteTime } = tm;
@@ -862,6 +850,8 @@ const { setRule } = series;
 export const { scores, scoreOf, scoreSetup, scoreCells, setScore, setScoreNote } = scoreStore(core);
 
 export const { quads, quadOf, quadBoard, addQuad, moveQuad, editQuad, doneQuad, deleteQuad, restoreQuad, adoptQuads } = quadStore(core);
+
+export const { itemCfg, setItemCfg, setPlanNotes, setSectionLater, ensureRow, placeItem, tickLine, tickStep, backToPool, settleLists, addPoolLines, planShape, planText, pastePlan, adoptLists } = listStore(core);
 
 export const { goals, saveGoal, deleteGoal, setParent, linkGoal, renameGoalRef, ensureNorthStar, northStar, saveNorth } = goalStore(core);
 export const { readPlan, addReadPlan, moveReadPlan, removeReadPlan } = readPlanStore(core);

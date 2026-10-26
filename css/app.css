@@ -482,6 +482,37 @@ body.side-min .sync-pill span { display: none; }
 .line { display: flex; align-items: flex-start; gap: 8px; }
 .task { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 500; line-height: 1.35; cursor: pointer; overflow-wrap: anywhere; }
 .task .more { color: var(--muted); }
+/* 计划那一行（整块计时）+ 下面一行一项，像便条（2026-10-25 她挑的甲：一行一项、带大概多久）。勾选框白天墨底青柠勾，夜里青柠底 */
+.row.plan .task { font-weight: 700; }
+.row.plan .est b { font-size: 12.5px; letter-spacing: -.02em; }
+.row.plan.virtual .est { cursor: default; }
+.ls-cnt { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ls-plus { flex: none; width: 22px; height: 22px; display: grid; place-items: center; margin-top: 1px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: transparent; font: 600 14px/1 var(--num); color: var(--ink); }
+.ls-plus[aria-expanded="true"] { border-color: transparent; background: var(--accent); color: var(--accent-ink); }
+.ls-lines { margin: 5px 0 2px; }
+.ls-ln, .ls-step { display: flex; align-items: center; gap: 8px; padding: 2px 0; font-size: 13.5px; }
+.ls-step { font-size: 13px; }
+.ls-cb { position: relative; flex: none; width: 15px; height: 15px; display: grid; place-items: center; padding: 0; border: 1.5px solid var(--muted); border-radius: 4px; background: transparent; color: transparent; font-size: 10px; line-height: 1; }
+.ls-cb::after { content: ""; position: absolute; inset: -6px; }   /* 手指好点：点得到的地方比画出来的大一圈 */
+.ls-ln.done > .ls-cb, .ls-step.done > .ls-cb { border-color: var(--ink); background: var(--ink); color: var(--accent); }
+[data-theme="dark"] .ls-ln.done > .ls-cb, [data-theme="dark"] .ls-step.done > .ls-cb { border-color: var(--accent); background: var(--accent); color: var(--bg); }
+.ls-ln .ls-tx { flex: 1; min-width: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.ls-step .ls-tx { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ls-ln .ls-tx small { margin-left: 4px; font-size: 11.5px; color: var(--muted); }
+.ls-ln.done .ls-tx, .ls-step.done .ls-tx, .ls-ln.delay .ls-tx { color: var(--muted); text-decoration: line-through; }
+.ls-ln.drop { opacity: .5; }
+.ls-sz { flex: none; font: 500 12px var(--num); color: var(--muted); white-space: nowrap; }
+.ls-steps { margin: 2px 0 6px 7px; padding-left: 15px; border-left: 1px solid var(--line); }
+.ls-more { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 6px 23px; font-size: 12px; color: var(--muted); }
+.ls-cands { display: grid; gap: 1px; margin: 6px 0 4px; padding: 6px 8px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ls-cand { display: flex; align-items: baseline; gap: 8px; padding: 3px 2px; border: 0; background: none; font-size: 13px; color: var(--ink); text-align: left; }
+.ls-cand b { font-weight: 600; }
+.ls-cand small { margin-left: auto; font: 500 11.5px var(--num); color: var(--muted); white-space: nowrap; }
+@media (hover: hover) { .ls-cand:hover b { text-decoration: underline; text-underline-offset: 3px; } }
+.ls-cands .hint { margin: 0; }
+.ls-pnotes { margin: 8px 0 4px; padding: 8px 10px; max-height: 340px; overflow: auto; border-radius: 10px; background: var(--tonal); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; }
+body.phone .ls-ln, body.phone .ls-step { min-height: 30px; font-size: 14.5px; }
+body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
 /* 状态怎么画（和日历一个说法）：Done = 灰 + 划掉，Delay = 只划掉，Drop = 只灰 */
 .st-done .task { color: var(--muted); text-decoration: line-through; }
 .st-delay .task { text-decoration: line-through; }

@@ -6,6 +6,7 @@ import * as store from "../store.js";
 import { esc, on } from "../dom.js";
 import { fmtMin } from "../dates.js";
 import { colorOf, toast } from "./common.js";
+import * as L from "../lists.js";
 import { animateNext } from "../motion.js";
 import { cheer } from "../fx.js";
 
@@ -14,8 +15,10 @@ let stopped = null;  // 刚停下的那段 {taskId, min}：浮条上给 Done / D
 let atEdit = "";     // 浮条上正在改的钟点：since = 其实几点开始的 / stop = 其实几点就停了
 const TITLE = document.title;
 
-// 能计时的：今天的、还没做完的（Delay 的也可以接着做）
-export const timeable = (t, today) => Boolean(t) && t.date === today && (!t.status || t.status === "delay");
+// 能计时的：今天的、还没做完的（Delay 的也可以接着做）。计划下面那几项（便条）不单独计时，时间记在计划那一行上
+export const timeable = (t, today) => Boolean(t) && t.date === today && (!t.status || t.status === "delay") && !L.isLine(t);
+// 计划那一行（整块计时，没有 Done / Delay）
+const isPlanRow = (t) => L.isRow(t) && Boolean(store.get("projects", t.projectId));
 
 // 选中的任务；没手动选过（或者选的那个已经做完了）：正在计时的那个，再不然今天第一个没做的（先挑不是 Optional 的）
 export function pickedId(c) {
@@ -67,6 +70,11 @@ export function dockHTML(c, onToday, extra = () => null) {
   }
   atEdit = "";
   const st = stopped && store.get("tasks", stopped.taskId);
+  if (st && isPlanRow(st)) {
+    return '<div class="dock logged" style="--bar:' + colorOf(st) + '">' +
+      '<div class="dk-main"><span class="dk-k">Logged ' + fmtMin(stopped.min) + "</span>" + titleOf(st) + "</div>" +
+      '<button type="button" class="icon-btn dk-x" data-act="dock-close" aria-label="Close">×</button></div>';
+  }
   if (st && st.status !== "done") {
     return '<div class="dock logged" style="--bar:' + colorOf(st) + '">' +
       '<div class="dk-main"><span class="dk-k">Logged ' + fmtMin(stopped.min) + "</span>" + titleOf(st) + "</div>" +
@@ -78,8 +86,16 @@ export function dockHTML(c, onToday, extra = () => null) {
   const t = store.get("tasks", pickedId(c));
   if (!t) return "";
   return '<div class="dock idle" style="--bar:' + colorOf(t) + '">' +
-    '<i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected · ' + t.est + " min planned</span>" + titleOf(t) + "</div>" + deepBtn(t) +
+    '<i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected' + selectedText(t) + "</span>" + titleOf(t) + "</div>" + deepBtn(t) +
     '<button type="button" class="dk-btn start" data-act="timer-start" data-id="' + t.id + '"><i class="tri"></i>Start</button></div>';
+}
+
+// 「Selected · 30 min planned」；计划那一行写下面还没勾的几项加起来大概多久
+function selectedText(t) {
+  if (!isPlanRow(t)) return " · " + t.est + " min planned";
+  const open = store.tasksOn(t.date).filter((x) => x.projectId === t.projectId && x.itemId && !x.status);
+  const min = open.reduce((a, x) => a + (Number(x.est) || 0), 0);
+  return open.length ? " · " + open.length + " to do" + (min ? " · ~" + L.sizeOf(min) : "") : "";
 }
 
 // 每秒只改走着的数字和标签页标题，不整页重画；整页重画完也调一次

@@ -1,5 +1,6 @@
-// 「今天」页：安全线、当天的任务块、昨天的账单、过期没做的、任务列表、加任务、这一天自己打的分。
-// 电脑上左边是清单，右边是安全线、账单和打分；日历里点日期就是到这一页的那一天。
+// 「今天」页：做了多少 / 排了多少 / 盒子、当天的任务块、留下来没做的、任务列表、加任务、这一天自己打的分。
+// 电脑上左边是清单，右边是那几个数、提醒和打分；日历里点日期就是到这一页的那一天。
+// 计划（2026-10-25 起）：一个计划一天一行，整块计时；下面是这天从它 Pool 拖进来的几项，像便条（勾 = 这一次做了，有步骤的点开勾步骤）。
 // 手机上：看今天前后各 5 天的任务、给任务标结果、计时、加任务；右上角齿轮进去只有白天黑夜和连表格。计划都在电脑上做。
 
 import * as store from "../store.js";
@@ -15,6 +16,7 @@ import * as reading from "../reading.js";
 import * as Meal from "../meals.js";
 import { parseLogLine } from "../times.js";
 import * as R from "../routines.js";
+import * as L from "../lists.js";
 import { heroHTML, stripHTML, colorOf, badgeOf, projectOptions, pickable, pickTarget, segHTML, toast, STATUS, ballHTML, taskChainHTML, groupsOf } from "./common.js";
 import { openTaskEditor } from "./editor.js";
 import { pickedId, pick, timeable, elapsed } from "./timer.js";
@@ -39,6 +41,9 @@ const addTarget = {};   // 加任务框里选的是哪个项目 / 计划（日�
 const ideaDraft = {};   // 加任务框里从灵感池挑中的那条（日期 → 灵感 id）：任务建好后挂上去，池子里就划掉了
 let addOpen = "";       // 哪一天的加任务框展开着（下面那排选项）。自己记着，不靠焦点猜——见 initToday 里的 setAddOpen
 let timeEdit = "";      // 正在改头尾的那一段（「任务 id#第几段」）
+const lineOpen = new Set();   // 点开了的那几项（看步骤、备注、Back to the pool）
+let poolOpen = "";      // 哪个计划哪天的「+」开着（「计划 id|日期」）
+let notesShown = "";    // 哪一行把计划的 Notes 摊开了（那一行的任务 id）
 // 这个任务能不能选「和谁」：已经带着一条记录，或者它那个大类开了这一项
 const meetable = (t) => Boolean(store.meetOfTask(t.id) || store.groupByName(store.groupOf(t))?.friends);
 
@@ -155,6 +160,81 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
     "</div></div>";
 }
 
+// ---------- 计划那一行和它下面的几项（她 2026-10-25 挑的甲：一行一项、带大概多久） ----------
+
+// 一项（便条）：勾 = 这一次做了；点名字展开步骤、备注、Back to the pool（电脑）。过了那天勾了一半回了 Pool 的写着 back to the pool
+function lineHTML(t, phone) {
+  const { steps } = L.stepsOf(t.desc);
+  const ticked = steps.filter((s) => s.done).length;
+  const open = lineOpen.has(t.id), done = t.status === "done";
+  const spent = store.timeTotal(t.id);   // 以前的整块计划留下来的、记过时间的那几条
+  let h = '<div class="ls-ln' + (t.status ? " " + t.status : "") + '"><button type="button" class="ls-cb" data-act="ls-tick" data-line="' + t.id + '" aria-pressed="' + done + '" aria-label="' + esc((done ? "Not done: " : "Done: ") + t.title) + '">✓</button>' +
+    '<button type="button" class="ls-tx" data-act="ls-open" data-line="' + t.id + '" aria-expanded="' + open + '">' + esc(t.title) + (t.status === "delay" ? " <small>back to the pool</small>" : "") + "</button>" +
+    '<span class="ls-sz">' + [steps.length ? ticked + "/" + steps.length : "", spent ? fmtMin(spent) + " logged" : L.sizeOf(t.est)].filter(Boolean).join(" · ") + "</span></div>";
+  if (!open) return h;
+  if (steps.length) {
+    h += '<div class="ls-steps">' + steps.map((s, k) => '<div class="ls-step' + (s.done ? " done" : "") + '"><button type="button" class="ls-cb" data-act="ls-step" data-line="' + t.id + '" data-k="' + k + '" aria-pressed="' + s.done + '" aria-label="' + esc(s.t) + '">✓</button>' +
+      '<span class="ls-tx">' + esc(s.t) + '</span><span class="ls-sz">' + L.sizeOf(s.min) + "</span></div>").join("") + "</div>";
+  }
+  const note = t.itemId ? store.itemCfg(t.itemId).note : "";
+  const back = !phone && !t.status ? '<button type="button" class="link" data-act="ls-back" data-line="' + t.id + '">Back to the pool</button>' : "";
+  return h + (note || back ? '<p class="ls-more">' + (note ? "<span>" + esc(note) + "</span>" : "") + back + "</p>" : "");
+}
+
+// 电脑：计划那一行的 + 点开 = 这个计划 Pool 里还能拖的（勾了一半回了 Pool 的那次带着剩几步），点一个就进这天
+function candsHTML(c, plan, d) {
+  const items = L.pool(c).find((g) => g.plan.id === plan.id)?.items || [];
+  if (!items.length) return '<div class="ls-cands"><p class="hint">Nothing left in the pool — add things to the plan on Projects.</p></div>';
+  return '<div class="ls-cands">' + items.map((x) => {
+    const carry = x.count.carry[0];
+    const label = carry ? L.titleFor(x.item, x.cfg, carry.k) + " · " + carry.steps.length + " step" + (carry.steps.length > 1 ? "s" : "") + " left" : x.item.title;
+    const meta = [L.sizeOf(x.item.est), x.cfg.n > 1 ? x.count.done + "/" + x.cfg.n : x.cfg.n === 0 ? "any" : "", x.cfg.perWeek ? "this week " + x.week.placed + "/" + x.cfg.perWeek : ""].filter(Boolean).join(" · ");
+    return '<button type="button" class="ls-cand" data-act="ls-add" data-item="' + esc(x.item.id) + '" data-date="' + d + '"><b>' + esc(label) + "</b><small>" + esc(meta) + "</small></button>";
+  }).join("") + "</div>";
+}
+
+// 计划那一行：整块计时（点了选中、底部浮条 Start，和别的任务一样），没有 Done / Delay / Drop——结果在下面每一项上。
+// 左边那格是下面几项大概多久加起来；收着时右边是记了多久和「做了几项 / 几项」；展开有链条、计时记录、+ time、当天的备注（点名字）、Plan notes。
+// 那天还没有这一行（以前的旧数据）：画一个只有名字的头，点了再建
+function planRowHTML(c, b, tasks, phone, openId) {
+  const t = b.row, plan = b.plan, d = (t || b.lines[0]).date;
+  const lines = b.lines.slice().sort((x, y) => (Number(x.order) || 0) - (Number(y.order) || 0));
+  const live = lines.filter((x) => x.status !== "drop"), done = live.filter((x) => x.status === "done").length;
+  const sum = live.reduce((a, x) => a + (Number(x.est) || 0), 0) || Number(t?.est) || 0;
+  const open = Boolean(t) && t.id === openId;
+  const fresh = t ? !seen.has(t.id) : false;
+  if (t) seen.add(t.id);
+  const list = t ? store.timeOf(t.id) : [];
+  const run = store.timer(), running = Boolean(t) && run?.taskId === t.id;
+  const picked = Boolean(t) && timeable(t, c.today) && pickedId(c) === t.id;
+  const total = t ? store.timeTotal(t.id) : 0;
+  const form = open && t.date <= c.today && logOpen.has(t.id);
+  const notes = String(plan.rule?.notes || "").trim();
+  const key = plan.id + "|" + d;
+  const side = open ? "" : '<span class="rside">' + (running ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : total ? '<span class="num">' + fmtMin(total) + "</span>" : "") +
+    (live.length ? '<b class="ls-cnt num">' + done + "/" + live.length + "</b>" : "") + "</span>";
+  const plus = !phone && d >= c.today ? '<button type="button" class="ls-plus" data-act="ls-pool" data-plan="' + esc(plan.id) + '" data-date="' + d + '" aria-expanded="' + (poolOpen === key) + '" aria-label="Add from the ' + esc(plan.name) + ' pool" title="Add from the pool">+</button>' : "";
+  const ids = [t?.id, ...lines.map((x) => x.id)].filter(Boolean).join(" ");
+  return '<div class="row plan' + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + (open ? " open" : "") + (t ? "" : " virtual") + '"' + (t ? ' data-id="' + t.id + '"' : "") +
+    ' data-ids="' + ids + '" data-plan="' + esc(plan.id) + '" data-date="' + d + '" style="--i:' + (t ? tasks.indexOf(t) : 0) + '">' +
+    '<div class="est num" data-drag-row title="Drag to reorder"><b>' + (L.sizeOf(sum) || "—") + '</b><i class="grip"></i></div>' +
+    '<div class="bar" style="--bar:' + esc(plan.color || "var(--c-None)") + '"></div>' +
+    '<div class="body"><div class="line"><div class="task" data-act="desc">' + esc(t?.title || plan.name) + (t && E.isRoutine(t) ? ' <span class="rt" title="Routine">↻</span>' : "") +
+    (t?.deep ? ' <span class="dp" title="Deep work">◆ Deep</span>' : "") + (t?.desc && !(open && openDesc.has(t.id)) ? '<span class="more"> ⋯</span>' : "") + "</div>" + side + plus +
+    (phone || !t ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") + "</div>" +
+    (lines.length ? '<div class="ls-lines">' + lines.map((x) => lineHTML(x, phone)).join("") + "</div>" : "") +
+    (poolOpen === key && !phone ? candsHTML(c, plan, d) : "") +
+    (open ? taskChainHTML(t, 2) + timesHTML(c, t, list, form) : "") +
+    (open && openDesc.has(t.id) ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Notes for this day">' + esc(t.desc || "") + "</textarea>" : "") +
+    (open && (notes || (t.date <= c.today && !form)) ? '<div class="chips">' + (t.date <= c.today && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") +
+      (notes ? '<button type="button" class="chip ghost" data-act="ls-notes" aria-expanded="' + (notesShown === t.id) + '">Plan notes</button>' : "") + "</div>" : "") +
+    (open && notesShown === t.id && notes ? '<div class="ls-pnotes">' + esc(notes) + "</div>" : "") +
+    (form ? logFormHTML(c, t, list) : "") + "</div></div>";
+}
+
+// 一天的清单：按计划并起来（js/lists.js 的 dayBlocks），计划那一块画成上面那样，别的照旧一行一条
+const listRowsHTML = (c, tasks, phone, openId) => L.dayBlocks(c, tasks).map((b) => (b.task ? rowHTML(c, b.task, tasks, phone, openId) : planRowHTML(c, b, tasks, phone, openId))).join("");
+
 // 以后某天：自动排的计划画成淡色预览（只看，不存；到那天才变成任务）
 function ghostsHTML(c, d) {
   return E.ghostsOn(c, d).map((g) => '<div class="row ghost" title="' + (g.kind === "regular" ? "Repeats — shows up on the day" : "Projected share — shows up on the day") + '">' +
@@ -162,8 +242,10 @@ function ghostsHTML(c, d) {
     '<div class="body"><div class="line"><div class="task">' + esc(g.title) + (g.kind === "regular" ? ' <span class="rt">↻</span>' : "") + "</div></div></div></div>").join("");
 }
 
+// 留下来没做的：以前的日子里没标的。计划那一行不算（它不标状态），计划下面没勾的几项过了那天自己回 Pool
+const leftBehind = (c) => c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isAutoTask(t) && !L.isRow(t));
 function overdueHTML(c) {
-  const od = c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isAutoTask(t)).sort((a, b) => a.date.localeCompare(b.date));
+  const od = leftBehind(c).sort((a, b) => a.date.localeCompare(b.date));
   if (!od.length) return "";
   return '<section class="overdue"><div class="od-head"><b>' + od.length + " left behind</b><span>from earlier days</span>" +
     '<button type="button" class="link" data-act="od-toggle">' + (overdueOpen ? "Hide" : "Show") + "</button></div>" +
@@ -214,16 +296,26 @@ function dishesHTML(t) {
 const poolFor = (target) => { const g = store.groupByName(store.groupOf(pickTarget(target))); return GR.ideasOf(g) ? g : null; };
 const taskOf = (id) => store.get("tasks", id);
 
-// 标题框底下的候选（电脑）：池子里还没排的灵感，打了字就只留对得上的；再加一小段想看的（Reading 的 Want）——只看「多久没联系」的那种大类（Friends）不加。
-// 点一条 = 名字填进标题框；灵感那条在任务建好后挂上去
+// 标题框底下的候选（电脑）。先是计划 Pool 里还能拖的：下拉选了一个计划就列它的，没选计划但打了字就列各计划里名字对得上的，点一条 = 直接进这天（计划那一行下面）。
+// 再是池子里还没排的灵感，打了字就只留对得上的；再加一小段想看的（Reading 的 Want）——只看「多久没联系」的那种大类（Friends）不加。
+// 灵感、想看的点一条 = 名字填进标题框；灵感那条在任务建好后挂上去
+function poolPickHTML(target, query) {
+  const plan = target && !target.startsWith("g:") ? target : "", q = String(query || "").trim().toLowerCase();
+  if (!plan && !q) return "";
+  const rows = L.pool(store.ctx()).filter((g) => !plan || g.plan.id === plan).flatMap((g) => g.items.map((x) => ({ ...x, planName: g.plan.name })))
+    .filter((x) => !q || x.item.title.toLowerCase().includes(q)).slice(0, 8);
+  return rows.length ? "<p>From the pool</p><ul>" + rows.map((x) => '<li><button type="button" data-act="pool-pick" data-item="' + esc(x.item.id) + '">' + esc(x.item.title) +
+    "<small>" + esc([plan ? "" : x.planName, L.sizeOf(x.item.est), x.cfg.n > 1 ? x.count.done + "/" + x.cfg.n : ""].filter(Boolean).join(" · ")) + "</small></button></li>").join("") + "</ul>" : "";
+}
 function pickHTML(d, query) {
+  const pooled = poolPickHTML(addTarget[d] || "", query);
   const g = poolFor(addTarget[d] || "");
-  if (!g) return "";
+  if (!g) return pooled;
   const ideas = I.match(store.ideas(), taskOf, store.today(), query);
   const wants = GR.trackOf(g) === "contact" || !store.setting("reading")?.url ? [] : (reading.titleKey(query) ? reading.search(query, 20).filter((r) => r.want) : reading.wants()).slice(0, 4);
   const item = (act, id, text, small, on, em = "") => '<li><button type="button" data-act="' + act + '" data-id="' + esc(id) + '" data-t="' + esc(text) + '"' + (on ? ' class="on"' : "") + ">" +
     (em ? em + " " : "") + esc(text) + (small ? "<small>" + esc(small) + "</small>" : "") + "</button></li>";
-  return (ideas.length ? "<p>Ideas</p><ul>" + ideas.map((i) => item("idea-pick", i.id, i.text, i.date && i.date < store.today() ? "was " + fmtShort(i.date) : I.whenText(i), ideaDraft[d] === i.id && I.sameText(i.text, query), I.emojiOf(i))).join("") + "</ul>" : "") +
+  return pooled + (ideas.length ? "<p>Ideas</p><ul>" + ideas.map((i) => item("idea-pick", i.id, i.text, i.date && i.date < store.today() ? "was " + fmtShort(i.date) : I.whenText(i), ideaDraft[d] === i.id && I.sameText(i.text, query), I.emojiOf(i))).join("") + "</ul>" : "") +
     (wants.length ? "<p>Want</p><ul>" + wants.map((r) => item("want-pick", "", r.title, r.tab, false)).join("") + "</ul>" : "");
 }
 
@@ -292,7 +384,7 @@ export function dayParts(c, d) {
     strip: stripHTML(c, d, all),
     notices: isToday ? noticesHTML(c) : "",
     overdue: isToday ? overdueHTML(c) : "",
-    list: choreHTML(c, d) + '<div class="list" data-list="' + d + '">' + (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, false, openId)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">No tasks for this day.</div>') + ghostsHTML(c, d) + "</div>",
+    list: choreHTML(c, d) + '<div class="list" data-list="' + d + '">' + (tasks.length ? listRowsHTML(c, tasks, false, openId) : E.ghostsOn(c, d).length ? "" : '<div class="empty">No tasks for this day.</div>') + ghostsHTML(c, d) + "</div>",
     add: addHTML(c, d),
     score: scoreHTML(c, d)   // 开始日到今天才有（js/ui/scores.js）
   };
@@ -326,9 +418,10 @@ export function marquees(root = document) {
 
 const PHONE_SPAN = 5;
 
-// 一天的小圆点：全标完 = 实心；还有没标的 = 空心；没有任务 = 不画
-function dayDot(tasks) {
-  if (!tasks.length) return "";
+// 一天的小圆点：全标完 = 实心；还有没标的 = 空心；没有任务 = 不画（计划那一行不标状态，不算）
+function dayDot(all) {
+  const tasks = all.filter((t) => !L.isRow(t));
+  if (!tasks.length) return all.length ? '<i class="all"></i>' : "";
   const open = tasks.filter((t) => !t.status && !t.optional).length;
   return '<i class="' + (open ? (open < tasks.length ? "some" : "todo") : "all") + '"></i>';
 }
@@ -361,7 +454,7 @@ function phoneHTML(c) {
     '<header class="phead"><div class="l"><h1 data-act="day-today">' + fmtDay(d) + "</h1>" + ballHTML() + "</div>" +
     '<div class="r"><button type="button" class="psync" data-sync-status aria-label="Sync"></button><a class="pread pshop" href="#shop" aria-label="Next shop">' + icon("cart") + (toBuy ? "<span>" + toBuy + "</span>" : "") + '</a><a class="pread pico" href="#ideas" aria-label="Ideas">' + icon("idea") + '</a><a class="pread pico" href="#reading" aria-label="Reading">' + icon("reading") + "</a>" + '<a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
     (store.local().url ? bar + meta + choreHTML(c, d) + '<div class="list" data-list="' + d + '">' +
-      (tasks.length ? tasks.map((t) => rowHTML(c, t, tasks, true, openId)).join("") : E.ghostsOn(c, d).length ? "" : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + ghostsHTML(c, d) + "</div>" + addHTML(c, d, true)
+      (tasks.length ? listRowsHTML(c, tasks, true, openId) : E.ghostsOn(c, d).length ? "" : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + ghostsHTML(c, d) + "</div>" + addHTML(c, d, true)
       : connectHTML()) + "</div>";
 }
 
@@ -389,13 +482,16 @@ function logFromRow(row) {
 }
 const rowId = (el) => el.closest(".row")?.dataset.id;
 
+// 一行代表哪几条任务：计划那一块 = 那一行 + 下面的几项（挪的时候一起走），别的就是它自己
+const idsOf = (row) => (row.dataset.ids || row.dataset.id || "").split(" ").filter(Boolean);
+
 // 往上 / 往下挪一格：照这一天列表里现在的顺序换一下位置（和按住分钟数拖一样存）
 function moveRow(id, dir) {
   const list = document.querySelector('.dayview .row[data-id="' + CSS.escape(id) + '"]')?.closest(".list");
-  const ids = [...(list?.querySelectorAll(".row[data-id]") || [])].map((r) => r.dataset.id), i = ids.indexOf(id), j = i + dir;
-  if (i < 0 || j < 0 || j >= ids.length) return false;
-  [ids[i], ids[j]] = [ids[j], ids[i]];
-  store.reorder(ids);
+  const rows = [...(list?.querySelectorAll(".row[data-ids], .row[data-id]") || [])], i = rows.findIndex((r) => r.dataset.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= rows.length) return false;
+  [rows[i], rows[j]] = [rows[j], rows[i]];
+  store.reorder(rows.flatMap(idsOf));
   return true;
 }
 // 挪完页面重画了：焦点放回同一行的同一个按钮（箭头到头了变灰，就放在另一个箭头上）
@@ -464,8 +560,21 @@ export function initToday(rerender) {
     else if (act === "open-ideas") { store.setLocal({ projSide: "ideas" }); location.hash = "projects"; }
     else if (act === "all-today") {
       const c = store.ctx();
-      store.moveMany(c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isAutoTask(t)).map((t) => t.id), c.today);
-    } else if (act === "day-prev") go(addDays(shownDate(), -1));
+      store.moveMany(leftBehind(c).map((t) => t.id), c.today);
+    }
+    // 计划下面的几项：勾、勾步骤、展开、放回 Pool；计划那一行的 + 和 Plan notes
+    else if (act === "ls-tick") {
+      const t = store.get("tasks", el.dataset.line);
+      if (t && t.status !== "done") cheer(el, "done");
+      store.tickLine(el.dataset.line);
+    }
+    else if (act === "ls-step") store.tickStep(el.dataset.line, Number(el.dataset.k));
+    else if (act === "ls-open") { if (!lineOpen.delete(el.dataset.line)) lineOpen.add(el.dataset.line); rerender(); }
+    else if (act === "ls-back") store.backToPool(el.dataset.line);
+    else if (act === "ls-pool") { const k = el.dataset.plan + "|" + el.dataset.date; poolOpen = poolOpen === k ? "" : k; rerender(); }
+    else if (act === "ls-add") { if (!store.placeItem(el.dataset.item, el.dataset.date)) toast("Nothing of that left in the pool"); }
+    else if (act === "ls-notes") { notesShown = notesShown === id ? "" : id; rerender(); }
+    else if (act === "day-prev") go(addDays(shownDate(), -1));
     else if (act === "day-next") go(addDays(shownDate(), 1));
     else if (act === "day-today") go(store.today());
     else if (act === "day-pick") go(el.dataset.date);
@@ -478,6 +587,14 @@ export function initToday(rerender) {
     const act = document.activeElement?.dataset?.act || "", to = document.activeElement?.dataset?.to || "";
     animateNext();
     if (moveRow(row.dataset.id, e.key === "ArrowUp" ? -1 : 1)) refocusRow(row.dataset.id, act, to);
+  });
+
+  // 计划那一行那天还没建（以前的旧数据）：点了先建，再和别的一行一样选中
+  on(document, "click", ".dayview .row.plan.virtual", (e, row) => {
+    if (e.target.closest("button, input, textarea, select, label, a, [data-drag-row]") || row.dataset.date < store.today()) return;
+    focus = store.ensureRow(row.dataset.plan, row.dataset.date);
+    if (row.dataset.date === store.today()) pick(focus);
+    rerender();
   });
 
   // 点任务：还没展开的 → 展开它（今天能计时的同时选中，底部浮条换成它）；已经展开的再点名字 → 展开说明
@@ -550,6 +667,13 @@ export function initToday(rerender) {
   on(document, "mousedown", ".idea-pick button", (e) => e.preventDefault());
   on(document, "click", ".idea-pick button", (e, el) => {
     const form = el.closest("form"), d = form.dataset.add, input = form.querySelector('input[name="title"]');
+    // Pool 里的一项：直接进这天，标题框清空
+    if (el.dataset.act === "pool-pick") {
+      if (!store.placeItem(el.dataset.item, d)) { toast("Nothing of that left in the pool"); return; }
+      input.value = "";
+      el.closest("[data-idea-pick]").innerHTML = pickHTML(d, "");
+      return;
+    }
     input.value = el.dataset.t;
     ideaDraft[d] = el.dataset.act === "idea-pick" ? el.dataset.id : "";
     el.closest("[data-idea-pick]").innerHTML = pickHTML(d, input.value);
@@ -630,7 +754,7 @@ export function initToday(rerender) {
     if (e.button > 0) return;
     e.preventDefault();
     const list = handle.closest(".list");
-    const rows = [...list.querySelectorAll(".row[data-id]")];
+    const rows = [...list.querySelectorAll(".row[data-ids], .row[data-id]")];
     const row = handle.closest(".row"), i = rows.indexOf(row);
     const cs = getComputedStyle(row);
     const h = row.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
@@ -662,9 +786,9 @@ export function initToday(rerender) {
       rows.forEach((r) => { r.style.transform = ""; });
       row.classList.remove("dragging");
       if (to === i) return;
-      const ids = rows.map((r) => r.dataset.id);
-      ids.splice(to, 0, ids.splice(i, 1)[0]);
-      store.reorder(ids);
+      const order = rows.slice();
+      order.splice(to, 0, order.splice(i, 1)[0]);
+      store.reorder(order.flatMap(idsOf));
     };
     addEventListener("pointermove", move);
     addEventListener("pointerup", up);

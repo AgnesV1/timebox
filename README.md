@@ -1,25 +1,23 @@
 # 苦昼短
 
-A timebox that works backwards from the deadline and only asks you to do today's share well. On the computer you plan (a calendar plus a task pool you drag from) and can plan meals the way a meal kit does;
+A timebox: each plan keeps a pool of things to do, and each day you drag a few into the day's box and time the plan as a whole. On the computer you plan (a calendar plus the pool you drag from) and can plan meals the way a meal kit does;
 on the phone you see today, time things, mark them done, add things you want to read or watch, and check the next shopping list at the store. The data lives in your own Google Sheet, shared by the Mac and the phone.
 The interface is in English; your own task names, reasons and notes can be in any language.
 
 Design rules (colours, type, components, motion, and what design tools must leave alone) are in [`DESIGN.md`](DESIGN.md).
 
-## How it works out "how much today"
+## How plans work
 
-1. Two levels: **projects** (big aims like French or Work 1) contain **plans**. A plan has two choices:
-   - Kind: **Total** = so many hours by a date (B2 exam, 20h, by October 30); **Regular** = recurring (Gym Mon/Wed/Fri 40 minutes, Yoga twice a week)
-   - Place: **Auto** = shows up in each day's list by itself; **Pool** = goes into the task pool and you drag it onto a day
-2. A Total plan can be split into items, each with estimated minutes. An item marked Done counts as finished; otherwise it counts the time logged against it (capped at the estimate). A plan with only a total duration is one big item
-3. The remaining minutes are spread over the usable time of each day before the target date (each day's capacity; 0 = a rest day). That day's fixed Regular (Auto) work takes its share first
-4. With several Total plans at once, the load is balanced in 15-minute blocks so no day gets crowded. The Auto share appears in today's list each morning;
-   anything left undone isn't carried over as a task — the remainder is spread over the following days
-5. Only today's share / today's occurrence is written to the Sheet; future days show as faint previews in the calendar and the phone's date strip
-6. The first time you open the app each day, today's amount is recorded as the **line** — finishing tasks during the day doesn't lower it
-7. The next day settles up: if you did less yesterday, the difference is spread over the following days (Yesterday ran … short); if you did more, the following days get lighter
-8. When you finish something you enter the actual minutes; once a module has two samples that differ a lot from the estimate, it suggests re-estimating the remaining items
-9. The real pace of the last two weeks projects a finish date and gives the plan a health label: On pace / Cutting it close / … late
+1. Two levels: **projects** (areas of life like Build or Fitness) contain **plans** (IELTS, Swimming). There is one kind of plan: a name, and optionally
+   - fixed weekdays it shows up on by itself (Gym Mon / Wed / Fri, 40 minutes each), or nothing — you drag it onto a day when you like; "about N a week" is just a reference number
+   - dates (from – to), shown on its card as "day 4 of 40"
+   - **Notes**: phases, rules, how you do things — open them from the plan's row on Today while you work
+   - a **pool**: the concrete things to do. Each item has a name and, optionally, how many times (Once, ×11, or Any), about how long (only a guide — nothing is calculated from it), about N a week, **steps**, a note, a section and **Later** (out of the pool, not counted, until you switch it back). A plan with nothing in its pool is just its row.
+2. **A plan is one row a day**, timed as a whole like any task (select it, Start in the bar). Items dragged in from its pool sit under it like notes: tick one when it's done — that's one time of that item. An item with steps opens into a checklist; ticking the last step ticks the item. Item names carry their number (`Mock test #3`).
+3. Nothing is spread over days for you. On the computer, drag items from the Pool beside the calendar, or use the + on the plan's row on Today; the add-task box offers them too.
+4. **What isn't ticked goes back to the pool** once its day is over (its count comes back). Half-done steps stay on that day as a record, and the rest waits in the pool as the same time (`Mock test #1 · 4 steps left`) — drag it out again to carry on.
+5. The top of Today shows time done / about how long today's picked items add up to · the day's **box** (its usable time, set per weekday or per day in the calendar).
+6. A whole plan can be **pasted as text** (Markdown: `## sections`, `- [ ] item · 30min · ×11 · a note`, steps indented under their item, a line like `L3 ×2, L5 ×3` for weekly amounts; anything else is kept in Notes). You see what was found before Create plan. **Copy as text** gives the plan back in the same form; edit it anywhere and paste it again to update — items are matched by name or by a code like L3, so times already done stay, and items no longer in the text are offered as Keep / Later / Delete.
 
 ## 1. The Google Sheet side
 
@@ -82,7 +80,7 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   Goal onto goal = make it the parent (one parent per goal). Without dragging: Part of when editing a goal's text, Serves in the plan editor.
   A plan with no goal of its own counts its project's goals. On Today, an opened task shows what it's for under its title: For plan → goal → parent → … (skipping goals in Past, like the lines);
   on the phone, a chain too long for one line scrolls by itself like a marquee (hold it to pause).
-  Below, each project tracks something different (the Watch column in Settings → Projects changes it): **Build** tracks plan progress (bar, health, timeline);
+  Below, each project tracks something different (the Watch column in Settings → Projects changes it): **Build** shows how much of its plans' pools is done (one bar);
   **Fitness** checks whether the last 7 days reached 3 hours, **Leisure** whether the last 7 days of Relax stayed within the weekly range (5–20 hours by default) —
   each is one line, red when short, with a count on the Projects item in the sidebar; **Work / Chores** track nothing and just list their plans.
   The page is split by project: Build / Work / Friends / Leisure / Fitness / Chores are always there, always in that order (Rename changes the name or colour or merges into another project; an empty one can be removed).
@@ -97,9 +95,10 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   Hover a line and click `+` to put it on that day (Leisure; ✈️ counts 8 hours, 🛰️ 4, 🎭 🍽️ 🍹 3, unsorted 1; "by" ideas go on the last day, then drag as usual).
   Plan in the idea pool uses the same defaults. Which projects can pick ideas: the Ideas column in Settings → Projects.
   On the phone: with the `Idea` switch on in the add-task row, Add saves to the pool instead (it lands in Unsorted; sort it on the computer); the light bulb in the top bar opens the look-up page (search names and notes, read only). All of it is stored in the Settings tab, one row each (`idea:…`).
-  The sections hold plans. Click "New plan" or a project's "+ Plan", choose Total / Regular and Auto / Pool;
-  for Total enter a deadline and either a total duration or items (one per line to add many, or Numbered to generate "Unit 1…10"),
-  for Regular enter minutes per weekday (Auto) or times per week and minutes each (Pool); Rename renames the project and its plans with it
+  The sections hold plans. Click "New plan" or a project's "+ Plan": a name is enough (Swimming); "Shows up" is When I drag it or On set days (minutes per weekday),
+  with About … a week, dates, a colour and Notes; or Paste text for a whole plan. In a plan's editor the pool is listed by section — name · about how long · times · done / a week / steps;
+  click an item to change it (steps one per line, `Listening set · 35min`), switch a section or an item to Later, and add more one per line (`L5 shadowing · 20min · ×18`).
+  Cards show how the plan shows up, its dates and day, the time spent, this week per item (those with about N a week) and what's left in the pool. Rename renames the project and its plans with it
 - **Repeat shortcuts**: in the add-task box, pick "↻ Every day / Weekdays / Every <weekday>" and "for good / for 1 week …", then Add —
   that creates a Regular + Auto plan; a task's ⋯ → Repeat does the same and lets each weekday have its own minutes.
   These small repeating things count straight towards their project: Projects shows them as one line under the project header (click to edit or stop) rather than a card; the task's label is the project name;
@@ -109,11 +108,13 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   For a repeating task, the top of the editor offers This one / This & following / All; renaming or changing minutes applies to those days;
   "Change…" changes the repeat from that day on. Deleting offers Only this / This & following / This & earlier / All;
   days already done or timed stay as a record. Missed automatic tasks don't count as "left behind"
-- `Calendar`: clicking a date opens that day on Today. Every day always shows its whole schedule (names wrap in full); cells have a minimum width and the calendar scrolls sideways when the window is narrow. The task pool is on the right: drag an item onto a day to plan it,
-  or click it (or Tab to it and press Enter) to pick the day from a "Put on…" menu. Pool-placed Regular plans are under "This week" with how many are left this week; each drag places one.
-  Calendar tasks can be dragged to other days, or back to the pool to unschedule them (in the task editor: Back to the pool). In the faint previews of future days, a Regular occurrence can be dragged away or opened; a Total plan's projected share is view-only.
+- `Calendar`: clicking a date opens that day on Today. Every day always shows its whole schedule — nothing is folded away; cells have a minimum width and the calendar scrolls sideways when the window is narrow.
+  A plan's day is one sticky: its name, then that day's items in small type (done ones struck through); hovering it, or dragging something over the day, opens it into one item per line, and each item can be dragged elsewhere.
+  Dragging the whole sticky moves that day's unticked items; back to the Pool puts them back; clicking it opens the day on Today. The month view draws only the weeks the month touches.
+  The Pool is on the right, by project and plan: drag an item onto a day (or click it, or Tab to it and press Enter, for a "Put on…" menu) and it joins that plan's row there; drag a plan's name for just its row.
+  The box at the top adds lines to a plan's pool. Other calendar tasks can be dragged to other days, or back to the Pool to unschedule them. In the faint previews of future days, a fixed-day plan's occurrence can be dragged away or opened.
   The number at the top right of a cell is that day's usable time; click it to change
-- `Today`: today's list on the left; on the right the line, yesterday's bill, and what's overdue.
+- `Today`: today's list on the left — each plan one row with its items under it (+ on the row lists what's left in its pool); on the right time done / picked · the day's box, and what was left behind on earlier days.
   At the bottom centre of the screen (above the timer bar) is a translucent half-disc, the day's **dial**: the outer ring is 6→18h, the inner ring 18→6h, with 6 on the left, 9 at the top and 12 on the right;
   the base is grey (time with nothing done stays grey), and the leftmost ring has a thin cut across its ends; "now" is a hand from the centre.
   Tasks are blocks in the neon version of their project colour. At night the base is mirrored chrome and tasks glow; by day the whole dial is screen-printed —
@@ -135,9 +136,10 @@ after stopping, the bar offers Done / Delay right away. Only one runs at a time;
 The timer syncs through the Sheet — start on the phone, stop on the computer; anything under a minute isn't kept.
 No timer is fine too: after Done, enter under the task how long it took and when it ended, then Log (the estimate and the current time are filled in); if there's already a record, or for Delay, "+ time" adds another segment.
 
-**Time and status are separate**: time spent is only what was recorded (the timer and segments you logged) — that's what today's done, the line, the dial, Stats' time and the quarter sheet use;
+**Time and status are separate**: time spent is only what was recorded (the timer and segments you logged) — that's what today's done, the dial, Stats' time and the quarter sheet use;
 a task marked Done with nothing recorded counts no time. There are only three statuses — Done (finished), Delay (not finished, put off; it's only a note, it doesn't move anything — make a new task if you'll do more) and Drop (not doing it) —
-used only for: how the calendar draws it (Done greyed and struck through, Delay struck through, Drop greyed), Stats' completion rate and Delay / Drop reasons, and plan progress (a Done item counts as finished).
+used only for: how the calendar draws it (Done greyed and struck through, Delay struck through, Drop greyed), Stats' completion rate and Delay / Drop reasons, and pool counts (a Done item is one time done).
+A plan's row has no status: its time is what counts, and its items carry the results.
 The old Partial and Later both count as Delay; running setup with this `Code.gs` first backs up Tasks and then changes them to Delay;
 old Done tasks with no time get one segment equal to their estimate (no clock times), so past numbers stay the same.
 Each segment is written in the task's `Times` cell ("09:10-09:40 30m; 20m"), and Actual min is their sum; time on a task with no status yet already counts towards today.
@@ -166,7 +168,7 @@ To set yourself a target: Stats, under the pie → Adjust → Deep goal (hours p
     **On the side** (also in Adjust): one total per month — shows, novels and podcasts while working out or commuting. You can fill the previous two months, plus the current month in its last three days.
     Typing 0 counts as filled in (that month had none); an empty box means not filled in, and while last month is empty a red dot sits next to Adjust.
     It's spread over each day of that month and shows on the pie as a streak of light sweeping down from the middle of Untracked; it takes no time (it overlapped other things anyway).
-  - **Plan** (how the plans went): how much got done, how many days held the line, how good the estimates were, planned vs actual per day and per project, reasons for unfinished work, and each plan's planned vs actual
+  - **Plan** (how the plans went): how much got done, how good the estimates were, planned vs actual per day and per project, reasons for unfinished work, and each plan's times done out of its pool with the time spent on it
 
 **Reading (computer and phone)**: the first time you open Reading (or Settings → Reading on the computer), paste the link to your reading log Sheet once; it's saved as you paste. The Sheet doesn't need to be public — it's opened with your own Google account.
 The `Reading` page (the book icon at the top right on the phone) has two boxes at the top right:
@@ -227,6 +229,7 @@ Offline, entries wait on the device and go out once you're back online.
 
 **Phone**: see tasks, time them, mark results, add tasks, add to the reading log. The top row is the five days before and after today; tap a day to see it.
 Only the opened row has Done / Delay / Drop (other rows just show their status on the right); after Done you enter how long and when it ended, Delay and Drop ask for a reason;
+a plan is one row with its items under it, ticked the same way (steps too); picking from the pool and moving things between days happen on the computer;
 press and drag the minutes on the left to reorder (the phone has no ↑ ↓; the computer keeps them, plus Alt+↑↓); add tasks at the bottom of the list ("Gym 40" — a trailing number is minutes). The project is a small chip; tapping it opens a dropdown of projects with their plans.
 **Spend** at the bottom right of the add-task box records a transaction (see Spending below); to its left, in grey, what's left of this month's budget (`$1,356 left`; still grey at $0, only past the budget does it turn red). Planning and settings happen on the computer.
 
@@ -278,8 +281,10 @@ Cards, the sidebar and the bars are translucent (lightly frosted by day), so the
 
 **What's where in the Sheet**: Tasks / Projects / Items and a few more tabs are visible (plus Archive once you've archived). Tasks' `Group` column = the project a task belongs to
 (it can belong straight to a project with `Project` left empty). Each row of Projects is a plan: `Group` = the project,
-`Project` = the plan's name, `Kind` / `Place` as above, and a Regular plan's rule in the hidden `Rule` column;
-automatic task IDs start with `rt:` (Regular) or `au:` (a Total plan's share for today);
+`Project` = the plan's name, `Kind` is Regular for every plan (older Total plans were moved over), `Place` is Auto for fixed weekdays and Pool otherwise, `Start` / `Deadline` its dates,
+and the hidden `Rule` column holds the weekdays, about N a week, Notes and each pool item's settings (times, a week, steps, note, Later). Each row of Items is a pool item (name, section in `Module`, about how long in `Est min`).
+A plan's row for a day is the task with no Item ID (new ones have IDs starting `pd:`); an item dragged onto a day is a task with that Item ID, and its steps are `- [ ]` / `- [x]` lines in its Description;
+the day a device switched to this way of planning is `lists-from` in Settings (unticked items go back to the pool only from then on); automatic task IDs start with `rt:` (fixed weekdays) or `au:` (old daily shares);
 timer records are in Tasks' `Times` column, deep work in `Deep` (ticked = yes, editable in the Sheet);
 the running timer, per-day capacity changes, commute days, the reading Sheet link, the pie defaults and the deep goal (`life`) are in the (hidden) Settings tab.
 The project list (names, colours, progress / growth) is `groups` in Settings; goals are one row each, `goal:<id>` (`up` is the parent goal, `by` the projects `g:name` / plans `p:id` serving it),

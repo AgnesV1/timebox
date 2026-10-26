@@ -505,8 +505,9 @@ export function unschedule(id) {
   return true;
 }
 
-// ---------- 计划和条目 ----------
-// 计划 = projects 表一行。kind：total（总时长 + 截止日）/ regular（规律）；place：auto（自动排到每天）/ pool（进任务池）
+// ---------- 计划和 Pool 里的项 ----------
+// 计划 = projects 表一行，kind 都是 regular（以前的 total 打开时搬过来，见 js/store/lists.js）；place：auto（固定星期几自己出现）/ pool（拖到哪天）。
+// Pool 里的项 = items 表一行，它的设置在计划的 rule.items 里
 
 const nextPlanOrder = () => all("projects").reduce((m, x) => Math.max(m, Number(x.order) || 0), 0) + 1;
 // 同一个大类里的计划默认用大类的颜色
@@ -518,12 +519,12 @@ export const groupOf = (t) => (t.projectId && get("projects", t.projectId) ? gro
 // 计划的「默认深度」（rule.deep）：从它来的任务一开始就标成 Deep
 export const planDeep = (projectId) => Boolean(projectId && get("projects", projectId)?.rule?.deep);
 
-// p.total（分钟）：新建整块计划时只填了总时长，就建一个同名的大条目
+// p.total（分钟）：以前新建整块计划时只填了总时长，就建一个同名的大条目（现在的编辑框不给 total 了，测试里还用）
 export function saveProject(p) {
   const id = p.id || newId();
   const prev = get("projects", id);
   const { total, ...fields } = p;
-  const row = { name: "", group: "", kind: "total", place: "pool", status: "active", deadline: "", start: "", early: 2, calib: null, rule: null, ...prev, ...fields, id };
+  const row = { name: "", group: "", kind: "regular", place: "pool", status: "active", deadline: "", start: "", early: 0, calib: null, rule: null, ...prev, ...fields, id };
   row.order = prev?.order ?? nextPlanOrder();
   row.color = fields.color || prev?.color || colorFor(row.group);
   if (row.kind === "regular") { const { id: _i, title: _t, ...rule } = R.ruleOf(row); row.rule = rule; }

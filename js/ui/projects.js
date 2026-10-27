@@ -75,7 +75,7 @@ function cardHTML(c, p, track) {
     const from = startOfMonth(c.today);
     const month = ts.filter((t) => t.date >= from && t.date <= c.today && (E.spentMin(t) > 0 || t.status === "done"));
     const days = new Set(month.map((t) => t.date)).size, hours = month.reduce((a, t) => a + E.spentMin(t), 0);
-    lines = [[when, datesText(p, c.today), days ? "<b>" + days + "</b> time" + (days > 1 ? "s" : "") + " this month" : "", hours ? "<b>" + fmtHours(hours) + "</b>" : ""].filter(Boolean).join(" · "), "Pool empty — just the one row"];
+    lines = [[when, datesText(p, c.today), days ? "<b>" + days + "</b> time" + (days > 1 ? "s" : "") + " this month" : "", hours ? "<b>" + fmtHours(hours) + "</b>" : ""].filter(Boolean).join(" · ")];   // Pool 空着就不提（她说没加就空着）
   }
   const w = !st.length && track !== "" ? E.regularWeek(c, p) : null;
   return '<article class="pcard" data-project="' + p.id + '" style="--pc:' + esc(p.color) + '">' +

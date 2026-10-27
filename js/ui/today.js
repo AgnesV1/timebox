@@ -181,7 +181,7 @@ function lineHTML(t, phone) {
   return h + (note || back ? '<p class="ls-more">' + (note ? "<span>" + esc(note) + "</span>" : "") + back + "</p>" : "");
 }
 
-// 电脑：计划那一块的「+ From the pool」点开 = 这个计划 Pool 里还能拖的（勾了一半回了 Pool 的那次带着剩几步），点一个就进这天
+// 电脑：点开计划那一行的「From the pool」= 这个计划 Pool 里还能拖的（勾了一半回了 Pool 的那次带着剩几步），点一个就进这天
 function candsHTML(c, plan, d) {
   const items = L.pool(c).find((g) => g.plan.id === plan.id)?.items || [];
   if (!items.length) return '<div class="ls-cands"><p class="hint">Nothing left in the pool — add things to the plan on Projects.</p></div>';
@@ -216,12 +216,13 @@ function planRowHTML(c, b, tasks, phone, openId) {
   const key = plan.id + "|" + d;
   const side = open ? "" : '<span class="rside">' + (running ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : total ? '<span class="num">' + fmtMin(total) + "</span>" : "") +
     (live.length ? '<b class="ls-cnt num">' + done + "/" + live.length + "</b>" : "") + (t?.status ? '<b class="stw">' + STATUS_WORD[t.status] + "</b>" : "") + "</span>";
+  // 电脑：点开这一行才有「From the pool」（她 2026-10-27 说没加项就空着，别一直提醒她从 Pool 里挑）；Pool 里没东西的计划不给
+  const pool = !phone && d >= c.today && L.itemsOf(c, plan.id).length ? '<button type="button" class="chip ghost" data-act="ls-pool" data-plan="' + esc(plan.id) + '" data-date="' + d + '" aria-expanded="' + (poolOpen === key) + '">' + (poolOpen === key ? "Close the pool" : "From the pool") + "</button>" : "";
   // 状态按钮：电脑上收着时停上去浮出来，展开了一直在；手机上只有展开的那一行有
   const chips = t ? '<div class="chips' + (open ? "" : " hov") + '">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
     (open && t.date <= c.today && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") +
+    (open ? pool : "") +
     (open && notes ? '<button type="button" class="chip ghost" data-act="ls-notes" aria-expanded="' + (notesShown === t.id) + '">Plan notes</button>' : "") + "</div>" : "";
-  // 电脑：那几项下面一行「+ From the pool」（放在标题行右边会被停上去浮出来的状态按钮盖住）；Pool 里没东西的计划不画
-  const plus = !phone && d >= c.today && L.itemsOf(c, plan.id).length ? '<button type="button" class="link ls-addp" data-act="ls-pool" data-plan="' + esc(plan.id) + '" data-date="' + d + '" aria-expanded="' + (poolOpen === key) + '">' + (poolOpen === key ? "Close the pool" : "+ From the pool") + "</button>" : "";
   const ids = [t?.id, ...lines.map((x) => x.id)].filter(Boolean).join(" ");
   return '<div class="row plan st-' + (t?.status || "open") + (t?.optional ? " opt" : "") + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + (open ? " open" : "") + (t ? "" : " virtual") + '"' + (t ? ' data-id="' + t.id + '"' : "") +
     ' data-ids="' + ids + '" data-plan="' + esc(plan.id) + '" data-date="' + d + '" style="--i:' + (t ? tasks.indexOf(t) : 0) + '">' +
@@ -230,7 +231,7 @@ function planRowHTML(c, b, tasks, phone, openId) {
     '<div class="body"><div class="line"><div class="task" data-act="desc">' + esc(t?.title || plan.name) + (t && E.isRoutine(t) ? ' <span class="rt" title="Routine">↻</span>' : "") +
     (t?.deep ? ' <span class="dp" title="Deep work">◆ Deep</span>' : "") + (t?.desc && !(open && openDesc.has(t.id)) ? '<span class="more"> ⋯</span>' : "") + "</div>" + side +
     (phone || !t ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") + "</div>" +
-    (lines.length ? '<div class="ls-lines">' + lines.map((x) => lineHTML(x, phone)).join("") + "</div>" : "") + plus +
+    (lines.length ? '<div class="ls-lines">' + lines.map((x) => lineHTML(x, phone)).join("") + "</div>" : "") +
     (poolOpen === key && !phone ? candsHTML(c, plan, d) : "") +
     (open ? taskChainHTML(t, 2) + timesHTML(c, t, list, form) : "") +
     (open && openDesc.has(t.id) ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Notes for this day">' + esc(t.desc || "") + "</textarea>" : "") +

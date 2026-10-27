@@ -583,12 +583,17 @@ body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
 .load { height: 4px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .load i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--hot)); }
 [data-theme="dark"] .load i { background: linear-gradient(90deg, #00E5FF, #CCFF00); }
-/* 那天实际记下的时间超过 7 小时（她 2026-10-27 要的，暂定，之后可能取消）：这条变红、一闪一闪发红光；关了 Sparkles 或减少动态就只亮着不闪 */
+/* 那天实际记下的时间超过 7 小时（她 2026-10-27 要的，暂定，之后可能取消）：大部分时候还是平常的霓虹色，隔 7 秒慢慢呼吸一下——
+   红色带红光浮上来、再慢慢退掉（她说闪得太勤）。红的是盖在上面的一层（::after），底下照旧是渐变；排多了的那种静止红（.cell.over）这几天也让给它。
+   关了 Sparkles 或减少动态：不呼吸，只在底下留一圈淡淡的红光 */
 .load.over7 { overflow: visible; }
-.load.over7 i, [data-theme="dark"] .load.over7 i { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
-.load.over7.blink i { animation: over7 1.4s ease-in-out infinite; }
-@keyframes over7 { 0%, 100% { opacity: .55; box-shadow: 0 0 2px var(--warn); } 50% { opacity: 1; box-shadow: 0 0 12px 2px var(--warn); } }
-@media (prefers-reduced-motion: reduce) { .load.over7.blink i { animation: none; } }
+.cell .load.over7 i { position: relative; background: linear-gradient(90deg, var(--blue), var(--hot)); }
+[data-theme="dark"] .cell .load.over7 i { background: linear-gradient(90deg, #00E5FF, #CCFF00); }
+.load.over7 i::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--warn); box-shadow: 0 0 10px 2px var(--warn); opacity: 0; }
+.load.over7.blink i::after { animation: over7 7s ease-in-out infinite; }
+.load.over7:not(.blink) i { box-shadow: 0 0 6px var(--warn); }
+@keyframes over7 { 0%, 60%, 100% { opacity: 0; } 76% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .load.over7.blink i::after { animation: none; } .load.over7 i { box-shadow: 0 0 6px var(--warn); } }
 /* 日历上的任务 = 一张张便利贴：直角，纸按项目的颜色染淡，顶上一道细细的、深一点的同色胶条（1.5px，分得清上一张下一张），
    底边一点点纸的阴影（夜里是染了色的暗纸，只留胶条不要阴影）；不写时长（一天合计多少在格子头上） */
 .ev { --paper: #FFFEF2; position: relative; display: flex; align-items: flex-start; gap: 4px; padding: 6px 6px 4px; border-radius: 0; background: color-mix(in srgb, var(--c) 28%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) 75%, var(--paper)), 0 1px 1px rgba(11, 11, 11, .06), 0 5px 6px -5px rgba(11, 11, 11, .35); font-size: 11.5px; line-height: 1.3; cursor: grab; }

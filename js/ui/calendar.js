@@ -38,16 +38,19 @@ function ghostHTML(g) {
     '<span class="t"><i class="rt">↻</i>' + esc(g.title) + '</span><span class="m num">' + g.est + "</span></div>";
 }
 
-// 一个计划那天的那一张：计划名，后面是那天的几项（做了的划掉）；停上去展开成一行一项，每一项能单独拖走
+// 一个计划那天的那一张：那一行的名字（没有那一行才写计划名），后面是那天的几项（做了的划掉）；停上去展开成一行一项，每一项能单独拖走。
+// 状态跟着那一行，和别的便利贴一样（Done 灰掉划掉、Delay 划掉、Drop 灰掉）——她 2026-10-27 报的：今天页标了 Done，日历上没跟着；
+// 那一行没标、下面的项都勾了，也算做完
 function blockHTML(b, d) {
   const plan = b.plan, lines = b.lines.slice().sort((x, y) => (Number(x.order) || 0) - (Number(y.order) || 0));
   const li = (t, drag) => '<span class="li' + (t.status === "done" || t.status === "delay" ? " dn" : t.status === "drop" ? " dp" : "") + '"' + (drag ? ' data-drag="task:' + t.id + '"' : "") + ">" + esc(t.title) + "</span>";
   const spent = b.row ? E.spentMin(b.row) : 0;
-  const allDone = lines.length > 0 && lines.every((t) => t.status === "done");
-  return '<div class="ev blk' + (allDone ? " st-done" : "") + '" data-drag="blk:' + esc(plan.id) + "|" + d + '" data-act="open-day" data-date="' + d + '" style="--c:' + esc(plan.color || "var(--c-None)") + '" title="' +
-    esc(plan.name + (lines.length ? " · " + lines.length + " thing" + (lines.length > 1 ? "s" : "") : "") + (spent ? " · " + fmtHours(spent) + " logged" : "")) + '">' +
-    '<span class="t"><span class="bt">' + esc(plan.name) + "</span>" + lines.map((t) => li(t, false)).join("") + "</span>" +
-    (lines.length ? '<div class="full"><span class="bt">' + esc(plan.name) + "</span>" + lines.map((t) => li(t, !t.status)).join("") + "</div>" : "") + "</div>";
+  const st = b.row?.status || (lines.length && lines.every((t) => t.status === "done") ? "done" : "open");
+  const name = b.row?.title || plan.name;
+  return '<div class="ev blk st-' + st + (b.row?.optional ? " opt" : "") + '" data-drag="blk:' + esc(plan.id) + "|" + d + '" data-act="open-day" data-date="' + d + '" style="--c:' + esc(plan.color || "var(--c-None)") + '" title="' +
+    esc(name + (name !== plan.name ? " · " + plan.name : "") + (lines.length ? " · " + lines.length + " thing" + (lines.length > 1 ? "s" : "") : "") + (spent ? " · " + fmtHours(spent) + " logged" : "")) + '">' +
+    '<span class="t"><span class="bt">' + esc(name) + "</span>" + lines.map((t) => li(t, false)).join("") + "</span>" +
+    (lines.length ? '<div class="full"><span class="bt">' + esc(name) + "</span>" + lines.map((t) => li(t, !t.status)).join("") + "</div>" : "") + "</div>";
 }
 
 function cellHTML(c, d, { month = false, outside = false, scores = null, still = false } = {}) {

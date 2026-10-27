@@ -17,7 +17,7 @@ const TITLE = document.title;
 
 // 能计时的：今天的、还没做完的（Delay 的也可以接着做）。计划下面那几项（便条）不单独计时，时间记在计划那一行上
 export const timeable = (t, today) => Boolean(t) && t.date === today && (!t.status || t.status === "delay") && !L.isLine(t);
-// 计划那一行（整块计时，没有 Done / Delay）
+// 计划那一行（整块计时）
 const isPlanRow = (t) => L.isRow(t) && Boolean(store.get("projects", t.projectId));
 
 // 选中的任务；没手动选过（或者选的那个已经做完了）：正在计时的那个，再不然今天第一个没做的（先挑不是 Optional 的）
@@ -70,11 +70,6 @@ export function dockHTML(c, onToday, extra = () => null) {
   }
   atEdit = "";
   const st = stopped && store.get("tasks", stopped.taskId);
-  if (st && isPlanRow(st)) {
-    return '<div class="dock logged" style="--bar:' + colorOf(st) + '">' +
-      '<div class="dk-main"><span class="dk-k">Logged ' + fmtMin(stopped.min) + "</span>" + titleOf(st) + "</div>" +
-      '<button type="button" class="icon-btn dk-x" data-act="dock-close" aria-label="Close">×</button></div>';
-  }
   if (st && st.status !== "done") {
     return '<div class="dock logged" style="--bar:' + colorOf(st) + '">' +
       '<div class="dk-main"><span class="dk-k">Logged ' + fmtMin(stopped.min) + "</span>" + titleOf(st) + "</div>" +

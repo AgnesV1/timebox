@@ -212,3 +212,38 @@ test("store: old plans move over — Total becomes a plan with a pool, the big s
   assert.ok(store.all("items").some((i) => i.projectId === p && i.title === "Unit 1"), "other items stay, as Once");
   assert.equal(store.adoptLists(), false, "running it again changes nothing");
 });
+
+test("store: a task added under a plan is the plan's own unless its name picks a pool item (she said 2026-10-26)", async () => {
+  const store = await import("../js/store.js?lists-own");
+  const day = store.today();
+  const plan = store.saveProject({ name: "IELTS CLB9", group: "Build", kind: "regular", place: "pool" });
+  const [l3] = store.addPoolLines(plan, "Pool", "L3 listening set · 2h · ×11");
+  const items = () => store.all("items").filter((i) => i.projectId === plan).length;
+
+  const typed = store.addTask({ title: "IELTS", projectId: plan, date: day, est: 60 });
+  assert.equal(store.get("tasks", typed).itemId, "", "a name that isn't in the pool: the plan's own task, not folded under it");
+  assert.equal(items(), 1, "and nothing new is put in the pool");
+  assert.equal(store.addTask({ title: "", projectId: plan, date: day }), typed, "no name: the plan's row for that day, which is the one already there");
+  const second = store.addTask({ title: "Vocab review", projectId: plan, date: day });
+  assert.notEqual(second, typed, "another name is its own task under the plan");
+  const picked = store.addTask({ title: "l3 listening set", projectId: plan, date: day });
+  assert.equal(store.get("tasks", picked).itemId, l3, "the name of a pool item picks it");
+  assert.equal(store.get("tasks", picked).title, "L3 listening set #1");
+
+  store.setStatus(typed, "done");
+  assert.equal(store.get("tasks", typed).status, "done", "the plan's row can be marked done like any task");
+});
+
+test("store: tasks folded under items the old way are put back as the plan's own", async () => {
+  const store = await import("../js/store.js?lists-unfold");
+  const plan = store.saveProject({ name: "Work", group: "Work", kind: "regular", place: "pool" });
+  store.addItems(plan, "Added", ["Work 1: deck"], 30);
+  const added = store.all("items").find((i) => i.projectId === plan);
+  const t = store.addTask({ title: "Work 1: deck", projectId: plan, itemId: added.id, date: "2026-10-26", est: 30, status: "done" });
+  const [kept] = store.addPoolLines(plan, "Pool", "Quarterly report · 1h");
+  store.adoptLists();
+  assert.equal(store.get("items", added.id), null, "the item made on the side is gone");
+  assert.equal(store.get("tasks", t).itemId, "", "its task is the plan's own again");
+  assert.equal(store.get("tasks", t).status, "done", "and keeps what it had");
+  assert.ok(store.get("items", kept), "items put in the pool on purpose stay");
+});

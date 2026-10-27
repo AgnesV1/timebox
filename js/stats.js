@@ -67,14 +67,13 @@ export function lifeOn(life, date) {
   return { sleep: life.sleep, care: life.care, chores: wd === 0 || wd === 6 ? life.chores / 2 : 0 };
 }
 
-const counts = (t) => !E.isChore(t) && !(L.isRow(t) && !t.status);
-
 export function summarize(ctx, from, to, { by = "group" } = {}) {
+  // 只算分钟、不算一条任务的：Chore 键那条（一直标着 Done）、没标的计划那一块的头（那天下面有项、结果在项上；标了的照旧算）
+  const counts = (t) => !E.isChore(t) && (t.status || !L.isContainer(ctx, t));
   const last = to < ctx.today ? to : ctx.today;
   const days = from <= last ? range(from, last) : [];
   const inRange = (d) => d >= from && d <= last;
   const all = ctx.tasks.filter((t) => t.date && inRange(t.date));
-  // 只算分钟、不算一条任务的：Chore 键那条（一直标着 Done）、计划的那一行（整块计时，结果在下面那几项上；以前标过状态的照旧算）
   const tasks = all.filter(counts);
 
   const spentBy = {}, plannedBy = {}, deepBy = {}, wdBy = {};   // wdBy：每一行（大类 / 计划）在星期几各花了多少

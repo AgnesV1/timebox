@@ -131,6 +131,9 @@ export function poolTotals(ctx, plan) {
 
 // ---------- 每天那一行 ----------
 
+// 计划那一块的头：那一行，那天下面还有它的项。标不标都行，不算「留下来没做的」
+export const isContainer = (ctx, t) => isRow(t) && (idx(ctx).byDate.get(t.date) || []).some((x) => x.projectId === t.projectId && x.itemId);
+
 export const rowOn = (ctx, planId, date) => (idx(ctx).byDate.get(date) || []).filter((t) => t.projectId === planId && isRow(t)).sort(byOrder)[0] || null;
 // 新的一行的 ID：pd:<计划>:<日期>；被挪走的那一行还占着这个 ID 就加后缀
 export function rowId(planId, date, taken) {

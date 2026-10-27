@@ -181,7 +181,7 @@ function lineHTML(t, phone) {
   return h + (note || back ? '<p class="ls-more">' + (note ? "<span>" + esc(note) + "</span>" : "") + back + "</p>" : "");
 }
 
-// 电脑：计划那一行的 + 点开 = 这个计划 Pool 里还能拖的（勾了一半回了 Pool 的那次带着剩几步），点一个就进这天
+// 电脑：计划那一块的「+ From the pool」点开 = 这个计划 Pool 里还能拖的（勾了一半回了 Pool 的那次带着剩几步），点一个就进这天
 function candsHTML(c, plan, d) {
   const items = L.pool(c).find((g) => g.plan.id === plan.id)?.items || [];
   if (!items.length) return '<div class="ls-cands"><p class="hint">Nothing left in the pool — add things to the plan on Projects.</p></div>';
@@ -193,8 +193,9 @@ function candsHTML(c, plan, d) {
   }).join("") + "</div>";
 }
 
-// 计划那一行：整块计时（点了选中、底部浮条 Start，和别的任务一样），没有 Done / Delay / Drop——结果在下面每一项上。
-// 左边那格是下面几项大概多久加起来；收着时右边是记了多久和「做了几项 / 几项」；展开有链条、计时记录、+ time、当天的备注（点名字）、Plan notes。
+// 计划那一行：整块计时（点了选中、底部浮条 Start，和别的任务一样），和别的任务一样有 Done / Delay / Drop（她 2026-10-26 要回来的：Work、IELTS 这种要能标完成）。
+// 左边那格是下面几项大概多久加起来（没有项就是它自己的分钟）；收着时右边是记了多久、「做了几项 / 几项」、标了什么；
+// 展开有链条、计时记录、+ time、Done / Delay / Drop、原因、当天的备注（点名字）、Plan notes。
 // 那天还没有这一行（以前的旧数据）：画一个只有名字的头，点了再建
 function planRowHTML(c, b, tasks, phone, openId) {
   const t = b.row, plan = b.plan, d = (t || b.lines[0]).date;
@@ -208,28 +209,36 @@ function planRowHTML(c, b, tasks, phone, openId) {
   const run = store.timer(), running = Boolean(t) && run?.taskId === t.id;
   const picked = Boolean(t) && timeable(t, c.today) && pickedId(c) === t.id;
   const total = t ? store.timeTotal(t.id) : 0;
-  const form = open && t.date <= c.today && logOpen.has(t.id);
+  // 补记用了多久：和别的任务一样，标了 Done、还一点没记的直接出来；别的点「+ time」才出来
+  const form = open && t.date <= c.today && (logOpen.has(t.id) || (t.status === "done" && !list.length));
+  const why = t && (t.status === "delay" || t.status === "drop");
   const notes = String(plan.rule?.notes || "").trim();
   const key = plan.id + "|" + d;
   const side = open ? "" : '<span class="rside">' + (running ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : total ? '<span class="num">' + fmtMin(total) + "</span>" : "") +
-    (live.length ? '<b class="ls-cnt num">' + done + "/" + live.length + "</b>" : "") + "</span>";
-  const plus = !phone && d >= c.today ? '<button type="button" class="ls-plus" data-act="ls-pool" data-plan="' + esc(plan.id) + '" data-date="' + d + '" aria-expanded="' + (poolOpen === key) + '" aria-label="Add from the ' + esc(plan.name) + ' pool" title="Add from the pool">+</button>' : "";
+    (live.length ? '<b class="ls-cnt num">' + done + "/" + live.length + "</b>" : "") + (t?.status ? '<b class="stw">' + STATUS_WORD[t.status] + "</b>" : "") + "</span>";
+  // 状态按钮：电脑上收着时停上去浮出来，展开了一直在；手机上只有展开的那一行有
+  const chips = t ? '<div class="chips' + (open ? "" : " hov") + '">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
+    (open && t.date <= c.today && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") +
+    (open && notes ? '<button type="button" class="chip ghost" data-act="ls-notes" aria-expanded="' + (notesShown === t.id) + '">Plan notes</button>' : "") + "</div>" : "";
+  // 电脑：那几项下面一行「+ From the pool」（放在标题行右边会被停上去浮出来的状态按钮盖住）；Pool 里没东西的计划不画
+  const plus = !phone && d >= c.today && L.itemsOf(c, plan.id).length ? '<button type="button" class="link ls-addp" data-act="ls-pool" data-plan="' + esc(plan.id) + '" data-date="' + d + '" aria-expanded="' + (poolOpen === key) + '">' + (poolOpen === key ? "Close the pool" : "+ From the pool") + "</button>" : "";
   const ids = [t?.id, ...lines.map((x) => x.id)].filter(Boolean).join(" ");
-  return '<div class="row plan' + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + (open ? " open" : "") + (t ? "" : " virtual") + '"' + (t ? ' data-id="' + t.id + '"' : "") +
+  return '<div class="row plan st-' + (t?.status || "open") + (t?.optional ? " opt" : "") + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + (open ? " open" : "") + (t ? "" : " virtual") + '"' + (t ? ' data-id="' + t.id + '"' : "") +
     ' data-ids="' + ids + '" data-plan="' + esc(plan.id) + '" data-date="' + d + '" style="--i:' + (t ? tasks.indexOf(t) : 0) + '">' +
     '<div class="est num" data-drag-row title="Drag to reorder"><b>' + (L.sizeOf(sum) || "—") + '</b><i class="grip"></i></div>' +
     '<div class="bar" style="--bar:' + esc(plan.color || "var(--c-None)") + '"></div>' +
     '<div class="body"><div class="line"><div class="task" data-act="desc">' + esc(t?.title || plan.name) + (t && E.isRoutine(t) ? ' <span class="rt" title="Routine">↻</span>' : "") +
-    (t?.deep ? ' <span class="dp" title="Deep work">◆ Deep</span>' : "") + (t?.desc && !(open && openDesc.has(t.id)) ? '<span class="more"> ⋯</span>' : "") + "</div>" + side + plus +
+    (t?.deep ? ' <span class="dp" title="Deep work">◆ Deep</span>' : "") + (t?.desc && !(open && openDesc.has(t.id)) ? '<span class="more"> ⋯</span>' : "") + "</div>" + side +
     (phone || !t ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") + "</div>" +
-    (lines.length ? '<div class="ls-lines">' + lines.map((x) => lineHTML(x, phone)).join("") + "</div>" : "") +
+    (lines.length ? '<div class="ls-lines">' + lines.map((x) => lineHTML(x, phone)).join("") + "</div>" : "") + plus +
     (poolOpen === key && !phone ? candsHTML(c, plan, d) : "") +
     (open ? taskChainHTML(t, 2) + timesHTML(c, t, list, form) : "") +
     (open && openDesc.has(t.id) ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Notes for this day">' + esc(t.desc || "") + "</textarea>" : "") +
-    (open && (notes || (t.date <= c.today && !form)) ? '<div class="chips">' + (t.date <= c.today && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") +
-      (notes ? '<button type="button" class="chip ghost" data-act="ls-notes" aria-expanded="' + (notesShown === t.id) + '">Plan notes</button>' : "") + "</div>" : "") +
+    (open || !phone ? chips : "") +
     (open && notesShown === t.id && notes ? '<div class="ls-pnotes">' + esc(notes) + "</div>" : "") +
-    (form ? logFormHTML(c, t, list) : "") + "</div></div>";
+    (form ? logFormHTML(c, t, list) : "") +
+    (why && open ? '<input class="reason" data-act="reason" data-keep="reason-' + t.id + '" placeholder="Why?" value="' + esc(t.reason || "") + '">' : "") +
+    (why && !open && t.reason ? '<p class="why">' + esc(t.reason) + "</p>" : "") + "</div></div>";
 }
 
 // 一天的清单：按计划并起来（js/lists.js 的 dayBlocks），计划那一块画成上面那样，别的照旧一行一条
@@ -242,8 +251,8 @@ function ghostsHTML(c, d) {
     '<div class="body"><div class="line"><div class="task">' + esc(g.title) + (g.kind === "regular" ? ' <span class="rt">↻</span>' : "") + "</div></div></div></div>").join("");
 }
 
-// 留下来没做的：以前的日子里没标的。计划那一行不算（它不标状态），计划下面没勾的几项过了那天自己回 Pool
-const leftBehind = (c) => c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isAutoTask(t) && !L.isRow(t));
+// 留下来没做的：以前的日子里没标的。计划那一块的头（那天下面有项的那一行）不算，下面没勾的几项过了那天自己回 Pool
+const leftBehind = (c) => c.tasks.filter((t) => !t.status && t.date && t.date < c.today && !E.isAutoTask(t) && !L.isContainer(c, t));
 function overdueHTML(c) {
   const od = leftBehind(c).sort((a, b) => a.date.localeCompare(b.date));
   if (!od.length) return "";
@@ -418,9 +427,9 @@ export function marquees(root = document) {
 
 const PHONE_SPAN = 5;
 
-// 一天的小圆点：全标完 = 实心；还有没标的 = 空心；没有任务 = 不画（计划那一行不标状态，不算）
-function dayDot(all) {
-  const tasks = all.filter((t) => !L.isRow(t));
+// 一天的小圆点：全标完 = 实心；还有没标的 = 空心；没有任务 = 不画（计划那一块的头没标不算）
+function dayDot(c, all) {
+  const tasks = all.filter((t) => t.status || !L.isContainer(c, t));
   if (!tasks.length) return all.length ? '<i class="all"></i>' : "";
   const open = tasks.filter((t) => !t.status && !t.optional).length;
   return '<i class="' + (open ? (open < tasks.length ? "some" : "todo") : "all") + '"></i>';
@@ -442,7 +451,7 @@ function phoneHTML(c) {
   const days = Array.from({ length: PHONE_SPAN * 2 + 1 }, (_, i) => addDays(c.today, i - PHONE_SPAN));
   const strip = '<nav class="daystrip" aria-label="Days">' + days.map((x) =>
     '<button type="button" class="dpill' + (x === c.today ? " today" : "") + (x === d ? " on" : "") + (x < c.today ? " past" : "") + '" data-act="day-pick" data-date="' + x + '" aria-label="' + fmtDay(x) + '">' +
-    "<span>" + WEEKDAYS[weekday(x)].slice(0, 2) + "</span><b>" + Number(x.slice(8)) + "</b>" + dayDot(store.tasksOn(x)) + "</button>").join("") +
+    "<span>" + WEEKDAYS[weekday(x)].slice(0, 2) + "</span><b>" + Number(x.slice(8)) + "</b>" + dayDot(c, store.tasksOn(x)) + "</button>").join("") +
     // 选中的标记单独一个元素，压在选中那天的格子上（换天时它滑过去，见 js/motion.js 的 slideDay）
     '<i class="dmark" aria-hidden="true" style="--k:' + days.indexOf(d) + '"></i></nav>';
   const day = E.daySummary(c, d);
@@ -698,7 +707,12 @@ export function initToday(rerender) {
     e.preventDefault();
     const f = new FormData(form);
     let title = String(f.get("title") || "").trim();
-    if (!title) return;
+    // 没写名字、选了计划或项目：就是那个计划 / 项目自己的一条（计划那天已经有那一行就是那一行）
+    if (!title) {
+      const to = pickTarget(f.get("project"));
+      title = to.projectId ? store.get("projects", to.projectId)?.name || "" : to.group;
+      if (!title) return;
+    }
     let est = Number(f.get("est")) || 30;
     // 「Gym 40」「Gym 40m」：末尾的数字当分钟
     const m = title.match(/^(.*\S)\s+(\d{1,3})\s*(m|min|mins)?$/i);

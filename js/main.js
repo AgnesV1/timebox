@@ -237,10 +237,10 @@ function paintSync() {
 }
 let wasBad = false;
 
-// 今天排的都做完了（至少三件；可选的、Chores、计划那一行不算）：一天只庆祝一次
+// 今天排的都做完了（至少三件；可选的、Chores、没标的计划那一块的头不算）：一天只庆祝一次
 function celebrate(c, view) {
   if (view !== "today" || shownDate() !== c.today) return;
-  const list = store.tasksOn(c.today).filter((t) => !t.optional && !store.isChore(t) && !L.isRow(t));
+  const list = store.tasksOn(c.today).filter((t) => !t.optional && !store.isChore(t) && (t.status || !L.isContainer(c, t)));
   if (list.length < 3 || list.some((t) => t.status !== "done")) return;
   if (localStorage.getItem("kuzhouduan-celebrated") === c.today) return;
   localStorage.setItem("kuzhouduan-celebrated", c.today);

@@ -487,8 +487,7 @@ body.side-min .sync-pill span { display: none; }
 .row.plan .est b { font-size: 12.5px; letter-spacing: -.02em; }
 .row.plan.virtual .est { cursor: default; }
 .ls-cnt { font-size: 12px; font-weight: 600; color: var(--muted); }
-.ls-plus { flex: none; width: 22px; height: 22px; display: grid; place-items: center; margin-top: 1px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: transparent; font: 600 14px/1 var(--num); color: var(--ink); }
-.ls-plus[aria-expanded="true"] { border-color: transparent; background: var(--accent); color: var(--accent-ink); }
+.ls-addp { display: block; margin: 3px 0 0 23px; font-size: 12.5px; }
 .ls-lines { margin: 5px 0 2px; }
 .ls-ln, .ls-step { display: flex; align-items: center; gap: 8px; padding: 2px 0; font-size: 13.5px; }
 .ls-step { font-size: 13px; }

@@ -401,27 +401,29 @@ function nextOrder(date) {
   return tasksOn(date).reduce((m, t) => Math.max(m, Number(t.order) || 0), 0) + 1;
 }
 
-// 直接在某天加计划上的任务：名字和计划一样（或空着）= 那天的那一行（整块计时，不挂项）；
-// 和 Pool 里哪一项同名就挂上那一项；都不是就在 Pool 里新建一项（分区 Added），算这一次
-function itemFor(projectId, title, est) {
-  const items = all("items").filter((i) => i.projectId === projectId);
-  const key = (s) => String(s || "").trim().toLowerCase();
-  if (!key(title) || key(title) === key(get("projects", projectId)?.name)) return "";
-  const hit = items.find((i) => key(i.title) === key(title));
-  if (hit) return hit.id;
-  const id = newId();
-  put("items", { id, projectId, module: "Added", title, est: Number(est) || 0, origEst: null, order: items.reduce((m, i) => Math.max(m, Number(i.order) || 0), 0) + 1 });
-  return id;
+// 计划 Pool 里和这个名字一样的那一项（不分大小写）；没写名字、没有一样的 = null
+const key = (s) => String(s || "").trim().toLowerCase();
+function poolItemFor(projectId, title) {
+  if (!key(title)) return null;
+  return all("items").find((i) => i.projectId === projectId && key(i.title) === key(title)) || null;
 }
 
-// 挂在计划上的：那天的那一行已经有了就不再建第二条（返回原来那条）；挂了项的，顺手把那天的那一行建好（计时在它身上）
+// 在某天加一条挂在计划上的任务（她 2026-10-26 定的）：写的名字是 Pool 里的一项 = 挑了那一项（带号、带步骤，见 js/store/lists.js 的 placeItem）；
+// 别的都是这个计划自己的一条，不拆成下面的子项——没写名字、或者写的就是计划名，那天已经有那一行了就是那一行，不再建第二条；
+// 写了别的名字就是计划下面单独一条任务（和以前一样有 Done / Delay / Drop）。挂了项的，顺手把那天的那一行建好（计时在它身上）
 export function addTask(fields) {
   let id = fields.id || newId();   // 给了 id 就用它（Chore 键那条每天固定是 chore-日期）
   const date = fields.date || today();
+  const plan = fields.projectId ? get("projects", fields.projectId) : null;
+  if (plan && fields.itemId === undefined && !fields.id) {
+    const hit = poolItemFor(plan.id, fields.title);
+    const placed = hit ? placeItem(hit.id, date) : "";
+    if (placed) return placed;
+  }
   change(() => {
-    const itemId = fields.projectId && fields.itemId === undefined ? itemFor(fields.projectId, fields.title, fields.est) : fields.itemId || "";
-    const plan = fields.projectId && get("projects", fields.projectId);
-    const row = plan && !itemId && !fields.id ? rowOf(plan.id, date) : null;
+    const itemId = fields.itemId || "";
+    const own = plan && !itemId && !fields.id && (!key(fields.title) || key(fields.title) === key(plan.name));
+    const row = own ? rowOf(plan.id, date) : null;
     if (row) { id = row.id; return; }
     put("tasks", {
       id, title: "", est: 30, actual: null, status: "", reason: "", optional: false, deep: planDeep(fields.projectId), projectId: "", group: "", times: "", desc: "",
@@ -459,11 +461,11 @@ export function moveMany(ids, date) {
   }), "Moved " + ids.length + " task" + (ids.length > 1 ? "s" : ""));
 }
 
-// 换计划：解开原来的条目，再按名字挂到新计划的条目上。不挂计划时可以直接挂在大类上（group）
+// 换计划：解开原来的项，名字和新计划 Pool 里哪一项一样就挂上那一项，不一样就是新计划自己的一条。不挂计划时可以直接挂在大类上（group）
 export function setTaskProject(id, projectId, group = "") {
   const t = get("tasks", id);
   if (!t || (t.projectId === projectId && (projectId || (t.group || "") === group))) return;
-  change(() => put("tasks", { ...t, projectId, group: projectId ? "" : group, itemId: projectId ? itemFor(projectId, t.title, t.est) : "" }));
+  change(() => put("tasks", { ...t, projectId, group: projectId ? "" : group, itemId: projectId ? poolItemFor(projectId, t.title)?.id || "" : "" }));
 }
 
 export function reorder(ids) {

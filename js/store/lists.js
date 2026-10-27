@@ -242,12 +242,12 @@ export default function (core) {
   }
 
   // ---------- 换成这套（打开时看一次，可以重复跑） ----------
-  // 记下换的那天；旧的 Total 计划变成普通的计划（项留着，都是 Once）；和计划同名的项（以前「总时长」那一大块、
-  // 或者以前在计划上直接加任务时顺手建的）拿掉，它的任务变成那天的那一行
+  // 记下换的那天；旧的 Total 计划变成普通的计划（项留着，都是 Once）；以前「总时长」那一大块（和计划同名的项）、
+  // 还有以前在计划上直接加任务时顺手建的项（分区 Added）拿掉，它们的任务变回计划自己的一条（她 2026-10-26 说没挑 Pool 的就该是计划本身，不拆成子项）
   function adoptLists() {
     const fix = [];
     for (const p of all("projects")) {
-      const same = all("items").filter((i) => i.projectId === p.id && key(i.title) === key(p.name) && (p.kind === "total" || i.module === "Added"));
+      const same = all("items").filter((i) => i.projectId === p.id && (i.module === "Added" || (p.kind === "total" && key(i.title) === key(p.name))));
       if (p.kind === "total" || same.length) fix.push({ p, same });
     }
     const first = !setting(FROM, "");
@@ -255,11 +255,16 @@ export default function (core) {
     change(() => {
       if (first) put("settings", { id: FROM, key: FROM, value: today() });
       for (const { p, same } of fix) {
-        if (p.kind === "total") put("projects", { ...p, kind: "regular", place: "pool", rule: { ...(p.rule || {}), perWeek: Number(p.rule?.perWeek) || 0, min: Number(p.rule?.min) || 0 } });
+        let row = get("projects", p.id);
+        if (row.kind === "total") row = { ...row, kind: "regular", place: "pool", rule: { ...(row.rule || {}), perWeek: Number(row.rule?.perWeek) || 0, min: Number(row.rule?.min) || 0 } };
+        const items = { ...(row.rule?.items || {}) };
         for (const i of same) {
           for (const t of all("tasks")) if (t.itemId === i.id) put("tasks", { ...t, itemId: "" });
           drop("items", i.id);
+          delete items[i.id];
         }
+        if (row.rule) row = { ...row, rule: { ...row.rule, items } };
+        put("projects", row);
       }
     });
     return fix.length > 0;

@@ -42,7 +42,6 @@ const ideaDraft = {};   // 加任务框里从灵感池挑中的那条（日期 �
 let addOpen = "";       // 哪一天的加任务框展开着（下面那排选项）。自己记着，不靠焦点猜——见 initToday 里的 setAddOpen
 let timeEdit = "";      // 正在改头尾的那一段（「任务 id#第几段」）
 const lineOpen = new Set();   // 点开了的那几项（看步骤、备注、Back to the pool）
-let poolOpen = "";      // 哪个计划哪天的「+」开着（「计划 id|日期」）
 let notesShown = "";    // 哪一行把计划的 Notes 摊开了（那一行的任务 id）
 // 这个任务能不能选「和谁」：已经带着一条记录，或者它那个大类开了这一项
 const meetable = (t) => Boolean(store.meetOfTask(t.id) || store.groupByName(store.groupOf(t))?.friends);
@@ -181,21 +180,9 @@ function lineHTML(t, phone) {
   return h + (note || back ? '<p class="ls-more">' + (note ? "<span>" + esc(note) + "</span>" : "") + back + "</p>" : "");
 }
 
-// 电脑：点开计划那一行的「From the pool」= 这个计划 Pool 里还能拖的（勾了一半回了 Pool 的那次带着剩几步），点一个就进这天
-function candsHTML(c, plan, d) {
-  const items = L.pool(c).find((g) => g.plan.id === plan.id)?.items || [];
-  if (!items.length) return '<div class="ls-cands"><p class="hint">Nothing left in the pool — add things to the plan on Projects.</p></div>';
-  return '<div class="ls-cands">' + items.map((x) => {
-    const carry = x.count.carry[0];
-    const label = carry ? L.titleFor(x.item, x.cfg, carry.k) + " · " + carry.steps.length + " step" + (carry.steps.length > 1 ? "s" : "") + " left" : x.item.title;
-    const meta = [L.sizeOf(x.item.est), x.cfg.n > 1 ? x.count.done + "/" + x.cfg.n : x.cfg.n === 0 ? "any" : "", x.cfg.perWeek ? "this week " + x.week.placed + "/" + x.cfg.perWeek : ""].filter(Boolean).join(" · ");
-    return '<button type="button" class="ls-cand" data-act="ls-add" data-item="' + esc(x.item.id) + '" data-date="' + d + '"><b>' + esc(label) + "</b><small>" + esc(meta) + "</small></button>";
-  }).join("") + "</div>";
-}
-
 // 计划那一行：整块计时（点了选中、底部浮条 Start，和别的任务一样），和别的任务一样有 Done / Delay / Drop（她 2026-10-26 要回来的：Work、IELTS 这种要能标完成）。
 // 左边那格是下面几项大概多久加起来（没有项就是它自己的分钟）；收着时右边是记了多久、「做了几项 / 几项」、标了什么；
-// 展开有链条、计时记录、+ time、Done / Delay / Drop、原因、当天的备注（点名字）、Plan notes。
+// 展开有链条、计时记录、+ time、Done / Delay / Drop、原因、当天的备注（点名字）、Plan notes。没加项就只是这一行，不提醒从 Pool 里挑（她说的）。
 // 那天还没有这一行（以前的旧数据）：画一个只有名字的头，点了再建
 function planRowHTML(c, b, tasks, phone, openId) {
   const t = b.row, plan = b.plan, d = (t || b.lines[0]).date;
@@ -213,15 +200,11 @@ function planRowHTML(c, b, tasks, phone, openId) {
   const form = open && t.date <= c.today && (logOpen.has(t.id) || (t.status === "done" && !list.length));
   const why = t && (t.status === "delay" || t.status === "drop");
   const notes = String(plan.rule?.notes || "").trim();
-  const key = plan.id + "|" + d;
   const side = open ? "" : '<span class="rside">' + (running ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : total ? '<span class="num">' + fmtMin(total) + "</span>" : "") +
     (live.length ? '<b class="ls-cnt num">' + done + "/" + live.length + "</b>" : "") + (t?.status ? '<b class="stw">' + STATUS_WORD[t.status] + "</b>" : "") + "</span>";
-  // 电脑：点开这一行才有「From the pool」（她 2026-10-27 说没加项就空着，别一直提醒她从 Pool 里挑）；Pool 里没东西的计划不给
-  const pool = !phone && d >= c.today && L.itemsOf(c, plan.id).length ? '<button type="button" class="chip ghost" data-act="ls-pool" data-plan="' + esc(plan.id) + '" data-date="' + d + '" aria-expanded="' + (poolOpen === key) + '">' + (poolOpen === key ? "Close the pool" : "From the pool") + "</button>" : "";
   // 状态按钮：电脑上收着时停上去浮出来，展开了一直在；手机上只有展开的那一行有
   const chips = t ? '<div class="chips' + (open ? "" : " hov") + '">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
     (open && t.date <= c.today && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") +
-    (open ? pool : "") +
     (open && notes ? '<button type="button" class="chip ghost" data-act="ls-notes" aria-expanded="' + (notesShown === t.id) + '">Plan notes</button>' : "") + "</div>" : "";
   const ids = [t?.id, ...lines.map((x) => x.id)].filter(Boolean).join(" ");
   return '<div class="row plan st-' + (t?.status || "open") + (t?.optional ? " opt" : "") + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + (open ? " open" : "") + (t ? "" : " virtual") + '"' + (t ? ' data-id="' + t.id + '"' : "") +
@@ -232,7 +215,6 @@ function planRowHTML(c, b, tasks, phone, openId) {
     (t?.deep ? ' <span class="dp" title="Deep work">◆ Deep</span>' : "") + (t?.desc && !(open && openDesc.has(t.id)) ? '<span class="more"> ⋯</span>' : "") + "</div>" + side +
     (phone || !t ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") + "</div>" +
     (lines.length ? '<div class="ls-lines">' + lines.map((x) => lineHTML(x, phone)).join("") + "</div>" : "") +
-    (poolOpen === key && !phone ? candsHTML(c, plan, d) : "") +
     (open ? taskChainHTML(t, 2) + timesHTML(c, t, list, form) : "") +
     (open && openDesc.has(t.id) ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Notes for this day">' + esc(t.desc || "") + "</textarea>" : "") +
     (open || !phone ? chips : "") +
@@ -306,26 +288,16 @@ function dishesHTML(t) {
 const poolFor = (target) => { const g = store.groupByName(store.groupOf(pickTarget(target))); return GR.ideasOf(g) ? g : null; };
 const taskOf = (id) => store.get("tasks", id);
 
-// 标题框底下的候选（电脑）。先是计划 Pool 里还能拖的：下拉选了一个计划就列它的，没选计划但打了字就列各计划里名字对得上的，点一条 = 直接进这天（计划那一行下面）。
-// 再是池子里还没排的灵感，打了字就只留对得上的；再加一小段想看的（Reading 的 Want）——只看「多久没联系」的那种大类（Friends）不加。
-// 灵感、想看的点一条 = 名字填进标题框；灵感那条在任务建好后挂上去
-function poolPickHTML(target, query) {
-  const plan = target && !target.startsWith("g:") ? target : "", q = String(query || "").trim().toLowerCase();
-  if (!plan && !q) return "";
-  const rows = L.pool(store.ctx()).filter((g) => !plan || g.plan.id === plan).flatMap((g) => g.items.map((x) => ({ ...x, planName: g.plan.name })))
-    .filter((x) => !q || x.item.title.toLowerCase().includes(q)).slice(0, 8);
-  return rows.length ? "<p>From the pool</p><ul>" + rows.map((x) => '<li><button type="button" data-act="pool-pick" data-item="' + esc(x.item.id) + '">' + esc(x.item.title) +
-    "<small>" + esc([plan ? "" : x.planName, L.sizeOf(x.item.est), x.cfg.n > 1 ? x.count.done + "/" + x.cfg.n : ""].filter(Boolean).join(" · ")) + "</small></button></li>").join("") + "</ul>" : "";
-}
+// 标题框底下的候选（电脑）：池子里还没排的灵感，打了字就只留对得上的；再加一小段想看的（Reading 的 Want）——只看「多久没联系」的那种大类（Friends）不加。
+// 点一条 = 名字填进标题框；灵感那条在任务建好后挂上去。计划 Pool 里的项不在这里列（她 2026-10-27 说不要 From the pool：挑项在日历的 Pool 里拖，或者标题写那一项的名字）
 function pickHTML(d, query) {
-  const pooled = poolPickHTML(addTarget[d] || "", query);
   const g = poolFor(addTarget[d] || "");
-  if (!g) return pooled;
+  if (!g) return "";
   const ideas = I.match(store.ideas(), taskOf, store.today(), query);
   const wants = GR.trackOf(g) === "contact" || !store.setting("reading")?.url ? [] : (reading.titleKey(query) ? reading.search(query, 20).filter((r) => r.want) : reading.wants()).slice(0, 4);
   const item = (act, id, text, small, on, em = "") => '<li><button type="button" data-act="' + act + '" data-id="' + esc(id) + '" data-t="' + esc(text) + '"' + (on ? ' class="on"' : "") + ">" +
     (em ? em + " " : "") + esc(text) + (small ? "<small>" + esc(small) + "</small>" : "") + "</button></li>";
-  return pooled + (ideas.length ? "<p>Ideas</p><ul>" + ideas.map((i) => item("idea-pick", i.id, i.text, i.date && i.date < store.today() ? "was " + fmtShort(i.date) : I.whenText(i), ideaDraft[d] === i.id && I.sameText(i.text, query), I.emojiOf(i))).join("") + "</ul>" : "") +
+  return (ideas.length ? "<p>Ideas</p><ul>" + ideas.map((i) => item("idea-pick", i.id, i.text, i.date && i.date < store.today() ? "was " + fmtShort(i.date) : I.whenText(i), ideaDraft[d] === i.id && I.sameText(i.text, query), I.emojiOf(i))).join("") + "</ul>" : "") +
     (wants.length ? "<p>Want</p><ul>" + wants.map((r) => item("want-pick", "", r.title, r.tab, false)).join("") + "</ul>" : "");
 }
 
@@ -572,7 +544,7 @@ export function initToday(rerender) {
       const c = store.ctx();
       store.moveMany(leftBehind(c).map((t) => t.id), c.today);
     }
-    // 计划下面的几项：勾、勾步骤、展开、放回 Pool；计划那一行的 + 和 Plan notes
+    // 计划下面的几项：勾、勾步骤、展开、放回 Pool；计划那一行的 Plan notes
     else if (act === "ls-tick") {
       const t = store.get("tasks", el.dataset.line);
       if (t && t.status !== "done") cheer(el, "done");
@@ -581,8 +553,6 @@ export function initToday(rerender) {
     else if (act === "ls-step") store.tickStep(el.dataset.line, Number(el.dataset.k));
     else if (act === "ls-open") { if (!lineOpen.delete(el.dataset.line)) lineOpen.add(el.dataset.line); rerender(); }
     else if (act === "ls-back") store.backToPool(el.dataset.line);
-    else if (act === "ls-pool") { const k = el.dataset.plan + "|" + el.dataset.date; poolOpen = poolOpen === k ? "" : k; rerender(); }
-    else if (act === "ls-add") { if (!store.placeItem(el.dataset.item, el.dataset.date)) toast("Nothing of that left in the pool"); }
     else if (act === "ls-notes") { notesShown = notesShown === id ? "" : id; rerender(); }
     else if (act === "day-prev") go(addDays(shownDate(), -1));
     else if (act === "day-next") go(addDays(shownDate(), 1));
@@ -677,13 +647,6 @@ export function initToday(rerender) {
   on(document, "mousedown", ".idea-pick button", (e) => e.preventDefault());
   on(document, "click", ".idea-pick button", (e, el) => {
     const form = el.closest("form"), d = form.dataset.add, input = form.querySelector('input[name="title"]');
-    // Pool 里的一项：直接进这天，标题框清空
-    if (el.dataset.act === "pool-pick") {
-      if (!store.placeItem(el.dataset.item, d)) { toast("Nothing of that left in the pool"); return; }
-      input.value = "";
-      el.closest("[data-idea-pick]").innerHTML = pickHTML(d, "");
-      return;
-    }
     input.value = el.dataset.t;
     ideaDraft[d] = el.dataset.act === "idea-pick" ? el.dataset.id : "";
     el.closest("[data-idea-pick]").innerHTML = pickHTML(d, input.value);

@@ -118,8 +118,6 @@ const SHOTS = [
   { device: "desk", name: "today", hash: "today" },
   { device: "desk", name: "today-hover", hash: "today", act: hover(".today-main .row:not(.open) .task") },
   { device: "desk", name: "today-open", hash: "today", act: tap('.today-main .row.plan[data-plan="seed-b2"] .task') },
-  // 计划那一行下面的一项点开（有步骤的是勾选清单）、+ 列出 Pool 里还能拖的
-  { device: "desk", name: "today-plan-pool", hash: "today", act: async (page) => { await tap('.today-main .row.plan[data-plan="seed-b2"] .task')(page); await page.waitForTimeout(300); await tap('.today-main .row.plan[data-plan="seed-b2"] [data-act="ls-pool"]')(page); } },
   { device: "desk", name: "calendar", hash: "calendar" },
   { device: "desk", name: "calendar-month", hash: "calendar", act: tap('.calendar [data-act="cal-mode"][data-mode="month"]') },
   { device: "desk", name: "projects", hash: "projects" },

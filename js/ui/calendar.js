@@ -20,7 +20,7 @@ import { ideasPoolHTML } from "./ideas.js";
 import { showDate } from "./today.js";
 import { openTaskEditor } from "./editor.js";
 
-// 那天排的或记的超过这么多分钟：格子顶上那条变红、闪红光（她 2026-10-27 要的，暂定，之后可能取消）
+// 那天实际记下的时间超过这么多分钟：格子顶上那条变红、闪红光（她 2026-10-27 要的，只看实际的；暂定，之后可能取消）
 const LONG_DAY = 7 * 60;
 
 let anchor = "";
@@ -66,7 +66,7 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
   const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
   const all = [...L.dayBlocks(c, tasks).map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d))), ...ghosts.map(ghostHTML)];
   const loadPct = sum.cap ? Math.min(100, (sum.planned / sum.cap) * 100) : 0;
-  const long = !gold && Math.max(sum.planned, sum.done) > LONG_DAY;   // 金条那天不变红
+  const long = !gold && sum.done > LONG_DAY;   // 金条那天不变红
   let h = '<div class="' + cls + '" data-drop="day:' + d + '">' +
     '<div class="cell-head"><span class="dn-w"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"' + (unscored ? ' title="Not scored yet"' : "") + "><span>" + (month ? "" : WEEKDAYS[wd]) + "</span><b>" + Number(d.slice(8)) + "</b>" + (isPayday(d) ? '<span class="payday" title="Payday">$</span>' : "") + (unscored ? '<i class="dsc-dot" aria-label="Not scored yet"></i>' : "") + "</button>" +
     (wd === 0 || wd === 6 ? "" : '<button type="button" class="offday-t' + (off.off ? " on" : "") + '" data-act="off-day" data-date="' + d + '" aria-pressed="' + off.off + '" title="' + esc(off.off ? (off.holiday || "Day off") + " — click to clear" : "Mark as a day off") + '">💤</button>') + "</span>" +

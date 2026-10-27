@@ -502,12 +502,6 @@ body.side-min .sync-pill span { display: none; }
 .ls-sz { flex: none; font: 500 12px var(--num); color: var(--muted); white-space: nowrap; }
 .ls-steps { margin: 2px 0 6px 7px; padding-left: 15px; border-left: 1px solid var(--line); }
 .ls-more { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 6px 23px; font-size: 12px; color: var(--muted); }
-.ls-cands { display: grid; gap: 1px; margin: 6px 0 4px; padding: 6px 8px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.ls-cand { display: flex; align-items: baseline; gap: 8px; padding: 3px 2px; border: 0; background: none; font-size: 13px; color: var(--ink); text-align: left; }
-.ls-cand b { font-weight: 600; }
-.ls-cand small { margin-left: auto; font: 500 11.5px var(--num); color: var(--muted); white-space: nowrap; }
-@media (hover: hover) { .ls-cand:hover b { text-decoration: underline; text-underline-offset: 3px; } }
-.ls-cands .hint { margin: 0; }
 .ls-pnotes { margin: 8px 0 4px; padding: 8px 10px; max-height: 340px; overflow: auto; border-radius: 10px; background: var(--tonal); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; }
 body.phone .ls-ln, body.phone .ls-step { min-height: 30px; font-size: 14.5px; }
 body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
@@ -589,7 +583,7 @@ body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
 .load { height: 4px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .load i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--hot)); }
 [data-theme="dark"] .load i { background: linear-gradient(90deg, #00E5FF, #CCFF00); }
-/* 那天排的或记的超过 7 小时（她 2026-10-27 要的，暂定，之后可能取消）：这条变红、一闪一闪发红光；关了 Sparkles 或减少动态就只亮着不闪 */
+/* 那天实际记下的时间超过 7 小时（她 2026-10-27 要的，暂定，之后可能取消）：这条变红、一闪一闪发红光；关了 Sparkles 或减少动态就只亮着不闪 */
 .load.over7 { overflow: visible; }
 .load.over7 i, [data-theme="dark"] .load.over7 i { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
 .load.over7.blink i { animation: over7 1.4s ease-in-out infinite; }

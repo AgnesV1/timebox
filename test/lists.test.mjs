@@ -270,3 +270,18 @@ test("store: no numbers on the times an item is done; old #k come off when opene
   store.updateItem(l4, { title: "L4 error log" });
   assert.deepEqual([store.get("tasks", a).title, store.get("tasks", old).title], ["L4 error log", "L4 listening error stats"], "the done one keeps its name");
 });
+
+test("a day's planned minutes: a plan counts its items (its own minutes only without any); Delay and Drop don't count", () => {
+  const c = ctx({ projects: [plan("ielts"), plan("swim")] });
+  const tasks = [
+    task({ id: "r", projectId: "ielts", est: 60 }),
+    task({ id: "a", projectId: "ielts", itemId: "i1", est: 30, status: "done" }),
+    task({ id: "b", projectId: "ielts", itemId: "i2", est: 105 }),
+    task({ id: "c", projectId: "ielts", itemId: "i3", est: 8, status: "delay" }),
+    task({ id: "s", projectId: "swim", est: 45 }),
+    task({ id: "w", title: "Work", est: 20 }),
+    task({ id: "x", title: "Dropped", est: 50, status: "drop" })
+  ];
+  assert.equal(L.dayMin(L.dayBlocks(c, tasks)), 30 + 105 + 45 + 20, "IELTS's own 60 isn't added on top of its items");
+  assert.equal(L.dayMin([]), 0);
+});

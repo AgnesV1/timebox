@@ -1,6 +1,7 @@
 // 日历（电脑）：周视图 / 月视图，右边是 Pool。
 // 把 Pool 里的一项拖到某天 = 那天这个计划下面多一条；计划名本身拖过去 = 那天这个计划空的一行（Swimming 这种）。
-// 一个计划那天是一张便利贴（她 2026-10-25 挑的乙）：计划名 + 那天的几项小字接着排，鼠标停上去展开成一行一项（每一项能单独拖到别的天）；
+// 一个计划那天是一张便利贴：Pool 关着只写计划名，鼠标停上去展开成一行一项；Pool 开着（排计划的时候）直接一行一项、右边写分钟，日期后面写那天排了几小时
+//   （她 2026-10-27 挑的甲；每一项能单独拖到别的天）；
 // 整张拖到别的天 = 那天还没勾的几项一起挪，拖回 Pool = 回去；点它 = 到今天页的那一天。别的任务照旧一张一张，拖到别的天就挪过去，拖回 Pool 就撤回。
 // 固定星期几的计划在以后的日子里画成淡色预览：可以拖走 / 点开（这时才变成真任务）。
 // 格子里的日程永远全部显示（不折叠）；月视图只画这个月占到的那几周，便利贴排得紧一点，尽量一屏看完。格子有最小宽度，放不下就左右滑。格子顶上的小开关标「通勤日」。
@@ -41,34 +42,41 @@ function ghostHTML(g) {
     '<span class="t"><i class="rt">↻</i>' + esc(g.title) + '</span><span class="m num">' + g.est + "</span></div>";
 }
 
-// 一个计划那天的那一张：那一行的名字（没有那一行才写计划名），后面是那天的几项（做了的划掉）；停上去展开成一行一项，每一项能单独拖走。
+// 一个计划那天的那一张（她 2026-10-27 改的）：Pool 关着只写名字（那一行的名字，没有那一行才写计划名），停上去展开成一行一项；
+// Pool 开着（排计划的时候）直接一行一项。一项 = 名字（做了的划掉），右边大概几分钟；还没勾的每一项能单独拖走。
 // 状态跟着那一行，和别的便利贴一样（Done 灰掉划掉、Delay 划掉、Drop 灰掉）——她 2026-10-27 报的：今天页标了 Done，日历上没跟着；
 // 那一行没标、下面的项都勾了，也算做完
-function blockHTML(b, d) {
+function blockHTML(b, d, pool) {
   const plan = b.plan, lines = b.lines.slice().sort((x, y) => (Number(x.order) || 0) - (Number(y.order) || 0));
-  const li = (t, drag) => '<span class="li' + (t.status === "done" || t.status === "delay" ? " dn" : t.status === "drop" ? " dp" : "") + '"' + (drag ? ' data-drag="task:' + t.id + '"' : "") + ">" + esc(t.title) + "</span>";
+  const li = (t) => '<span class="li' + (t.status === "done" || t.status === "delay" ? " dn" : t.status === "drop" ? " dp" : "") + '"' + (t.status ? "" : ' data-drag="task:' + t.id + '"') + "><span>" + esc(t.title) + "</span>" +
+    (Number(t.est) > 0 ? '<i class="lm num">' + Number(t.est) + "</i>" : "") + "</span>";
   const spent = b.row ? E.spentMin(b.row) : 0;
   const st = b.row?.status || (lines.length && lines.every((t) => t.status === "done") ? "done" : "open");
-  const name = b.row?.title || plan.name;
-  return '<div class="ev blk st-' + st + (b.row?.optional ? " opt" : "") + '" data-drag="blk:' + esc(plan.id) + "|" + d + '" data-act="open-day" data-date="' + d + '" style="--c:' + esc(plan.color || "var(--c-None)") + '" title="' +
+  const name = b.row?.title || plan.name, list = lines.map(li).join("");
+  return '<div class="ev blk' + (pool ? " blk-ls" : "") + " st-" + st + (b.row?.optional ? " opt" : "") + '" data-drag="blk:' + esc(plan.id) + "|" + d + '" data-act="open-day" data-date="' + d + '" style="--c:' + esc(plan.color || "var(--c-None)") + '" title="' +
     esc(name + (name !== plan.name ? " · " + plan.name : "") + (lines.length ? " · " + lines.length + " thing" + (lines.length > 1 ? "s" : "") : "") + (spent ? " · " + fmtHours(spent) + " logged" : "")) + '">' +
-    '<span class="t"><span class="bt">' + esc(name) + "</span>" + lines.map((t) => li(t, false)).join("") + "</span>" +
-    (lines.length ? '<div class="full"><span class="bt">' + esc(name) + "</span>" + lines.map((t) => li(t, !t.status)).join("") + "</div>" : "") + "</div>";
+    '<span class="t"><span class="bt">' + esc(name) + "</span>" + (pool ? list : "") + "</span>" +
+    (!pool && lines.length ? '<div class="full"><span class="bt">' + esc(name) + "</span>" + list + "</div>" : "") + "</div>";
 }
 
-function cellHTML(c, d, { month = false, outside = false, scores = null, still = false } = {}) {
+// 那天排了多少分钟：计划那一块算下面几项（js/lists.js 的 dayMin），以后的日子加上固定星期几的预览。
+// Pool 开着时写在日期后面（她 2026-10-27 挑的甲）；顶上那条和「排多了」也按它算，两边对得上
+function cellHTML(c, d, { month = false, outside = false, scores = null, still = false, pool = false } = {}) {
   const tasks = store.tasksOn(d);
   const unscored = scores && SC.unscored(scores, store.scoreOf(d), d, c.today);
   const ghosts = E.ghostsOn(c, d);
   const sum = E.daySummary(c, d);
+  const blocks = L.dayBlocks(c, tasks);
+  const planned = L.dayMin(blocks) + ghosts.reduce((a, g) => a + (Number(g.est) || 0), 0);
   const capOver = c.capacity.overrides[d] !== undefined;
   const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d);
-  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && sum.planned > sum.cap ? "over" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
-  const all = [...L.dayBlocks(c, tasks).map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d))), ...ghosts.map(ghostHTML)];
-  const loadPct = sum.cap ? Math.min(100, (sum.planned / sum.cap) * 100) : 0;
+  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && planned > sum.cap ? "over" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
+  const all = [...blocks.map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d, pool))), ...ghosts.map(ghostHTML)];
+  const loadPct = sum.cap ? Math.min(100, (planned / sum.cap) * 100) : 0;
   const long = !gold && sum.done > LONG_DAY;   // 金条那天不变红
   let h = '<div class="' + cls + '" data-drop="day:' + d + '">' +
     '<div class="cell-head"><span class="dn-w"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"' + (unscored ? ' title="Not scored yet"' : "") + "><span>" + (month ? "" : WEEKDAYS[wd]) + "</span><b>" + Number(d.slice(8)) + "</b>" + (isPayday(d) ? '<span class="payday" title="Payday">$</span>' : "") + (unscored ? '<i class="dsc-dot" aria-label="Not scored yet"></i>' : "") + "</button>" +
+    (pool && planned > 0 ? '<span class="cal-hrs num" title="Planned this day">' + fmtHours(planned) + "</span>" : "") +
     (wd === 0 || wd === 6 ? "" : '<button type="button" class="offday-t' + (off.off ? " on" : "") + '" data-act="off-day" data-date="' + d + '" aria-pressed="' + off.off + '" title="' + esc(off.off ? (off.holiday || "Day off") + " — click to clear" : "Mark as a day off") + '">💤</button>') + "</span>" +
     '<button type="button" class="cm-t' + (commute ? " on" : "") + '" data-act="commute" data-date="' + d + '" aria-pressed="' + commute + '" title="' + (commute ? "Commute day — click to clear" : "Mark as a commute day") + '">' + icon("commute") + "</button>" +
     (month ? "" : capEdit === d
@@ -87,14 +95,14 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
 
 export function calendarHTML(c) {
   if (!anchor) anchor = c.today;
-  const week = mode() === "week", scores = store.scoreSetup();
+  const week = mode() === "week", scores = store.scoreSetup(), pool = Boolean(store.local().pool);
   const still = Boolean(document.getElementById("sky")?.classList.contains("still"));   // 设置里关了动效：金条不反光
   let title, body;
   if (week) {
     const s = startOfWeek(anchor, weekStart());
     const e = addDays(s, 6);
     title = fmtShort(s) + " – " + (s.slice(5, 7) === e.slice(5, 7) ? Number(e.slice(8)) : fmtShort(e));
-    body = '<div class="cal-scroll"><div class="week">' + range(s, e).map((d) => cellHTML(c, d, { scores, still })).join("") + "</div></div>";
+    body = '<div class="cal-scroll"><div class="week">' + range(s, e).map((d) => cellHTML(c, d, { scores, still, pool })).join("") + "</div></div>";
   } else {
     const m0 = startOfMonth(anchor);
     const s = startOfWeek(m0, weekStart());
@@ -103,9 +111,9 @@ export function calendarHTML(c) {
     title = MONTHS_LONG[Number(m0.slice(5, 7)) - 1] + " " + m0.slice(0, 4);
     const heads = range(s, addDays(s, 6)).map((d) => "<span>" + WEEKDAYS[weekday(d)] + "</span>").join("");
     body = '<div class="cal-scroll"><div class="month-head">' + heads + '</div><div class="month">' +
-      range(s, addDays(s, weeks * 7 - 1)).map((d) => cellHTML(c, d, { month: true, outside: d.slice(0, 7) !== m0.slice(0, 7), scores, still })).join("") + "</div></div>";
+      range(s, addDays(s, weeks * 7 - 1)).map((d) => cellHTML(c, d, { month: true, outside: d.slice(0, 7) !== m0.slice(0, 7), scores, still, pool })).join("") + "</div></div>";
   }
-  return '<div class="calendar">' +
+  return '<div class="calendar' + (pool ? " cal-pool" : "") + '">' +
     '<header class="page-head"><div><h2>' + title + "</h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="cal-today">Today</button>' +
     '<button type="button" class="nav" data-act="cal-prev" aria-label="Previous">' + icon("left") + '</button><button type="button" class="nav" data-act="cal-next" aria-label="Next">' + icon("right") + "</button>" +

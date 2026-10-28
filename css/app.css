@@ -614,20 +614,21 @@ body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
 .month { display: grid; grid-template-columns: repeat(7, minmax(96px, 1fr)); gap: 6px; }
 .month .cell { gap: 4px; min-height: 112px; padding-bottom: 8px; }
 .month .ev { padding: 4px 5px 3px; font-size: 11px; }
-/* 一个计划那天一张（她 2026-10-25 挑的乙）：计划名粗一点，那天的几项小字接着排（不折叠，什么都看得到）；
-   鼠标停上去、或者拖东西经过那一天，展开成一行一项浮在上面（每一项能单独拖走） */
+/* 一个计划那天一张（她 2026-10-27 改的）：Pool 关着只写计划名，鼠标停上去、或者拖东西经过那一天，展开成一行一项浮在上面；
+   Pool 开着（.blk-ls，排计划的时候，她挑的甲）直接一行一项。一项 = 名字，右边大概几分钟（.lm）；还没勾的每一项能单独拖走 */
 .ev.blk .t { line-height: 1.35; }
-.ev.blk .bt { margin-right: 4px; font-weight: 700; }
-.ev.blk .li { font-size: .95em; }
-.ev.blk .li + .li::before { content: "· "; color: var(--muted); }
-.ev.blk .li.dn { text-decoration: line-through; opacity: .55; }
+.ev.blk .bt { font-weight: 700; }
+.ev.blk.blk-ls .bt { display: block; margin-bottom: 2px; }
+.ev.blk .li { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 1px 0; }
+.ev.blk .li > span { min-width: 0; overflow-wrap: anywhere; }
+.ev.blk .lm { flex: none; font-style: normal; font-size: .95em; color: var(--muted); }
+.ev.blk .li.dn > span { text-decoration: line-through; }
+.ev.blk .li.dn { opacity: .55; }
 .ev.blk .li.dp { opacity: .45; }
+.ev.blk .li[data-drag] { cursor: grab; }
 .ev.blk .full { display: none; position: absolute; left: -5px; right: -5px; top: -5px; z-index: 6; padding: 7px 8px 6px; background: color-mix(in srgb, var(--c) 24%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) 75%, var(--paper)), 0 12px 26px rgba(11, 11, 11, .28); font-size: 11.5px; line-height: 1.4; }
 [data-theme="dark"] .ev.blk .full { background: color-mix(in srgb, var(--c) 28%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) 75%, var(--paper)), 0 0 0 1px var(--line), 0 14px 30px rgba(0, 0, 0, .6); }
 .ev.blk .full .bt { display: block; margin-bottom: 3px; }
-.ev.blk .full .li { display: block; padding: 1px 0; font-size: 1em; }
-.ev.blk .full .li + .li::before { content: none; }
-.ev.blk .full .li[data-drag] { cursor: grab; }
 @media (hover: hover) { .ev.blk:hover .full { display: block; } }
 .cell.drop-on .ev.blk .full { display: block; }
 body.dragging .ev.blk .full { pointer-events: none; }
@@ -1464,6 +1465,17 @@ body[data-view="today"] #main, body.phone.has-dock[data-view="today"] #main { pa
 [data-theme="dark"] .cm-t.on { background: var(--surface2); color: var(--ink); }
 /* 发薪日：日期后面一个小 $ */
 .payday { margin-left: -2px; font: 700 11px var(--num); color: var(--muted); }
+/* Pool 开着时日期后面那天排了几小时（她 2026-10-27 挑的甲，js/ui/calendar.js 的 cellHTML）；💤 跟在它后面。
+   Pool 占了右边、周视图的格子窄（1440 宽时一格里面只有 116px）：间距收一点，通勤的小开关先藏起来（关掉 Pool 就回来），就是她挑的那个样子 */
+.cal-hrs { margin-left: 4px; font-size: 11px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.cal-hrs::before { content: "·"; margin-right: 3px; color: var(--muted); }
+.cal-pool .cell-head { gap: 3px; }
+.cal-pool .dn { gap: 4px; }
+.cal-pool .week .cm-t { display: none; }
+.cal-pool .cap { padding: 1px 4px; }
+/* 窗口再窄、一格放不下：右边的可用时间（7h）先收起来（顶上那条照旧按它算） */
+.cal-pool .week .cell { container-type: inline-size; }
+@container (max-width: 110px) { .cal-pool .week .cap { display: none; } }
 /* 不上班（请假、公众假日）：日期右上角一个很小的 💤，不占格子顶上那一行的宽度；工作日没标的时候，鼠标移上来才淡淡出现 */
 .dn-w { position: relative; display: flex; align-items: center; }
 .offday-t { position: absolute; left: 100%; top: -4px; padding: 0 1px; border: 0; background: none; font-size: 10px; line-height: 1; opacity: 0; transition: opacity .15s; }

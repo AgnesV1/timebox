@@ -148,6 +148,17 @@ export function dayBlocks(ctx, tasks) {
   return out.sort((a, b) => a.order - b.order);
 }
 
+// 一天排了多少分钟（日历 Pool 开着时日期后面那个小时数）：dayBlocks 的结果。计划那一块算下面几项加起来（没有项就是那一行自己的分钟，
+// 和今天页那一行左边那格一样），别的任务算自己的；Delay、Drop 的不算
+const counts = (t) => t.status !== "delay" && t.status !== "drop";
+export function dayMin(blocks) {
+  return blocks.reduce((a, b) => {
+    if (b.task) return a + (counts(b.task) ? num(b.task.est) : 0);
+    const live = b.lines.filter(counts);
+    return a + (live.length ? live.reduce((s, t) => s + num(t.est), 0) : b.row && counts(b.row) ? num(b.row.est) : 0);
+  }, 0);
+}
+
 // ---------- 过了那天 ----------
 // from = 换成这套的那天（Settings 一行）：更早的旧记录不动。返回要做的事，店里一次改完：
 //   done：步骤全勾了、自己没勾的 → 勾上

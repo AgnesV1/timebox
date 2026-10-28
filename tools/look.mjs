@@ -120,6 +120,10 @@ const SHOTS = [
   { device: "desk", name: "today-open", hash: "today", act: tap('.today-main .row.plan[data-plan="seed-b2"] .task') },
   { device: "desk", name: "calendar", hash: "calendar" },
   { device: "desk", name: "calendar-month", hash: "calendar", act: tap('.calendar [data-act="cal-mode"][data-mode="month"]') },
+  // Pool 关着：计划那一张只写名字、日期后面不写小时，停上去展开成一行一项（开着的样子就是上面两张）。关着的状态留在这台设备上，后面没有日历的图了
+  { device: "desk", name: "calendar-closed", hash: "calendar", act: async (page) => { await page.evaluate(async () => (await import("/js/store.js")).setLocal({ pool: false, calMode: "week" })); await page.waitForTimeout(600); } },
+  { device: "desk", name: "calendar-closed-hover", hash: "calendar", act: hover(".calendar .ev.blk", 500) },
+  { device: "desk", name: "calendar-month-closed", hash: "calendar", act: async (page) => { await page.evaluate(async () => (await import("/js/store.js")).setLocal({ pool: false, calMode: "month" })); await page.waitForTimeout(600); } },
   { device: "desk", name: "projects", hash: "projects" },
   { device: "desk", name: "projects-hover", hash: "projects", act: hover('.goals .gl[data-goal="t1"] .gt', 1600) },
   { device: "desk", name: "projects-hover-plan", hash: "projects", act: hover('.pcard[data-project="seed-b2"] .ls-l', 1600) },

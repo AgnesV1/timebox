@@ -566,7 +566,7 @@ body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
 .cell.rest { background: repeating-linear-gradient(-45deg, transparent 0 7px, var(--surface) 7px 8px), var(--bg); }
 .cell.today { border: 2px solid var(--edge); box-shadow: 2px 2px 0 var(--accent); }
 [data-theme="dark"] .cell.today { border-color: var(--accent); box-shadow: 0 0 22px rgba(204, 255, 0, .2); }
-/* 排了的超过那天的 box（她是 10h）：整条静止的警示色（她 2026-10-27 定的；实际干活超过 7h 的闪会盖过它） */
+/* 排了的、或者实际记下的总时间（所有大类）超过那天的 box（她是 10h）：整条静止的警示色（她 2026-10-27 定的；实际干活超过 7h 的闪会盖过它，金条那天都不红） */
 .cell.over .load i { background: var(--warn); }
 .cell.drop-on { background: #F4FFD6; box-shadow: inset 0 0 0 2px var(--edge); }
 [data-theme="dark"] .cell.drop-on { background: rgba(204, 255, 0, .08); box-shadow: inset 0 0 0 1px var(--accent); }

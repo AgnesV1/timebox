@@ -61,7 +61,8 @@ function blockHTML(b, d, pool) {
 
 // 排计划的样子（Pool 开着，而且是今天和以后——以前的日子不跟着 Pool 变，她 2026-10-27 说的）：计划那张一行一项、别的任务也写分钟，
 // 日期后面是那天排了几小时（计划那一块算下面几项，js/lists.js 的 dayMin；以后的日子加上固定星期几的预览，Gym 这种也算进 box）。
-// 顶上那条（她 2026-10-27 定的两个设定）：排了的超过那天的 box（右上角的数，她是 10h）= 整条静止的警示色；
+// 顶上那条（她 2026-10-27 定的两个设定）：排了的、或者实际记下的总时间（所有大类都算——Leisure 占得多的那天她自己改成金条）超过那天的 box
+// （右上角的数，她是 10h）= 整条静止的警示色；
 // 实际记下的「干活」时间超过 7 小时（LONG_DAY）= 闪，两样都有时闪的那个盖过静止的。长短照旧是排了的 ÷ box（不算以后的预览，她说多出一截会怪）
 function cellHTML(c, d, { month = false, outside = false, scores = null, still = false, pool = false } = {}) {
   const tasks = store.tasksOn(d);
@@ -72,7 +73,7 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
   const planned = L.dayMin(blocks) + ghosts.reduce((a, g) => a + (Number(g.est) || 0), 0);
   const capOver = c.capacity.overrides[d] !== undefined;
   const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d), ahead = pool && d >= c.today;
-  const over = sum.cap > 0 && planned > sum.cap;
+  const over = sum.cap > 0 && (planned > sum.cap || sum.done > sum.cap);
   const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", over ? "over" : "", ahead ? "cal-plan" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
   const all = [...blocks.map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d, ahead))), ...ghosts.map(ghostHTML)];
   const loadPct = over ? 100 : sum.cap ? Math.min(100, (sum.planned / sum.cap) * 100) : 0;
@@ -85,7 +86,7 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
     (month ? "" : capEdit === d
       ? '<input class="cap-input num" type="number" min="0" step="15" data-cap-input="' + d + '" data-keep="cap-' + d + '" value="' + sum.cap + '" title="Minutes in the box this day · 0 = rest day · empty = weekly default">'
       : '<button type="button" class="cap num' + (capOver ? " set" : "") + '" data-act="cap" data-date="' + d + '" title="The box this day (available time) — click to change">' + (sum.rest ? "rest" : fmtHours(sum.cap)) + "</button>") + "</div>" +
-    '<button type="button" class="load-t" data-act="super-rest" data-date="' + d + '" aria-pressed="' + gold + '" title="' + (long ? "Over 7 hours of work logged · " : over ? "Planned past the box · " : "") + (gold ? "Super rest day — click to clear" : "Mark as a super rest day") + '">' +
+    '<button type="button" class="load-t" data-act="super-rest" data-date="' + d + '" aria-pressed="' + gold + '" title="' + (long ? "Over 7 hours of work logged · " : over ? "Past the day's box · " : "") + (gold ? "Super rest day — click to clear" : "Mark as a super rest day") + '">' +
     '<span class="load' + (gold && !still ? " shine" : "") + (long ? " over7" + (still ? "" : " blink") : "") + '"><i style="width:' + (long ? Math.max(loadPct, 8) : loadPct) + '%"></i></span></button>' +
     all.join("");
   if (!month) {

@@ -1927,6 +1927,9 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 @keyframes lk-pop { from { opacity: 0; transform: scale(0); } }
 .lk.gone, .lk.cutting .lk-dot { opacity: 0; transition: opacity .14s ease-in; }
 [data-theme="dark"] .lk-t { stroke: var(--c, var(--accent)); opacity: .35; }
+/* 「×」对着的那条（js/ui/links.js 的 showCut）：轨迹变成实线、深一点，看得出点了断的是哪条 */
+.lk.pick .lk-t { stroke-dasharray: none; stroke-width: 1.6; opacity: .85; }
+[data-theme="dark"] .lk.pick .lk-t { opacity: .8; }
 [data-theme="dark"] .lk-sp { stroke: color-mix(in srgb, var(--c, var(--accent)) 55%, #fff); }
 [data-theme="dark"] .lk-sa { stroke: var(--c, var(--accent)); stroke-width: 6; opacity: .3; transform: none; }
 [data-theme="dark"] .lk-sb { display: none; }

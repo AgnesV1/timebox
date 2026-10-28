@@ -77,7 +77,7 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   Everything linked is marked with a lime highlighter (the goals' names and the North star's framed words) and the rest fades, and it's all brought into view:
   if a linked word is hidden below the North star's three lines, the box shows the sentence it's in until you move away (a shorter part of it if the sentence doesn't fit;
   with two or more linked words, only the words); linked goals folded behind "+N more" show; and when you're resting on something on the left, the goals column scrolls to the linked goals.
-  Drag the small circle that appears onto another goal, plan or project to link them; the × in the middle of a line unlinks. While you drag, the North star paragraph opens in full
+  Drag the small circle that appears onto another goal, plan or project to link them; bring the mouse next to the dot at a line's end and a × shows just left of it (that line lights up) — it unlinks. While you drag, the North star paragraph opens in full
   and sections folded behind "+N more" show all their goals, so everything can be dropped on.
   Goals in Past are out of the picture: a line that would go through one goes straight to the next goal up that's still showing (a plan linked to last month's goal is drawn to that goal's parent).
   Goal onto goal = make it the parent (one parent per goal). Without dragging: Part of when editing a goal's text, Serves in the plan editor.

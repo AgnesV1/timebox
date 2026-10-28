@@ -75,6 +75,9 @@ test("one line: name, minutes, times, a week, the rest is a note", () => {
   assert.deepEqual(T.parseLine("Gym · any · 2/week"), { title: "Gym", est: null, n: 0, perWeek: 2, note: "", code: "" });
   assert.deepEqual(T.parseLine("S2 loop · 1h · ×6（new topics）"), { title: "S2 loop", est: 60, n: 6, perWeek: null, note: "（new topics）", code: "S2" });
   assert.equal(T.parseLine("Mock test #N").title, "Mock test", "the #N placeholder goes");
+  // 「•」（Mac 上 ⌥8）、「・」也当分隔的点；x12 也是次数
+  assert.deepEqual(T.parseLine("L4 listening error stats • 30min • ×3"), { title: "L4 listening error stats", est: 30, n: 3, perWeek: null, note: "", code: "L4" });
+  assert.deepEqual(T.parseLine("S2 speaking Part 1・15min・x12"), { title: "S2 speaking Part 1", est: 15, n: 12, perWeek: null, note: "", code: "S2" });
   assert.equal(T.parseLine("E1 错题统计 #1 · 30min").title, "E1 错题统计 #1", "a real number stays");
 });
 

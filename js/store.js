@@ -11,6 +11,7 @@ import * as OD from "./offdays.js";
 import * as F from "./friends.js";
 import { readLocal, writeLocal } from "./dom.js";
 import { formatTimes, sumTimes } from "./times.js";
+import { OLD_NUM } from "./lists.js";
 import seriesStore from "./store/series.js";
 import timerStore from "./store/timer.js";
 import sideStore from "./store/side.js";
@@ -575,7 +576,7 @@ export function addItems(projectId, module, titles, est) {
   change(() => titles.forEach((title) => put("items", { id: newId(), projectId, module: module || "", title, est: Number(est) || 0, origEst: null, order: ++order })));
 }
 
-// 改了名字：还没勾的那几次跟着改（带着的 #k 留着）
+// 改了名字：还没勾的那几次跟着改（以前带着 #k 的，号一起拿掉）
 export function updateItem(id, patch) {
   const i = get("items", id);
   if (!i) return;
@@ -584,8 +585,7 @@ export function updateItem(id, patch) {
     if (patch.title !== undefined) {
       for (const t of all("tasks")) {
         if (t.itemId !== id || t.status) continue;
-        if (t.title === i.title) put("tasks", { ...t, title: patch.title });
-        else if (t.title.startsWith(i.title + " #")) put("tasks", { ...t, title: patch.title + t.title.slice(i.title.length) });
+        if (t.title === i.title || t.title.replace(OLD_NUM, "") === i.title) put("tasks", { ...t, title: patch.title });
       }
     }
   });

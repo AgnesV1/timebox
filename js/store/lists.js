@@ -61,7 +61,7 @@ export default function (core) {
   }
 
   // ---------- 拖一项进某天 ----------
-  // 勾了一半回了 Pool 的那次先接着做（带着剩下的步骤、同一个号）；没有就是新的一次（#k、步骤全新）。做满了的拖不出来，返回空
+  // 勾了一半回了 Pool 的那次先接着做（带着剩下的步骤）；没有就是新的一次（步骤全新）。名字就是项的名字。做满了的拖不出来，返回空
   function placeItem(itemId, date) {
     const item = get("items", itemId), plan = item && get("projects", item.projectId);
     if (!plan) return "";
@@ -71,16 +71,12 @@ export default function (core) {
     change(() => {
       ensureRow(plan.id, date);
       const carry = count.carry[0];
-      let title, steps;
+      let steps;
       if (carry) {
-        const from = get("tasks", carry.from);
-        put("tasks", { ...from, reason: L.CONTINUED });
-        title = from.title;
+        put("tasks", { ...get("tasks", carry.from), reason: L.CONTINUED });
         steps = carry.steps.map((s) => ({ ...s, done: false }));
-      } else {
-        title = L.titleFor(item, cfg, L.nextNum(lines));
-        steps = (cfg.steps || []).map((s) => ({ t: s.t, min: Number(s.min) || 0, done: false }));
-      }
+      } else steps = (cfg.steps || []).map((s) => ({ t: s.t, min: Number(s.min) || 0, done: false }));
+      const title = item.title;
       const est = carry ? steps.reduce((a, s) => a + (Number(s.min) || 0), 0) || Number(item.est) || 0 : Number(item.est) || 0;
       put("tasks", { id, date, title, est, actual: null, status: "", reason: "", optional: false, deep: planDeep(plan.id), projectId: plan.id, group: "", itemId,
         times: "", desc: L.withSteps("", steps), order: nextOrder(date) });
@@ -172,7 +168,7 @@ export default function (core) {
     const rows = [];
     for (const raw of String(text || "").split("\n")) {
       if (!raw.trim()) continue;
-      const body = raw.trim().replace(/^[-*+]\s+(\[[ xX]\]\s+)?/, "");
+      const body = raw.trim().replace(/^[-*+•·|]\s+(\[[ xX]\]\s+)?/, "");
       const x = PT.parseLine(body);
       if (/^\s{2,}/.test(raw) && rows.length) rows[rows.length - 1].steps.push({ t: x.title, min: x.est || 0 });
       else rows.push({ ...x, steps: [] });
@@ -244,16 +240,19 @@ export default function (core) {
   // ---------- 换成这套（打开时看一次，可以重复跑） ----------
   // 记下换的那天；旧的 Total 计划变成普通的计划（项留着，都是 Once）；以前「总时长」那一大块（和计划同名的项）、
   // 还有以前在计划上直接加任务时顺手建的项（分区 Added）拿掉，它们的任务变回计划自己的一条（她 2026-10-26 说没挑 Pool 的就该是计划本身，不拆成子项）
+  // 以前每一次的名字后面带的 #k 拿掉（她 2026-10-27 说没用）
   function adoptLists() {
     const fix = [];
     for (const p of all("projects")) {
       const same = all("items").filter((i) => i.projectId === p.id && (i.module === "Added" || (p.kind === "total" && key(i.title) === key(p.name))));
       if (p.kind === "total" || same.length) fix.push({ p, same });
     }
+    const numbered = all("tasks").filter((t) => { const i = t.itemId && get("items", t.itemId); return i && t.title !== i.title && L.OLD_NUM.test(t.title); });
     const first = !setting(FROM, "");
-    if (!fix.length && !first) return false;
+    if (!fix.length && !first && !numbered.length) return false;
     change(() => {
       if (first) put("settings", { id: FROM, key: FROM, value: today() });
+      for (const t of numbered) put("tasks", { ...t, title: t.title.replace(L.OLD_NUM, "") });
       for (const { p, same } of fix) {
         let row = get("projects", p.id);
         if (row.kind === "total") row = { ...row, kind: "regular", place: "pool", rule: { ...(row.rule || {}), perWeek: Number(row.rule?.perWeek) || 0, min: Number(row.rule?.min) || 0 } };

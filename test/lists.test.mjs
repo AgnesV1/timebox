@@ -28,12 +28,9 @@ test("counting: done, still open, half done and back in the pool; Any never runs
   ];
   const c = L.countOf(lines, cfg);
   assert.deepEqual([c.done, c.open, c.left], [1, 2, 2]);
-  assert.deepEqual(c.carry, [{ k: 2, steps: [{ t: "Reading", min: 0, done: false }], from: "b" }], "only the one whose rest hasn't been dragged out again");
-  assert.equal(L.nextNum(lines), 5, "#2 is held by the half-done one, #5 was dropped so it's free again");
+  assert.deepEqual(c.carry, [{ steps: [{ t: "Reading", min: 0, done: false }], from: "b" }], "only the one whose rest hasn't been dragged out again");
   assert.equal(L.countOf([], { ...L.DEFAULT, n: 0 }).left, Infinity);
   assert.equal(L.countOf([task({ id: "x", status: "done" })], L.DEFAULT).left, 0, "Once, done: nothing left");
-  assert.equal(L.titleFor({ title: "Mock" }, cfg, 3), "Mock #3");
-  assert.equal(L.titleFor({ title: "Book the exam" }, L.DEFAULT, 1), "Book the exam");
 });
 
 test("this week counts done and placed from Monday", () => {
@@ -132,11 +129,11 @@ test("store: paste a plan, drag items onto days, tick steps, back to the pool, p
   assert.equal(store.itemCfg(id("L3 listening set")).perWeek, 2);
   assert.equal(store.itemCfg(id("R2 reading")).later, true);
 
-  // 拖一项进今天：那一行跟着建好，名字带号，步骤复制一份
+  // 拖一项进今天：那一行跟着建好，名字就是项的名字（不带号），步骤复制一份
   const m1 = store.placeItem(id("Mock test"), day);
   const row = L.rowOn(store.ctx(), plan.id, day);
   assert.ok(row && row.id.startsWith("pd:"), "the plan's row for the day");
-  assert.equal(store.get("tasks", m1).title, "Mock test #1");
+  assert.equal(store.get("tasks", m1).title, "Mock test");
   assert.deepEqual(next(store.get("tasks", m1).desc).steps.map((s) => s.done), [false, false]);
   assert.equal(store.get("tasks", m1).est, 90);
   const l3 = store.placeItem(id("L3 listening set"), day);
@@ -151,14 +148,14 @@ test("store: paste a plan, drag items onto days, tick steps, back to the pool, p
   store.tickStep(m1, 1);
   assert.equal(store.get("tasks", m1).status, "");
 
-  // 放回 Pool：勾了一步的留着（Delay），剩下那步在 Pool 里接着做、还是 #1
+  // 放回 Pool：勾了一步的留着（Delay），剩下那步在 Pool 里接着做
   assert.ok(store.backToPool(m1));
   assert.equal(store.get("tasks", m1).status, "delay");
   const again = store.placeItem(id("Mock test"), day);
-  assert.equal(store.get("tasks", again).title, "Mock test #1");
+  assert.equal(store.get("tasks", again).title, "Mock test");
   assert.deepEqual(next(store.get("tasks", again).desc).steps.map((s) => s.t), ["Reading"]);
   assert.equal(store.get("tasks", m1).reason, L.CONTINUED);
-  assert.equal(store.get("tasks", store.placeItem(id("Mock test"), day)).title, "Mock test #2");
+  assert.equal(store.get("tasks", store.placeItem(id("Mock test"), day)).title, "Mock test", "the next time: no number either");
   assert.ok(store.backToPool(l3));
   assert.equal(store.get("tasks", l3), null, "nothing done on it: just gone");
 
@@ -228,7 +225,7 @@ test("store: a task added under a plan is the plan's own unless its name picks a
   assert.notEqual(second, typed, "another name is its own task under the plan");
   const picked = store.addTask({ title: "l3 listening set", projectId: plan, date: day });
   assert.equal(store.get("tasks", picked).itemId, l3, "the name of a pool item picks it");
-  assert.equal(store.get("tasks", picked).title, "L3 listening set #1");
+  assert.equal(store.get("tasks", picked).title, "L3 listening set");
 
   store.setStatus(typed, "done");
   assert.equal(store.get("tasks", typed).status, "done", "the plan's row can be marked done like any task");
@@ -246,4 +243,30 @@ test("store: tasks folded under items the old way are put back as the plan's own
   assert.equal(store.get("tasks", t).itemId, "", "its task is the plan's own again");
   assert.equal(store.get("tasks", t).status, "done", "and keeps what it had");
   assert.ok(store.get("items", kept), "items put in the pool on purpose stay");
+});
+
+test("store: no numbers on the times an item is done; old #k come off when opened (she said 2026-10-27)", async () => {
+  const store = await import("../js/store.js?lists-nonum");
+  const plan = store.saveProject({ name: "IELTS", group: "Build", kind: "regular", place: "pool" });
+  // 加进 Pool 那一格打的是「•」、前面还带个点：照样认出时长和次数
+  const [l4] = store.addPoolLines(plan, "", "• L4 listening error stats • 30min • ×3");
+  const item = store.get("items", l4);
+  assert.deepEqual([item.title, item.est, store.itemCfg(l4).n], ["L4 listening error stats", 30, 3]);
+  const a = store.placeItem(l4, "2026-10-28"), b = store.placeItem(l4, "2026-10-29");
+  assert.deepEqual([store.get("tasks", a).title, store.get("tasks", b).title], ["L4 listening error stats", "L4 listening error stats"]);
+  // 以前留下来的「#2」「#8」：打开时拿掉；项自己名字里的 # 不碰，没挂项的不碰
+  const [mock] = store.addPoolLines(plan, "", "Mock #3 · 1h · ×2");
+  const old = store.addTask({ title: "L4 listening error stats #8", projectId: plan, itemId: l4, date: "2026-10-27", est: 30, status: "done" });
+  const odd = store.addTask({ title: "Mock #3 #2", projectId: plan, itemId: mock, date: "2026-10-27", est: 60 });
+  const own = store.placeItem(mock, "2026-10-28");
+  const loose = store.addTask({ title: "Essay #2", date: "2026-10-27", est: 30 });
+  store.adoptLists();
+  assert.equal(store.get("tasks", old).title, "L4 listening error stats");
+  assert.equal(store.get("tasks", odd).title, "Mock #3", "only the number at the end comes off");
+  assert.equal(store.get("tasks", own).title, "Mock #3", "an item called that keeps its name");
+  assert.equal(store.get("tasks", loose).title, "Essay #2", "not on an item: left alone");
+  assert.equal(store.adoptLists(), false, "running it again changes nothing");
+  // 改项的名字：还没勾的跟着改
+  store.updateItem(l4, { title: "L4 error log" });
+  assert.deepEqual([store.get("tasks", a).title, store.get("tasks", old).title], ["L4 error log", "L4 listening error stats"], "the done one keeps its name");
 });

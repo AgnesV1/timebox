@@ -137,7 +137,7 @@ export function poolHTML(c) {
     for (const x of items) {
       if ((x.item.module || "") !== mod) { mod = x.item.module || ""; if (mod) h += '<div class="pg-mod">' + esc(mod) + "</div>"; }
       const carry = x.count.carry[0];
-      const label = carry ? L.titleFor(x.item, x.cfg, carry.k) + " · " + carry.steps.length + " step" + (carry.steps.length > 1 ? "s" : "") + " left" : x.item.title;
+      const label = carry ? x.item.title + " · " + carry.steps.length + " step" + (carry.steps.length > 1 ? "s" : "") + " left" : x.item.title;
       const meta = [L.sizeOf(x.item.est), x.cfg.n > 1 ? x.count.left + " left" : x.cfg.n === 0 ? "any" : "", x.cfg.perWeek ? "wk " + x.week.placed + "/" + x.cfg.perWeek : ""].filter(Boolean).join(" · ");
       h += '<div class="pi" data-drag="item:' + esc(x.item.id) + '" role="button" tabindex="0" aria-haspopup="listbox" style="--c:' + esc(p.color) + '" title="' + esc(x.cfg.note || "") + '"><i class="g"></i><span>' + esc(label) + '</span><b class="num">' + esc(meta) + "</b></div>";
     }

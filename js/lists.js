@@ -43,11 +43,9 @@ export function withSteps(rest, steps) {
 const leftSteps = (t) => stepsOf(t.desc).steps.filter((s) => !s.done);
 
 // ---------- 第几次 ----------
-// 做好几次的项（×N）每一次的名字后面带 #k；Once、Any 不带
-
-const K = /\s#(\d+)$/;
-export const numOf = (t) => Number(K.exec(String(t?.title || ""))?.[1]) || 0;
-export const titleFor = (item, cfg, k) => String(item?.title || "") + (cfg.n > 1 && k ? " #" + k : "");
+// 每一次的名字就是项的名字，不带号（以前 ×N 的项每一次后面带 #k，她 2026-10-27 说没用）。
+// 以前带着的号打开时拿掉（js/store/lists.js 的 adoptLists）：挂着项、名字和项不一样、后面是「 #数字」的，去掉最后那个
+export const OLD_NUM = /\s#\d+$/;
 
 // 勾了一半、剩下的回了 Pool、还没接着拖出来的那几次
 const carried = (lines) => lines.filter((t) => t.status === "delay" && t.reason !== CONTINUED && leftSteps(t).length);
@@ -55,16 +53,8 @@ const carried = (lines) => lines.filter((t) => t.status === "delay" && t.reason 
 // 一项的次数：done 做完的；open 排在某天还没勾的；carry 勾了一半回了 Pool 的；left 还能从 Pool 拖几次（含 carry，Any = Infinity）
 export function countOf(lines, cfg) {
   const done = lines.filter((t) => t.status === "done").length, open = lines.filter((t) => !t.status).length;
-  const carry = carried(lines).map((t) => ({ k: numOf(t), steps: leftSteps(t), from: t.id }));
+  const carry = carried(lines).map((t) => ({ steps: leftSteps(t), from: t.id }));
   return { n: cfg.n, done, open, carry, left: cfg.n > 0 ? Math.max(0, cfg.n - done - open) : Infinity };
-}
-
-// 下一个新的那次用几号：没用过的最小号（回了 Pool 的那几次留着它们的号）
-export function nextNum(lines) {
-  const used = new Set([...lines.filter((t) => t.status === "done" || !t.status), ...carried(lines)].map(numOf));
-  let k = 1;
-  while (used.has(k)) k++;
-  return k;
 }
 
 // 这一周（d 所在的那周）：做了几次、排了几次（做了的 + 还没勾的）

@@ -26,7 +26,6 @@ const LONG_DAY = 7 * 60;
 
 let anchor = "";
 let adding = "";      // 正在哪一天的格子里加任务
-let capEdit = "";     // 正在改哪一天的可用时间
 
 const mode = () => store.local().calMode || "week";
 const weekStart = () => store.prefs().weekStartsOn;
@@ -34,12 +33,12 @@ const weekStart = () => store.prefs().weekStartsOn;
 function chipHTML(t) {
   const p = badgeOf(t);
   return '<div class="ev st-' + (t.status || "open") + (t.optional ? " opt" : "") + '" data-drag="task:' + t.id + '" data-act="edit-task" data-id="' + t.id + '" style="--c:' + colorOf(t) + '" title="' + esc(t.title + (p ? " · " + p.name : "")) + '">' +
-    '<span class="t">' + (E.isRoutine(t) ? '<i class="rt">↻</i>' : "") + esc(t.title) + '</span><span class="m num">' + t.est + "</span></div>";
+    '<span class="t">' + (E.isRoutine(t) ? '<i class="rt">↻</i>' : "") + esc(t.title) + "</span>" + (Number(t.est) > 0 ? '<span class="m num">' + Number(t.est) + "</span>" : "") + "</div>";
 }
 
 function ghostHTML(g) {
   return '<div class="ev ghost" data-drag="ghost:' + esc(g.key) + '" data-act="open-ghost" data-key="' + esc(g.key) + '" style="--c:' + esc(g.plan.color) + '" title="' + esc(g.title + " · repeats") + '">' +
-    '<span class="t"><i class="rt">↻</i>' + esc(g.title) + '</span><span class="m num">' + g.est + "</span></div>";
+    '<span class="t"><i class="rt">↻</i>' + esc(g.title) + "</span>" + (Number(g.est) > 0 ? '<span class="m num">' + Number(g.est) + "</span>" : "") + "</div>";
 }
 
 // 一个计划那天的那一张（她 2026-10-27 改的）：Pool 关着只写名字（那一行的名字，没有那一行才写计划名），停上去展开成一行一项；
@@ -59,8 +58,9 @@ function blockHTML(b, d, pool) {
     (!pool && lines.length ? '<div class="full"><span class="bt">' + esc(name) + "</span>" + list + "</div>" : "") + "</div>";
 }
 
-// 那天排了多少分钟：计划那一块算下面几项（js/lists.js 的 dayMin），以后的日子加上固定星期几的预览。
-// Pool 开着时写在日期后面（她 2026-10-27 挑的甲）；顶上那条和「排多了」也按它算，两边对得上
+// 排计划的样子（Pool 开着，而且是今天和以后——以前的日子不跟着 Pool 变，她 2026-10-27 说的）：计划那张一行一项、别的任务也写分钟，
+// 日期后面是那天排了几小时（计划那一块算下面几项，js/lists.js 的 dayMin；以后的日子加上固定星期几的预览）。顶上那条的长短也按它算。
+// 那条变红只看实际记下的时间（LONG_DAY），排得多不变红；可用时间（以前格子右上角的 7h）不在日历上显示了（她说的）
 function cellHTML(c, d, { month = false, outside = false, scores = null, still = false, pool = false } = {}) {
   const tasks = store.tasksOn(d);
   const unscored = scores && SC.unscored(scores, store.scoreOf(d), d, c.today);
@@ -68,20 +68,16 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
   const sum = E.daySummary(c, d);
   const blocks = L.dayBlocks(c, tasks);
   const planned = L.dayMin(blocks) + ghosts.reduce((a, g) => a + (Number(g.est) || 0), 0);
-  const capOver = c.capacity.overrides[d] !== undefined;
-  const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d);
-  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", sum.cap && planned > sum.cap ? "over" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
-  const all = [...blocks.map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d, pool))), ...ghosts.map(ghostHTML)];
+  const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d), ahead = pool && d >= c.today;
+  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", ahead ? "cal-plan" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
+  const all = [...blocks.map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d, ahead))), ...ghosts.map(ghostHTML)];
   const loadPct = sum.cap ? Math.min(100, (planned / sum.cap) * 100) : 0;
   const long = !gold && sum.done > LONG_DAY;   // 金条那天不变红
   let h = '<div class="' + cls + '" data-drop="day:' + d + '">' +
     '<div class="cell-head"><span class="dn-w"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"' + (unscored ? ' title="Not scored yet"' : "") + "><span>" + (month ? "" : WEEKDAYS[wd]) + "</span><b>" + Number(d.slice(8)) + "</b>" + (isPayday(d) ? '<span class="payday" title="Payday">$</span>' : "") + (unscored ? '<i class="dsc-dot" aria-label="Not scored yet"></i>' : "") + "</button>" +
-    (pool && planned > 0 ? '<span class="cal-hrs num" title="Planned this day">' + fmtHours(planned) + "</span>" : "") +
+    (ahead && planned > 0 ? '<span class="cal-hrs num" title="Planned this day">' + fmtHours(planned) + "</span>" : "") +
     (wd === 0 || wd === 6 ? "" : '<button type="button" class="offday-t' + (off.off ? " on" : "") + '" data-act="off-day" data-date="' + d + '" aria-pressed="' + off.off + '" title="' + esc(off.off ? (off.holiday || "Day off") + " — click to clear" : "Mark as a day off") + '">💤</button>') + "</span>" +
-    '<button type="button" class="cm-t' + (commute ? " on" : "") + '" data-act="commute" data-date="' + d + '" aria-pressed="' + commute + '" title="' + (commute ? "Commute day — click to clear" : "Mark as a commute day") + '">' + icon("commute") + "</button>" +
-    (month ? "" : capEdit === d
-      ? '<input class="cap-input num" type="number" min="0" step="15" data-cap-input="' + d + '" data-keep="cap-' + d + '" value="' + sum.cap + '" title="Minutes available · 0 = rest day · empty = weekly default">'
-      : '<button type="button" class="cap num' + (capOver ? " set" : "") + '" data-act="cap" data-date="' + d + '" title="Available minutes this day — click to change">' + (sum.rest ? "rest" : fmtHours(sum.cap)) + "</button>") + "</div>" +
+    '<button type="button" class="cm-t' + (commute ? " on" : "") + '" data-act="commute" data-date="' + d + '" aria-pressed="' + commute + '" title="' + (commute ? "Commute day — click to clear" : "Mark as a commute day") + '">' + icon("commute") + "</button></div>" +
     '<button type="button" class="load-t" data-act="super-rest" data-date="' + d + '" aria-pressed="' + gold + '" title="' + (long ? "Over 7 hours · " : "") + (gold ? "Super rest day — click to clear" : "Mark as a super rest day") + '">' +
     '<span class="load' + (gold && !still ? " shine" : "") + (long ? " over7" + (still ? "" : " blink") : "") + '"><i style="width:' + (long ? Math.max(loadPct, 8) : loadPct) + '%"></i></span></button>' +
     all.join("");
@@ -113,7 +109,7 @@ export function calendarHTML(c) {
     body = '<div class="cal-scroll"><div class="month-head">' + heads + '</div><div class="month">' +
       range(s, addDays(s, weeks * 7 - 1)).map((d) => cellHTML(c, d, { month: true, outside: d.slice(0, 7) !== m0.slice(0, 7), scores, still, pool })).join("") + "</div></div>";
   }
-  return '<div class="calendar' + (pool ? " cal-pool" : "") + '">' +
+  return '<div class="calendar">' +
     '<header class="page-head"><div><h2>' + title + "</h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="cal-today">Today</button>' +
     '<button type="button" class="nav" data-act="cal-prev" aria-label="Previous">' + icon("left") + '</button><button type="button" class="nav" data-act="cal-next" aria-label="Next">' + icon("right") + "</button>" +
@@ -175,27 +171,8 @@ export function initCalendar(rerender) {
       adding = el.dataset.date;
       rerender();
       document.querySelector('[data-keep="cell-add-' + adding + '"]')?.focus();
-    } else if (act === "cap") {
-      capEdit = el.dataset.date;
-      rerender();
-      const input = document.querySelector('[data-cap-input="' + capEdit + '"]');
-      input?.focus();
-      input?.select();
     }
   });
-
-  // 改某天的可用时间：回车或离开就存；清空 = 用每周默认；Esc 放弃
-  const saveCap = (input) => {
-    if (capEdit !== input.dataset.capInput) return;
-    capEdit = "";
-    const v = input.value.trim();
-    store.setDayCapacity(input.dataset.capInput, v === "" ? null : Math.max(0, Number(v) || 0));
-  };
-  on(document, "keydown", "[data-cap-input]", (e, input) => {
-    if (e.key === "Enter") saveCap(input);
-    if (e.key === "Escape") { capEdit = ""; rerender(); }
-  });
-  on(document, "focusout", "[data-cap-input]", (e, input) => saveCap(input));
 
   on(document, "submit", ".cell-form", (e, form) => {
     e.preventDefault();

@@ -70,6 +70,9 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
     Ideas is the idea pool described below; switching to it keeps the North star paragraph in view.
   **Goals, projects and plans can be linked** to say what each thing is for: rest the mouse on a goal, a framed phrase in the North star, a project name or a plan card
   (or Tab onto it with the keyboard), and the related links fly out one by one (a direct curve between the two ends — crossing text is fine, they only show while you're there).
+  Lines from something on the left (a plan card, a project name, a repeat) **hold** once they're out and the small circle shows: passing over other plans or goals doesn't switch to theirs
+  (rest on one that isn't linked for a moment to switch; linked goals never take over), and they stay while the mouse is anywhere between it and its goals or when you click the card itself.
+  Moving well away, clicking something else or Esc puts them away. Goals and North star words still switch as soon as you rest on another.
   A **streak** of light keeps running along each line towards "what it's for" (plan → goal → parent goal → … → North star), and the dot at that end bounces when it arrives. By day it's ink with pink and blue printed slightly off-register; at night it's the project's neon colour.
   Everything linked is marked with a lime highlighter (the goals' names and the North star's framed words) and the rest fades, and it's all brought into view:
   if a linked word is hidden below the North star's three lines, the box shows the sentence it's in until you move away (a shorter part of it if the sentence doesn't fit;

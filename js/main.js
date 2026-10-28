@@ -103,8 +103,8 @@ function showDesk() {
   if (!desk) desk = createSpending();
   if (desk.el.parentNode !== main || main.children.length !== 1) {
     main.replaceChildren(desk.el); desk.show();
-    // 和手机拉开记账一样：半小时没整份对过，就整份拉一次（表格里手改的、别处改的都回来）
-    if (store.setting("spend")?.url && spend.wantFull()) sync.queue();
+    // 和手机拉开记账一样：马上要一次新的；一天没整份对过，就是整份（表格里手改的、别处改的都回来）
+    if (store.setting("spend")?.url) { spend.wantFull(); sync.soon(); }
   }
 }
 
@@ -179,6 +179,7 @@ function draw() {
   document.body.classList.toggle("side-min", !phone && Boolean(store.local().sideMin));
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
+  if (!phone) spend.view(view === "spending");   // 电脑看着 Spending 时每次同步都带上记账（js/spend.js 的 due；手机上是拉下来那页自己说）
   if (view === "spending") showDesk();
   else main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : view === "ideas" ? ideasPhoneHTML(c) : view === "friends" ? friendsHTML(c) : todayHTML(c, phone);
   placePills();

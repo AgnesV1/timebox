@@ -1237,10 +1237,14 @@ function spendTab_(book, k) {
   return { sh: sh, col: col, width: names.length };
 }
 
-// 日期那一列照表格里显示的字读（"2026-10-23"），不用 getValues 给的时刻再按时区换——记账表格和脚本的时区不一样时会差一天
-function spendShown_(tab, name) {
+// 日期那一列照表格里显示的字读（"2026-10-23"），不用 getValues 给的时刻再按时区换——记账表格和脚本的时区不一样时会差一天。
+// from、n：只读第 from 条（0 起）往后 n 条；不给就是整列
+function spendShown_(tab, name, from, n) {
   var last = tab.sh.getLastRow();
-  return last < 2 || tab.col[name] === undefined ? [] : tab.sh.getRange(2, tab.col[name] + 1, last - 1, 1).getDisplayValues().map(function (r) { return r[0]; });
+  if (last < 2 || tab.col[name] === undefined) return [];
+  from = from || 0;
+  if (n === undefined) n = last - 1 - from;
+  return n > 0 ? tab.sh.getRange(2 + from, tab.col[name] + 1, n, 1).getDisplayValues().map(function (r) { return r[0]; }) : [];
 }
 // 显示的字 → yyyy-mm-dd（格子改成了 2026/10/23、10/23/2026 也认）；认不出就退回旧的办法
 function spendDay_(raw, shown, tz) {
@@ -1283,10 +1287,21 @@ function spendWrite_(tab, rows) {
   if (rows.length) tab.sh.getRange(2, 1, rows.length, tab.width).setValues(rows);
 }
 
+// 记账表格上次被这里写过的时刻（Script Properties 的 spendAt）。拉的时候这次没东西要写、那之后也没人写过 = 不打开那张表格，直接回「没变化」——
+// 平常每 30 秒、点回窗口的那一下就省下打开表格、读几千行（她 2026-10-28 说手机拉下来慢）。
+// 表格里手改、手加的行照旧等整份拉（一天一次）或者下一次有人写的时候才回来
+function spendQuiet_(req, since) {
+  if (!since || (req.put || []).length || (req.del || []).length || Array.isArray(req.budgets) || Array.isArray(req.cats)) return false;
+  var at = Number(PropertiesService.getScriptProperties().getProperty('spendAt'));
+  return at > 0 && at < since;
+}
+
 function spend_(req) {
+  var now = Date.now(), since = Number(req.since) || 0;
+  if (spendQuiet_(req, since)) return { ok: true, now: now, rows: [], dels: [], curs: true, bcur: true };
   var book = spendBook_();
   if (!book) return { error: 'no sheet' };
-  var now = Date.now(), tz = book.getSpreadsheetTimeZone(), since = Number(req.since) || 0;
+  var tz = book.getSpreadsheetTimeZone(), wrote = false;
   var tx = spendTab_(book, 'tx'), dead = spendTab_(book, 'dead'), c = tx.col;
   var cats = spendCats_(book), inc = {};
   (req.cats || cats).forEach(function (x) { if (x.kind === 'in') inc[x.name] = true; });
@@ -1298,7 +1313,7 @@ function spend_(req) {
     if (id) at[id] = i;
   });
   // 一次写回（一行一行写，几千行会超时）
-  if (fixed.length) { var lo = Math.min.apply(null, fixed), hi = Math.max.apply(null, fixed); tx.sh.getRange(lo + 2, 1, hi - lo + 1, tx.width).setValues(data.slice(lo, hi + 1)); }
+  if (fixed.length) { var lo = Math.min.apply(null, fixed), hi = Math.max.apply(null, fixed); tx.sh.getRange(lo + 2, 1, hi - lo + 1, tx.width).setValues(data.slice(lo, hi + 1)); wrote = true; }
   var cell = function (x) {
     var row = data.length && at[x.id] !== undefined ? data[at[x.id]].slice() : Array(tx.width).fill('');
     row[c.Date] = String(x.d || ''); row[c.Kind] = x.v > 0 ? 'Income' : 'Expense'; row[c.Category] = toCell_('text', x.c || '');
@@ -1315,6 +1330,7 @@ function spend_(req) {
       if (Number(data[i][c.Updated]) > Number(x.u)) return;
       data[i] = cell(x);
       tx.sh.getRange(i + 2, 1, 1, tx.width).setValues([data[i]]);
+      wrote = true;
     } else {
       var r = cell(x);
       data.push(r);
@@ -1325,6 +1341,7 @@ function spend_(req) {
     var need = data.length + 1 - tx.sh.getMaxRows();
     if (need > 0) tx.sh.insertRowsAfter(tx.sh.getMaxRows(), need);
     tx.sh.getRange(fresh + 2, 1, data.length - fresh, tx.width).setValues(data.slice(fresh));
+    wrote = true;
   }
   // 删：从下往上删（行号不乱），每一笔记进 Deleted
   var gone = [], log = [];
@@ -1336,29 +1353,36 @@ function spend_(req) {
     log.push([x.id, now]);
   });
   gone.sort(function (a, b) { return b - a; }).forEach(function (i) { tx.sh.deleteRow(i + 2); });
-  if (log.length) dead.sh.getRange(dead.sh.getLastRow() + 1, 1, log.length, 2).setValues(log);
+  if (log.length) { dead.sh.getRange(dead.sh.getLastRow() + 1, 1, log.length, 2).setValues(log); wrote = true; }
   if (gone.length) data = spendData_(tx);
   // 清单：发来了就整张换掉
-  if (Array.isArray(req.budgets)) spendWrite_(spendTab_(book, 'budgets'), req.budgets.map(function (b) { return [String(b.from), Number(b.v) / 100, SPEND_CUR[b.cur] || '']; }));
+  if (Array.isArray(req.budgets)) { spendWrite_(spendTab_(book, 'budgets'), req.budgets.map(function (b) { return [String(b.from), Number(b.v) / 100, SPEND_CUR[b.cur] || '']; })); wrote = true; }
   if (Array.isArray(req.cats)) {
     spendWrite_(spendTab_(book, 'cats'), req.cats.map(function (x) { return [x.kind === 'in' ? 'Income' : 'Expense', toCell_('text', x.name), SPEND_ROLE_OUT[x.role] || '', x.hidden ? 'yes' : '']; }));
     cats = spendCats_(book);
+    wrote = true;
   }
-  // 拉：since 之后写过的（since = 0 就是全部）。同一毫秒写的也算上（多发几行没关系，漏了就找不回来）
-  var rows = [], shown = spendShown_(tx, 'Date');
-  data.forEach(function (r, i) {
-    var id = String(r[c.ID] || '').trim(), d = spendDay_(r[c.Date], shown[i], tz);
-    if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(d) || (since && !(Number(r[c.Synced]) >= since))) return;
+  // 写过（或者还没记过 spendAt，比如刚换上这一版）：记下这个时刻，别的设备下一次拉就知道要真的读
+  var props = PropertiesService.getScriptProperties();
+  if (wrote || !props.getProperty('spendAt')) props.setProperty('spendAt', String(now));
+  // 拉：since 之后写过的（since = 0 就是全部）。同一毫秒写的也算上（多发几行没关系，漏了就找不回来）。
+  // 显示的日期只读要回的那几行所在的那一段（平常就是底下几行），不再每次整列读
+  var hit = [];
+  data.forEach(function (r, i) { if (String(r[c.ID] || '').trim() && (!since || Number(r[c.Synced]) >= since)) hit.push(i); });
+  var first = hit.length ? hit[0] : 0, shown = hit.length ? spendShown_(tx, 'Date', first, hit[hit.length - 1] - first + 1) : [], rows = [];
+  hit.forEach(function (i) {
+    var r = data[i], id = String(r[c.ID]).trim(), d = spendDay_(r[c.Date], shown[i - first], tz);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
     var v = Math.round(Number(String(r[c.Amount]).replace(/[^\d.]/g, '')) * 100) || 0, cat = String(r[c.Category] || '').trim();
     var isIn = /^inc/i.test(String(r[c.Kind] || '')) || (!String(r[c.Kind] || '').trim() && inc[cat]);
     var cur = spendCur_(r[c.Currency]), one = { id: id, d: d, v: isIn ? v : -v, c: cat, n: String(r[c.Note] || ''), u: Number(r[c.Updated]) || 0 };
     if (cur) one.cur = cur;
     rows.push(one);
   });
-  var dels = since ? spendData_(dead).filter(function (r) { return Number(r[1]) >= since; }).map(function (r) { return String(r[0]); }) : [];
+  var deadRows = spendData_(dead), dels = since ? deadRows.filter(function (r) { return Number(r[1]) >= since; }).map(function (r) { return String(r[0]); }) : [];
   // 删除记录只留 14 天
-  var keep = spendData_(dead).filter(function (r) { return now - Number(r[1]) < KEEP_DELETED_DAYS * 864e5; });
-  if (keep.length < spendData_(dead).length) spendWrite_(dead, keep);
+  var keep = deadRows.filter(function (r) { return now - Number(r[1]) < KEEP_DELETED_DAYS * 864e5; });
+  if (keep.length < deadRows.length) spendWrite_(dead, keep);
   return { ok: true, now: now, rows: rows, dels: dels, budgets: spendBudgets_(book), cats: cats, curs: true, bcur: true };
 }
 

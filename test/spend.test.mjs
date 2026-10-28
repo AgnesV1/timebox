@@ -231,3 +231,54 @@ test("spend: ids stay unique even when thousands are made in the same millisecon
   const ids = Array.from({ length: 20000 }, () => SP.newId());
   assert.equal(new Set(ids).size, ids.length);
 });
+
+test("spend: a poll with nothing new doesn't open the spending sheet; a change made elsewhere still comes back (she said 2026-10-28 it was slow)", async () => {
+  const { g, book, sync } = sheet();
+  let opened = 0;
+  const open = g.sandbox.SpreadsheetApp.openById;
+  g.sandbox.SpreadsheetApp.openById = (id) => { opened++; return open(id); };
+  const phone = await device(), desk = await device();
+  phone.add({ d: "2026-10-27", v: -1200, c: "Food", n: "lunch" });
+  const wait = () => { const t = Date.now(); while (Date.now() === t) { /* 下一毫秒 */ } };
+  // 新表格的类别页是空的：头一回同步后手机会把自己的类别写过去（也算写）。来回几轮，到没东西要写、各自的 cursor 都在最后一次写之后
+  for (let i = 0; i < 3; i++) { sync(phone); wait(); sync(desk); wait(); }
+  opened = 0;
+  const quiet = sync(phone);
+  assert.deepEqual([opened, quiet.rows.length, quiet.ok], [0, 0, true], "nothing new: answered without opening the sheet");
+  assert.equal(phone.entries().length, 1, "and nothing on the phone changes");
+  // 电脑记一笔 → 手机下一次拉要真的去读
+  desk.add({ d: "2026-10-28", v: -450, c: "Drink", n: "tea" });
+  sync(desk);
+  wait();
+  opened = 0;
+  sync(phone);
+  assert.ok(opened > 0, "after a write the sheet is opened again");
+  assert.deepEqual(phone.entries().map((e) => e.n).sort(), ["lunch", "tea"]);
+  // 整份拉照样整份（表格里手改的就靠它）
+  const tx = book.getSheetByName("Transactions");
+  const r = tx.getLastRow() + 1;
+  ["2026-10-28", "Expense", "Food", "typed in", 3].forEach((v, j) => tx.put(r, j + 1, v));
+  wait(); sync(phone);
+  assert.ok(!phone.entries().some((e) => e.n === "typed in"), "a row typed into the sheet waits for the full pull");
+  phone.forceFull();
+  sync(phone);
+  assert.ok(phone.entries().some((e) => e.n === "typed in"), "the full pull brings it");
+});
+
+test("spend: a sync carries the spending part only when it's needed", async () => {
+  const { sync } = sheet();
+  const phone = await device();
+  assert.equal(phone.due(), true, "nothing pulled yet");
+  sync(phone);
+  sync(phone);   // 新表格：头一回把类别写过去
+  assert.equal(phone.due(), false, "just pulled, nothing waiting, not looking at it");
+  phone.view(true);
+  assert.equal(phone.due(), true, "the ledger is open");
+  phone.view(false);
+  phone.add({ d: "2026-10-28", v: -100, c: "Food", n: "" });
+  assert.equal(phone.due(), true, "a record waiting to go");
+  sync(phone);
+  assert.equal(phone.due(), false);
+  phone.forceFull();
+  assert.equal(phone.due(), true, "Reload everything");
+});

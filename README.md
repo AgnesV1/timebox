@@ -308,6 +308,9 @@ Spending has its own Sheet: Transactions (Date, Kind, Category, Note, Amount, Cu
 - Every record has an ID and a modified time; when two devices change the same record, the later change wins
 - Changes are pushed 2.5 seconds after you make them (spending: 0.6 seconds), again when you leave the page or lock the phone (spending included), and everything syncs again when you come back to the page or the window, reconnect, or every 30 seconds while the page is showing.
   A sync that brings nothing new doesn't redraw the page
+- Spending rides along only when it's needed: something waiting to go, the spending page open (the phone's pull-down or Spending on the computer), or 10 minutes since it last came in;
+  opening it asks right away. The whole ledger is compared once a day (it used to be every half hour, a few hundred KB each time). The script remembers when it last wrote the
+  spending Sheet, so a check with nothing new answers without opening that Sheet; rows typed straight into the Sheet come in with the daily full check
 - Everything is saved on the device first, so it works offline and goes out once you're back online
 - The Sheet is for looking and analysing, not planning: edits made directly in the Sheet only reach the device after
   "Reload everything from the Sheet" in Settings

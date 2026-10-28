@@ -257,13 +257,16 @@ function open() {
     drop.classList.remove("on", "falling");
     drop.getAnimations().forEach((a) => a.cancel());
   }, quiet() ? 20 : OPEN_MS + 20);
-  if (store.setting("spend")?.url && SP.wantFull()) import("../sync.js").then((s) => s.queue());
+  // 拉开就马上要一次新的（平常的同步不一定带着记账）；一天没整份对过的话就是整份
+  SP.view(true);
+  if (store.setting("spend")?.url) { SP.wantFull(); import("../sync.js").then((s) => s.soon()); }
 }
 
 // ---------- 收 ----------
 function close() {
   if (state !== "open" && state !== "opening") return;
   state = "closing";
+  SP.view(false);
   const dur = quiet() ? 10 : CLOSE_MS;
   if (!quiet()) inner.querySelectorAll(".mn-home > *").forEach((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: "forwards" }));
   curtain.style.transition = "transform " + dur + "ms " + EXIT;

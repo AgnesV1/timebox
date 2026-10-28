@@ -8,7 +8,8 @@ import { readLocal, writeLocal } from "./dom.js";
 import { DEFAULT_CATS, parts, isCur } from "./money.js";
 
 const KEY = "kuzhouduan-spend";
-const FULL_EVERY = 30 * 60000;   // 打开记账页时，半小时没整份对过就整份拉一次（表格里手改的那几行也能拉回来）
+const FULL_EVERY = 864e5;        // 打开记账页时，一天没整份对过就整份拉一次（表格里手改的那几行也能拉回来）——以前半小时一次，每次几百 KB，手机上慢（她 2026-10-28）
+const PULL_EVERY = 10 * 60000;   // 没看着记账时，同步隔这么久才带上它一次（今天页 Spend 旁边的 left 要跟上）
 const STALE = 13 * 864e5;        // 太久没同步：表格里的删除记录只留 14 天，整份对一遍
 
 let S = { entries: {}, budgets: [], cats: DEFAULT_CATS.map((c) => ({ ...c })), put: {}, del: {}, bDirty: false, cDirty: false, cursor: 0, fullAt: 0, wantFull: true, error: "", linked: false, inCur: "cad", show: "cad" };
@@ -109,6 +110,14 @@ export function link(on) { if (S.linked !== on) { S.linked = on; if (on) S.wantF
 export function forceFull() { S.wantFull = true; save(); }
 export function wantFull() { if (Date.now() - (S.fullAt || 0) > FULL_EVERY) { S.wantFull = true; save(); return true; } return false; }
 
+// 这一次同步要不要带上记账（她 2026-10-28 说手机拉下来慢：以前每一次都带，表格那边每次都要打开记账表格读几千行）：
+// 有没发出去的、要整份拉、正看着记账（手机拉下来的那页、电脑的 Spending），或者离上次拉回来过了 PULL_EVERY
+let viewing = false, pulledAt = 0;
+export function view(on) { viewing = Boolean(on); }
+export function due() {
+  return viewing || S.wantFull || !S.cursor || S.bDirty || S.cDirty || Object.keys(S.put).length > 0 || Object.keys(S.del).length > 0 || Date.now() - pulledAt > PULL_EVERY;
+}
+
 // 同步时带上：要写的、要删的、改过的清单；从哪个时间点往后拉
 export function request() {
   const stale = S.cursor && Date.now() - S.cursor > STALE;
@@ -127,6 +136,7 @@ export function readError(e) {
 // 表格回来的。res 没有（旧脚本不认 spend）：提示换 Code.gs，排着的都留着
 export function apply(res, sent) {
   if (!sent) return;
+  pulledAt = Date.now();
   if (!res) { S.error = "Update Code.gs in your 苦昼短 Sheet to sync spending"; save(); emit(); return; }
   if (res.error) { S.error = readError(res.error); save(); emit(); return; }
   S.error = "";

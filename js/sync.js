@@ -81,7 +81,7 @@ export async function sync({ full = false, archive = null } = {}) {
     const rq = store.setting("reading")?.url ? reading.request() : null;
     // 记账表格：一样，设了链接才带（js/spend.js）
     spend.link(Boolean(store.setting("spend")?.url));
-    const sq = store.setting("spend")?.url ? spend.request() : null;
+    const sq = store.setting("spend")?.url && spend.due() ? spend.request() : null;
     const day = store.today(), tidy = store.local().tidied !== day;
     const data = await post(url, { secret, pull: true, since: full ? 0 : store.cursor(), push: { rows: out.rows, deletes: out.deletes },
       ...(rq ? { reading: rq } : {}), ...(sq ? { spend: sq } : {}), ...(tidy ? { tidy: true } : {}), ...(archive ? { archive } : {}) });

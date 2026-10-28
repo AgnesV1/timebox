@@ -102,12 +102,14 @@ export function load(codePath, ss = new Spreadsheet()) {
   const others = {};   // openByUrl 能打开的别的表格：url → Spreadsheet
   const byUrl = (url) => { const k = Object.keys(others).find((u) => String(url).startsWith(u)); if (!k) throw new Error("Spreadsheet not found"); return others[k]; };
   const logs = [];
+  const props = {};   // Script Properties
   const pad = (n) => String(n).padStart(2, "0");
   const validation = { requireValueInList() { return this; }, requireValueInRange() { return this; }, build() { return {}; } };
   const sandbox = {
     SpreadsheetApp: { getActiveSpreadsheet: () => ss, openByUrl: byUrl, openById: (id) => byUrl(Object.keys(others).find((u) => u.includes("/d/" + id)) || "?"), flush() {}, newDataValidation: () => Object.create(validation) },
     Utilities: { getUuid: () => crypto.randomUUID(), formatDate: (d, tz, f) => (f === "HH:mm" ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = String(v); }, deleteProperty: (k) => { delete props[k]; } }) },
     ContentService: { MimeType: { JSON: "json" }, createTextOutput: (s) => ({ setMimeType() { return this; }, getContent: () => s }) },
     Logger: { log: (m) => logs.push(m) },
     Date, JSON, Math, Object, String, Number, isNaN, console

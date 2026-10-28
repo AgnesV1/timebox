@@ -116,11 +116,11 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   other tasks show their minutes too, and each date says how many hours are planned that day (items, other tasks and the repeats due then; Delay and Drop don't count).
   Days already gone don't change with the Pool and show no hours or minutes. With the Pool closed a sticky shows just the plan's name; hovering it, or dragging something
   over the day, opens it into one item per line. Each unticked item can be dragged elsewhere. The number at the top right of a day is its box (the time you have that day, from Settings → Time;
-  click it to change just that day). The bar under each date is how full the day is: planned ÷ the box.
+  click it to change just that day). The bar under each date is how full the day is against that box: for days already gone, the time actually logged;
+  for today and the days ahead, what's planned (the hours after the date — repeats like Gym included). Every project counts, Leisure and Fitness too.
   Dragging the whole sticky moves that day's unticked items; back to the Pool puts them back; clicking it opens the day on Today. The month view draws only the weeks the month touches.
-  Two warnings on that bar: planning past the day's box (the hours after the date, repeats like Gym included), or logging more than the box in all (every project counts —
-  a day that went mostly to Leisure can be marked gold instead, and a gold day never turns red), turns it a steady red; logging more than 7 hours of work that day
-  (time actually recorded, not counting projects that don't count as progress — Leisure and Fitness, where Gym is) makes it pulse every 5 seconds, rose by day and red at night (for now).
+  Two warnings on that bar: past the box it turns a steady red (no pulse); past 7 hours but still within the box it pulses every 5 seconds, rose by day and red at night (for now).
+  A gold super rest day never turns red — a day that went mostly to Leisure can be marked gold instead.
   The Pool is on the right, by project and plan: drag an item onto a day (or click it, or Tab to it and press Enter, for a "Put on…" menu) and it joins that plan's row there; drag a plan's name for just its row.
   The box at the top adds lines to a plan's pool. Other calendar tasks can be dragged to other days, or back to the Pool to unschedule them. In the faint previews of future days, a fixed-day plan's occurrence can be dragged away or opened.
   The number at the top right of a cell is that day's usable time; click it to change

@@ -50,13 +50,3 @@ test("capacity: weekly, override, rest days", () => {
   assert.equal(E.isWorkDay(cap, "2026-10-04"), false);
   assert.equal(E.isWorkDay({ weekly: [0, 0, 0, 0, 0, 0, 0] }, "2026-10-04"), true);
 });
-
-
-test("a day's logged work leaves out the groups that don't count as progress (Leisure, Fitness — where Gym is)", async () => {
-  const GR = await import("../js/groups.js");
-  const t = (id, group, actual) => ({ id, date: TODAY, title: id, est: 30, status: "done", actual, group, projectId: "", order: 1 });
-  const c = ctx({ groups: GR.DEFAULTS, tasks: [t("deck", "Work", 300), t("ielts", "Build", 90), t("gym", "Fitness", 60), t("film", "Leisure", 120), t("landlord", "", 20)] });
-  const s = E.daySummary(c, TODAY);
-  assert.equal(s.done, 590, "everything logged");
-  assert.equal(s.work, 410, "the 7-hour warning counts Work, Build and things with no project, not Gym or Leisure");
-});

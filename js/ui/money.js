@@ -68,7 +68,7 @@ export const IX = () => { const list = shownEntries(); if (ixKey !== shKey || !i
 // 预算是按加币定的：换成看的那种
 export const budgetsShown = () => M.budgetsIn(SP.budgets(), SP.show(), RATES());
 // 当月整个预算还剩多少（她 10-24 要的）：预算 − 这个月算进预算的花销（House 两边都有，Bonds 不算；提前记的、日期还没到的也算），整数块钱。
-// 记账面板标题下面、手机今天页 Spend 左边都用它；没定预算 = null。正好 0 是灰的，超了（负的）才标橙
+// 手机今天页 Spend 左边用它（记账面板标题下面那一截 2026-10-27 删了）；没定预算 = null。正好 0 是灰的，超了（负的）才标橙
 export function monthLeft() {
   const now = todayP(), B = M.budgetAt(budgetsShown(), now.y, now.m);
   if (!B) return null;
@@ -231,8 +231,8 @@ export function createView() {
     '<div class="mn-hdr">' + btn("set", "settings", "Settings") + btn("chart", "chart", "Charts") + btn("find", "search", "Search") + "</div>" +
     // ‹ 期间 ›：标题在两个箭头正中间，下面一行是这一期的支出 / 收入
     '<div class="mn-thead">' + btn("prev", "left", "Earlier", "mn-sm") + '<div class="mn-tmid"><span class="mn-tw"><h2 class="mn-h1" data-title></h2>' + nowDot("reset", "Back to today") + "</span>" +
-    // 支出前面一截灰的：当月（今天这个月，不管翻到哪一期）整个预算还剩多少（她 10-24 要的；没定预算不显示；超了是负的、橙色）
-    '<div class="mn-num mn-13 mn-tsub"><span class="mn-tleft" data-tlw hidden><span class="mn-rn" data-tl></span> left<span style="display:inline-block;width:12px"></span></span><span class="mn-rn" data-to></span><span style="display:inline-block;width:12px"></span><span class="mn-rn" data-ti style="color:var(--mn-green)"></span>' +
+    // （以前支出前面还有一截灰的「当月预算还剩」，不管翻到哪一期都是当月的——她 2026-10-27 说不要，删了）
+    '<div class="mn-num mn-13 mn-tsub"><span class="mn-rn" data-to></span><span style="display:inline-block;width:12px"></span><span class="mn-rn" data-ti style="color:var(--mn-green)"></span>' +
     '<button type="button" class="mn-curb" data-act="showcur" aria-label="Show totals in another currency" title="Show totals in"><span data-showc></span>' + icon("down") + "</button></div></div>" +
     btn("next", "right", "Later", "mn-sm") + "</div>" +
     '<div class="mn-seg" data-seg="mode" style="margin-top:14px"><i></i><button type="button" data-v="year">Year</button><button type="button" data-v="month">Month</button><button type="button" data-v="day">Day</button></div>' +
@@ -408,13 +408,9 @@ export function createView() {
     const g = M.sumOf(IX(), V.cur, V.mode);
     roll($("[data-to]"), "−" + M.money(g.out));
     roll($("[data-ti]"), "+" + M.money(g.inc));
-    // 当月整个预算还剩（monthLeft）
-    const ml = monthLeft(), wrap = $("[data-tlw]");
-    wrap.hidden = !ml;
-    if (ml) { roll($("[data-tl]"), ml.text); wrap.classList.toggle("over", ml.over); }
     fitSub();
   }
-  // 标题下面那一行（剩多少 · 支出 · 收入 · 币种）放不下：整行字缩小一点（最小 10px），不切掉数字
+  // 标题下面那一行（支出 · 收入 · 币种）放不下：整行字缩小一点（最小 10px），不切掉数字
   function fitSub() {
     const sub = $(".mn-tsub"), room = sub.parentElement.clientWidth;
     sub.style.fontSize = "";
@@ -763,7 +759,6 @@ export function createView() {
   function openChart() {
     if (V.chartOpen) return;
     V.chartOpen = true;
-    root.classList.add("mn-chart-on");   // 图表页开着：标题下面那截「… left」收起来（下面 Budget Left 方块里已经有了，她 10-25 说的）
     V.cmode = V.mode === "year" ? "year" : "month";
     V.nohouse = false;   // 每次打开都是完整的（包括 House）
     V.cc = { ...V.cur };
@@ -780,7 +775,6 @@ export function createView() {
   function closeChart() {
     if (!V.chartOpen) return;
     V.chartOpen = false;
-    root.classList.remove("mn-chart-on");
     sheetTo("", quiet() ? "" : ".26s", EXIT);
   }
   {

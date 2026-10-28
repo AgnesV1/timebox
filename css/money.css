@@ -143,12 +143,6 @@
 .mn .mn-card.mn-card-hl .v { font-size: 19px; font-weight: 600; color: var(--mn-blue); }
 /* Budget Left 那个数后面的「· 69%」（剩下几成） */
 .mn .mn-kp::before { content: "·"; margin: 0 .3em; color: var(--mn-mute); }
-/* 手机记账主页标题下面那一行最前面：这个月预算还剩多少，灰的（超了是橙的） */
-.mn .mn-tleft { display: inline-flex; column-gap: .3em; max-width: 14em; overflow: hidden; color: var(--mn-mute); transition: max-width .32s var(--mn-enter), opacity .2s; }
-/* 图表页开着的时候收起来（下面 Budget Left 方块里有），合上再展开 */
-.mn.mn-chart-on .mn-tleft { max-width: 0; opacity: 0; }
-.mn .mn-tleft.over { color: var(--mn-orange); }
-.mn .mn-tleft[hidden] { display: none; }
 .mn .mn-up { margin-left: 4px; padding: 0 5px; border-radius: 999px; background: rgba(255, 255, 255, .08); font: 600 9px/1.6 var(--num); letter-spacing: .07em; text-transform: uppercase; }   /* 提前记的、日期还没到（已经算进合计） */
 .mn .mn-track { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; }
 .mn .mn-track > i { display: block; height: 100%; width: 0; background: var(--mn-blue); transition: width .52s var(--mn-enter); }

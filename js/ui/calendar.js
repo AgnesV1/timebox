@@ -21,11 +21,12 @@ import { ideasPoolHTML } from "./ideas.js";
 import { showDate } from "./today.js";
 import { openTaskEditor } from "./editor.js";
 
-// 那天实际记下的时间超过这么多分钟：格子顶上那条变红、闪红光（她 2026-10-27 要的，只看实际的；暂定，之后可能取消）
+// 那天实际记下的「干活」时间（不算 Leisure、Fitness，E.daySummary 的 work）超过这么多分钟：格子顶上那条闪（她 2026-10-27 要的，只看实际的；暂定，之后可能取消）
 const LONG_DAY = 7 * 60;
 
 let anchor = "";
 let adding = "";      // 正在哪一天的格子里加任务
+let capEdit = "";     // 正在改哪一天的 box（可用时间）
 
 const mode = () => store.local().calMode || "week";
 const weekStart = () => store.prefs().weekStartsOn;
@@ -59,8 +60,9 @@ function blockHTML(b, d, pool) {
 }
 
 // 排计划的样子（Pool 开着，而且是今天和以后——以前的日子不跟着 Pool 变，她 2026-10-27 说的）：计划那张一行一项、别的任务也写分钟，
-// 日期后面是那天排了几小时（计划那一块算下面几项，js/lists.js 的 dayMin；以后的日子加上固定星期几的预览）。顶上那条的长短也按它算。
-// 那条变红只看实际记下的时间（LONG_DAY），排得多不变红；可用时间（以前格子右上角的 7h）不在日历上显示了（她说的）
+// 日期后面是那天排了几小时（计划那一块算下面几项，js/lists.js 的 dayMin；以后的日子加上固定星期几的预览，Gym 这种也算进 box）。
+// 顶上那条（她 2026-10-27 定的两个设定）：排了的超过那天的 box（右上角的数，她是 10h）= 整条静止的警示色；
+// 实际记下的「干活」时间超过 7 小时（LONG_DAY）= 闪，两样都有时闪的那个盖过静止的。长短照旧是排了的 ÷ box（不算以后的预览，她说多出一截会怪）
 function cellHTML(c, d, { month = false, outside = false, scores = null, still = false, pool = false } = {}) {
   const tasks = store.tasksOn(d);
   const unscored = scores && SC.unscored(scores, store.scoreOf(d), d, c.today);
@@ -68,17 +70,22 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
   const sum = E.daySummary(c, d);
   const blocks = L.dayBlocks(c, tasks);
   const planned = L.dayMin(blocks) + ghosts.reduce((a, g) => a + (Number(g.est) || 0), 0);
+  const capOver = c.capacity.overrides[d] !== undefined;
   const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d), ahead = pool && d >= c.today;
-  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", ahead ? "cal-plan" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
+  const over = sum.cap > 0 && planned > sum.cap;
+  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", over ? "over" : "", ahead ? "cal-plan" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
   const all = [...blocks.map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d, ahead))), ...ghosts.map(ghostHTML)];
-  const loadPct = sum.cap ? Math.min(100, (planned / sum.cap) * 100) : 0;
-  const long = !gold && sum.done > LONG_DAY;   // 金条那天不变红
+  const loadPct = over ? 100 : sum.cap ? Math.min(100, (sum.planned / sum.cap) * 100) : 0;
+  const long = !gold && sum.work > LONG_DAY;   // 金条那天不变红
   let h = '<div class="' + cls + '" data-drop="day:' + d + '">' +
     '<div class="cell-head"><span class="dn-w"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"' + (unscored ? ' title="Not scored yet"' : "") + "><span>" + (month ? "" : WEEKDAYS[wd]) + "</span><b>" + Number(d.slice(8)) + "</b>" + (isPayday(d) ? '<span class="payday" title="Payday">$</span>' : "") + (unscored ? '<i class="dsc-dot" aria-label="Not scored yet"></i>' : "") + "</button>" +
     (ahead && planned > 0 ? '<span class="cal-hrs num" title="Planned this day">' + fmtHours(planned) + "</span>" : "") +
     (wd === 0 || wd === 6 ? "" : '<button type="button" class="offday-t' + (off.off ? " on" : "") + '" data-act="off-day" data-date="' + d + '" aria-pressed="' + off.off + '" title="' + esc(off.off ? (off.holiday || "Day off") + " — click to clear" : "Mark as a day off") + '">💤</button>') + "</span>" +
-    '<button type="button" class="cm-t' + (commute ? " on" : "") + '" data-act="commute" data-date="' + d + '" aria-pressed="' + commute + '" title="' + (commute ? "Commute day — click to clear" : "Mark as a commute day") + '">' + icon("commute") + "</button></div>" +
-    '<button type="button" class="load-t" data-act="super-rest" data-date="' + d + '" aria-pressed="' + gold + '" title="' + (long ? "Over 7 hours · " : "") + (gold ? "Super rest day — click to clear" : "Mark as a super rest day") + '">' +
+    '<button type="button" class="cm-t' + (commute ? " on" : "") + '" data-act="commute" data-date="' + d + '" aria-pressed="' + commute + '" title="' + (commute ? "Commute day — click to clear" : "Mark as a commute day") + '">' + icon("commute") + "</button>" +
+    (month ? "" : capEdit === d
+      ? '<input class="cap-input num" type="number" min="0" step="15" data-cap-input="' + d + '" data-keep="cap-' + d + '" value="' + sum.cap + '" title="Minutes in the box this day · 0 = rest day · empty = weekly default">'
+      : '<button type="button" class="cap num' + (capOver ? " set" : "") + '" data-act="cap" data-date="' + d + '" title="The box this day (available time) — click to change">' + (sum.rest ? "rest" : fmtHours(sum.cap)) + "</button>") + "</div>" +
+    '<button type="button" class="load-t" data-act="super-rest" data-date="' + d + '" aria-pressed="' + gold + '" title="' + (long ? "Over 7 hours of work logged · " : over ? "Planned past the box · " : "") + (gold ? "Super rest day — click to clear" : "Mark as a super rest day") + '">' +
     '<span class="load' + (gold && !still ? " shine" : "") + (long ? " over7" + (still ? "" : " blink") : "") + '"><i style="width:' + (long ? Math.max(loadPct, 8) : loadPct) + '%"></i></span></button>' +
     all.join("");
   if (!month) {
@@ -171,8 +178,27 @@ export function initCalendar(rerender) {
       adding = el.dataset.date;
       rerender();
       document.querySelector('[data-keep="cell-add-' + adding + '"]')?.focus();
+    } else if (act === "cap") {
+      capEdit = el.dataset.date;
+      rerender();
+      const input = document.querySelector('[data-cap-input="' + capEdit + '"]');
+      input?.focus();
+      input?.select();
     }
   });
+
+  // 改某天的 box：回车或离开就存；清空 = 用每周默认；Esc 放弃
+  const saveCap = (input) => {
+    if (capEdit !== input.dataset.capInput) return;
+    capEdit = "";
+    const v = input.value.trim();
+    store.setDayCapacity(input.dataset.capInput, v === "" ? null : Math.max(0, Number(v) || 0));
+  };
+  on(document, "keydown", "[data-cap-input]", (e, input) => {
+    if (e.key === "Enter") saveCap(input);
+    if (e.key === "Escape") { capEdit = ""; rerender(); }
+  });
+  on(document, "focusout", "[data-cap-input]", (e, input) => saveCap(input));
 
   on(document, "submit", ".cell-form", (e, form) => {
     e.preventDefault();

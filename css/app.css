@@ -566,6 +566,8 @@ body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
 .cell.rest { background: repeating-linear-gradient(-45deg, transparent 0 7px, var(--surface) 7px 8px), var(--bg); }
 .cell.today { border: 2px solid var(--edge); box-shadow: 2px 2px 0 var(--accent); }
 [data-theme="dark"] .cell.today { border-color: var(--accent); box-shadow: 0 0 22px rgba(204, 255, 0, .2); }
+/* 排了的超过那天的 box（她是 10h）：整条静止的警示色（她 2026-10-27 定的；实际干活超过 7h 的闪会盖过它） */
+.cell.over .load i { background: var(--warn); }
 .cell.drop-on { background: #F4FFD6; box-shadow: inset 0 0 0 2px var(--edge); }
 [data-theme="dark"] .cell.drop-on { background: rgba(204, 255, 0, .08); box-shadow: inset 0 0 0 1px var(--accent); }
 .cell-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
@@ -575,20 +577,27 @@ body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
 /* 打分开始日以后、过完了还没打满分的日子：日期旁边一个红点（填满就没了） */
 .dsc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); align-self: center; flex-shrink: 0; }
 [data-theme="dark"] .dsc-dot { box-shadow: 0 0 6px var(--warn); }
+/* 右上角那天的 box（可用时间，她是 10h），点了能改这一天的 */
+.cap { padding: 1px 7px; border: 1px solid transparent; border-radius: 999px; background: none; font-size: 10.5px; color: var(--muted); }
+.cap.set { border-color: var(--line); background: var(--surface); }
+@media (hover: hover) { .cap:hover { border-color: var(--line); background: var(--surface); } }
+.cap-input { width: 56px; padding: 2px 6px; font-size: 11px; text-align: center; border: var(--b-ctl); }
 .load { height: 4px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .load i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--hot)); }
 [data-theme="dark"] .load i { background: linear-gradient(90deg, #00E5FF, #CCFF00); }
-/* 那天实际记下的时间超过 7 小时（她 2026-10-27 要的，暂定，之后可能取消）：大部分时候还是平常的霓虹色，隔 7 秒慢慢呼吸一下——
-   红色带红光浮上来、再慢慢退掉（她说闪得太勤）。红的是盖在上面的一层（::after），底下照旧是渐变。排得多不变红（她 2026-10-27：红只看真实记录）。
-   关了 Sparkles 或减少动态：不呼吸，只在底下留一圈淡淡的红光 */
+/* 那天实际记下的「干活」时间超过 7 小时（不算 Leisure、Fitness；她 2026-10-27 要的，暂定，之后可能取消）：大部分时候还是平常的霓虹色，
+   隔 5 秒呼吸一下——白天是玫红、淡淡一圈光（她嫌红的太显眼），夜里红色带红光（7 秒她嫌慢、1.4 秒嫌勤）。盖在上面的一层（::after），底下照旧是渐变。
+   关了 Sparkles 或减少动态：不呼吸，只在底下留一圈淡淡的光 */
 .load.over7 { overflow: visible; }
 .cell .load.over7 i { position: relative; background: linear-gradient(90deg, var(--blue), var(--hot)); }
 [data-theme="dark"] .cell .load.over7 i { background: linear-gradient(90deg, #00E5FF, #CCFF00); }
-.load.over7 i::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--warn); box-shadow: 0 0 10px 2px var(--warn); opacity: 0; }
-.load.over7.blink i::after { animation: over7 7s ease-in-out infinite; }
-.load.over7:not(.blink) i { box-shadow: 0 0 6px var(--warn); }
+.load.over7 i::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--hot); box-shadow: 0 0 4px var(--hot); opacity: 0; }
+[data-theme="dark"] .load.over7 i::after { background: var(--warn); box-shadow: 0 0 10px 2px var(--warn); }
+.load.over7.blink i::after { animation: over7 5s ease-in-out infinite; }
+.load.over7:not(.blink) i { box-shadow: 0 0 4px var(--hot); }
+[data-theme="dark"] .load.over7:not(.blink) i { box-shadow: 0 0 6px var(--warn); }
 @keyframes over7 { 0%, 60%, 100% { opacity: 0; } 76% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .load.over7.blink i::after { animation: none; } .load.over7 i { box-shadow: 0 0 6px var(--warn); } }
+@media (prefers-reduced-motion: reduce) { .load.over7.blink i::after { animation: none; } .load.over7 i { box-shadow: 0 0 4px var(--hot); } [data-theme="dark"] .load.over7 i { box-shadow: 0 0 6px var(--warn); } }
 /* 日历上的任务 = 一张张便利贴：直角，纸按项目的颜色染淡，顶上一道细细的、深一点的同色胶条（1.5px，分得清上一张下一张），
    底边一点点纸的阴影（夜里是染了色的暗纸，只留胶条不要阴影）；不写时长（一天合计多少在格子头上） */
 .ev { --paper: #FFFEF2; position: relative; display: flex; align-items: flex-start; gap: 4px; padding: 6px 6px 4px; border-radius: 0; background: color-mix(in srgb, var(--c) 28%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) 75%, var(--paper)), 0 1px 1px rgba(11, 11, 11, .06), 0 5px 6px -5px rgba(11, 11, 11, .35); font-size: 11.5px; line-height: 1.3; cursor: grab; }
@@ -1461,9 +1470,13 @@ body[data-view="today"] #main, body.phone.has-dock[data-view="today"] #main { pa
 /* 发薪日：日期后面一个小 $ */
 .payday { margin-left: -2px; font: 700 11px var(--num); color: var(--muted); }
 /* 排计划的样子（.cal-plan = Pool 开着的今天和以后，她 2026-10-27 挑的甲，js/ui/calendar.js 的 cellHTML）：
-   日期后面那天排了几小时（💤 跟在它后面），别的任务右边也写分钟；以前的日子不写时长（她说不需要知道），停上去展开的那几项也不写 */
-.cal-hrs { margin-left: 4px; font-size: 11px; font-weight: 600; color: var(--ink); white-space: nowrap; }
-.cal-hrs::before { content: "·"; margin-right: 3px; color: var(--muted); }
+   日期后面那天排了几小时（💤 跟在它后面），别的任务右边也写分钟；以前的日子不写时长（她说不需要知道），停上去展开的那几项也不写。
+   周视图的格子这时窄（Pool 占了右边，1440 宽时一格里面只有 116px）：通勤的小开关先藏起来（关掉 Pool 就回来，她说可以），box 收紧；再窄放不下就先收起 box */
+.cal-hrs { margin-left: 5px; font-size: 11px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.week .cell.cal-plan { container-type: inline-size; }
+.week .cell.cal-plan .cm-t { display: none; }
+.cell.cal-plan .cap { padding: 1px 4px; }
+@container (max-width: 110px) { .cell.cal-plan .cap { display: none; } }
 .cell.cal-plan .ev .m { display: block; flex: none; font-size: .95em; color: var(--muted); }
 .cell.past .ev.blk .lm { display: none; }
 /* 不上班（请假、公众假日）：日期右上角一个很小的 💤，不占格子顶上那一行的宽度；工作日没标的时候，鼠标移上来才淡淡出现 */

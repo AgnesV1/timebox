@@ -15,6 +15,7 @@
 
 import { addDays, weekday, range, startOfWeek } from "./dates.js";
 import { ruleOf, dueOn, inRange } from "./routines.js";
+import { byName } from "./groups.js";
 
 
 const num = (v) => Number(v) || 0;
@@ -83,9 +84,12 @@ export function isWorkDay(cap, d) {
 
 // ---------- 日历格子用的汇总 ----------
 
+// work：实际记下的时间里「干活」的那部分——不算进度的大类（Settings 里 Counts as progress 没勾的，默认 Leisure、Fitness，Gym 在 Fitness 里）不算，
+// 没归大类的照算。日历那条超过 7 小时就闪（她 2026-10-27 说的：7h 不算 Leisure 和 Gym）
+const isWork = (ctx, t) => byName(ctx.groups, t.group)?.labor !== false;
 export function daySummary(ctx, d) {
   const ts = tasksOn(ctx, d);
-  return { planned: sum(ts.filter(isPlanned), (t) => num(t.est)), done: sum(ts, spentMin), cap: capacityFor(ctx.capacity, d), rest: !isWorkDay(ctx.capacity, d), count: ts.length };
+  return { planned: sum(ts.filter(isPlanned), (t) => num(t.est)), done: sum(ts, spentMin), work: sum(ts.filter((t) => isWork(ctx, t)), spentMin), cap: capacityFor(ctx.capacity, d), rest: !isWorkDay(ctx.capacity, d), count: ts.length };
 }
 
 // ---------- 固定星期几：以后的预览、这一周 ----------

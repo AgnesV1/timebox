@@ -222,7 +222,7 @@ export function yearChart(ix, budgets, y, today, { house = true } = {}) {
     top: niceMax(Math.max(bud[n], v(n), base[n]) * 1.04 || 100), used: sumOf(ix, { y }, "year"), home: (last || n) - 1, dateOf: (k) => dateOfDay(y, k) };
 }
 
-// 五个小方块的那条线：和之前六个月（年模式 = 之前几年）比，这个数落在什么范围里。
+// Budget left、Spent 底下的横杠：和之前六个月（年模式 = 之前几年）比，这个数落在什么范围里。
 // 看的是这个月（今年）的时候，之前的每个月也只算到同一天（不然月中的数总是显得很少）；看已经过完的月，就整月比整月
 function upTo(ix, y, m, cut) {
   const g = { out: 0, inc: 0, base: 0, outside: 0 };
@@ -233,8 +233,9 @@ function upTo(ix, y, m, cut) {
 // 提前记的、日期还没到的也算在里面（记了就算）
 export const metricsOf = (g, B) => ({ expense: g.out, income: g.inc, left: B - (g.out - g.outside), balance: g.inc - g.out, used: B ? (g.out - g.outside) / B : 0,
   leftPct: B - g.base > 0 ? 1 - (g.out - g.outside - g.base) / (B - g.base) : null, room: Math.max(0, B - g.base) });
-// cur = 这一期整份（提前记的也算，四个大数字用它）；now = 这一期到今天为止（不算日期还没到的，横杠上的点用它；过完的一期 = cur）；
-// usual = 之前那几期（到同一天）的中间值，小字「Until today usual ~…」用它（她 2026-11-01 说的：横杠还是之前六个月的范围，点 = 这个月到今天花了多少）
+// cur = 这一期整份（提前记的也算，大数字用它）；now = 这一期到今天为止（不算日期还没到的，横杠上的点用它；过完的一期 = cur）；
+// usual = 之前那几期（到同一天）的中间值，横杠正中间那条线（她 2026-11-01 说的：横杠还是之前六个月的范围，点 = 这个月到今天花了多少）。
+// 只算 Budget left（leftPct）和 Spent（expense）：Income、Balance 只有整月的数，没有横杠（她 11-01 晚说的）
 export function compare(ix, budgets, p, mode, today) {
   const t = parts(today), prev = [];
   let cur, now, cutText = "";
@@ -269,13 +270,28 @@ export function compare(ix, budgets, p, mode, today) {
       const cut = isCur ? Math.min(t.d, dim(q.y, q.m)) : dim(q.y, q.m);
       prev.push(metricsOf(cut === dim(q.y, q.m) ? all : upTo(ix, q.y, q.m, cut), budgetAt(budgets, q.y, q.m)));
     }
-    if (isCur) cutText = "by day " + t.d;
+    if (isCur) cutText = "by the " + nth(t.d);
   }
   const xsOf = (k) => prev.map((x) => x[k]).filter((v) => v !== null && v !== undefined).sort((a, b) => a - b);
   const range = (k) => { const xs = xsOf(k); return xs.length >= 2 ? [xs[0], xs[xs.length - 1]] : null; };
   const usual = (k) => { const xs = xsOf(k), h = xs.length >> 1; return xs.length >= 2 ? (xs.length % 2 ? xs[h] : (xs[h - 1] + xs[h]) / 2) : null; };
-  const keys = ["expense", "income", "left", "leftPct", "balance"];
+  const keys = ["expense", "leftPct"];
   return { cur, now: now || cur, n: prev.length, cutText, range: Object.fromEntries(keys.map((k) => [k, range(k)])), usual: Object.fromEntries(keys.map((k) => [k, usual(k)])) };
+}
+const nth = (d) => d + (d % 10 === 1 && d !== 11 ? "st" : d % 10 === 2 && d !== 12 ? "nd" : d % 10 === 3 && d !== 13 ? "rd" : "th");
+
+// 横杠上的点放哪、算快还是慢（她 2026-11-01 晚说的：横杠看到今天为止花钱的速度，大数字照旧是整月）。
+// 正中间 = 平时（usual），两头 = 之前最低 / 最高，左右两半各自按比例；两边至少各留能花的钱（预算 − House）的 6%（没预算按平时的 6%），
+// 月初多吃一顿不至于把点推到头上。点落在中间那一半 = 平时（pace 0），外面两截 = 快（1）/ 慢（−1）；
+// Budget left 看的是剩下几成：剩得比平时少 = 花得快。没有可比的（之前不到两期、没预算）= null
+export function gauge(cmp, key) {
+  const r = cmp.range[key], u = cmp.usual[key], x = cmp.now[key];
+  if (!r || u === null || x === null || x === undefined) return null;
+  const pad = key === "leftPct" ? 0.06 : 0.06 * (cmp.cur.room || Math.abs(u));
+  const lo = Math.min(r[0], u - pad), hi = Math.max(r[1], u + pad), half = x < u ? u - lo : hi - u;
+  const pos = half ? Math.max(0, Math.min(1, 0.5 + 0.5 * (x - u) / half)) : x < u ? 0 : x > u ? 1 : 0.5;
+  const side = pos > 0.75 ? 1 : pos < 0.25 ? -1 : 0;
+  return { pos, pace: side && (key === "leftPct" ? -side : side) };
 }
 
 // 推荐：①这个月之前两个月都有、同样金额的底座类别（房租、网费这类），这个月还没记的；②最近 60 天里同一类同一个金额出现得最多的那笔（至少两次）。

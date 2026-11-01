@@ -172,7 +172,7 @@ test("cards compare with the previous six months, cut at the same day for the cu
   // up to the 3rd: Aug = rent + 20, Sep = rent + 10
   assert.deepEqual(cmp.range.expense, [146000, 147000]);
   assert.equal(cmp.cut, undefined);
-  assert.equal(cmp.cutText, "by day 3");
+  assert.equal(cmp.cutText, "by the 3rd");
   const past = M.compare(ix, budgets, { y: 2026, m: 10 }, "month", "2026-11-20");
   assert.deepEqual(past.range.expense, [145000 + 6500 + 2000, 145000 + 6500 + 1000 + 5000]);
   assert.equal(M.compare(ix, budgets, { y: 2026, m: 8 }, "month", "2026-10-03").range.expense, null);   // nothing before August
@@ -189,6 +189,31 @@ test("the dot on the bar is this month until today: records written down early c
   assert.equal(past.now, past.cur, "a month that's over: the dot is the whole month");
   const year = M.compare(M.index(more, cats), budgets, { y: 2026 }, "year", "2026-10-03");
   assert.equal(year.cur.expense - year.now.expense, 60000, "the year view leaves it out of the dot too");
+});
+
+test("the bar reads speed: usual in the middle, the earlier lowest and highest at the ends, Budget left the other way round", () => {
+  const cmp = (now, range, usual, room = 213000) => ({ cur: { room }, now, range, usual });
+  // Spent by the 15th: earlier months $1,970–$2,330, usually $2,140, $2,130 to spend after rent
+  const spent = (x) => M.gauge(cmp({ expense: x }, { expense: [197000, 233000] }, { expense: 214000 }), "expense");
+  assert.deepEqual(spent(214000), { pos: 0.5, pace: 0 }, "usual sits in the middle");
+  assert.equal(spent(233000).pos, 1, "the highest earlier month is the right end");
+  assert.equal(spent(197000).pos, 0);
+  assert.equal(spent(400000).pos, 1, "past the highest stays at the end");
+  assert.equal(spent(229000).pace, 1, "$150 more than usual by the 15th: faster");
+  assert.equal(spent(220000).pace, 0, "$60 more: still the usual pace");
+  assert.equal(spent(199000).pace, -1);
+  // The 1st: earlier months are rent and a coffee, all close together; a $40 dinner more doesn't push the dot to the end
+  const day1 = M.gauge(cmp({ expense: 151800 }, { expense: [145600, 151200] }, { expense: 147800 }), "expense");
+  assert.equal(day1.pace, 0);
+  assert.ok(day1.pos > 0.5 && day1.pos < 0.75);
+  // Budget left: less left than usual = spending faster, and the dot sits left (less left)
+  const left = M.gauge(cmp({ leftPct: 0.61 }, { leftPct: [0.59, 0.76] }, { leftPct: 0.68 }), "leftPct");
+  assert.ok(left.pos < 0.25);
+  assert.equal(left.pace, 1);
+  assert.equal(M.gauge(cmp({ leftPct: 0.71 }, { leftPct: [0.59, 0.76] }, { leftPct: 0.68 }), "leftPct").pace, 0);
+  assert.equal(M.gauge(cmp({ leftPct: 0.9 }, { leftPct: [0.59, 0.76] }, { leftPct: 0.68 }), "leftPct").pace, -1);
+  assert.equal(M.gauge(cmp({ expense: 1 }, { expense: null }, { expense: null }), "expense"), null, "nothing earlier to compare with");
+  assert.equal(M.gauge(cmp({ leftPct: null }, { leftPct: [0.5, 0.7] }, { leftPct: 0.6 }), "leftPct"), null, "no budget");
 });
 
 test("currencies: each record keeps its own; totals convert at the typed rate, or a rough one until there is one", () => {

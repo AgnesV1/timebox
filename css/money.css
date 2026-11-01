@@ -153,8 +153,15 @@
 .mn .mn-track { height: 4px; border-radius: 2px; background: var(--mn-trk); overflow: hidden; }
 .mn .mn-track > i { display: block; height: 100%; width: 0; background: var(--mn-blue); transition: width .52s var(--mn-enter); }
 .mn .mn-track > i.over { background: var(--mn-orange); }
-/* 之前六个月的范围：整条线 = 最少到最多，点 = 这次在哪儿（比最差的还差 = 橙） */
+/* 快慢杠（Budget left、Spent）：两头 = 之前六个月到同一天最少 / 最多，正中间那条竖线 = 平时，点 = 这一期到今天为止（超了预算 = 橙）。
+   没有可比的时候点藏起来，竖线也不画；小字不是平时的速度（.mn-pace）时用墨色，不加别的颜色 */
 .mn .mn-range { position: relative; overflow: visible; background: var(--mn-rng); }
+.mn .mn-range::before { content: ""; position: absolute; left: 50%; top: -3px; width: 2px; height: 10px; margin-left: -1px; border-radius: 1px; background: var(--mn-mute); }
+.mn .mn-range:has(> b[hidden])::before { display: none; }
+.mn :is(.mn-meta, .sp-ks).mn-pace { color: var(--mn-ink); }
+/* Income、Balance 合成最后一张（她 11-01 晚说的）：没有横杠，两行「名字 数」，数靠右、小数点对齐 */
+.mn .mn-card.mn-card-io { display: grid; grid-template-columns: auto auto; align-content: center; align-items: baseline; gap: 10px 14px; }
+.mn .mn-card-io .v { justify-self: end; }
 .mn .mn-range > b { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--mn-blue); box-shadow: 0 0 0 2px var(--mn-ring); transition: left .62s var(--spring-pop), background-color .3s; }   /* 换期时点弹着滑到新位置（只改 left，元素不重建） */
 .mn .mn-range > b.over { background: var(--mn-orange); }
 .mn .mn-sect { margin-top: 22px; font-size: 15px; font-weight: 500; }
@@ -307,7 +314,7 @@
   --sp-a035: rgba(255, 255, 255, .035); --sp-a045: rgba(255, 255, 255, .045); --sp-a05: rgba(255, 255, 255, .05); --sp-a07: rgba(255, 255, 255, .07); --sp-a08: rgba(255, 255, 255, .08); --sp-a18: rgba(255, 255, 255, .18);
   --sp-soft: #B9B5AC; --sp-softer: #D8D4CB; --sp-scheme: dark;
   position: relative; min-height: calc(100vh - 56px); margin: -4px 0 0; padding: 22px 28px 40px; border-radius: 22px;
-  background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); container-type: inline-size; }
+  background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); container: spend / inline-size; }
 /* 白天：白纸（她 2026-11-01 从两个样子里挑的 A）——和苦昼短白天别的页一样，半透明白底 + 磨砂、粗墨边 + 硬投影（这一页的主卡片），墨色字；
    记账的钴蓝 / 橙 / 青绿调深一点，白底上才读得清（这些颜色手机面板也一起用，在最后一段）。夜里照旧是黑板 */
 [data-theme="light"] .mn.spend {
@@ -360,9 +367,12 @@
   .spend .sp-add:hover { filter: brightness(1.12); }
 }
 
-/* 一排数：一样宽的五格，竖线隔开；数是字，不是方块 */
-.spend .sp-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--sp-line); border-bottom: 1px solid var(--sp-line); }
+/* 一排数：一样宽的三格（Budget left、Spent、Income + Balance），竖线隔开；数是字，不是方块 */
+.spend .sp-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--sp-line); border-bottom: 1px solid var(--sp-line); }
 .spend .sp-kpi { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 14px 18px 15px; container-type: inline-size; }
+/* Income、Balance 那一格（她 11-01 晚说的）：没有横杠，两行「名字 数」，数靠右、小数点对齐，比左边两格的数小一号 */
+.spend .sp-kio { display: grid; grid-template-columns: auto auto; justify-content: start; align-content: center; align-items: baseline; gap: 12px 22px; }
+.spend .sp-kio .sp-kv { justify-self: end; font-size: 19px; font-weight: 500; white-space: nowrap; }
 .spend .sp-kpi + .sp-kpi { border-left: 1px solid var(--sp-line); }
 .spend .sp-kpi:first-child { padding-left: 0; }
 .spend .sp-kl { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--mn-mute); }
@@ -371,6 +381,7 @@
 .spend .sp-kpi[data-k="left"] .sp-kvw { font-size: clamp(14px, 9.5cqi, 24px); }
 .spend .sp-kp:empty { display: none; }
 .spend .sp-kp::before { content: "·"; margin: 0 .3em; color: var(--mn-mute); }
+.spend .sp-kb { margin: -7px 0; padding: 7px 0; }   /* 停在横杠上看具体的数：线只有 4px 高，上下各放宽 7px 好停 */
 .spend .sp-kb .mn-track { max-width: 160px; }
 .spend .sp-ks { font-size: 11px; color: var(--mn-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -477,13 +488,16 @@
 .spend .sp-foot { margin: 10px 8px 0; font-size: 11px; color: var(--mn-mute); }
 .spend .sp-empty { margin: 0; padding: 14px 8px; font-size: 13px; color: var(--mn-mute); }
 
-/* 窄了：按类别挪到图表下面，一排数变两行 */
+/* 窄了：按类别挪到图表下面 */
 @container (max-width: 980px) {
   .spend .sp-body { grid-template-columns: minmax(0, 1fr); }
   .spend .sp-side { position: static; margin-top: 24px; padding: 18px 0 0; border-left: 0; border-top: 1px solid var(--sp-line); }
+}
+/* 再窄（窗口只比手机宽一点）：一排数变两行，Income、Balance 那格占满第二行，两个并排 */
+@container spend (max-width: 640px) {   /* 每一格自己也是 container，要点名量整页 */
   .spend .sp-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .spend .sp-kpi:nth-child(3) { padding-left: 0; border-left: 0; }
-  .spend .sp-kpi:nth-child(n + 3) { border-top: 1px solid var(--sp-line); }
+  .spend .sp-kpi + .sp-kio { grid-column: 1 / -1; grid-template-columns: repeat(4, auto); padding-left: 0; border-left: 0; border-top: 1px solid var(--sp-line); }
+  .spend .sp-kio .sp-kl ~ .sp-kl { margin-left: 18px; }
 }
 
 /* 设定弹窗（苦昼短自己的弹窗，里面是苦昼短的样式） */

@@ -18,7 +18,7 @@ import * as store from "../store.js";
 import { esc, icon } from "../dom.js";
 import { toast } from "./common.js";
 import { openModal, modalSheet } from "./modal.js";
-import { IX, cents, roll, kfmt, periodTitle, chartView, shownEntries, budgetsShown, amtOf, convOf, setShowCur, setRate, fetchRates, RATES, rateNote, curLabel, fx } from "./money.js";
+import { IX, cents, roll, kfmt, paceNote, paceTip, periodTitle, chartView, shownEntries, budgetsShown, amtOf, convOf, setShowCur, setRate, fetchRates, RATES, rateNote, curLabel, fx } from "./money.js";
 
 const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const today = () => store.today();
@@ -42,9 +42,11 @@ export function createSpending() {
     '<button type="button" class="sp-ic" data-act="set" aria-label="Spending settings" title="Settings">' + icon("settings") + "</button>" +
     '<button type="button" class="sp-add" data-act="add" title="Add a transaction (N)">' + icon("plus") + "Add<kbd>N</kbd></button></div></header>" +
     '<div class="sp-addw" data-add></div>' +
-    '<section class="sp-kpis" data-kpis aria-label="This period at a glance">' + [["left", "Budget left"], ["out", "Spent"], ["inc", "Income"], ["bal", "Balance"]].map(([k, l]) =>
+    '<section class="sp-kpis" data-kpis aria-label="This period at a glance">' + [["left", "Budget left"], ["out", "Spent"]].map(([k, l]) =>
       // 线和点只建一次：换期时点从原处弹簧滑到新位置（重画就没有过渡了）
-      '<div class="sp-kpi" data-k="' + k + '"><span class="sp-kl">' + l + '</span><span class="sp-kvw"><span class="sp-kv mn-num mn-rn"></span><span class="sp-kp mn-num mn-rn"></span></span><div class="sp-kb"><div class="mn-track mn-range"><b hidden></b></div></div><span class="sp-ks mn-num"></span></div>').join("") + "</section>" +
+      '<div class="sp-kpi" data-k="' + k + '"><span class="sp-kl">' + l + '</span><span class="sp-kvw"><span class="sp-kv mn-num mn-rn"></span><span class="sp-kp mn-num mn-rn"></span></span><div class="sp-kb"><div class="mn-track mn-range"><b hidden></b></div></div><span class="sp-ks mn-num"></span></div>').join("") +
+      // Income、Balance 合成最后一格（她 11-01 晚说的）：两行「名字 数」，只有整期的数，没有横杠
+      '<div class="sp-kpi sp-kio"><span class="sp-kl">Income</span><span class="sp-kv mn-num mn-rn" data-k="inc" style="color:var(--mn-green)"></span><span class="sp-kl">Balance</span><span class="sp-kv mn-num mn-rn" data-k="bal"></span></div></section>' +
     '<div class="sp-body"><div class="sp-main">' +
     '<figure class="sp-chart"><figcaption><div><h3 data-ctitle></h3><p class="sp-lede" data-pace></p></div><div class="sp-legend" data-legend aria-hidden="true"></div></figcaption>' +
     '<svg class="mn-chart" data-chart role="img" aria-label="Spending against the budget"></svg></figure>' +
@@ -88,43 +90,37 @@ export function createSpending() {
 
   // ---------- 一排数 ----------
   function renderKpis(c) {
-    const p = V.cur, mode = V.mode, cmp = M.compare(IX(), budgetsShown(), p, mode, today());
+    const p = V.cur, mode = V.mode, cmp = M.compare(IX(), budgetsShown(), p, mode, today()), box = $("[data-kpis]");
     const g = c.used, B = c.B, bal = cmp.cur.balance, pct = cmp.cur.leftPct;
-    const since = (mode === "year" ? "earlier years" : "the last six months") + (cmp.cutText ? ", " + cmp.cutText : "");
     const pctText = (x) => Math.round(x * 100) + "%";
-    // 范围线：之前六个月（年 = 往年）到同一天的最低到最高，点 = 这一期到今天为止落在哪儿（提前记的不算；她 11-01 说的）；
-    // 小字 = 平时到今天大约多少（之前那几期的中间值）。Budget left 第一格（手机也是）。橙色只标超了预算的（她 10-22 说的）：
-    // Budget left 是负的时候那个数和 Budget left、Spent 的点；结余是负的、比平时花得多都不标
+    // Budget left、Spent：大数字 = 整期（提前记的也算）；横杠 = 到今天为止花得快还是慢（之前六个月（年 = 往年）到同一天，最低到最高、
+    // 正中间那条线 = 平时，点 = 这一期到今天为止，提前记的不算）；小字 = 快 / 慢（过完的一期 = 平时整期大约多少），停在横杠上看具体的数（她 11-01 晚定的）。
+    // Budget left 第一格（手机也是）。橙色只标超了预算的（她 10-22 说的）：Budget left 是负的时候那个数和两个点；比平时花得快不标
     const blown = pct !== null && pct < 0;
-    // extra = 跟在数后面的那一截（Budget left 的「· 69%」），一样滚着变
-    const cell = (k, value, { color = "", money = true, key, fmt = kfmt, small = "", extra = "" }) => {
-      const el = root.querySelector('[data-k="' + k + '"]'), v = el.querySelector(".sp-kv"), kp = el.querySelector(".sp-kp"), tr = el.querySelector(".mn-track"), dot = tr.querySelector("b");
+    // extra = 跟在数后面的那一截（Budget left 的「· 69%」），一样滚着变；note = 小字前面那截（「of $2.1k」）
+    const cell = (k, value, { color = "", money = true, key, fmt = kfmt, note = "", extra = "" }) => {
+      const el = box.querySelector('[data-k="' + k + '"]'), v = el.querySelector(".sp-kv"), kp = el.querySelector(".sp-kp"), bar = el.querySelector(".sp-kb"), dot = bar.querySelector("b"), small = el.querySelector(".sp-ks");
       roll(v, value, money);
       if (extra) roll(kp, extra);
       else { kp.textContent = ""; delete kp.dataset.v; }
       v.style.color = kp.style.color = color;
-      const r = key && cmp.range[key], x = cmp.now[key], u = key && cmp.usual[key];
-      if (!r || x === null || x === undefined) {
-        dot.hidden = true;
-        tr.title = "";
-        el.querySelector(".sp-ks").textContent = small || (mode === "year" ? "No earlier years yet" : "No history yet");
-        return;
-      }
-      const span = r[1] - r[0], pos = span ? (x - r[0]) / span : 0.5;
+      const at = M.gauge(cmp, key);
+      bar.title = at ? paceTip(cmp, key, mode) : "";
+      small.classList.toggle("mn-pace", Boolean(at && cmp.cutText && at.pace));   // 不是平时的速度：字深一点
+      if (!at) { dot.hidden = true; small.textContent = note || (mode === "year" ? "No earlier years yet" : "No history yet"); return; }
       dot.hidden = false;
-      dot.classList.toggle("over", blown && (k === "left" || k === "out"));
-      dot.style.left = (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + "%";
-      tr.title = "Lowest to highest over " + since + " (" + fmt(r[0]) + "–" + fmt(r[1]) + "); the dot is this " + (mode === "year" ? "year" : "month") + (cmp.cutText ? " until today, " + fmt(x) : ", " + fmt(x));
-      const us = (cmp.cutText ? "until today usual ~" : "usual ~") + fmt(u);
-      el.querySelector(".sp-ks").textContent = small ? small + " · " + us : us.charAt(0).toUpperCase() + us.slice(1);
+      dot.classList.toggle("over", blown);
+      dot.style.left = (at.pos * 100).toFixed(1) + "%";
+      small.textContent = paceNote(cmp, key, at, fmt, note);
     };
     cell("out", "−" + M.money(g.out), { key: "expense" });
-    cell("inc", "+" + M.money(g.inc), { color: "var(--mn-green)", key: "income" });
-    cell("bal", (bal < 0 ? "−" : "+") + M.money(bal), { key: "balance" });
-    // 预算还剩多少钱 · 几成（她 10-22 要的）：不算 House（底座）和 Bonds；提前记的未来那几笔也算在里面。小字 = 一共能花多少（预算 − House）
+    // 预算还剩多少钱 · 几成（她 10-22 要的）：不算 House（底座）和 Bonds；提前记的未来那几笔也算在里面。小字前面 = 一共能花多少（预算 − House）
     const left = cmp.cur.left;
     cell("left", pct === null ? "—" : (left < 0 ? "−" : "") + M.money(Math.abs(left)), { money: pct !== null, color: blown ? "var(--mn-orange)" : "", key: "leftPct", fmt: pctText,
-      extra: pct === null ? "" : (pct < 0 ? "−" : "") + pctText(Math.abs(pct)), small: pct === null ? (B ? "Budget is all base" : "No budget yet") : "of " + kfmt(cmp.cur.room) });
+      extra: pct === null ? "" : (pct < 0 ? "−" : "") + pctText(Math.abs(pct)), note: pct === null ? (B ? "Budget is all base" : "No budget yet") : "of " + kfmt(cmp.cur.room) });
+    // Income、Balance：整期的数（月中的工资提前记了也算），没有横杠
+    roll(box.querySelector('[data-k="inc"]'), "+" + M.money(g.inc), true);
+    roll(box.querySelector('[data-k="bal"]'), (bal < 0 ? "−" : "+") + M.money(bal), true);
   }
 
   // ---------- 图表 ----------

@@ -122,6 +122,20 @@ function tracker() {
 }
 // 放不下的大金额写短：「$1.2k」「−$12k」
 export const kfmt = (c) => { const a = Math.abs(c) / 100, sgn = c < 0 ? "−" : "", sym = M.curInfo(M.showing()).sym; return sgn + sym + (a >= 1000 ? (a / 1000).toFixed(a >= 10000 ? 0 : 1) + "k" : Math.round(a)); };
+// Budget left、Spent 横杠底下那行小字（电脑、手机一样，她 11-01 晚定的）：这一期还没过完 = 快 / 慢，不写钱（钱看大数字，具体的停在横杠上看）；
+// 过完的一期 = 平时整期大约多少（和大数字一样是整期，比得上）。g = M.gauge；note = 写在前面的（Budget left 的「of $2.1k」）
+const PACE = ["Slower than usual", "Usual pace", "Faster than usual"];
+export function paceNote(cmp, key, g, fmt, note = "") {
+  const t = cmp.cutText ? PACE[g.pace + 1] : "Usual ~" + fmt(cmp.usual[key]);
+  return note ? note + " · " + t.charAt(0).toLowerCase() + t.slice(1) : t;
+}
+// 停在横杠上看的那句：「So far $2,290 · usually ~$2,140 by the 15th · last 6 months $1,970–$2,330」；过完的一期「This month … · usual ~…」
+export function paceTip(cmp, key, mode) {
+  const f = key === "leftPct" ? (x) => Math.round(x * 100) + "%" : (c) => M.money(Math.round(c / 100) * 100).replace(/\.0+$/, ""), r = cmp.range[key];
+  const x = f(cmp.now[key]) + (key === "leftPct" ? " left" : ""), u = "~" + f(cmp.usual[key]);
+  return (cmp.cutText ? "So far " + x + " · usually " + u + " " + cmp.cutText : "This " + (mode === "year" ? "year " : "month ") + x + " · usual " + u) +
+    " · " + (mode === "year" ? "earlier years " : "last 6 months ") + f(r[0]) + "–" + f(r[1]);
+}
 const pie = (p, cls = "") => '<svg class="mn-pie ' + cls + '" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="currentColor" fill-opacity=".2"/><circle cx="7" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="6" stroke-dasharray="' + (Math.max(0, Math.min(1, p)) * 18.85).toFixed(2) + ' 18.85" transform="rotate(-90 7 7)"/></svg>';
 const btn = (act, ic, label, cls = "") => '<button type="button" class="mn-ic ' + cls + '" data-act="' + act + '" aria-label="' + label + '" title="' + label + '">' + icon(ic) + "</button>";
 // 回到现在：标题后面一颗钴蓝小点，不在当前那一期才出来（和电脑上标题后的小圆点一样）；挂在标题右边外面，标题照样居中
@@ -675,35 +689,37 @@ export function createView() {
     }
   }
 
-  // 四个小方块：一样的四行（名字 / 数 / 一条线 / 小字），所以对得齐。线 = 之前六个月（年模式 = 之前几年）这个数的范围（这个月的话，之前的也只算到同一天），
-  // 点 = 这一期到今天为止落在哪儿（提前记的不算），小字 = 平时到今天大约多少（她 11-01 说的，和电脑一样）。方块只建一次，换期只挪点（弹着滑过去）、换数。
-  // 橙色只标超了预算的（她 10-22 说的）：Budget Left 是负的时候那个数和 Budget Left、Expense 的点；结余是负的、比平时花得多都不标
-  const CARDS = [["left", "Budget Left", "leftPct"], ["expense", "Expense", "expense"], ["income", "Income", "income"], ["balance", "Balance", "balance"]];
+  // Budget Left、Expense：一样的四行（名字 / 整期的数 / 横杠 / 小字），所以对得齐。横杠 = 到今天为止花得快还是慢（她 11-01 晚定的，和电脑一样）：
+  // 之前六个月（年模式 = 之前几年）到同一天，最低到最高、正中间那条线 = 平时，点 = 这一期到今天为止（提前记的不算）；小字 = 快 / 慢，过完的一期 = 平时整期大约多少。
+  // Income、Balance 合成最后一张，只有整期的数、没有横杠（她 11-01 晚说的）。方块只建一次，换期只挪点（弹着滑过去）、换数。
+  // 橙色只标超了预算的（她 10-22 说的）：Budget Left 是负的时候那个数和两个点；结余是负的、比平时花得快都不标
+  const CARDS = [["left", "Budget Left", "leftPct"], ["expense", "Expense", "expense"]];
   function cards(c, mode, p) {
     const box = $(".mn-cards");
-    if (!box.querySelector("[data-card]")) box.innerHTML = CARDS.map(([k, label]) => '<div class="mn-card' + (k === "left" ? " mn-card-hl" : "") + '" data-card="' + k + '"><span class="mn-meta">' + label + '</span><span class="mn-num v"></span><div class="mn-track mn-range"><b hidden></b></div><span class="mn-num mn-meta"></span></div>').join("");
+    if (!box.querySelector("[data-card]")) box.innerHTML = CARDS.map(([k, label]) => '<div class="mn-card' + (k === "left" ? " mn-card-hl" : "") + '" data-card="' + k + '"><span class="mn-meta">' + label + '</span><span class="mn-num v"></span><div class="mn-track mn-range"><b hidden></b></div><span class="mn-num mn-meta"></span></div>').join("") +
+      '<div class="mn-card mn-card-io" data-card="io"><span class="mn-meta">Income</span><span class="mn-num v" data-v="inc" style="color:var(--mn-green)"></span><span class="mn-meta">Balance</span><span class="mn-num v" data-v="bal"></span></div>';
     const g = c.used, B = c.B, cmp = M.compare(IX(), budgetsShown(), p, mode, today()), pct = cmp.cur.leftPct, bal = cmp.cur.balance;
-    const since = (mode === "year" ? "Earlier years" : "6 mo") + (cmp.cutText ? " " + cmp.cutText : "");
     const pctText = (x) => Math.round(x * 100) + "%";
-    // Budget Left：剩下的钱 · 剩下几成（她 10-22 要的；方块宽度跟着字走，长了自己变宽）；超了两个都是负的、橙色。下面一行小字 = 一共能花多少（预算 − House）
+    // Budget Left：剩下的钱 · 剩下几成（她 10-22 要的；方块宽度跟着字走，长了自己变宽）；超了两个都是负的、橙色。下面一行小字前面 = 一共能花多少（预算 − House）
     const blown = pct !== null && pct < 0, left = cmp.cur.left;
     const leftHTML = pct === null ? "—" : cents((left < 0 ? "−" : "") + M.money(Math.abs(left))) + '<span class="mn-kp">' + (pct < 0 ? "−" : "") + pctText(Math.abs(pct)) + "</span>";
     const show = { left: [leftHTML, blown ? "var(--mn-orange)" : "", pctText, pct === null ? (B ? "All base" : "No budget yet") : "of " + kfmt(cmp.cur.room)],
-      expense: [cents("−" + M.money(g.out)), "", kfmt, ""], income: [cents("+" + M.money(g.inc)), "var(--mn-green)", kfmt, ""], balance: [cents((bal < 0 ? "−" : "+") + M.money(bal)), "", kfmt, ""] };
+      expense: [cents("−" + M.money(g.out)), "", kfmt, ""] };
     for (const [k, , key] of CARDS) {
       const el = box.querySelector('[data-card="' + k + '"]'), [value, col, fmt, note] = show[k], v = el.querySelector(".v"), dot = el.querySelector(".mn-range > b"), small = el.querySelector(".mn-meta:last-child");
       v.innerHTML = value;
       v.style.color = col;
-      el.title = since;
-      const r = cmp.range[key], x = cmp.now[key], u = cmp.usual[key];
-      if (!r || x === null || x === undefined) { dot.hidden = true; small.textContent = note || (mode === "year" ? "No earlier years" : "No history yet"); continue; }
-      const span = r[1] - r[0], pos = span ? (x - r[0]) / span : 0.5;
+      const at = M.gauge(cmp, key);
+      el.title = at ? paceTip(cmp, key, mode) : "";
+      small.classList.toggle("mn-pace", Boolean(at && cmp.cutText && at.pace));   // 不是平时的速度：字深一点
+      if (!at) { dot.hidden = true; small.textContent = note || (mode === "year" ? "No earlier years" : "No history yet"); continue; }
       dot.hidden = false;
-      dot.classList.toggle("over", blown && (k === "left" || k === "expense"));
-      dot.style.left = (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + "%";
-      const us = (cmp.cutText ? "until today usual ~" : "usual ~") + fmt(u);
-      small.textContent = note ? note + " · " + us : us.charAt(0).toUpperCase() + us.slice(1);
+      dot.classList.toggle("over", blown);
+      dot.style.left = (at.pos * 100).toFixed(1) + "%";
+      small.textContent = paceNote(cmp, key, at, fmt, note);
     }
+    box.querySelector('[data-v="inc"]').innerHTML = cents("+" + M.money(g.inc));
+    box.querySelector('[data-v="bal"]').innerHTML = cents((bal < 0 ? "−" : "+") + M.money(bal));
   }
   function breakdown(mode, p) {
     const inP = (e) => M.inPeriod(e, p, mode), rows = shownEntries().filter(inP);

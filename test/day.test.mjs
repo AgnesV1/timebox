@@ -43,6 +43,13 @@ test("hours: a stretch splits across the hours it touches, counted from 6:00", (
   assert.equal(D.hourLabel(20), "02:00");
 });
 
+test("quarter hours: a stretch splits into 15-minute slots counted from midnight, and wraps past it", () => {
+  assert.deepEqual(D.slotMinutes("09:10", "09:40"), { 36: 5, 37: 15, 38: 10 });
+  assert.deepEqual(D.slotMinutes("23:50", "00:20"), { 95: 10, 0: 15, 1: 5 }, "the part after midnight starts again from slot 0");
+  assert.deepEqual(D.slotMinutes("10:00", "10:00"), {});
+  assert.deepEqual(D.slotMinutes("", "10:00"), {});
+});
+
 test("heat grid: per day per hour, averages by weekday, weeks newest first, commute hours marked", () => {
   const ctx = { today: "2026-10-07", commute: { days: { "2026-10-06": true } }, tasks: [
     { date: "2026-10-05", times: "09:00-10:30 90m; 20m", group: "Work" },

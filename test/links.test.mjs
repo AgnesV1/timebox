@@ -32,6 +32,20 @@ test("stacked boxes (narrow window): out of the bottom, into the top", () => {
   assert.equal(c.c1.x, c.p0.x);
 });
 
+test("a North star word in the band at the top: lines come up into its bottom edge", () => {
+  const word = { l: 600, t: 100, r: 760, b: 124 };
+  const fromRail = L.curve({ l: 1100, t: 600, r: 1300, b: 622 }, word, { north: "side" });
+  assert.deepEqual([fromRail.p0.x, fromRail.p0.y], [1097, 611], "a goal in the rail leaves from its left side");
+  assert.ok(fromRail.c1.x < fromRail.p0.x && fromRail.c1.y === fromRail.p0.y, "heading left first");
+  assert.deepEqual([fromRail.p3.x, fromRail.p3.y], [680, 127], "into the middle of the word's bottom edge");
+  assert.ok(fromRail.c2.x === fromRail.p3.x && fromRail.c2.y > fromRail.p3.y, "arriving straight up");
+  const fromPlan = L.curve({ l: 200, t: 300, r: 500, b: 380 }, word, { north: "top" });
+  assert.deepEqual([fromPlan.p0.x, fromPlan.p0.y], [350, 298], "a plan card leaves from its top");
+  assert.equal(L.curve({ l: 1100, t: 600, r: 1300, b: 622 }, word, { north: "side", y1: 140 }).p3.y, 155, "a hidden word: the end follows the clamped height");
+  const above = L.curve({ l: 1100, t: 600, r: 1300, b: 622 }, { l: 1150, t: 100, r: 1300, b: 124 }, { north: "side" });
+  assert.equal(above.c2.x, above.c1.x, "a word right above the rail: up the gap beside the rail, not straight through its goals");
+});
+
 test("the streak keeps the same speed on long and short lines", () => {
   const short = L.streakOf(120), long = L.streakOf(900);
   assert.ok(long.sd > short.sd, "a longer line takes longer");

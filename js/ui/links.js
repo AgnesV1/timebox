@@ -3,12 +3,13 @@
 //   用键盘（Tab）停在它们上面也一样（不出拖的把手——拖本来就要鼠标）；Esc、焦点离开 Projects 页就收起，
 //   画完以后，线上一道流光一直朝「为了谁」那头跑：计划 / 项目 → 目标 → 上级 → … → North star。没关系的目标、卡片淡下去，
 //   连着的目标和 North star 里的词涂上青柠荧光笔（她 10-21 从三个样子里挑的）。连着的都要看得见：折在「+N more」里的露出来，
-//   右栏滚走了的滚过去（悬停的在左边时），North star 那三行里被挡住的词，框里暂时换成那一句 / 那一小段 / 只列词（focusNorth）。
+//   右栏滚走了的滚过去（悬停的在左边时），North star 那两行里被挡住的词，框里暂时换成那一句 / 那一小段 / 只列词（focusNorth）。
 //   目标：往上一路到顶，往下是挂在它下面的（一层层）和为它们服务的项目、计划；
 //   计划：它连着的目标（自己没连的，看它所在的项目连着的），再一路往上；项目：它连着的，加上它下面自己连了目标的计划。
 // 线就是两头直接连的一条三次贝塞尔，斜着飞过去，压着字也没关系（只在鼠标停着的时候有）：
 //   左边的计划卡 → 右栏的目标：从朝着对方的那一边出去，两头水平，中间一道斜的 S；
-//   都在右栏里的（目标 → 上级、→ North star 里的词）：两头都从左边进出，往左鼓成一个 C，不压目标的字；
+//   都在右栏里的（目标 → 上级）：两头都从左边进出，往左鼓成一个 C，不压目标的字；
+//   接到页头下面那条 North star 里的词（她 10-31 挪到最上面了）：从下面接进那个词的底边——右栏里的从左边出去再往上拐，左边的从顶上出去；
 //   右栏里滚走了、看不见的那头：压到能看见的那一截的边上，那头的小圆点画成空心的。
 // 每条线：一条很淡的细虚线当轨迹，上面一小截亮的（流光）沿着线跑到头，停一下，再从头出来；跑到「为了谁」那头时小圆点跳一下。
 //   白天墨色，粉、蓝两版错开一点（丝网印套色，和换页的标题一个路子）；夜里项目的霓虹色，底下一条宽的淡的当光（不用滤镜）。
@@ -19,7 +20,7 @@
 // 左边的（计划卡、项目的头、↻ 那几行）用鼠标选中了（出了拖的把手那个小圆点）就拿住，不轻易换、不轻易收（她 10-27 说的：太容易消失、会漂到别的线上）：
 //   要停住才选中，挪着路过的不算；拿住以后路过别的不换——在一个没连着的上面停住 REST 才换成它，连着的（亮着的）不换；
 //   鼠标在这一套占的那一片里（线的外框，加上它自己和亮着的那些）就一直在，出了那一片 HOLD 才收；点它自己、点亮着的（不是上面的按钮）也不收。
-//   右栏里的（目标、North star 的词）照旧：停一下就换，离线远了一会儿就收。
+//   右栏里的目标、最上面 North star 里的词照旧：停一下就换，离线远了一会儿就收。
 // 拖一下建链接：悬停时旁边出一个小圆圈，从它拖出去，一条线跟着鼠标飞；能连的地方亮着，经过时吸过去，松手就连上。拖到右栏的上下沿，右栏自己滚。
 //   目标拖到目标 = 设成它的上级（一条只有一个上级，会换掉原来的；会连成环的不亮）；目标 ↔ 计划 / 项目 = 这个计划 / 项目为这条目标服务。
 //   不拖也能连：计划编辑框里的 Serves（js/ui/projects.js），改目标文字时的 Part of（js/ui/goals.js）。
@@ -31,7 +32,7 @@ import * as GR from "../groups.js";
 import * as E from "../engine.js";
 import { esc } from "../dom.js";
 
-const NODE = ".goals .gl[data-goal], .goals .ns-g[data-goal], .pgroup[data-group] > .pg-top:not(.editing), .pcard[data-project], .g-rep[data-project]";
+const NODE = ".goals .gl[data-goal], .pj-north .ns-g[data-goal], .pgroup[data-group] > .pg-top:not(.editing), .pcard[data-project], .g-rep[data-project]";
 const fine = matchMedia("(hover: hover) and (pointer: fine)");
 const still = matchMedia("(prefers-reduced-motion: reduce)");
 const NS = "http://www.w3.org/2000/svg";
@@ -74,7 +75,7 @@ function elOf(key, cols) {
     const id = CSS.escape(key.slice(5)), col = cols.get(key.slice(5));
     const gl = q('.goals .gl[data-goal="' + id + '"]');
     if (gl && (!gl.classList.contains("fold") || gl.classList.contains("lk-unfold") || root.classList.contains("lk-drag"))) return gl;
-    return q('.goals .ns-focus [data-fgoal="' + id + '"]') || q('.goals .ns-g[data-goal="' + id + '"]') ||
+    return q('.pj-north .ns-focus [data-fgoal="' + id + '"]') || q('.pj-north .ns-g[data-goal="' + id + '"]') ||
       (col && (q('.goals [data-col="' + col + '"] .gmore') || q('.goals [data-col="' + col + '"] h4'))) || q('.goals .rail-tabs [data-v="goals"]');
   }
   if (key.startsWith("g:")) return q('.pgroup[data-group="' + CSS.escape(key.slice(2)) + '"] > .pg-top:not(.editing)');
@@ -192,9 +193,18 @@ function sample({ p0, c1, c2, p3 }, n = 24) {
 }
 
 // 两个框之间的一条线（框是 { l, t, r, b }，坐标随意，只要两个一样）。rail = 两头都在右栏里。y0 / y1 = 线头的高度（不给就是正中）
-//   都在右栏里：两头从左边进出，往左鼓成 C；左右隔开：从朝着对方的那一边出去，两头水平，中间一道斜的 S；上下叠着（窗口窄了，右栏挪到上面）：从上下沿出去
-export function curve(A, B, { rail = false, y0, y1 } = {}) {
+//   都在右栏里：两头从左边进出，往左鼓成 C；左右隔开：从朝着对方的那一边出去，两头水平，中间一道斜的 S；上下叠着（窗口窄了，右栏挪到上面）：从上下沿出去。
+//   north = B 是最上面那条 North star 里的词：从下面接进它的底边中间（y1 压过边的话跟着往上挪）；"side"（A 在右栏里）从 A 的左边出去先往左再往上，"top" 从 A 的顶上出去
+export function curve(A, B, { rail = false, north = "", y0, y1 } = {}) {
   const ya = y0 ?? (A.t + A.b) / 2, yb = y1 ?? (B.t + B.b) / 2;
+  if (north) {
+    const p3 = { x: (B.l + B.r) / 2, y: yb + (B.b - B.t) / 2 + 3 };
+    const p0 = north === "side" ? { x: A.l - 3, y: ya } : { x: (A.l + A.r) / 2, y: A.t - 2 };
+    const k = clamp(Math.abs(p0.y - p3.y) * 0.5, 24, 160);
+    const c1 = north === "side" ? { x: p0.x - clamp(Math.abs(p0.y - p3.y) * 0.3, 24, 120), y: p0.y } : { x: p0.x, y: p0.y - k };
+    // 词在右栏正上方：沿着右栏左边那道缝上去，再斜着接进词里，不从右栏的目标上竖着穿过
+    return { p0, c1, c2: { x: north === "side" ? Math.min(p3.x, c1.x) : p3.x, y: p3.y + k }, p3 };
+  }
   if (rail) {
     const p0 = { x: A.l - 3, y: ya }, p3 = { x: B.l - 3, y: yb }, k = clamp(Math.abs(p3.y - p0.y) * 0.28, 18, 80);
     return { p0, c1: { x: p0.x - k, y: p0.y }, c2: { x: p3.x - k, y: p3.y }, p3 };
@@ -249,7 +259,8 @@ function boxOf(el) {
   return b;
 }
 
-// 线头的高度：计划卡是标题那一行，别的是正中。在右栏里滚走了（或 North star 那段字滚走了）：压到能看见的那一截的边上，clip = 那头画成空心
+// 线头的高度：计划卡是标题那一行，别的是正中。在右栏里滚走了（或 North star 那段字收起来、滚走了）：压到能看见的那一截的边上，clip = 那头画成空心。
+// 最上面那条 North star 跟着页面滚出了窗口：压到窗口上沿
 function endOf(el) {
   const b = boxOf(el);
   let y = el.classList.contains("pcard") ? Math.min((b.t + b.b) / 2, b.t + 14) : (b.t + b.b) / 2, clip = false;
@@ -258,13 +269,25 @@ function endOf(el) {
     const r = rectOf(sc), lo = r.t + 5, hi = r.b - 5;
     if (y < lo || y > hi) { y = clamp(y, lo, hi); clip = true; }
   }
+  if (el.closest(".pj-north")) {
+    const top = -layer.getBoundingClientRect().top + 6;
+    if (y < top) { y = top; clip = true; }
+  }
   return { b, y, clip };
+}
+
+// 两头是谁决定线怎么走：有一头是最上面 North star 里的词 = 从下面接进它（另一头在右栏里就从左边出去）；都在右栏里 = 往左鼓的 C；别的 curve 自己看
+export function route(A, B, a, b, ys = {}) {
+  const na = Boolean(a?.closest?.(".pj-north")), nb = Boolean(b?.closest?.(".pj-north"));
+  if (nb && !na) return curve(A, B, { north: a?.closest?.(".pj-rail") ? "side" : "top", ...ys });
+  if (na && !nb) { const c = curve(B, A, { north: b?.closest?.(".pj-rail") ? "side" : "top", y0: ys.y1, y1: ys.y0 }); return { p0: c.p3, c1: c.c2, c2: c.c1, p3: c.p0 }; }
+  return curve(A, B, { rail: Boolean(a?.closest?.(".pj-rail") && b?.closest?.(".pj-rail")), ...ys });
 }
 
 // a 为 b 服务：从 a 画到 b
 function geo(a, b) {
   const A = endOf(a), B = endOf(b);
-  const c = curve(A.b, B.b, { rail: Boolean(a.closest(".pj-rail") && b.closest(".pj-rail")), y0: A.y, y1: B.y });
+  const c = route(A.b, B.b, a, b, { y0: A.y, y1: B.y });
   const pts = sample(c);
   return { c, pts, len: lengthOf(pts), clip: B.clip };
 }
@@ -379,11 +402,11 @@ function shows(box, el) {
   return rs[0].top >= r.top - 1 && rs[rs.length - 1].bottom <= r.bottom + 1;
 }
 
-// North star 那段平时只露三行。连着的词有被挡住的（在第三行下面、被滚走了、折了行露一半）：框里暂时换成重点——
+// North star 那段平时只露两行。连着的词有被挡住的（在第二行下面、被滚走了、折了行露一半）：框里暂时换成重点——
 //   只连着一个词：那一句；一句放不下就那一小段（先带上前面一小段），再放不下就只剩这个词；连着两三个词：只列这几个词（她说的）。
 // 盖在原来那段字上面，一样大（下面的目标不跳）；原来那段藏起来（也不接鼠标），线走开就换回来（unfocusNorth）
 function focusNorth(root, ids) {
-  const ns = root.querySelector(".goals .ns"), txt = ns?.querySelector(".ns-text:not(.empty)");
+  const ns = root.querySelector(".pj-north .ns"), txt = ns?.querySelector(".ns-text:not(.empty)");
   if (!txt || !ids.length || ids.every((id) => shows(txt, txt.querySelector('.ns-g[data-goal="' + CSS.escape(id) + '"]')))) { unfocusNorth(root); return; }
   const sig = [...ids].sort().join(" "), place = (el) => Object.assign(el.style, { top: txt.offsetTop + "px", left: txt.offsetLeft + "px", width: txt.clientWidth + "px", height: txt.clientHeight + "px" });
   let ov = ns.querySelector(".ns-focus");
@@ -411,8 +434,8 @@ function focusNorth(root, ids) {
 }
 
 function unfocusNorth(root) {
-  root?.querySelector(".goals .ns-focus")?.remove();
-  root?.querySelector(".goals .ns.focus")?.classList.remove("focus");
+  root?.querySelector(".pj-north .ns-focus")?.remove();
+  root?.querySelector(".pj-north .ns.focus")?.classList.remove("focus");
 }
 
 // 右栏滚走了、看不见的连着的目标：悬停的在左边（计划卡、项目名）时，右栏滚过去（刚飞出去那一下，一次）。
@@ -514,7 +537,7 @@ function close(now = false) {
 const keep = () => { clearTimeout(closeT); closeT = 0; };
 const later = (ms = GRACE) => { if (!closeT) closeT = setTimeout(() => close(), ms); };
 // 用鼠标选中的、在左边的：拿住
-const held = () => Boolean(cur && !cur.kb && !cur.el.closest(".pj-rail"));
+const held = () => Boolean(cur && !cur.kb && !cur.el.closest(".pj-rail, .pj-north"));
 
 // 停在 key 上 ms 以后画它。still：离开始等的那一点挪远了 STILL 就从头等（路过的不算，要停住）；不然换了一个才从头等
 function wait(key, n, ms, still) {
@@ -608,7 +631,7 @@ function onMove() {
     if (cur?.key === key || (hold && n.classList.contains("lk-on"))) { want = ""; clearTimeout(wantT); keep(); const o = layer.getBoundingClientRect(); showCut(nearEnd(mx - o.left, my - o.top)); return; }
     if (cutX) showCut(null);
     if (hold) wait(key, n, REST, true);
-    else wait(key, n, DWELL, !n.closest(".pj-rail"));
+    else wait(key, n, DWELL, !n.closest(".pj-rail, .pj-north"));
     if (cur) keep();
     return;
   }
@@ -651,11 +674,13 @@ function startDrag(e) {
     if (k && canLink(goals, from, k)) { can.set(n, k); n.classList.add("lk-can"); }
   }
   el.classList.add("lk-src");
-  // 右栏展开（css：North star 那段放开、各段折起来的目标露出来），能连的才都看得到、放得上去。
-  // 拖的那一条在右栏里：展开以后它会往下挪——把右栏往下滚同样多，它就留在手指底下
-  const body = page()?.querySelector(".goals .rail-body"), top0 = el.getBoundingClientRect().top, scroll0 = body?.scrollTop || 0;
+  // 展开（css：最上面 North star 那段放开、右栏各段折起来的目标露出来），能连的才都看得到、放得上去。
+  // 展开以后拖的那一个会往下挪：在右栏里就把右栏往下滚同样多，别的把页面往下滚同样多，它就留在手指底下（松手后两样都滚回去）
+  const body = page()?.querySelector(".goals .rail-body"), top0 = el.getBoundingClientRect().top, scroll0 = body?.scrollTop || 0, page0 = scrollY;
   page()?.classList.add("lk-drag");
-  if (body?.contains(el)) body.scrollTop += el.getBoundingClientRect().top - top0;
+  const moved = el.getBoundingClientRect().top - top0;
+  if (body?.contains(el)) body.scrollTop += moved;
+  else if (moved) scrollBy(0, moved);
   dragSvg = document.createElementNS(NS, "svg");
   dragSvg.setAttribute("class", "lk-drag-svg");
   dragSvg.setAttribute("aria-hidden", "true");
@@ -665,7 +690,7 @@ function startDrag(e) {
   live.style.setProperty("--c", glow(colorOf(from)) || "var(--accent)");
   live.style.setProperty("--sl", ".22"); live.style.setProperty("--sg", String(RUN - 0.22)); live.style.setProperty("--sd", ".9s"); live.style.setProperty("--sdl", "0s"); live.style.setProperty("--hd", Math.round(((1.3 - 0.22) / RUN - 0.05) * 900) + "ms");
   document.body.appendChild(dragSvg);
-  drag = { from, el, can, target: null, id: e.pointerId, x: e.clientX, y: e.clientY, raf: 0, body, scroll0 };
+  drag = { from, el, can, target: null, id: e.pointerId, x: e.clientX, y: e.clientY, raf: 0, body, scroll0, page0 };
   handle.setPointerCapture(e.pointerId);
   handle.addEventListener("pointermove", dragMove);
   handle.addEventListener("pointerup", dragEnd);
@@ -686,7 +711,7 @@ function dragMove(e) {
   const t = over && drag.can.has(over) ? over : null;
   if (t !== drag.target) { drag.target?.classList.remove("lk-snap"); t?.classList.add("lk-snap"); drag.target = t; }
   const to = t ? screenBox(t) : { l: drag.x - 1, t: drag.y - 1, r: drag.x + 1, b: drag.y + 1 };
-  const c = curve(screenBox(drag.el), to, { rail: Boolean(t && drag.el.closest(".pj-rail") && t.closest(".pj-rail")) }), d = cOf(c);
+  const c = route(screenBox(drag.el), to, drag.el, t), d = cOf(c);
   dragSvg.querySelectorAll(".lk-t, .lk-sa, .lk-sb, .lk-sp, .lk-rev").forEach((p) => p.setAttribute("d", d));
   const dot = dragSvg.querySelector(".lk-dot");
   dot.setAttribute("cx", fmt(c.p3.x)); dot.setAttribute("cy", fmt(c.p3.y));
@@ -714,7 +739,7 @@ function autoScroll() {
 
 function dragEnd(e) {
   if (!drag) return;
-  const { from, el, can, target: t, body, scroll0 } = drag;
+  const { from, el, can, target: t, body, scroll0, page0 } = drag;
   handle.removeEventListener("pointermove", dragMove);
   handle.removeEventListener("pointerup", dragEnd);
   handle.removeEventListener("pointercancel", dragEnd);
@@ -724,7 +749,8 @@ function dragEnd(e) {
   for (const n of can.keys()) n.classList.remove("lk-can", "lk-snap");
   el.classList.remove("lk-src");
   page()?.classList.remove("lk-drag");
-  if (body?.isConnected) body.scrollTop = scroll0;   // 收回去：右栏回到拖之前的样子
+  if (body?.isConnected) body.scrollTop = scroll0;   // 收回去：右栏、页面回到拖之前的样子
+  if (scrollY !== page0) scrollTo(scrollX, page0);
   handle.classList.remove("drag", "on");
   const line = dragSvg;
   dragSvg = null;

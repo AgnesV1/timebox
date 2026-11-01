@@ -58,8 +58,8 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
 ## 3. Day to day
 
 **Computer**
-- `Projects`: goals live in the **right-hand column** (it sticks to the top as you scroll). From top to bottom:
-  - **North star**: a paragraph that always stays at the top. Normally only its first three lines show (scroll inside it for the rest; a fade at the bottom means there's more).
+- `Projects`: the **North star** runs across the top, under the page title; goals live in the **right-hand column** (it sticks to the top as you scroll).
+  - **North star**: a paragraph across the whole page. Normally its first two lines show (scroll inside it for the rest; a fade at the bottom means there's more); **More** at the right opens it in full and **Less** folds it again, remembered on that device.
     Put `[ ]` around words (or select some and click **Frame as goal**) and each framed phrase is a North star goal;
     click the paragraph to edit, ⌘↵ or clicking outside saves. Rewording inside a frame keeps the same goal (its parent and links stay); removing the frame deletes that goal (undo in the toast).
   - **Goals | Ideas**: Goals are stacked by time: This month, This quarter, Next quarter, This year, Next year, then three more years (in 2026 that's 2028, 2029, 2030; they move with the date).
@@ -67,7 +67,7 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
     Once a goal's month / quarter / year is over, finished or not, it leaves these sections for **Past** at the bottom: pick a quarter (`2026 Q3`) and open it to see that quarter's goals,
     its three months' goals and that year's goals, ticked or not, with "N of M done". You can still tick one there (it counts as done in the month it was due), or drag an unfinished one back to a current section by its grip;
     inside a section goals are ordered by their tag's project order (Build first, untagged last). A small grip shows on the left of a goal when you hover it: drag it to another section to give the goal that section's default due date (or click the grip to pick a section; undo in the toast).
-    Ideas is the idea pool described below; switching to it keeps the North star paragraph in view.
+    Ideas is the idea pool described below; the North star stays at the top either way.
   **Goals, projects and plans can be linked** to say what each thing is for: rest the mouse on a goal, a framed phrase in the North star, a project name or a plan card
   (or Tab onto it with the keyboard), and the related links fly out one by one (a direct curve between the two ends — crossing text is fine, they only show while you're there).
   Lines from something on the left (a plan card, a project name, a repeat) **hold** once they're out and the small circle shows: passing over other plans or goals doesn't switch to theirs
@@ -75,7 +75,7 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   Moving well away, clicking something else or Esc puts them away. Goals and North star words still switch as soon as you rest on another.
   A **streak** of light keeps running along each line towards "what it's for" (plan → goal → parent goal → … → North star), and the dot at that end bounces when it arrives. By day it's ink with pink and blue printed slightly off-register; at night it's the project's neon colour.
   Everything linked is marked with a lime highlighter (the goals' names and the North star's framed words) and the rest fades, and it's all brought into view:
-  if a linked word is hidden below the North star's three lines, the box shows the sentence it's in until you move away (a shorter part of it if the sentence doesn't fit;
+  lines into a North star word come up into it from below; if a linked word is hidden below the North star's two lines, the box shows the sentence it's in until you move away (a shorter part of it if the sentence doesn't fit;
   with two or more linked words, only the words); linked goals folded behind "+N more" show; and when you're resting on something on the left, the goals column scrolls to the linked goals.
   Drag the small circle that appears onto another goal, plan or project to link them; bring the mouse next to the dot at a line's end and a × shows just left of it (that line lights up) — it unlinks. While you drag, the North star paragraph opens in full
   and sections folded behind "+N more" show all their goals, so everything can be dropped on.
@@ -166,9 +166,11 @@ Today's deep time is on the small label just under the dial; Stats has a Deep se
 To set yourself a target: Stats, under the pie → Adjust → Deep goal (hours per working day).
 
 - `Stats`: pick a period (week / month / Season / year / Custom; it opens on Month each time), optionally only some projects or plans (tick several; none = everything, split by project), or only deep work. Two tabs:
-  - **Time** (where the time went): a thin strip at the top — time on Build, how much of it deep, up or down from the previous period, and the overall total on the right; then daily bars (roughly how much was deep, with a soft electric-blue tide), a **24-hour pie**,
+  - **Time** (where the time went): a thin strip at the top — time on Build, how much of it deep, up or down from the previous period, and Build + Work together (with their deep time) on the right; then daily bars (roughly how much was deep, with a soft electric-blue tide), a **24-hour pie** (under it, everything logged and untracked, each with a daily average),
     an **hours-of-the-week heat map** (weekday × 24 hours from 6am; a cell's colour is the project that mostly filled that hour — its own colour above 70%,
     otherwise a blend of the top two; hovering a weekday on the left shows that weekday's average day split by project; "Week by week" expands each week),
+    **a typical day** (an average work day — Monday to Friday, not holidays or days off — and an average weekend day, from timed sessions only and only days with something timed:
+    a 24-hour clock with one bar per hour, sleep and the commute as a grey arc, the daily total, and a list of what you usually do when, "some days" for the less regular bits),
     and a **timesheet** (project × day, grouped by week or month when long; the small triangle before a project opens its plans).
     The bars default to Build and the heat map to everything; both switch at the top right. Daily bars are lime (the total); charts split by project use each project's colour.
     Projects are always ordered Build, Work, Friends, Leisure, Fitness, Chores (on Projects, in menus, the pie and the timesheet).
@@ -177,7 +179,8 @@ To set yourself a target: Stats, under the pie → Adjust → Deep goal (hours p
     Click a project's slice (or its row in the legend) and the whole page shows only that project, split into its plans — the same as picking it in the project menu; **Clear** under the pie goes back to everything.
     **On the side** (also in Adjust): one total per month — shows, novels and podcasts while working out or commuting. You can fill the previous two months, plus the current month in its last three days.
     Typing 0 counts as filled in (that month had none); an empty box means not filled in, and while last month is empty a red dot sits next to Adjust.
-    It's spread over each day of that month and shows on the pie as a streak of light sweeping down from the middle of Untracked; it takes no time (it overlapped other things anyway).
+    It's spread over each day of that month. On the pie, Leisure ends at 12 o'clock on the left and On the side follows it as a glow in Leisure's colour, a streak of light sweeping down over Untracked;
+    pick Leisure and each daily bar also sits on a still glow for it, with the line above giving logged + on the side in all and the real daily average. It never adds to any other total (it overlapped other things anyway).
   - **Plan** (how the plans went): how much got done, how good the estimates were, planned vs actual per day and per project, reasons for unfinished work, and each plan's times done out of its pool with the time spent on it
 
 **Reading (computer and phone)**: the first time you open Reading (or Settings → Reading on the computer), paste the link to your reading log Sheet once; it's saved as you paste. The Sheet doesn't need to be public — it's opened with your own Google account.

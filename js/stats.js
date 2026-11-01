@@ -1,7 +1,7 @@
 // 统计的计算：只算数，不碰页面。时间单位都是分钟。
 // 看的是一段时间（一周 / 一个月 / 一个季度 / 一年 / 自己选的两头）里：花了多少时间、其中多少是深度（Deep）、
 // 做完了多少、估时准不准、各项目、星期几、没做完的原因；
-// 时间去向（一天 24 小时：睡觉、吃饭洗澡、家务按默认值算，剩下 = 记下来的 + 没记的）、时间表（项目 × 日子）。
+// 时间去向（一天 24 小时：睡觉、吃饭洗澡、家务按默认值算，剩下 = 记下来的 + 没记的）、时间表（项目 × 日子）、典型的一天（上班日 / 周末几点在干什么）。
 // 只看某个项目 / 只看深度：页面先把 ctx.tasks 筛好再传进来，这里不用管。
 
 import { addDays, diffDays, range, weekday, startOfWeek, startOfMonth, startOfQuarter, addMonths, daysInMonth, isoOf } from "./dates.js";
@@ -9,7 +9,7 @@ import * as E from "./engine.js";
 import * as GR from "./groups.js";
 import * as L from "./lists.js";
 import { parseTimes } from "./times.js";
-import { hourMinutes, isCommute, COMMUTE_BLOCKS } from "./day.js";
+import { hourMinutes, slotMinutes, isCommute, COMMUTE_BLOCKS } from "./day.js";
 
 export const PERIODS = { week: "Week", month: "Month", season: "Season", year: "Year", custom: "Custom" };
 
@@ -155,8 +155,8 @@ export function weekly(daily, weekStartsOn) {
   const out = new Map();
   for (const x of daily) {
     const w = startOfWeek(x.date, weekStartsOn);
-    const g = out.get(w) || { date: w, spent: 0, deep: 0, planned: 0, goal: 0, future: true };
-    g.spent += x.spent; g.deep += x.deep || 0; g.planned += x.planned; g.goal += x.goal || 0; g.future = g.future && x.future;
+    const g = out.get(w) || { date: w, spent: 0, deep: 0, planned: 0, goal: 0, side: 0, future: true };
+    g.spent += x.spent; g.deep += x.deep || 0; g.planned += x.planned; g.goal += x.goal || 0; g.side += x.side || 0; g.future = g.future && x.future;
     out.set(w, g);
   }
   return [...out.values()];
@@ -304,6 +304,14 @@ export function clockPie(ctx, s, { trackedOnly = false, rest = 0, filtered = fal
   return { total: lived + tracked + blank, tracked, deep: s.deep, blank, parts };
 }
 
+// 饼图上从 12 点顺时针怎么排（画出来的那几片）：别的照原来的先后 → Everything else → Untracked → Leisure 那几片，最后一片停在 12 点；
+// On the side 那段光从第一片 Leisure 的起点往下（逆时针）接着画，压在紧挨着的 Untracked 上。isLeisure(片) 说哪几片算 Leisure
+export function ringOrder(parts, isLeisure) {
+  const leis = parts.filter((x) => isLeisure(x)), rest = parts.filter((x) => !leis.includes(x));
+  const at = (k) => rest.filter((x) => x.kind === k);
+  return [...rest.filter((x) => x.kind !== "rest" && x.kind !== "blank"), ...at("rest"), ...at("blank"), ...leis];
+}
+
 // ---------- 时间表：项目 × 日子 ----------
 // 列：两周以内一天一列，十四周以内一周一列，再长一个月一列。格子 = 那一格里花掉的分钟。
 // 按大类分行时，每行带着 subs：它下面每个计划一行（名字为空的 = 直接挂在大类上的），加起来就是这一行。
@@ -417,18 +425,97 @@ export function heatWeeks(grid, weekStartsOn) {
   return [...weeks.entries()].map(([from, days]) => ({ from, days })).sort((a, b) => b.from.localeCompare(a.from));
 }
 
+// ---------- 典型的一天：上班日一张、周末一张 ----------
+// 上班日 = 周一到周五、不是假日 / 请假（isOff 说了算）；周末 = 周六、周日；放假的工作日两边都不算。只算那天有计时（写了起止钟点）的日子。
+// 钟点从 0 点起（不是热力图的 6 点）。每份：days 几天、total 平均一天计了多少分钟、rows 各行（大类 / 计划，见 rowOf）平均多少（多的在前）、
+// hours[h] = h 点那一个小时平均多少分钟和按行拆开的 parts、blocks = 15 分钟一格连成的段（typicalBlocks）、commute = 上班日里一半以上是通勤日
+export const SLOT = 15;
+const SLOTS = 1440 / SLOT;
+
+export function typicalDays(ctx, from, to, { by = "group", isOff = () => false } = {}) {
+  const last = to < ctx.today ? to : ctx.today;
+  const days = from <= last ? range(from, last) : [];
+  const per = new Map(), colors = {};   // 日期 → 96 格 [{ 行: 分钟 }]
+  for (const t of ctx.tasks) {
+    if (!t.date || t.date < from || t.date > last) continue;
+    let row = null;
+    for (const seg of parseTimes(t.times)) {
+      if (!seg.from || !seg.to) continue;
+      if (row === null) { row = rowOf(ctx, t, by); colors[row.name] = colors[row.name] || row.color; }
+      if (!per.has(t.date)) per.set(t.date, Array.from({ length: SLOTS }, () => ({})));
+      const day = per.get(t.date);
+      for (const [i, m] of Object.entries(slotMinutes(seg.from, seg.to, SLOT))) day[i][row.name] = (day[i][row.name] || 0) + m;
+    }
+  }
+  const kindOf = (d) => { const wd = weekday(d); return wd === 0 || wd === 6 ? "weekend" : isOff(d) ? "" : "work"; };
+  const pack = (kind) => {
+    const ds = days.filter((d) => per.has(d) && kindOf(d) === kind);
+    if (!ds.length) return { days: 0, total: 0, rows: [], hours: [], blocks: [], commute: false };
+    const avg = Array.from({ length: SLOTS }, (_, i) => {
+      const out = {};
+      for (const d of ds) for (const [n, m] of Object.entries(per.get(d)[i])) out[n] = (out[n] || 0) + m / ds.length;
+      return out;
+    });
+    const slots = avg.map((parts) => {
+      const list = Object.entries(parts).sort((a, b) => b[1] - a[1]);
+      return { min: list.reduce((a, [, m]) => a + m, 0), top: list.length ? list[0][0] : null, topMin: list.length ? list[0][1] : 0 };
+    });
+    const sums = {};
+    for (const parts of avg) for (const [n, m] of Object.entries(parts)) sums[n] = (sums[n] || 0) + m;
+    const hours = Array.from({ length: 24 }, (_, h) => {
+      const parts = {};
+      for (let i = h * 4; i < h * 4 + 4; i++) for (const [n, m] of Object.entries(avg[i])) parts[n] = (parts[n] || 0) + m;
+      return { min: Object.values(parts).reduce((a, m) => a + m, 0), parts };
+    });
+    return {
+      days: ds.length,
+      total: Object.values(sums).reduce((a, m) => a + m, 0),
+      rows: Object.entries(sums).map(([name, min]) => ({ name, color: colors[name] || "", min })).sort((a, b) => b.min - a.min),
+      hours,
+      blocks: typicalBlocks(slots).map((b) => ({ ...b, color: colors[b.name] || "" })),
+      commute: kind === "work" && ds.filter((d) => isCommute(ctx.commute, d)).length * 2 >= ds.length
+    };
+  };
+  return { work: pack("work"), weekend: pack("weekend") };
+}
+
+// 15 分钟一格连成段：每格看占得最多的那一行（topMin = 它平均几分钟），四天里有一天以上在做（≥ 3.75 分钟）才算；
+// 同一行、中间断开不超过一格的连起来，短于两格（30 分钟）的不要；跨过 0 点、头尾是同一行的接成一段（to 会超过 1440）。
+// some = 这一段平均不到一半的日子在做。→ [{ from, to（从 0 点起的分钟）, name, some }]
+export function typicalBlocks(slots) {
+  const runs = [];
+  slots.forEach((s, i) => {
+    if (!s.top || !(s.topMin >= SLOT / 4)) return;
+    const prev = runs[runs.length - 1];
+    if (prev && prev.name === s.top && i - prev.b <= 1) { prev.b = i + 1; prev.n += 1; prev.sum += s.topMin; }
+    else runs.push({ name: s.top, a: i, b: i + 1, n: 1, sum: s.topMin });
+  });
+  const first = runs[0], last = runs[runs.length - 1];
+  if (runs.length > 1 && first.a === 0 && last.b === slots.length && first.name === last.name) {
+    runs.shift();
+    Object.assign(last, { b: first.b + slots.length, n: last.n + first.n, sum: last.sum + first.sum });
+  }
+  return runs.filter((r) => r.b - r.a >= 2).sort((x, y) => x.a - y.a)
+    .map((r) => ({ from: r.a * SLOT, to: r.b * SLOT, name: r.name, some: r.sum / (r.n * SLOT) < 0.5 }));
+}
+
 // ---------- Build 那个大类（Stats 的大字、只看 Build 的柱子和热力图用） ----------
 // 叫 Build 的；没有就第一个看进度的；再没有就是空
 export function buildGroup(ctx) {
   const list = ctx.groups || [];
   return (list.find((g) => g.name === "Build") || list.find((g) => GR.trackOf(g) === "progress"))?.name || "";
 }
+// Leisure 那个大类（饼图上 On the side 那段光跟着它）：叫 Leisure 的；没有就第一个「只有 Deep 算成长」的；再没有就是空
+export function leisureGroup(ctx) {
+  const list = ctx.groups || [];
+  return (list.find((g) => g.name === "Leisure") || list.find((g) => g.grow === "deep"))?.name || "";
+}
 // ctx 里只留这个大类的任务
 export const onlyGroup = (ctx, name) => ({ ...ctx, tasks: ctx.tasks.filter((t) => rowOf(ctx, t, "group").name === name) });
 
 // ---------- On the side：边健身、边通勤看的剧 / 小说（一个月一个总数，Stats 页饼图那一块里填） ----------
 // ctx.side = [{ month: "2026-09", min }]。按月平摊到那个月每一天（到今天为止），所以看一周拿到的是那 7 天的份（界面上写 ~）。
-// 它本来就和别的事叠在一起：只在饼图里压一段流光在 Untracked 上，不占时间、不进任何总数。
+// 它本来就和别的事叠在一起：饼图上是接在 Leisure 后面的一段光（压在 Untracked 上），只看 Leisure 时柱子最下面也有一段；不占时间、不进任何总数。
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 // 这条摊在哪几天（那个月里、[from, last] 以内）、每天多少分钟
@@ -439,12 +526,16 @@ function spread(x, from, last) {
   return { days: a <= b ? range(a, b) : [], per: num(x.min) / n };
 }
 
+// 每天摊到多少分钟：{ 日期: 分钟 }（[from, to] 里、到今天为止）
+export function sideDaily(ctx, from, to) {
+  const last = to < ctx.today ? to : ctx.today, out = {};
+  for (const x of ctx.side || []) { const { days, per } = spread(x, from, last); for (const d of days) out[d] = (out[d] || 0) + per; }
+  return out;
+}
+
 // 在 [from, to]（到今天为止）里摊到多少分钟
 export function sideHaze(ctx, from, to) {
-  const last = to < ctx.today ? to : ctx.today;
-  let min = 0;
-  for (const x of ctx.side || []) { const { days, per } = spread(x, from, last); min += days.length * per; }
-  return { min };
+  return { min: Object.values(sideDaily(ctx, from, to)).reduce((a, v) => a + v, 0) };
 }
 
 // 能填哪几个月（新的在前）：平常是前两个月；这个月的最后三天里，这个月也能填了

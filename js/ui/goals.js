@@ -1,4 +1,4 @@
-// Projects 页右边那一栏（电脑）。从上往下：North star 那一段字（一直在，切到 Ideas 也不变）→ Goals | Ideas → 下面一块自己滚。
+// Projects 页（电脑）：页头下面单独一条 North star（northHTML，横跨两栏；她 10-31 说从右栏挪到最上面），右边那一栏是 Goals | Ideas，下面一块自己滚。
 // North star：一段长文字，[ ] 里的词是一条条 North star 目标（画成细框，括号只在改字的时候看得到）。点这段字就能改：
 //   选中一段点「Frame as goal」给它加上括号；Esc 不改，⌘/Ctrl+Enter、Done 或点到外面就存（js/store/goals.js 的 saveNorth：改了措辞还是原来那条）。
 // Goals：这个月 / 这个季度 / 下个季度 / 今年 / 明年（Next year）/ 再三个年份，一段段竖着排（年份跟着今天走，见 js/goals.js 的 columns）。
@@ -6,8 +6,8 @@
 //   鼠标移到那一段，标题旁出一个「+」，点了才出「加一条」的框（一条目标都没有时 This month 那一格一直开着）。
 //   点文字改字（「文字 #标签」一起改），同一行还能选它是哪条目标的一部分（Part of = 上级，一条只有一个）；点月份改年月（做完了的改的是实际做完的年月）。
 // Ideas：灵感池（js/ui/ideas.js 的 ideasHTML，窄栏的样子见 css）。选的是哪个记在这台设备上（projSide）。
-// 谁为谁服务的连线在 js/ui/links.js（悬停才画，拖一下就连上；拖的时候右栏整个展开：North star 那段放开、折起来的目标露出来）。
-// North star 那段平时只露前三行（她嫌大），里面能滚；往下还有字的时候底下淡出。
+// 谁为谁服务的连线在 js/ui/links.js（悬停才画，拖一下就连上；拖的时候 North star 那段放开、右栏里折起来的目标露出来）。
+// North star 那段平时只露两行（整页宽，一般两三行就写完），里面能滚；往下还有字的时候底下淡出，右下角 More 整段放开（记在这台设备上：local.northOpen）。
 // 往期：过了那一期的目标（做没做完都一样）不在上面几段，收在最底下——选一个季度（2026 Q3），展开看那一季的季度、月度目标和那一年的年度目标，
 //   打没打勾都看得到、还能补勾；没做完还想做的，用左边的小把手挪回现在的某一段（js/goals.js 的 past）。
 
@@ -101,18 +101,19 @@ function colHTML(col, k, first) {
     (add ? '<form class="gadd" data-span="' + col.span + '" data-due="' + col.due + '" autocomplete="off"><input name="text" data-keep="gadd-' + col.key + '" placeholder="Add…" aria-label="Add a goal: ' + title + '"></form>' : "") + "</section>";
 }
 
-// ---------- North star 那一段字 ----------
+// ---------- North star 那一段字（Projects 页头下面那一条，js/ui/projects.js 放进 .pj-north） ----------
 
 const STAR = '<i class="gstar" aria-hidden="true">✦</i>';
-const rowsFor = (text) => Math.min(14, Math.max(4, String(text).split("\n").reduce((n, line) => n + Math.ceil((line.length + 1) / 38), 0)));
+// 改字的框开几行：整页宽，一行大约 110 个字
+const rowsFor = (text) => Math.min(14, Math.max(3, String(text).split("\n").reduce((n, line) => n + Math.ceil((line.length + 1) / 110), 0)));
 
-function northHTML() {
+export function northHTML() {
   const text = store.northStar();
   if (northEdit) {
     return '<section class="ns editing"><h3>' + STAR + "North star</h3>" +
-      '<textarea class="ns-in" data-keep="north-star" rows="' + rowsFor(text) + '" aria-label="North star. Put [brackets] around the parts that are goals.">' + esc(text) + "</textarea>" +
+      '<div class="ns-edit"><textarea class="ns-in" data-keep="north-star" rows="' + rowsFor(text) + '" aria-label="North star. Put [brackets] around the parts that are goals.">' + esc(text) + "</textarea>" +
       '<div class="ns-bar"><button type="button" class="btn ghosty" data-act="ns-frame" disabled title="Put brackets around the selected words">[ ] Frame as goal</button>' +
-      '<span class="ns-tip">⌘↵ saves · Esc cancels</span><button type="button" class="btn" data-act="ns-done">Done</button></div></section>';
+      '<span class="ns-tip">⌘↵ saves · Esc cancels</span><button type="button" class="btn" data-act="ns-done">Done</button></div></div></section>';
   }
   const north = store.goals().filter((g) => g.span === "north"), at = new Map(north.map((g) => [g.id, g]));
   const phrases = G.parseNorth(text), { ids } = G.matchNorth(phrases, north);
@@ -126,9 +127,13 @@ function northHTML() {
     from = p.end;
   });
   h += esc(text.slice(from));
-  return '<section class="ns"><h3>' + STAR + 'North star<button type="button" class="link" data-act="ns-edit">Edit</button></h3>' +
+  const open = store.local().northOpen === true;
+  // 右边一小列：Edit（鼠标移上来才出来）、More / Less（字比两行长、或者已经放开了才有，css 看 .long / .open）
+  return '<section class="ns' + (open ? " open" : "") + '"><h3>' + STAR + "North star</h3>" +
     (text.trim() ? '<p class="ns-text" data-act="ns-edit">' + h + "</p>"
-      : '<p class="ns-text empty" data-act="ns-edit">What are you steering by? Write it here, and put [brackets] around the parts that are goals.</p>') + "</section>";
+      : '<p class="ns-text empty" data-act="ns-edit">What are you steering by? Write it here, and put [brackets] around the parts that are goals.</p>') +
+    '<div class="ns-tools"><button type="button" class="link" data-act="ns-edit">Edit</button>' +
+    (text.trim() ? '<button type="button" class="link ns-more" data-act="ns-more" aria-expanded="' + open + '">' + (open ? "Less" : "More") + "</button>" : "") + "</div></section>";
 }
 
 // ---------- 往期 ----------
@@ -170,7 +175,7 @@ export function goalsHTML(c) {
   const tab = sideTab();
   const open = store.goals().filter((g) => g.span !== "north" && !g.done && !G.isOld(g, c.today)).length;
   const seg = '<span class="seg">' + [["goals", "Goals"], ["ideas", "Ideas"]].map(([v, l]) => '<button type="button" data-act="rail-tab" data-v="' + v + '"' + (v === tab ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
-  return '<aside class="goals pj-rail" aria-label="Goals and ideas">' + northHTML() +
+  return '<aside class="goals pj-rail" aria-label="Goals and ideas">' +
     '<div class="rail-tabs">' + seg + (tab === "goals" && open ? '<span class="msub">' + open + " open</span>" : "") + "</div>" +
     '<div class="rail-body" data-rail="' + tab + '">' + (tab === "ideas" ? ideasHTML(c) : listHTML(c)) + "</div></aside>";
 }
@@ -181,8 +186,11 @@ export function goalsAfterRender() {
   if (body && railTop && body.dataset.rail === railTab && Math.abs(body.scrollTop - railTop) > 1) body.scrollTop = railTop;
   fitNorth();
 }
-function fitNorth(p = document.querySelector(".goals .ns-text")) {
-  if (p) p.classList.toggle("more", p.scrollHeight - p.scrollTop - p.clientHeight > 2);
+// .more = 底下还有字（最后一截淡出）；.long（在 .ns 上）= 两行放不下，要有 More
+function fitNorth(p = document.querySelector(".pj-north .ns-text")) {
+  if (!p) return;
+  p.classList.toggle("more", p.scrollHeight - p.scrollTop - p.clientHeight > 2);
+  p.closest(".ns")?.classList.toggle("long", p.scrollHeight > p.clientHeight + 2);
 }
 
 // 拖到 / 挑了另一段（js/ui/dnd.js 转过来的）：改成那一段的长短和默认期限（这个月 = 这个月，这一季 = 季末，今年 = 12 月……）；提示条能撤销
@@ -204,9 +212,6 @@ export function initGoals(rerender) {
     if (el.closest(".idea-page")) return;   // 灵感池自己管（js/ui/ideas.js）
     const act = el.dataset.act, id = rowOf(el), col = el.closest("[data-col]")?.dataset.col || "";
     if (act === "rail-tab") { edit = null; adding = ""; store.setLocal({ projSide: el.dataset.v === "ideas" ? "ideas" : "goals" }); return; }
-    if (act === "ns-edit") { if (!northEdit) openNorth(el.dataset.i === undefined ? -1 : Number(el.dataset.i)); return; }
-    if (act === "ns-frame") { frame(); return; }
-    if (act === "ns-done") { saveNorth(document.querySelector(".goals .ns-in")?.value); return; }
     if (act === "g-del") { edit = null; store.deleteGoal(id); return; }
     if (act === "past-toggle") pastOpen = !pastOpen;
     else if (act === "g-add") {
@@ -225,13 +230,20 @@ export function initGoals(rerender) {
     rerender();
   });
 
-  // ---------- North star：点开来改、给选中的字加括号、存 ----------
+  // ---------- North star：点开来改、给选中的字加括号、存；More / Less ----------
+  on(document, "click", ".pj-north [data-act]", (e, el) => {
+    const act = el.dataset.act;
+    if (act === "ns-edit") { if (!northEdit) openNorth(el.dataset.i === undefined ? -1 : Number(el.dataset.i)); }
+    else if (act === "ns-frame") frame();
+    else if (act === "ns-done") saveNorth(document.querySelector(".pj-north .ns-in")?.value);
+    else if (act === "ns-more") { store.setLocal({ northOpen: store.local().northOpen !== true }); rerender(); }
+  });
   function openNorth(pick) {
     northEdit = true;
     northPick = pick;
     rerender();
     afterRender(() => {
-      const ta = document.querySelector(".goals .ns-in");
+      const ta = document.querySelector(".pj-north .ns-in");
       if (!ta) return;
       ta.focus();
       const p = northPick >= 0 ? G.parseNorth(ta.value)[northPick] : null;
@@ -252,7 +264,7 @@ export function initGoals(rerender) {
   const selected = (ta) => { const s = ta.value.slice(ta.selectionStart, ta.selectionEnd); return s.trim() && !/[[\]\n]/.test(s) ? s : ""; };
   const canFrame = (ta) => { const b = ta.closest(".ns")?.querySelector('[data-act="ns-frame"]'); if (b) b.disabled = !selected(ta); };
   function frame() {
-    const ta = document.querySelector(".goals .ns-in");
+    const ta = document.querySelector(".pj-north .ns-in");
     if (!ta || !selected(ta)) return;
     const a = ta.selectionStart, b = ta.selectionEnd, s = ta.value.slice(a, b);
     const lead = s.length - s.trimStart().length, tail = s.length - s.trimEnd().length;   // 选到的前后空格留在括号外面
@@ -265,22 +277,22 @@ export function initGoals(rerender) {
     grow(ta);
     canFrame(ta);
   }
-  on(document, "keydown", ".goals .ns-g[role=button]", (e, el) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } });
+  on(document, "keydown", ".pj-north .ns-g[role=button]", (e, el) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } });
   // 按钮按下时别把输入框的选中弄丢
-  on(document, "mousedown", '.goals [data-act="ns-frame"]', (e) => e.preventDefault());
-  on(document, "input", ".goals .ns-in", (e, ta) => { grow(ta); canFrame(ta); });
-  ["select", "keyup", "mouseup"].forEach((t) => on(document, t, ".goals .ns-in", (e, ta) => canFrame(ta)));
-  on(document, "keydown", ".goals .ns-in", (e, ta) => {
+  on(document, "mousedown", '.pj-north [data-act="ns-frame"]', (e) => e.preventDefault());
+  on(document, "input", ".pj-north .ns-in", (e, ta) => { grow(ta); canFrame(ta); });
+  ["select", "keyup", "mouseup"].forEach((t) => on(document, t, ".pj-north .ns-in", (e, ta) => canFrame(ta)));
+  on(document, "keydown", ".pj-north .ns-in", (e, ta) => {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); northEdit = false; rerender(); }
     else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNorth(ta.value); }
   });
   // 点到这一块外面就存。页面重画时（同步拉下来之类）旧的框会被换掉：新的框接着在改，不算离开
-  on(document, "focusout", ".goals .ns.editing", (e, sec) => {
+  on(document, "focusout", ".pj-north .ns.editing", (e, sec) => {
     if (sec.contains(e.relatedTarget)) return;
     const value = sec.querySelector(".ns-in")?.value;
     setTimeout(() => {
       if (!northEdit) return;
-      const now = document.querySelector(".goals .ns-in");
+      const now = document.querySelector(".pj-north .ns-in");
       if (now && now === document.activeElement) return;
       saveNorth(value);
     }, 0);

@@ -107,7 +107,7 @@ function peopleHTML(all, shown, fields, last, T) {
   const cols = fields.slice(0, 2);
   const next = (f) => (low(f.next) ? '<span class="fnext' + (f.nextDate && f.nextDate < T ? " late" : "") + '">' + esc(f.next) + (f.nextDate ? " <small>" + fmtShort(f.nextDate) + "</small>" : "") + "</span>" : "");
   const table = shown.length
-    ? '<div class="table-wrap"><table class="ftable"><thead><tr><th>Name</th><th aria-label="Marks"></th>' + cols.map((f) => "<th>" + esc(f) + "</th>").join("") + "<th>Last</th><th>Next</th></tr></thead><tbody>" +
+    ? '<div class="table-wrap"><table class="ftable"><thead><tr><th class="ftc-name">Name</th><th class="ftc-marks" aria-label="Marks"></th>' + cols.map((f) => "<th>" + esc(f) + "</th>").join("") + '<th class="ftc-last">Last</th><th class="ftc-next">Next</th></tr></thead><tbody>' +
       shown.map((f) => '<tr data-act="edit-friend" data-id="' + esc(f.id) + '" tabindex="0"><td><b>' + esc(f.name || "Untitled") + '</b></td><td class="fm-cell">' + marksHTML(F.marksOf(f.more?.[spName("marks")]), "mark", "Marks") + "</td>" +
         cols.map((k) => "<td>" + esc(f.more?.[k] || "") + "</td>").join("") + '<td class="num">' + esc(F.ago(last[f.id], T)) + "</td><td>" + next(f) + "</td></tr>").join("") + "</tbody></table></div>"
     : '<p class="empty">' + (all.length ? "Nobody matches." : "Nobody here yet. Add a person, or pick “New person…” on a task.") + "</p>";

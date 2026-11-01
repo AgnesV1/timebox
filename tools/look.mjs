@@ -72,6 +72,50 @@ const dragLink = (from, to) => async (page) => {
   for (let i = 1; i <= 12; i++) { await page.mouse.move(h.x + (t.x + t.width / 2 - h.x) * i / 12, h.y + (t.y + t.height / 2 - h.y) * i / 12); await page.waitForTimeout(16); }
   await page.waitForTimeout(300);
 };
+// Stats 勾 Leisure 之前：今天和昨天各记一段 Leisure，这个月填 20h On the side（只在这一个浏览器里，假表格那边无所谓）
+async function seedLeisure(page) {
+  await page.evaluate(async () => {
+    const store = await import("/js/store.js"), { addDays } = await import("/js/dates.js"), T = store.today();
+    store.addLogged({ title: "Read a novel", group: "Leisure", date: T }, "20:00", "21:30");
+    store.addLogged({ title: "Film night", group: "Leisure", date: addDays(T, -1) }, "19:00", "21:10");
+    store.setSide(T.slice(0, 7), 1200);
+  });
+  await page.waitForTimeout(600);
+}
+
+// 字有没有被截掉（每张图截完都量一遍，最后列在 Text cut off 底下）：
+//   cut      被 overflow / 省略号截掉了一截（名字本来就很长的那种是该截的，看清楚是不是）
+//   scrolls  横着能滚的一块比它自己宽（表格最右边几列要横着滚才看得到）
+//   sticks out  字伸出了它所在的卡片
+// 故意藏起来的不算：悬停才出来的月份（.gdue.dflt）、读屏用的字（.sp-sr、.sr-only）、透明的。
+// 本来就是横着滑 / 翻页 / 走马灯的那几块自己不报（里面的字照样查）：记账面板的框和两页（.mn、.mn-inner）、类别和柱子那两条（.mn-hs、.mn-rw）、手机上计划那一串（.chain.mq）
+function clipAudit() {
+  const out = [], seen = new Set();
+  const skip = (el) => el.closest(".gdue.dflt, .sp-sr, .sr-only, #sky, .fx, .lk-layer, svg, [hidden], [aria-hidden='true']");
+  const meant = (el) => el.matches(".mn, .mn-inner, .mn-hs, .mn-rw, .chain.mq, .phone-day .chain");
+  const label = (el) => el.tagName.toLowerCase() + (el.classList[0] ? "." + el.classList[0] : "") + (el.parentElement?.classList[0] ? " in ." + el.parentElement.classList[0] : "");
+  const say = (kind, el, text, extra) => { const k = kind + "|" + label(el) + "|" + text; if (!seen.has(k)) { seen.add(k); out.push(kind + "  " + label(el) + "  “" + text + "”  " + extra); } };
+  for (const el of document.body.querySelectorAll("*")) {
+    if (!el.getClientRects().length || skip(el)) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden" || Number(cs.opacity) === 0) continue;
+    const text = (el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 50);
+    if (!text) continue;
+    const ellipsis = cs.textOverflow === "ellipsis" || cs.overflowX === "hidden" || cs.overflowX === "clip";
+    if (meant(el)) { /* 横着滑的，不算 */ }
+    else if (ellipsis && el.scrollWidth > el.clientWidth + 1) say("cut", el, text, el.clientWidth + "/" + el.scrollWidth + "px");
+    else if (cs.overflowX === "auto" && el.scrollWidth > el.clientWidth + 1) say("scrolls", el, text, el.clientWidth + "/" + el.scrollWidth + "px");
+    // 两行就省略的（-webkit-line-clamp）：竖着放不下也算被截
+    if (cs.webkitLineClamp !== "none" && cs.webkitLineClamp && el.scrollHeight > el.clientHeight + 2) say("cut", el, text, "line clamp " + el.clientHeight + "/" + el.scrollHeight + "px");
+    if (el.children.length) continue;
+    const card = el.parentElement?.closest(".card, .pj-rail, #modal .sheet");
+    if (!card) continue;
+    const a = el.getBoundingClientRect(), b = card.getBoundingClientRect(), by = Math.max(a.right - b.right, b.left - a.left);
+    if (by > 2) say("sticks out", el, text, Math.round(by) + "px");
+  }
+  return out;
+}
+
 // 记账的图：点一下 House 那块上面（图的中间、上面四分之一处）= 只看 House 以外
 async function tapChartAbove(page, sel) {
   const b = await page.locator(sel).first().boundingBox();
@@ -132,8 +176,8 @@ const SHOTS = [
   { device: "desk", name: "projects-plan", hash: "projects", act: async (page) => { await tap('.pcard[data-project="seed-b2"] .pname')(page); await page.waitForTimeout(300); await tap(".project-editor .ls-it")(page); } },
   { device: "desk", name: "projects-edit-goal", hash: "projects", act: tap('.goals .gl[data-goal="q1"] .gt') },
   { device: "desk", name: "projects-add-goal", hash: "projects", act: async (page) => { await hover('.goals [data-col="next"] h4', 300)(page); await tap('.goals [data-col="next"] .gplus')(page); await page.keyboard.type("Run 10k #Fitness"); } },
-  { device: "desk", name: "projects-hover-north", hash: "projects", act: hover('.goals .ns-g[data-goal="n2"]', 1600) },
-  { device: "desk", name: "projects-north-edit", hash: "projects", act: async (page) => { await tap('.goals .ns-g[data-goal="n2"]')(page); await page.keyboard.press("Control+End"); await page.keyboard.type(" Write every week.", { delay: 5 }); await page.keyboard.down("Shift"); for (let i = 0; i < 17; i++) await page.keyboard.press("ArrowLeft"); await page.keyboard.up("Shift"); await page.waitForTimeout(200); } },
+  { device: "desk", name: "projects-hover-north", hash: "projects", act: hover('.pj-north .ns-g[data-goal="n2"]', 1600) },
+  { device: "desk", name: "projects-north-edit", hash: "projects", act: async (page) => { await tap('.pj-north .ns-g[data-goal="n2"]')(page); await page.keyboard.press("Control+End"); await page.keyboard.type(" Write every week.", { delay: 5 }); await page.keyboard.down("Shift"); for (let i = 0; i < 17; i++) await page.keyboard.press("ArrowLeft"); await page.keyboard.up("Shift"); await page.waitForTimeout(200); } },
   { device: "desk", name: "projects-ideas", hash: "projects", act: tap('.goals [data-act="rail-tab"][data-v="ideas"]') },
   // 往期：最底下那一行点开（上个月、上一季过期的目标都在这里）。上一张切到了 Ideas（记在这台设备上），先切回 Goals
   { device: "desk", name: "projects-past", hash: "projects", act: async (page) => { await tap('.goals [data-act="rail-tab"][data-v="goals"]')(page); await page.locator('.goals [data-act="past-toggle"]').first().scrollIntoViewIfNeeded(); await tap('.goals [data-act="past-toggle"]')(page); await page.locator(".goals .gpast").first().scrollIntoViewIfNeeded(); await page.waitForTimeout(200); } },
@@ -141,6 +185,10 @@ const SHOTS = [
   { device: "desk", name: "stats", hash: "stats" },
   // 点饼图里 Build 那一片（图例那一行也一样）：整页只看 Build、按计划拆开，饼图底下出 Clear
   { device: "desk", name: "stats-pick", hash: "stats", act: tap(".stats .pie-li") },
+  // 勾了 Leisure：饼图上 Leisure 停在 12 点左边、后面接 On the side 的光，柱子最下面也垫一段（先记两段 Leisure、填上这个月的 On the side）
+  { device: "desk", name: "stats-leisure", hash: "stats", act: async (page) => { await seedLeisure(page); await tap('.stats .pie-li[data-g="Leisure"]')(page); } },
+  // Adjust 开着：几个默认值和 On the side 那一行（单位那一列窄了会折行，不能伸出卡片）
+  { device: "desk", name: "stats-adjust", hash: "stats", act: tap('.stats [data-act="life-adjust"]') },
   { device: "desk", name: "spending", hash: "spending" },
   { device: "desk", name: "spending-add", hash: "spending", act: async (page) => { await page.keyboard.press("n"); await page.waitForTimeout(300); await page.keyboard.type("12.5+8"); await page.keyboard.press("Tab"); } },
   { device: "desk", name: "spending-edit", hash: "spending", act: tap(".spend .sp-row:nth-child(3)") },
@@ -236,7 +284,7 @@ async function main() {
   const { chromium } = playwright();
   const browser = await chromium.launch();
   const shots = SHOTS.filter((s) => !only.length || only.some((w) => (s.device + "-" + s.name).includes(w)));
-  const made = [], skipped = [], errors = [], small = [];
+  const made = [], skipped = [], errors = [], small = [], cut = [];
   for (const theme of ["light", "dark"]) {
     for (const device of ["phone", "desk", "small"]) {
       const mine = shots.filter((s) => s.device === device);
@@ -263,6 +311,7 @@ async function main() {
         const file = path.join(out, device + "-" + theme + "-" + s.name + ".png");
         await page.screenshot({ path: file });
         made.push(file);
+        for (const x of await page.evaluate(clipAudit)) cut.push(device + "-" + theme + "-" + s.name + ": " + x);
         if (device === "phone") {
           const tiny = await page.evaluate(() => [...document.querySelectorAll("input, textarea, select")]
             .filter((el) => el.getClientRects().length && getComputedStyle(el).visibility !== "hidden" && !["checkbox", "radio", "range", "color"].includes(el.type))
@@ -278,6 +327,7 @@ async function main() {
   console.log(made.join("\n"));
   if (skipped.length) console.log("\nSkipped:\n  " + [...new Set(skipped)].join("\n  "));
   if (small.length) console.log("\nInputs under 16px on the phone (iPhone zooms in when they get focus):\n  " + [...new Set(small)].join("\n  "));
+  if (cut.length) console.log("\nText cut off (long names may be fine; labels and normal names are not):\n  " + [...new Set(cut)].join("\n  "));
   if (errors.length) console.log("\nConsole errors:\n  " + [...new Set(errors)].join("\n  "));
   stop();
 }

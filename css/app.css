@@ -224,7 +224,7 @@ body.side-min .sync-pill { flex: none; padding: 8px; }
 body.side-min .sync-pill span { display: none; }
 .sfoot { display: flex; align-items: center; gap: 6px; }
 .sync-pill { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7.5px; padding: 7px 10px; border: 1.5px solid transparent; border-radius: 999px; background: transparent; font-size: 12px; color: var(--muted); }
-.sync-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-pill span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; line-height: 1.3; text-align: left; }   /* 长的状态（Update Code.gs in your Sheet first — saved here）折行写全，不再截成「Update Code.gs in y…」 */
 .sync-pill .ic { width: 15px; height: 15px; margin: 0 3px; }   /* 图标占 18px 宽、字从同一条线开始，和上面侧栏各项对齐（同步中的小转圈也一样） */
 .sync-pill.bad, .sync-status.bad { color: var(--warn); }
 .sync-status { font-size: 12.5px; color: var(--muted); }
@@ -858,6 +858,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .st-strip .ss-all b { font-size: 13px; }
 .chart figcaption { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .chart figcaption p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.chart figcaption > div:first-child { flex: 1 1 220px; min-width: 0; }   /* 那句话长了自己折行，图例留在右边 */
 .chart figcaption b { color: var(--ink); font-weight: 600; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -869,10 +870,10 @@ body.phone .settings .page-head { margin-top: 4px; }
 .hday:focus-visible { color: var(--ink); }
 @media (hover: hover) { .hday:hover { color: var(--ink); } }
 /* Adjust 里最后一行：On the side 一个月一个总数（和上面几行同一个格子排法，月份是个小下拉） */
-.ots-row { display: grid; grid-template-columns: minmax(0, 1fr) 54px 10.5em; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.ots-row { display: grid; grid-template-columns: minmax(0, 1fr) 54px minmax(0, 10.5em); align-items: center; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
 .ots-row select { padding: 1px 6px; font-size: 12px; }
 .ots-row input { padding: 4px 6px; border: var(--b-ctl); text-align: center; }
-.ots-row em { font-style: normal; color: var(--muted); white-space: nowrap; }
+.ots-row em { font-style: normal; line-height: 1.3; color: var(--muted); }
 .k { display: inline-block; width: 12px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 /* 总量的柱子是青柠（界面的那个强调色）：白底上要一圈细黑边才看得清，夜间不用。按项目拆开的图用项目自己的颜色 */
 .k.dn { background: var(--accent); box-shadow: inset 0 0 0 1px var(--edge); }
@@ -942,7 +943,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .st-bar .dk-deep { min-height: 30px; padding: 4px 11px; }
 .st-range { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .st-range input { padding: 4px 8px; border: var(--b-ctl); border-radius: 999px; font-size: 12.5px; }
-.st-two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); gap: 0 14px; align-items: stretch; }
+.st-two { display: grid; grid-template-columns: minmax(0, 5fr) minmax(400px, 4fr); gap: 0 14px; align-items: stretch; }   /* 饼图那张要放得下图例的名字（1280 宽时原来只剩 40px，Untracked 都被截） */
 .st-two > * { margin-bottom: 10px; }
 @media (max-width: 1100px) { .st-two { grid-template-columns: minmax(0, 1fr); } }
 /* 花了多久 / 深度那两个数字竖着叠成窄窄一列，挨着 Weekly rhythm；窄了就回到上面并排两块 */
@@ -968,6 +969,10 @@ body.phone .settings .page-head { margin-top: 4px; }
 @keyframes wave-b { to { -webkit-mask-position: 34px 0, 0 13px; mask-position: 34px 0, 0 13px; } }
 @keyframes tide { to { transform: translateY(3px); } }
 .col .dgoal { width: min(100%, 24px); height: 0; border-top: 2px dotted var(--ink); border-radius: 0; }
+/* 勾了 Leisure：每根柱子最下面垫一段 On the side（静止的光，Leisure 的颜色 --c 写在这张图上），记的时间从它上面算起 */
+.col .ots-cap { width: min(100%, 24px); background: linear-gradient(0deg, color-mix(in srgb, var(--c) 58%, transparent), color-mix(in srgb, var(--c) 16%, transparent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent); }
+[data-theme="dark"] .col .ots-cap { box-shadow: 0 0 7px color-mix(in srgb, var(--c) 55%, transparent); }
+.k.ots { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 30%, transparent), var(--c), color-mix(in srgb, var(--c) 30%, transparent)); }
 /* 按项目叠起来的柱子（Weekly rhythm）：一段一个项目，最多的在最下面 */
 .col .stack { position: absolute; bottom: 0; display: flex; flex-direction: column-reverse; gap: 1px; width: min(100%, 30px); border-radius: 4px 4px 0 0; overflow: hidden; }
 .col .stack i { position: static; flex-basis: 0; min-height: 1px; border-radius: 0; }
@@ -978,12 +983,45 @@ body.phone .settings .page-head { margin-top: 4px; }
 .ctip .k.tide { width: 10px; height: 10px; border-radius: 3px; }
 .ctip .k.dgoal { height: 0; border-top: 2px dotted var(--ink); background: none; }
 .ctip .k.sw { width: 10px; height: 10px; border-radius: 3px; }
+/* 典型的一天（js/ui/stats.js 的 typicalHTML）：上班日、周末两半并排（卡片窄了上下排），每半左边一个 24 小时的钟、右边几点做什么 */
+.typ-card { container-type: inline-size; }
+.typ-two { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px 32px; }
+@container (min-width: 760px) { .typ-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.typ-half { display: grid; grid-template-columns: 172px minmax(0, 1fr); align-items: start; gap: 6px 18px; }
+.typ-h { grid-column: 1 / -1; margin: 0; font-size: 12.5px; color: var(--muted); }
+.typ-h b { font-size: 13.5px; color: var(--ink); }
+.typ-half .empty { grid-column: 1 / -1; }
+.typ-clock { position: relative; }
+.typ-clock svg { display: block; width: 100%; height: auto; overflow: visible; }
+.typ-track line { stroke: var(--track); stroke-width: 5; }
+.typ-bar { stroke: var(--c); stroke-width: 5; cursor: default; transition: stroke-width .15s; }
+.typ-bar.hot { stroke-width: 6.5; }
+.typ-sh { display: none; }
+.typ-sh line { stroke: #171C55; stroke-width: 5; }
+[data-theme="light"] .typ-sh { display: inline; }
+[data-theme="dark"] .typ-bar { filter: drop-shadow(0 0 2px var(--c)); }
+.typ-fix { fill: none; stroke: var(--muted); stroke-opacity: .45; stroke-width: 3; }
+.typ-lab { font: 600 7px var(--num); fill: var(--muted); }
+.typ-c { position: absolute; top: 50%; left: 50%; display: grid; justify-items: center; transform: translate(-50%, -50%); font-size: 10.5px; line-height: 1.2; color: var(--muted); pointer-events: none; }
+.typ-c b { font-size: 14px; color: var(--ink); }
+.typ-txt { min-width: 0; }
+.typ-sum { margin: 4px 0 8px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.typ-sum b { color: var(--ink); }
+.typ-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.4; }
+.typ-list li { display: grid; grid-template-columns: 96px 9px minmax(0, 1fr); align-items: center; gap: 8px; }
+.typ-list i { width: 9px; height: 9px; border-radius: 3px; }
+[data-theme="light"] .typ-list li:not(.typ-fx) i { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .22); }
+.typ-list .typ-fx { color: var(--muted); }   /* 别用 .fx：那是撒星星那一层（position: fixed） */
+.typ-list .typ-fx i { background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.typ-list em { font-style: normal; color: var(--muted); }
+.typ-t { color: var(--muted); white-space: nowrap; }
+@container (max-width: 380px) { .typ-half { grid-template-columns: minmax(0, 1fr); } .typ-clock { width: 172px; } }
 .pie-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .pie-head .lede { margin-bottom: 8px; }
 .pie-head .seg { flex-shrink: 0; }
 /* 这张卡和左边的柱子图一样高：饼图和图例占满剩下的高度、竖着居中，饼图大一些（她 10-23 说右边比左边空很多） */
-.piecard { display: flex; flex-direction: column; }
-.pie-wrap { flex: 1; display: grid; grid-template-columns: minmax(150px, 210px) minmax(0, 1fr); align-items: center; gap: 18px; }
+.piecard { display: flex; flex-direction: column; container-type: inline-size; }
+.pie-wrap { flex: 1; display: grid; grid-template-columns: clamp(140px, 36cqi, 210px) minmax(0, 1fr); align-items: center; gap: 16px; }   /* 饼跟着卡片缩，图例留够宽 */
 .pie-head .lede .st-due { display: inline-block; margin-left: 5px; vertical-align: middle; }
 .pie { position: relative; aspect-ratio: 1; }
 .pie svg { display: block; width: 100%; height: 100%; overflow: visible; }
@@ -1007,28 +1045,31 @@ body.phone .settings .page-head { margin-top: 4px; }
 .pie-li { width: 100%; margin: -3px -6px; padding: 3px 6px; border: 0; border-radius: 7px; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; box-sizing: content-box; }
 @media (hover: hover) { .pie-li:hover { background: var(--surface); } }
 /* 只看某个项目的时候，饼图底下：Showing only Build · Clear */
+/* 饼图底下一行：全部记了多久、没记的多久，各带一天平均（原来顶上那条右边的 All） */
+.pie-sum { display: flex; flex-wrap: wrap; gap: 2px 16px; margin: 12px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.pie-sum b { font-weight: 600; color: var(--ink); }
 .pie-only { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .pie-only b { color: var(--ink); }
 .pie-only .btn { padding: 4px 12px; font-size: 12.5px; }
 .pie-legend i { width: 10px; height: 10px; border-radius: 3px; }
 .pie-legend span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pie-legend b { font-weight: 600; }
-/* On the side 的流光（js/ui/stats.js 的 hazeHTML）：压在粗圈上的一段半透明青柠（夜里冰蓝），一道亮光从 Untracked 正中往下扫；不接鼠标，读数在图例那一行 */
+/* On the side 的光（js/ui/stats.js 的 hazeHTML）：Leisure 的颜色（--c），接在 12 点左边那片 Leisure 后面往下，压在 Untracked 上的一段半透明，
+   一道亮光从 Leisure 的起点往下扫；不接鼠标，读数在图例那一行 */
 .haze circle { fill: none; stroke-width: 15; pointer-events: none; }
-.haze-band { stroke: rgba(178, 230, 0, .4); }
-.haze-glint { stroke: #C6FF00; stroke-dashoffset: var(--from); animation: haze-sweep var(--dur, 3s) cubic-bezier(.4, 0, .6, 1) infinite; }
+.haze-band { stroke: var(--c); stroke-opacity: .36; }
+.haze-glint { stroke: var(--c); stroke-dashoffset: var(--from); animation: haze-sweep var(--dur, 3s) cubic-bezier(.4, 0, .6, 1) infinite; }
 @keyframes haze-sweep { 0% { stroke-dashoffset: var(--from); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { stroke-dashoffset: var(--to); opacity: 0; } }
-[data-theme="dark"] .haze-band { stroke: rgba(190, 244, 255, .22); }
-[data-theme="dark"] .haze-glint { stroke: rgba(233, 251, 255, .9); filter: drop-shadow(0 0 3px rgba(190, 244, 255, .8)); }
-.pie-legend .haze-sw { background: linear-gradient(90deg, rgba(178, 230, 0, .25), #C6FF00, rgba(178, 230, 0, .25)); }
-[data-theme="dark"] .pie-legend .haze-sw { background: linear-gradient(90deg, rgba(190, 244, 255, .2), #E9FBFF, rgba(190, 244, 255, .2)); }
+[data-theme="dark"] .haze-band { stroke-opacity: .3; }
+[data-theme="dark"] .haze-glint { stroke: color-mix(in srgb, var(--c) 60%, #fff); filter: drop-shadow(0 0 3px var(--c)); }
+.pie-legend .haze-sw { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 28%, transparent), var(--c), color-mix(in srgb, var(--c) 28%, transparent)); }
 .pie-legend .haze-li { grid-template-columns: 10px minmax(0, 1fr) auto auto; }
 .pie-legend .haze-li em { font-style: normal; font-size: 11px; color: var(--muted); }
 .pie-legend em { font-style: normal; text-align: right; color: var(--muted); }
 .life-form { display: grid; gap: 6px; margin: 0 0 12px; padding: 10px; border-radius: 12px; background: var(--surface); font-size: 12.5px; }
-.life-form label { display: grid; grid-template-columns: minmax(0, 1fr) 54px 10.5em; align-items: center; gap: 6px; }   /* 单位那一列定宽：几行的输入框对齐 */
+.life-form label { display: grid; grid-template-columns: minmax(0, 1fr) 54px minmax(0, 10.5em); align-items: center; gap: 6px; }   /* 单位那一列定宽：几行的输入框对齐 */
 .life-form input { padding: 4px 6px; border: var(--b-ctl); text-align: center; }
-.life-form em { font-style: normal; color: var(--muted); white-space: nowrap; }
+.life-form em { font-style: normal; line-height: 1.3; color: var(--muted); }   /* 卡片窄了单位可以折到第二行，不再伸出卡片 */
 .tsheet { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tsheet th, .tsheet td { padding: 7px 8px; border-bottom: 1px solid var(--grid); text-align: right; white-space: nowrap; }
 .tsheet th:first-child { text-align: left; font-weight: 600; }
@@ -1314,7 +1355,7 @@ body.phone .logtime input, body.phone .add input, body.phone .add select, body.p
 .yl-grip { display: grid; place-content: center; gap: 2px; flex: none; width: 18px; height: 26px; cursor: grab; touch-action: none; opacity: .3; transition: opacity .15s; }
 .yl-grip i { display: block; width: 10px; height: 2px; border-radius: 1px; background: currentColor; }
 .yl-row:is(:hover, :focus-visible) .yl-grip { opacity: .8; }
-.yl-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.yl-t { flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.35; overflow-wrap: anywhere; font-weight: 600; }   /* 书名放得下两行：一般长的写全，特别长的第二行末尾才省略 */
 .yl-tab { flex: none; padding: 1px 7px; border-radius: 999px; background: var(--tonal); font-size: 11px; font-weight: 600; color: var(--muted); }
 .yl-done, .yl-from { flex: none; font: 600 11px var(--num); color: var(--muted); }
 .yl-done { color: var(--ok); }
@@ -1752,27 +1793,41 @@ body.phone .lname input { width: 20px; height: 20px; }
 body.phone .lnote { padding-left: 44px; }
 body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 
-/* ---------- Projects 页右边一栏：North star 那段字 + Goals | Ideas（js/ui/goals.js） ---------- */
-/* 左边是各个项目（.pj-plans），右边这一栏滚的时候贴着顶、最多一屏高。North star 一直在最上面（切到 Ideas 也不变），
-   下面 Goals / Ideas 那一块自己滚。这一栏还是这一页的主卡片：粗框 + 硬阴影（夜里是细框 + 鼠标经过时边框亮），半透明见最下面那一段 */
+/* ---------- Projects 页：页头下面一条 North star，右边一栏 Goals | Ideas（js/ui/goals.js） ---------- */
+/* 左边是各个项目（.pj-plans），右边这一栏滚的时候贴着顶、最多一屏高，Goals / Ideas 那一块自己滚。
+   这一栏还是这一页的主卡片：粗框 + 硬阴影（夜里是细框 + 鼠标经过时边框亮），半透明见最下面那一段 */
 .pj-wrap { display: grid; grid-template-columns: minmax(0, 1fr) clamp(300px, 27%, 380px); gap: 0 28px; align-items: start; }
 .pj-plans { min-width: 0; container-type: inline-size; }
 .goals.pj-rail { position: sticky; top: 16px; display: flex; flex-direction: column; min-width: 0; max-height: calc(100vh - 32px); padding: 12px 14px 0; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); }
 @container (max-width: 640px) { .pj-wrap { grid-template-columns: minmax(0, 1fr); } .goals.pj-rail { position: relative; top: 0; order: -1; max-height: none; margin-bottom: 18px; } }
 .goals .hint { margin: 10px 2px 4px; }
-/* North star：一段字，框出来的词是一条条目标（括号只在改的时候看得到） */
-.ns { position: relative; flex: none; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
-.ns h3 { display: flex; align-items: center; gap: 6px; height: 22px; margin: 0 0 4px; font: 700 13px var(--display); }
-.ns h3 .link { margin-left: auto; font-size: 12px; opacity: 0; transition: opacity .15s; }
-.ns:hover h3 .link, .ns h3 .link:focus-visible { opacity: 1; }
-@media (hover: none) { .ns h3 .link { opacity: 1; } }
-/* 平时只露前三行（她嫌整段太大），里面还能滚；底下还有字的时候（.more，js/ui/goals.js 量的）最后那一截淡出。
-   拖连线的时候（.projects.lk-drag）放开到原来的 34vh，框出来的词都露出来、放得上去；悬停画线时不放开（会挪位置），藏着的词照旧压在边上画成空心点 */
-.ns-text { max-height: calc(1.75em * 3 + 2px); margin: 0; overflow-y: auto; overscroll-behavior: contain; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; scrollbar-width: none; transition: opacity .16s; }   /* 不做展开的过渡：拖连线时要马上量到展开后的位置 */
+/* North star：页头下面单独一条，横跨两栏（她 10-31 说从右栏挪到最上面：整页宽一行一百多个字，一般两三行就写完）。
+   不套框：左边一小列标题，中间那段字，右边 Edit（鼠标移上来才出来）和 More / Less；底下一条细线。框出来的词是一条条目标（括号只在改的时候看得到） */
+.pj-north { margin: -2px 0 18px; }
+.ns { position: relative; display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: start; gap: 4px 18px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.ns h3 { display: flex; align-items: center; gap: 6px; height: 23.6px; margin: 0; font: 700 13px var(--display); white-space: nowrap; }
+.ns-tools { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; align-self: stretch; gap: 2px; }
+.ns-tools .link { font-size: 12px; white-space: nowrap; }
+.ns-tools [data-act="ns-edit"] { opacity: 0; transition: opacity .15s; }
+.ns:hover .ns-tools [data-act="ns-edit"], .ns-tools [data-act="ns-edit"]:focus-visible { opacity: 1; }
+@media (hover: none) { .ns-tools [data-act="ns-edit"] { opacity: 1; } }
+.ns:not(.open):not(.long) .ns-more { display: none; }   /* 两行放得下就不要 More */
+.ns.editing { grid-template-columns: max-content minmax(0, 1fr); }
+.ns-edit { min-width: 0; }
+@container (max-width: 640px) {
+  .ns { grid-template-columns: minmax(0, 1fr) max-content; }
+  .ns-text { grid-column: 1 / -1; grid-row: 2; }
+  .ns-tools { flex-direction: row; gap: 12px; }
+  .ns.editing { grid-template-columns: minmax(0, 1fr); }
+}
+/* 平时只露两行，里面还能滚；底下还有字的时候（.more，js/ui/goals.js 量的）最后那一截淡出，More 整段放开（.open）。
+   拖连线的时候（.projects.lk-drag）也整段放开，框出来的词都露出来、放得上去；悬停画线时不放开（会挪位置），藏着的词换成重点（.ns-focus）。
+   右边留几像素：框出来的词碰到行尾时，右边框不会被切掉 */
+.ns-text { max-height: calc(1.75em * 2 + 2px); margin: 0; padding-right: 6px; overflow-y: auto; overscroll-behavior: contain; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; scrollbar-width: none; transition: opacity .16s; }   /* 不做展开的过渡：拖连线时要马上量到展开后的位置 */
 .ns-text::-webkit-scrollbar { display: none; }
 .ns-text.more { -webkit-mask-image: linear-gradient(#000 calc(100% - 1.5em), transparent); mask-image: linear-gradient(#000 calc(100% - 1.5em), transparent); }
-.projects.lk-drag .ns-text { max-height: 34vh; -webkit-mask-image: none; mask-image: none; }
-/* 悬停画线时连着的词被这三行挡住了（js/ui/links.js 的 focusNorth）：盖一层一样大的 .ns-focus，里面只放那一句 / 那一小段 / 那几个词；
+.ns.open .ns-text, .projects.lk-drag .ns-text { max-height: none; -webkit-mask-image: none; mask-image: none; }
+/* 悬停画线时连着的词被这两行挡住了（js/ui/links.js 的 focusNorth）：盖一层一样大的 .ns-focus，里面只放那一句 / 那一小段 / 那几个词；
    原来那段藏起来（visibility，鼠标也不接），线走开就拿掉这一层、原来那段淡回来 */
 .ns.focus .ns-text { visibility: hidden; opacity: 0; }
 .ns-focus { position: absolute; margin: 0; overflow: hidden; font-size: 13.5px; line-height: 1.75; overflow-wrap: anywhere; pointer-events: none; animation: ns-focus .16s ease both; }
@@ -1960,16 +2015,16 @@ html.fx-off .lk-dot { animation: none; }
 @media (hover: hover) { [data-theme="dark"] .lk-h:hover { background: var(--accent); } }
 [data-theme="dark"] .lk-x { border-color: var(--edge); background: var(--surface); }
 /* 悬停时没关系的淡下去；拖的时候能连的亮着（虚线框），吸上去的实线框，连上的闪一下 */
-.projects :is(.goals .gl, .goals .ns-g, .pgroup, .pcard, .g-rep) { transition: opacity .16s; }
-.projects.lk-dim .goals :is(.gl, .ns-g):not(.lk-on), .projects.lk-dim .pgroup:not(.lk-has), .projects.lk-dim .pgroup.lk-has :is(.pcard, .g-rep):not(.lk-on),
-.projects.lk-drag .goals :is(.gl, .ns-g):not(.lk-can, .lk-src), .projects.lk-drag .pcard:not(.lk-can, .lk-src), .projects.lk-drag .g-rep:not(.lk-can, .lk-src),
+.projects :is(.goals .gl, .pj-north .ns-g, .pgroup, .pcard, .g-rep) { transition: opacity .16s; }
+.projects.lk-dim :is(.goals .gl, .pj-north .ns-g):not(.lk-on), .projects.lk-dim .pgroup:not(.lk-has), .projects.lk-dim .pgroup.lk-has :is(.pcard, .g-rep):not(.lk-on),
+.projects.lk-drag :is(.goals .gl, .pj-north .ns-g):not(.lk-can, .lk-src), .projects.lk-drag .pcard:not(.lk-can, .lk-src), .projects.lk-drag .g-rep:not(.lk-can, .lk-src),
 .projects.lk-drag .pg-top:not(.lk-can, .lk-src) h3 { opacity: .35; }
 /* 连着的：青柠荧光笔（她 10-21 从三个样子里挑的甲）——目标只涂字那一截（.gtx），North star 里的词整个框涂满；North star 里不是词的字变灰、底下不淡出。
    夜里和 .chip.on 一样：淡青柠底 + 青柠字 + 一圈光 */
-.projects.lk-dim .goals .gl.lk-on .gtx, .projects.lk-dim .goals .ns-g.lk-on { background: var(--accent); color: var(--accent-ink); }
-[data-theme="dark"] .projects.lk-dim .goals .gl.lk-on .gtx, [data-theme="dark"] .projects.lk-dim .goals .ns-g.lk-on { background: rgba(204, 255, 0, .16); color: var(--accent); box-shadow: 0 0 12px rgba(204, 255, 0, .35); }
-.projects.lk-dim .goals :is(.ns-text, .ns-focus) { color: var(--muted); }
-.projects.lk-dim .goals .ns-text.more { -webkit-mask-image: none; mask-image: none; }
+.projects.lk-dim .goals .gl.lk-on .gtx, .projects.lk-dim .pj-north .ns-g.lk-on { background: var(--accent); color: var(--accent-ink); }
+[data-theme="dark"] .projects.lk-dim .goals .gl.lk-on .gtx, [data-theme="dark"] .projects.lk-dim .pj-north .ns-g.lk-on { background: rgba(204, 255, 0, .16); color: var(--accent); box-shadow: 0 0 12px rgba(204, 255, 0, .35); }
+.projects.lk-dim .pj-north :is(.ns-text, .ns-focus) { color: var(--muted); }
+.projects.lk-dim .pj-north .ns-text.more { -webkit-mask-image: none; mask-image: none; }
 .lk-can { outline: 1.5px dashed color-mix(in srgb, var(--ink) 45%, transparent); outline-offset: 2px; border-radius: 6px; }
 .pcard.lk-can { outline-offset: 4px; border-radius: 14px; }
 .lk-snap { outline: 2px solid var(--ink); }
@@ -2070,9 +2125,13 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 @media (hover: hover) { .fchip button:hover { color: var(--warn); } }
 .fchip.open { padding-right: 3px; }
 .fchip input { width: 120px; padding: 1px 7px; border: 0; background: var(--bg); border-radius: 999px; font-size: 12px; }
-.ftable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ftable { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; }   /* 列宽固定：自己填的那几列再长也不会把 Last / Next 挤出卡片，长字以省略号结尾 */
+.ftable .ftc-name { width: 22%; }
+.ftable .ftc-marks { width: 64px; }
+.ftable .ftc-last { width: 84px; }
+.ftable .ftc-next { width: 24%; }
 .ftable th { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
-.ftable td { max-width: 240px; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ftable td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ftable tbody tr { cursor: pointer; }
 .ftable tbody tr:focus-visible { background: var(--surface); outline: none; }
 @media (hover: hover) { .ftable tbody tr:hover { background: var(--surface); outline: none; } }
@@ -2170,8 +2229,8 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 /* ---------- 设置页：大类的表、每周的门槛、存储 ---------- */
 .gtable { width: 100%; border-collapse: collapse; font-size: 13px; }
 .gtable th, .gtable td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
-.gtable thead th { font-size: 11.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
-.gtable select { max-width: 170px; }
+.gtable thead th { font-size: 11.5px; font-weight: 700; color: var(--muted); }   /* 表头可以折行（小字那一行本来就另起一行），窄了不伸出卡片 */
+.gtable select { max-width: 160px; }
 .gtable .gwatch input { width: 56px; margin: 4px 4px 0 0; }
 .gtable thead th small { display: block; font-weight: 500; }
 .gtable tbody th { display: flex; align-items: center; gap: 8px; font-weight: 600; white-space: nowrap; }

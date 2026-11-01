@@ -46,6 +46,19 @@ export const angleOf = (m) => 180 + ((m % 720) / 720) * 360;
 // 某天是不是通勤日：commute = Settings 里的 {days: {"2026-10-08": true}}
 export const isCommute = (commute, date) => Boolean(commute?.days?.[date]);
 
+// 一段拆到 15 分钟一格（Stats 典型的一天用）：{i: 分钟}，i = 从 0 点起第几格（0..95）；跨过 0 点的，过了 0 点那截接着从 0 点那格算
+export function slotMinutes(from, to, size = 15) {
+  if (!from || !to) return {};
+  const a = toMin(from), b0 = toMin(to);
+  if (a === b0) return {};
+  const b = b0 > a ? b0 : b0 + 1440, n = 1440 / size, out = {};
+  for (let s = Math.floor(a / size) * size; s < b; s += size) {
+    const m = Math.min(b, s + size) - Math.max(a, s), i = (s / size) % n;
+    if (m > 0) out[i] = (out[i] || 0) + m;
+  }
+  return out;
+}
+
 // 一段拆到各个小时：{h: 分钟}，h = 从 6:00 起第几个小时（0..23）
 export function hourMinutes(from, to) {
   const out = {};

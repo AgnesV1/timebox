@@ -258,6 +258,67 @@ test("on the side: one total a month, spread over its days, only ever a haze", (
   assert.deepEqual(S.sideMonths("2026-02-27"), ["2026-02", "2026-01", "2025-12"], "February's last three days; and across the year");
 });
 
+test("on the side, day by day: the same spread as the total; weeks add it up", () => {
+  const c = ctx({ side: [{ month: "2026-09", min: 1800 }, { month: "2026-10", min: 310 }] });
+  const days = S.sideDaily(c, "2026-09-28", "2026-10-31");
+  assert.equal(days["2026-09-28"], 60);
+  assert.equal(days["2026-10-05"], 10);
+  assert.equal(days["2026-10-06"], undefined, "nothing after today");
+  assert.equal(Object.values(days).reduce((a, v) => a + v, 0), S.sideHaze(c, "2026-09-28", "2026-10-31").min);
+  const w = S.weekly([{ date: "2026-10-05", spent: 60, planned: 0, side: 10, future: false }, { date: "2026-10-06", spent: 0, planned: 0, side: 10, future: false }], "monday");
+  assert.equal(w[0].side, 20);
+});
+
+test("the pie's ring: Leisure ends at 12 o'clock with Untracked right before it", () => {
+  assert.equal(S.leisureGroup({ groups: GROUPS }), "Leisure");
+  assert.equal(S.leisureGroup({ groups: [{ name: "Work" }, { name: "Fun", grow: "deep" }] }), "Fun", "renamed: the one where only deep counts as growth");
+  assert.equal(S.leisureGroup({ groups: [{ name: "Work" }] }), "");
+  const p = (key, kind = "project") => ({ key, name: key, kind });
+  const keys = (parts, isLeis) => S.ringOrder(parts, isLeis).map((x) => x.key);
+  const parts = [p("Build"), p("Leisure"), p("Fitness"), p("rest", "rest"), p("blank", "blank")];
+  assert.deepEqual(keys(parts, (x) => x.name === "Leisure"), ["Build", "Fitness", "rest", "blank", "Leisure"]);
+  assert.deepEqual(keys([p("Reading"), p("Shows"), p("rest", "rest"), p("blank", "blank")], (x) => x.kind === "project"), ["rest", "blank", "Reading", "Shows"], "only Leisure picked: its plans go last, in their order");
+  assert.deepEqual(keys(parts.filter((x) => x.key !== "Leisure"), () => false), ["Build", "Fitness", "rest", "blank"], "no Leisure: nothing moves");
+});
+
+test("a typical day: work days and weekends apart, only days with timed sessions, quarter-hour blocks", () => {
+  const timed = (id, date, times, extra = {}) => ({ id, date, est: 0, actual: 1, status: "done", times, ...extra });
+  const c = ctx({
+    today: "2026-10-12", groups: GROUPS, commute: { days: { "2026-10-05": true, "2026-10-06": true } },
+    tasks: [
+      timed("m", "2026-10-05", "09:00-12:00 180m", { group: "Work" }),
+      timed("t", "2026-10-06", "09:00-12:00 180m", { group: "Work" }), timed("t2", "2026-10-06", "20:00-21:00 60m", { group: "Leisure" }),
+      timed("w", "2026-10-07", "09:15-12:00 165m", { group: "Work" }),
+      { id: "th", date: "2026-10-08", est: 30, actual: 30, status: "done", group: "Work" },      // 没写起止钟点：这天不算
+      timed("f", "2026-10-09", "09:00-10:00 60m", { group: "Work" }),                              // 放假的周五：两边都不算
+      timed("sa", "2026-10-10", "14:00-17:00 180m", { group: "Leisure" }),
+      timed("su", "2026-10-11", "14:00-16:00 120m", { group: "Leisure" }), timed("su2", "2026-10-11", "10:00-10:45 45m", { group: "Fitness" })
+    ]
+  });
+  const { work, weekend } = S.typicalDays(c, "2026-10-05", "2026-10-11", { isOff: (d) => d === "2026-10-09" });
+  assert.equal(work.days, 3, "Thursday had nothing timed, Friday was a day off");
+  assert.equal(work.total, 195);
+  assert.deepEqual(work.rows.map((x) => [x.name, x.min, x.color]), [["Work", 175, "#00f"], ["Leisure", 20, "#80f"]]);
+  assert.equal(work.hours[9].min, 55, "9 o'clock: two full hours and one that started at 9:15");
+  assert.deepEqual(work.blocks.map((b) => [b.from, b.to, b.name, b.some]), [[540, 720, "Work", false], [1200, 1260, "Leisure", true]], "an evening on one day in three is only some days");
+  assert.equal(work.commute, true, "two of the three work days were commute days");
+  assert.equal(weekend.days, 2);
+  assert.equal(weekend.total, 172.5);
+  assert.deepEqual(weekend.blocks.map((b) => [b.from, b.to, b.name, b.some]), [[600, 645, "Fitness", false], [840, 1020, "Leisure", false]], "half the days is enough to count as usual");
+  assert.equal(weekend.commute, false);
+  assert.equal(S.typicalDays(c, "2026-10-13", "2026-10-19").work.days, 0, "nothing yet");
+});
+
+test("typical-day blocks: one-slot gaps join, short bits drop, the same thing across midnight is one block", () => {
+  const slots = Array.from({ length: 96 }, () => ({ min: 0, top: null, topMin: 0 }));
+  const put = (from, to, top, m = 15) => { for (let i = from; i < to; i++) slots[i] = { min: m, top, topMin: m }; };
+  put(36, 40, "Work"); put(41, 44, "Work");   // 中间断了一格
+  put(50, 51, "Build");                        // 只有一格
+  put(60, 64, "Leisure", 3);                   // 不到四天一天
+  put(92, 96, "Leisure"); put(0, 2, "Leisure");
+  assert.deepEqual(S.typicalBlocks(slots).map((b) => [b.from, b.to, b.name]), [[540, 660, "Work"], [1380, 1470, "Leisure"]]);
+});
+
 test("on the side in the store: one row a month; older rows folded in; 0 counts as filled, empty takes it out", async () => {
   const store = await import("../js/store.js?side");
   store.setSetting("side:old1", { month: "2026-09", min: 600, kind: "show", full: true });   // 上一版的写法

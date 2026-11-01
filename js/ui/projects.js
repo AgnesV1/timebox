@@ -25,7 +25,7 @@ import { esc, on, icon } from "../dom.js";
 import { diffDays, fmtShort, fmtHours, startOfMonth, WEEKDAYS } from "../dates.js";
 import { groupsOf, chainHTML, toast } from "./common.js";
 import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
-import { goalsHTML } from "./goals.js";
+import { goalsHTML, northHTML } from "./goals.js";
 
 let editing = "";
 let draft = null;      // 新建时还没存的：{ group, name, place, color, rule, notes, start, deadline }
@@ -170,12 +170,14 @@ function groupHead(c, name, subs, empty, track, last, more = {}) {
 // 循环小事 = 固定星期几、Pool 里又没东西的
 const isRep = (c, p) => E.isRepeat(p) && !L.itemsOf(c, p.id).length;
 
-// 页头：标题和「+ New plan」。下面两栏：左边是各个项目（.pj-plans），右边一栏是 North star、Goals | Ideas（js/ui/goals.js），滚的时候贴着顶
+// 页头：标题和「+ New plan」；下面单独一条 North star（横跨两栏，js/ui/goals.js 的 northHTML）。再下面两栏：左边是各个项目（.pj-plans），
+// 右边一栏是 Goals | Ideas（js/ui/goals.js），滚的时候贴着顶
 export function projectsHTML(c) {
   const groups = groupsOf(c.projects, { all: true });
   const last = lastContactDate();
   return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div>' +
     '<div class="tools"><button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +
+    '<div class="pj-north">' + northHTML() + "</div>" +
     '<div class="pj-wrap"><div class="pj-plans">' +
     (c.projects.length ? "" : '<p class="hint pintro">A project is an area of your life. Tasks can sit right on it, or under a plan inside it: a plan is one row on a day, timed as a whole, with a pool of things you drag in when you like.</p>') +
     columns(groups.map((g) => {

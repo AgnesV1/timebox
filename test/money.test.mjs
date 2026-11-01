@@ -68,13 +68,31 @@ test("the month chart starts at the base, adds the rest day by day, and trends t
   const ix = M.index(rows, cats), c = M.monthChart(ix, budgets, 2026, 10, "2026-10-16");
   assert.equal(c.n, 31);
   assert.equal(c.base, 145000);
-  assert.equal(c.val(1), 145000);
+  assert.equal(c.val(1), 145000, "the rent was paid on the 1st");
   assert.equal(c.val(3), 145000 + 2315 + 899);
   assert.equal(c.last, 16);
   assert.ok(c.val(31) > c.val(16));
   assert.equal(c.pace(31), 358000);
-  assert.equal(c.pace(0), 145000);
+  assert.equal(c.pace(0), 0, "nothing before the 1st");
+  assert.equal(c.pace(1), 145000 + (358000 - 145000) / 31, "paying the rent raises the budget the same day");
+  assert.equal(c.baseLine[31], 145000);
   assert.ok(c.top >= 358000);
+});
+
+test("the month chart puts every record on its own day: one written down early only bends the trend on its day", () => {
+  // 11 月 1 号：房租 1 号交了；保险（House）和网费（别的类）都提前记在 23 号
+  const T = "2026-11-01", bud = [{ from: "2026-01", v: 400000 }];
+  const list = [e("2026-11-01", -145000, "House", "rent"), e("2026-11-01", -3000, "Food", "lunch"), e("2026-11-23", -60000, "House", "insurance"), e("2026-11-23", -6500, "Phone", "internet")];
+  const c = M.monthChart(M.index(list, cats), bud, 2026, 11, T);
+  assert.equal(c.val(1), 145000 + 3000, "so far: only what's dated today or earlier — the insurance isn't spent yet");
+  assert.equal(Math.round(c.val(22) - c.val(21)), 3000, "before the 23rd the trend only grows at the usual pace");
+  assert.equal(Math.round(c.val(23) - c.val(22)), 60000 + 6500 + 3000, "on the 23rd it bends up by what's due that day");
+  assert.equal(c.baseLine[22], 145000);
+  assert.equal(c.baseLine[23], 205000, "House steps up the day the insurance is due");
+  assert.equal(c.pace(30), 400000);
+  assert.equal(Math.round(c.pace(23) - c.pace(22)), Math.round(60000 + (400000 - 205000) / 30), "and the budget rises with it, so paying it isn't counted as over");
+  const rest = M.monthChart(M.index(list, cats), bud, 2026, 11, T, { house: false });
+  assert.equal(Math.round(rest.val(23) - rest.val(22)), 6500 + 3000, "without House only the internet bill bends it");
 });
 
 test("recommends the House amount both previous months had and this month doesn't", () => {

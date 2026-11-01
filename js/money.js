@@ -155,20 +155,31 @@ export function niceMax(v) {
   return [1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((s) => f <= s) * p;
 }
 
-// 月度图：底座（这个月底座类别花的）+ 每天累加的其余花销（不算的那几类不算），预算 = 梯形（底座那一截 + 往上斜到预算）。
-// 今天以后的按到今天为止的平均速度画虚线。house: false = 只看底座（House）以外：没有底座、线从 0 起，预算从 0 斜到「预算 − 底座」
+// 月度图：每一笔落在它自己那天（她 2026-11-01 说的：保险 23 号交，提前记下不等于提前花；年度图 10 月起就是这样）。
+//   线 = 算进预算的花销一天天加起来（House 也按它记的那天，不算的那几类不算）；House 那一块 = House 一天天加起来（baseLine）；
+//   预算 = House 加起来 + 每天的额度（(这个月的预算 − 这个月的 House) ÷ 天数）加起来（budgetLine）——交了房租预算也跟着涨，所以 1 号交房租不算超。
+//   今天以后：提前记下的那几笔（House 也一样）落在它们那天，House 以外的再按到今天为止的平均速度往上加；图上的虚线一天一个点，到了那天才折上去。
+//   house: false = 只看底座（House）以外：线、预算都不含 House，没有那一块，B = 预算 − House，预算从 0 斜到它
 export function monthChart(ix, budgets, y, m, today, { house = true } = {}) {
-  const t = parts(today), N = dim(y, m), g = sumOf(ix, { y, m }, "month"), base = house ? g.base : 0;
-  const B = house ? budgetAt(budgets, y, m) : Math.max(0, budgetAt(budgets, y, m) - g.base);
+  const t = parts(today), N = dim(y, m), g = sumOf(ix, { y, m }, "month"), Bm = budgetAt(budgets, y, m);
+  const B = house ? Bm : Math.max(0, Bm - g.base), allow = Bm ? Math.max(0, Bm - g.base) / N : 0;
   const isCur = y === t.y && m === t.m, last = ord(y, m) > ord(t.y, t.m) ? 0 : isCur ? t.d : N;
-  // 今天以后的虚线 = 到今天的 + 已经提前记下的那几笔（落在它们那天）+ 照平均速度
-  const cv = [0], ahead = [0];
-  for (let d = 1; d <= N; d++) { const x = sumOf(ix, { y, m, d }, "day"), k = x.out - x.base - x.outside; cv[d] = cv[d - 1] + (d <= last ? k : 0); ahead[d] = ahead[d - 1] + (d > last ? k : 0); }
-  const rate = last ? cv[last] / last : 0;
-  const val = (d) => (d <= last ? base + cv[d] : base + cv[last] + ahead[d] + rate * (d - last));
-  const pace = (d) => (B ? base + Math.max(0, B - base) * d / N : 0);
+  const run = [0], ahead = [0], baseLine = [0], budgetLine = [0];
+  let rest = 0;   // 到今天为止 House 以外的（算平均速度用：房租这种一次付清的不该被当成每天的速度）
+  for (let d = 1; d <= N; d++) {
+    const x = sumOf(ix, { y, m, d }, "day"), b = house ? x.base : 0, k = x.out - x.outside - x.base;
+    if (d <= last) rest += k;
+    run[d] = run[d - 1] + (d <= last ? k + b : 0);
+    ahead[d] = ahead[d - 1] + (d > last ? k + b : 0);
+    baseLine[d] = baseLine[d - 1] + b;
+    budgetLine[d] = Bm ? baseLine[d] + allow * d : 0;
+  }
+  const rate = last ? rest / last : 0;
+  const val = (d) => (d <= last ? run[d] : run[last] + ahead[d] + rate * (d - last));
+  const pace = (d) => budgetLine[Math.max(0, Math.min(N, d))];
   // over(d)：到那天一共的超过这个月的预算了（图上读数的点这时才是橙的；比斜着的预算线高不算超）
-  return { n: N, B, base, last, isCur, val, pace, over: (d) => B > 0 && val(d) > B, top: niceMax(Math.max(B, val(N), base) * 1.04 || 100), used: g, home: (isCur ? t.d : N) - 1, house };
+  return { n: N, B, base: house ? g.base : 0, last, isCur, val, pace, baseLine, budgetLine, over: (d) => B > 0 && val(d) > B,
+    top: niceMax(Math.max(B, val(N), house ? g.base : 0) * 1.04 || 100), used: g, home: (isCur ? t.d : N) - 1, house };
 }
 
 // 年度图：按天画一整年（能拖到任意一天），每一笔落在它自己那天（她 2026-10 要的：不再把整月的 House 堆在 1 号）。

@@ -130,7 +130,8 @@ const back = '<button type="button" class="mn-ic" data-act="back" aria-label="Ba
 const chevR = '<svg class="ic mn-cr" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
 export const periodTitle = (p, mode) => (mode === "day" ? M.fmtDate(M.iso(p.y, p.m, p.d)) : mode === "month" ? M.MONTH[p.m - 1] + " " + p.y : String(p.y));
 
-// 图表：梯形图（House 是底座、预算是浅天蓝底、实线是花的、虚线是照现在的速度）+ 鼠标 / 手指移上去的读数（竖线、圆点，上面哪天、下面到那天一共多少）。
+// 图表：梯形图（House 是底座、预算是浅天蓝底、实线是花的）+ 鼠标 / 手指移上去的读数（竖线、圆点，上面哪天、下面到那天一共多少）。
+// 每一笔都落在它记的那天（月、年一样）：虚线一天一个点——提前记下的那几笔到了那天才折上去，其余照到今天为止的速度（她 11-01 说的，保险 23 号交不等于提前花）。
 // 圆点平时是钴蓝，到那天一共花的超了预算才是橙的（c.over；她 10-22 说没超预算就别标橙色）。
 // 手机的图表页和电脑的 Spending 页共用。draw 按给的宽高画（viewBox = 像素，字不跟着缩放），返回这一期的数（monthChart / yearChart）。
 // house: false = 只看 House（底座类别）以外的花销和预算。点一下（按下抬起没挪、不到半秒；拖着是看读数）交给 onTap：
@@ -146,16 +147,11 @@ export function chartView(svg, { onTap = null } = {}) {
     const X = (i) => X0 + (i - 1) / Math.max(1, c.n - 1) * (X1 - X0), Y = (v) => Y0 - v / c.top * (Y0 - Y1);
     const pts = Array.from({ length: c.n }, (_, i) => ({ x: X(i + 1), y: Y(c.val(i + 1)) }));
     const poly = (arr) => "M" + arr.map((v, i) => X(i + 1).toFixed(1) + " " + Y(v).toFixed(1)).join(" L") + " L" + X1 + " " + Y0 + " L" + X0 + " " + Y0 + "Z";
-    let h0;
-    if (mode === "month") {
-      h0 = (c.B ? '<path class="ar" d="M' + X0 + " " + Y(c.pace(1)) + " L" + X1 + " " + Y(c.B) + " L" + X1 + " " + Y0 + " L" + X0 + " " + Y0 + 'Z" fill="var(--mn-bud)"/>' : "") +
-        (c.base ? '<path class="ar" d="M' + X0 + " " + Y(c.base) + " H" + X1 + " V" + Y0 + " H" + X0 + 'Z" fill="var(--mn-base)"/>' : "");
-    } else {
-      h0 = (c.budgetLine[c.n] ? '<path class="ar" d="' + poly(c.budgetLine.slice(1)) + '" fill="var(--mn-bud)"/>' : "") + (c.baseLine[c.n] ? '<path class="ar" d="' + poly(c.baseLine.slice(1)) + '" fill="var(--mn-base)"/>' : "");
-    }
+    // 预算那一块、House 那一块：月和年一样，一天一个点（House 记在哪天就在哪天涨上去）
+    let h0 = (c.budgetLine[c.n] ? '<path class="ar" d="' + poly(c.budgetLine.slice(1)) + '" fill="var(--mn-bud)"/>' : "") + (c.baseLine[c.n] ? '<path class="ar" d="' + poly(c.baseLine.slice(1)) + '" fill="var(--mn-base)"/>' : "");
     h0 += [c.top, c.top / 2].map((v) => '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#fff" stroke-opacity=".07"/><text class="mn-ax" x="6" y="' + (Y(v) + 12) + '">' + esc(M.curInfo(M.showing()).sym) + Math.round(v / 100).toLocaleString("en-US") + "</text>").join("");
     if (c.last) h0 += '<path class="ln" pathLength="1" d="' + pts.slice(0, c.last).map((q, i) => (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1)).join(" ") + '" fill="none" stroke="#F2EEE6" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>';
-    if (c.isCur && c.last && c.last < c.n) h0 += '<path class="fc" d="M' + pts[c.last - 1].x + " " + pts[c.last - 1].y + " L" + pts[c.n - 1].x + " " + pts[c.n - 1].y + '" fill="none" stroke="#F2EEE6" stroke-opacity=".5" stroke-width="1.4" stroke-dasharray="4 4"/>';
+    if (c.isCur && c.last && c.last < c.n) h0 += '<path class="fc" d="' + pts.slice(c.last - 1).map((q, i) => (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1)).join(" ") + '" fill="none" stroke="#F2EEE6" stroke-opacity=".5" stroke-width="1.4" stroke-dasharray="4 4" stroke-linejoin="round"/>';
     const xl = mode === "month" ? [[1, M.MON[p.m - 1] + " 1"], [Math.ceil(c.n / 2), M.MON[p.m - 1] + " " + Math.ceil(c.n / 2)], [c.n, M.MON[p.m - 1] + " " + c.n]] : [[1, "Jan"], [M.dayOfYear(p.y, 7, 1), "Jul"], [c.n, "Dec"]];
     h0 += '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y0 + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".14"/>' + xl.map(([i, txt], k) => '<text x="' + X(i) + '" y="' + (H - 5) + '" text-anchor="' + (k === 0 ? "start" : k === 2 ? "end" : "middle") + '">' + txt + "</text>").join("") +
       '<line data-csl y1="' + (Y1 - 14) + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".35" style="pointer-events:none"/><circle data-csp r="4.5" fill="var(--mn-blue)" stroke="#000" stroke-width="1.5" style="pointer-events:none"/>' +
@@ -169,7 +165,7 @@ export function chartView(svg, { onTap = null } = {}) {
       svg.querySelector("[data-lab]").animate([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 900 + delay * 1000 });
     }
     // House 那块的上沿（这一天）：点在它上面算点到「House 以外那一块」
-    const baseY = (i) => Y(mode === "month" ? c.base : c.baseLine[i + 1] || 0), hasBase = mode === "month" ? c.base > 0 : c.baseLine[c.n] > 0;
+    const baseY = (i) => Y(c.baseLine[i + 1] || 0), hasBase = c.baseLine[c.n] > 0;
     CS = { c, pts, mode, p, W, H, house, hasBase, baseY, dateOf: (i) => (mode === "month" ? M.MON[p.m - 1] + " " + (i + 1) : (() => { const q = M.parts(c.dateOf(i + 1)); return M.MON[q.m - 1] + " " + q.d; })()) };
     svg.classList.remove("mn-tap");
     ct = ci = Math.min(c.n - 1, c.home);

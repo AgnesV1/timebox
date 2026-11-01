@@ -542,3 +542,7 @@
 /* 面板的底：白纸，角上还是两团很淡的钴蓝、青绿光；下摆也是白的，波边那一丝反光换成很淡的墨线 */
 [data-theme="light"] .mn-phone .mn-inner { background: radial-gradient(80% 45% at 0% 0%, rgba(76, 114, 216, .07), transparent 70%), radial-gradient(70% 38% at 100% 72%, rgba(79, 179, 169, .06), transparent 70%), #FFFFFF; }
 [data-theme="light"] .mn-phone .mn-hem > i { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 14' preserveAspectRatio='none'%3E%3Cpath d='M0 7Q27.5 15 55 7T110 7' fill='none' stroke='%230B0B0B' stroke-opacity='.1' stroke-width='1.6'/%3E%3C/svg%3E") var(--shift, 0px) 0 / 110px 14px repeat-x, #FFFFFF; }
+/* 底下露出来的那一条：夜里那层 42% 的黑压在白天今天页的淡青柠上成了橄榄灰，白天换成很淡的墨 + 一点磨砂（她 2026-11-01 从试样里挑的 A）；
+   下摆加一道淡影，白面板落在浅色的页面上才看得出前后 */
+[data-theme="light"] .mn-phone .mn-veil { background: rgba(11, 11, 11, .12); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+[data-theme="light"] .mn-phone .mn-hem { filter: drop-shadow(0 4px 7px rgba(11, 11, 11, .13)); }

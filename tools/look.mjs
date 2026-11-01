@@ -110,6 +110,10 @@ function clipAudit() {
     if (el.children.length) continue;
     const card = el.parentElement?.closest(".card, .pj-rail, #modal .sheet");
     if (!card) continue;
+    // 中间哪一层把它横着截掉了（省略号、能横着滚的）：那一层已经报过 cut / scrolls，这里不再算伸出去
+    let clipped = false;
+    for (let p = el.parentElement; p && p !== card; p = p.parentElement) if (getComputedStyle(p).overflowX !== "visible") { clipped = true; break; }
+    if (clipped) continue;
     const a = el.getBoundingClientRect(), b = card.getBoundingClientRect(), by = Math.max(a.right - b.right, b.left - a.left);
     if (by > 2) say("sticks out", el, text, Math.round(by) + "px");
   }

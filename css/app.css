@@ -838,7 +838,10 @@ body.phone .settings .page-head { margin-top: 4px; }
 .stats .card { margin-bottom: 14px; padding: 14px 16px 12px; border-radius: 14px; background: var(--bg); }
 .stats h3 { margin: 0; font: 700 15px var(--display); letter-spacing: -.01em; }
 .stats figure { margin: 0 0 16px; }
-.stats .lede { margin: 4px 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+/* 排版照 web-interface-guidelines（.claude/skills，Vercel 那份）：超宽屏不铺满——整页最宽 1480px、居中，读数不用隔着半个屏幕找；
+   说明文字避开最后一行只剩一两个词（text-wrap: pretty） */
+.stats { max-width: 1480px; margin: 0 auto; }
+.stats .lede { margin: 4px 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--muted); text-wrap: pretty; }
 .stats .empty { padding: 14px 0 4px; font-size: 13.5px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 10px; }
 .tile { padding: 4px 0; }
@@ -856,7 +859,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .st-strip .delta { display: inline; margin: 0; }
 .st-strip .ss-all { margin-left: auto; }
 .chart figcaption { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-.chart figcaption p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.chart figcaption p { margin: 4px 0 0; font-size: 13px; color: var(--muted); text-wrap: pretty; }
 .chart figcaption > div:first-child { flex: 1 1 220px; min-width: 0; }   /* 那句话长了自己折行，图例留在右边 */
 .chart figcaption b { color: var(--ink); font-weight: 600; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
@@ -985,8 +988,8 @@ body.phone .settings .page-head { margin-top: 4px; }
 /* 典型的一天（js/ui/stats.js 的 typicalHTML）：上班日、周末两半并排（卡片窄了上下排），每半左边一个 24 小时的钟、右边几点做什么 */
 .typ-card { container-type: inline-size; }
 .typ-two { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px 32px; }
-@container (min-width: 760px) { .typ-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.typ-half { display: grid; grid-template-columns: 172px minmax(0, 1fr); align-items: start; gap: 6px 18px; }
+@container (min-width: 900px) { .typ-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }   /* 窄于这个就上下排：并排时清单只剩一百来像素，「Sleep · get ready」会被折断 */
+.typ-half { display: grid; grid-template-columns: 172px minmax(0, 1fr); align-items: start; align-content: start; gap: 6px 18px; }   /* 另一半有数据时，这一半的「No timed sessions…」贴着标题，不飘在中间 */
 .typ-h { grid-column: 1 / -1; margin: 0; font-size: 12.5px; color: var(--muted); }
 .typ-h b { font-size: 13.5px; color: var(--ink); }
 .typ-half .empty { grid-column: 1 / -1; }
@@ -1004,7 +1007,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .typ-c { position: absolute; top: 50%; left: 50%; display: grid; justify-items: center; transform: translate(-50%, -50%); font-size: 10.5px; line-height: 1.2; color: var(--muted); pointer-events: none; }
 .typ-c b { font-size: 14px; color: var(--ink); }
 .typ-txt { min-width: 0; }
-.typ-sum { margin: 4px 0 8px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.typ-sum { margin: 4px 0 8px; font-size: 12.5px; line-height: 1.5; color: var(--muted); text-wrap: pretty; }
 .typ-sum b { color: var(--ink); }
 .typ-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.4; }
 .typ-list li { display: grid; grid-template-columns: 96px 9px minmax(0, 1fr); align-items: center; gap: 8px; }
@@ -1037,7 +1040,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .pie-c { position: absolute; top: 50%; left: 50%; display: grid; justify-items: center; width: 56%; transform: translate(-50%, -50%); text-align: center; font-size: 11.5px; line-height: 1.35; color: var(--muted); pointer-events: none; }
 .pie-c b { font-size: 16px; line-height: 1.15; letter-spacing: -.02em; color: var(--ink); }
 .pie-c span:last-child:not(:nth-child(2)) { margin-top: 2px; font-weight: 700; color: var(--ink); }
-.pie-legend { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 13.5px; }
+.pie-legend { display: grid; gap: 8px; max-width: 380px; margin: 0; padding: 0; list-style: none; font-size: 13.5px; }   /* 卡片宽了图例也不拉满：名字和数字挨得近，一眼读得过去 */
 .pie-legend li, .pie-legend .pie-li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 34px; align-items: center; gap: 7px; }
 /* 能点的那几行（点了只看这个项目）：整行一个按钮，样子和别的行一样，悬停时淡底 */
 .pie-legend li:has(> .pie-li) { display: block; }

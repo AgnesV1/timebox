@@ -1,7 +1,7 @@
 // 统计页（电脑）。最上面：看哪段时间（Week / Month / Season / Year / 自己选两头；每次打开都从 Month 开始）、只看哪几个项目 / 计划（可以勾好几个）、只看深度。
 // 下面两个页签：
 //   Time —— 时间去哪了：每天的柱子、一天 24 小时的饼图（带 On the side）、几点在干活（停在星期几上看那天平均多久）、典型的一天（上班日 / 周末各一个钟）、
-//   顶上一条：Build 花了多久、其中多少深度，右边 Build + Work 一共多久；时间表（项目 × 日子，点开看它下面的计划）。
+//   顶上一条：Build 花了多久、其中多少深度，右边 Build + Work + Chores 一共多久；时间表（项目 × 日子，点开看它下面的计划）。
 //   柱子默认只看 Build、热力图默认看全部（右上角都能切）；大类永远按 Build、Work、Friends、Leisure、Fitness、Chores 排（js/groups.js 的 ORDER）
 // 颜色的规矩：青柠 = 总量（每天的柱子）；项目自己的颜色 = 按项目拆开的图（饼图、时间表、星期几、几点在干活）。
 //   Plan —— 计划执行得怎样：做完多少、守住几天线、估时准不准、各项目、没做完的原因、项目健康
@@ -93,9 +93,10 @@ function tile(label, value, sub, dlt = "") {
   return '<div class="tile"><p class="tl">' + label + '</p><p class="tv">' + value + "</p>" + (sub ? '<p class="ts">' + sub + "</p>" : "") + dlt + "</div>";
 }
 
-// Time 页签顶上一条细条（她挑的，替掉原来两块大卡片）：左边 Build 花了多久、其中多少深度、比上一段；右边 Build + Work 一共多久、
+// Time 页签顶上一条细条（她挑的，替掉原来两块大卡片）：左边 Build 花了多久、其中多少深度、比上一段；右边 Build + Work + Chores 一共多久、
 // 深度平均一天多少（「deep ~0.7h/d」）。右边的两个数和左边一个样子：一共多久和 Build 那个数同色（白天钴蓝、夜里青柠），deep 和左边的 deep 一样亮（她 11-01 定的；10-31 换掉了原来的 All，
-// 全部记了多久、没记的挪到饼图底下那一行）。b、bp = 只看 Build 的这一段和上一段，w = 只看 Work 的这一段（这段时间没有 Work 就不写右边）；没有 Build 就只有全部那一半（带比上一段）
+// 全部记了多久、没记的挪到饼图底下那一行）。b、bp = 只看 Build 的这一段和上一段，w = Work、Chores 合起来的这一段（{ name: "Work + Chores", spent, deep }，
+// 这段时间都没有就不写右边）；没有 Build 就只有全部那一半（带比上一段）
 function timeStrip(s, p, b, bp, name, w) {
   const n = (v, cls = "") => '<b class="num' + (cls ? " " + cls : "") + '">' + fmtHours(v) + "</b>";
   if (!b) return '<div class="st-strip"><span>All ' + n(s.spent) + ' <span class="ss-m">· ◆ ' + fmtHours(s.deep) + (s.days ? " · ~" + fmtHours(s.avgSpent) + " a day" : "") + "</span></span>" + delta(s.spent, p.spent, fmtHours) + "</div>";
@@ -559,9 +560,10 @@ export function statsHTML(c) {
     const bOn = Boolean(bc) && (!picks.size || bc.tasks.length > 0);
     const b = bOn ? S.summarize(bc, r.from, r.to, { by: "plan" }) : null, bp = bOn ? S.summarize(bc, p.from, p.to, { by: "plan" }) : null;
     const tv = bOn && view.trend === "build", hv = bOn && view.heat === "build";
-    // 顶上那条右边的 Build + Work：Work 也在当前筛选之上再筛
-    const wName = bOn && c.groups.some((g) => g.name === "Work") ? "Work" : "", wc = wName ? S.onlyGroup(sc.c, wName) : null;
-    const w = wc && wc.tasks.length ? { ...S.summarize(wc, r.from, r.to), name: wName } : null;
+    // 顶上那条右边的 Build + Work + Chores（她 11-01 加了 Chores）：大类清单里有的才算，也在当前筛选之上再筛；这几个都没时间就不写
+    const more = bOn ? ["Work", "Chores"].filter((n) => c.groups.some((g) => g.name === n)) : [];
+    const ms = more.map((n) => S.onlyGroup(sc.c, n)).filter((x) => x.tasks.length).map((x) => S.summarize(x, r.from, r.to));
+    const w = ms.length ? { name: more.join(" + "), spent: ms.reduce((a, x) => a + x.spent, 0), deep: ms.reduce((a, x) => a + x.deep, 0) } : null;
     let ts = tv ? b : s, glow = "";
     if (haze && leisPicked && !tv && haze.min >= 1) {
       const side = S.sideDaily(c, r.from, r.to);

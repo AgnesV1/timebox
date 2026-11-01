@@ -166,7 +166,7 @@ Today's deep time is on the small label just under the dial; Stats has a Deep se
 To set yourself a target: Stats, under the pie → Adjust → Deep goal (hours per working day).
 
 - `Stats`: pick a period (week / month / Season / year / Custom; it opens on Month each time), optionally only some projects or plans (tick several; none = everything, split by project), or only deep work. Two tabs:
-  - **Time** (where the time went): a thin strip at the top — time on Build, how much of it deep, up or down from the previous period, and Build + Work together on the right (in the same size, with their deep time per day, e.g. deep ~0.7h/d); then daily bars (roughly how much was deep, with a soft electric-blue tide), a **24-hour pie** (under it, everything logged and untracked, each with a daily average),
+  - **Time** (where the time went): a thin strip at the top — time on Build, how much of it deep, up or down from the previous period, and Build + Work + Chores together on the right (in the same size and colours, with their deep time per day, e.g. deep ~0.7h/d); then daily bars (roughly how much was deep, with a soft electric-blue tide), a **24-hour pie** (under it, everything logged and untracked, each with a daily average),
     an **hours-of-the-week heat map** (weekday × 24 hours from 6am; a cell's colour is the project that mostly filled that hour — its own colour above 70%,
     otherwise a blend of the top two; hovering a weekday on the left shows that weekday's average day split by project; "Week by week" expands each week),
     **a typical day** (an average work day — Monday to Friday, not holidays or days off — and an average weekend day, from timed sessions only and only days with something timed:

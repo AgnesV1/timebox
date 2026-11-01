@@ -156,7 +156,7 @@ export function chartView(svg, { onTap = null } = {}) {
     h0 += '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y0 + '" y2="' + Y0 + '" stroke="var(--mn-ink)" stroke-opacity=".14"/>' + xl.map(([i, txt], k) => '<text x="' + X(i) + '" y="' + (H - 5) + '" text-anchor="' + (k === 0 ? "start" : k === 2 ? "end" : "middle") + '">' + txt + "</text>").join("") +
       '<line data-csl y1="' + (Y1 - 14) + '" y2="' + Y0 + '" stroke="var(--mn-ink)" stroke-opacity=".35" style="pointer-events:none"/><circle data-csp r="4.5" fill="var(--mn-blue)" stroke="var(--mn-dot-ring, #000)" stroke-width="1.5" style="pointer-events:none"/>' +
       // 读数在竖线右边：上面是哪天，下面是到那天一共多少（靠右边放不下就挪到左边）
-      '<g data-lab style="pointer-events:none"><text data-lt class="mn-ax" y="' + (Y1 - 4) + '" style="font-size:11px;fill:var(--sp-axis, #8C8CA0)"></text><text data-lv class="mn-ax" y="' + (Y1 + 12) + '" style="font-size:13px;fill:var(--mn-ink)"></text></g>';
+      '<g data-lab style="pointer-events:none"><text data-lt class="mn-ax" y="' + (Y1 - 4) + '" style="font-size:11px;fill:var(--mn-axis)"></text><text data-lv class="mn-ax" y="' + (Y1 + 12) + '" style="font-size:13px;fill:var(--mn-ink)"></text></g>';
     svg.innerHTML = h0;
     if (animate && !quiet()) {
       svg.querySelectorAll(".ar").forEach((a) => a.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 520, delay: delay * 1000, fill: "backwards" }));
@@ -675,8 +675,8 @@ export function createView() {
     }
   }
 
-  // 四个小方块：一样的四行（名字 / 数 / 一条线 / 小字），所以对得齐。线 = 之前六个月（年模式 = 之前几年）这个数的范围，
-  // 点 = 这次落在哪儿（这个月的话，之前的也只算到同一天）。方块只建一次，换期只挪点（弹着滑过去）、换数。
+  // 四个小方块：一样的四行（名字 / 数 / 一条线 / 小字），所以对得齐。线 = 之前六个月（年模式 = 之前几年）这个数的范围（这个月的话，之前的也只算到同一天），
+  // 点 = 这一期到今天为止落在哪儿（提前记的不算），小字 = 平时到今天大约多少（她 11-01 说的，和电脑一样）。方块只建一次，换期只挪点（弹着滑过去）、换数。
   // 橙色只标超了预算的（她 10-22 说的）：Budget Left 是负的时候那个数和 Budget Left、Expense 的点；结余是负的、比平时花得多都不标
   const CARDS = [["left", "Budget Left", "leftPct"], ["expense", "Expense", "expense"], ["income", "Income", "income"], ["balance", "Balance", "balance"]];
   function cards(c, mode, p) {
@@ -695,13 +695,14 @@ export function createView() {
       v.innerHTML = value;
       v.style.color = col;
       el.title = since;
-      const r = cmp.range[key], x = cmp.cur[key];
+      const r = cmp.range[key], x = cmp.now[key], u = cmp.usual[key];
       if (!r || x === null || x === undefined) { dot.hidden = true; small.textContent = note || (mode === "year" ? "No earlier years" : "No history yet"); continue; }
       const span = r[1] - r[0], pos = span ? (x - r[0]) / span : 0.5;
       dot.hidden = false;
       dot.classList.toggle("over", blown && (k === "left" || k === "expense"));
       dot.style.left = (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + "%";
-      small.textContent = note || fmt(r[0]) + "–" + fmt(r[1]);
+      const us = (cmp.cutText ? "until today usual ~" : "usual ~") + fmt(u);
+      small.textContent = note ? note + " · " + us : us.charAt(0).toUpperCase() + us.slice(1);
     }
   }
   function breakdown(mode, p) {

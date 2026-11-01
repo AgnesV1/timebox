@@ -42,7 +42,7 @@ export function createSpending() {
     '<button type="button" class="sp-ic" data-act="set" aria-label="Spending settings" title="Settings">' + icon("settings") + "</button>" +
     '<button type="button" class="sp-add" data-act="add" title="Add a transaction (N)">' + icon("plus") + "Add<kbd>N</kbd></button></div></header>" +
     '<div class="sp-addw" data-add></div>' +
-    '<section class="sp-kpis" data-kpis aria-label="This period at a glance">' + [["out", "Spent"], ["inc", "Income"], ["bal", "Balance"], ["left", "Budget left"]].map(([k, l]) =>
+    '<section class="sp-kpis" data-kpis aria-label="This period at a glance">' + [["left", "Budget left"], ["out", "Spent"], ["inc", "Income"], ["bal", "Balance"]].map(([k, l]) =>
       // 线和点只建一次：换期时点从原处弹簧滑到新位置（重画就没有过渡了）
       '<div class="sp-kpi" data-k="' + k + '"><span class="sp-kl">' + l + '</span><span class="sp-kvw"><span class="sp-kv mn-num mn-rn"></span><span class="sp-kp mn-num mn-rn"></span></span><div class="sp-kb"><div class="mn-track mn-range"><b hidden></b></div></div><span class="sp-ks mn-num"></span></div>').join("") + "</section>" +
     '<div class="sp-body"><div class="sp-main">' +
@@ -92,7 +92,8 @@ export function createSpending() {
     const g = c.used, B = c.B, bal = cmp.cur.balance, pct = cmp.cur.leftPct;
     const since = (mode === "year" ? "earlier years" : "the last six months") + (cmp.cutText ? ", " + cmp.cutText : "");
     const pctText = (x) => Math.round(x * 100) + "%";
-    // 范围线：之前六个月（年 = 往年）最低到最高，点 = 这一期落在哪儿。橙色只标超了预算的（她 10-22 说的）：
+    // 范围线：之前六个月（年 = 往年）到同一天的最低到最高，点 = 这一期到今天为止落在哪儿（提前记的不算；她 11-01 说的）；
+    // 小字 = 平时到今天大约多少（之前那几期的中间值）。Budget left 第一格（手机也是）。橙色只标超了预算的（她 10-22 说的）：
     // Budget left 是负的时候那个数和 Budget left、Spent 的点；结余是负的、比平时花得多都不标
     const blown = pct !== null && pct < 0;
     // extra = 跟在数后面的那一截（Budget left 的「· 69%」），一样滚着变
@@ -102,7 +103,7 @@ export function createSpending() {
       if (extra) roll(kp, extra);
       else { kp.textContent = ""; delete kp.dataset.v; }
       v.style.color = kp.style.color = color;
-      const r = key && cmp.range[key], x = cmp.cur[key];
+      const r = key && cmp.range[key], x = cmp.now[key], u = key && cmp.usual[key];
       if (!r || x === null || x === undefined) {
         dot.hidden = true;
         tr.title = "";
@@ -113,8 +114,9 @@ export function createSpending() {
       dot.hidden = false;
       dot.classList.toggle("over", blown && (k === "left" || k === "out"));
       dot.style.left = (Math.max(0, Math.min(1, pos)) * 100).toFixed(1) + "%";
-      tr.title = "Lowest to highest over " + since;
-      el.querySelector(".sp-ks").textContent = (small ? small + " · " : "") + "usually " + fmt(r[0]) + "–" + fmt(r[1]);
+      tr.title = "Lowest to highest over " + since + " (" + fmt(r[0]) + "–" + fmt(r[1]) + "); the dot is this " + (mode === "year" ? "year" : "month") + (cmp.cutText ? " until today, " + fmt(x) : ", " + fmt(x));
+      const us = (cmp.cutText ? "until today usual ~" : "usual ~") + fmt(u);
+      el.querySelector(".sp-ks").textContent = small ? small + " · " + us : us.charAt(0).toUpperCase() + us.slice(1);
     };
     cell("out", "−" + M.money(g.out), { key: "expense" });
     cell("inc", "+" + M.money(g.inc), { color: "var(--mn-green)", key: "income" });

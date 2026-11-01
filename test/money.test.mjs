@@ -176,6 +176,19 @@ test("cards compare with the previous six months, cut at the same day for the cu
   const past = M.compare(ix, budgets, { y: 2026, m: 10 }, "month", "2026-11-20");
   assert.deepEqual(past.range.expense, [145000 + 6500 + 2000, 145000 + 6500 + 1000 + 5000]);
   assert.equal(M.compare(ix, budgets, { y: 2026, m: 8 }, "month", "2026-10-03").range.expense, null);   // nothing before August
+  assert.equal(cmp.usual.expense, 146500, "usual = the middle of the earlier months up to the same day");
+  assert.equal(past.usual.expense, (145000 + 6500 + 2000 + 145000 + 6500 + 1000 + 5000) / 2);
+});
+
+test("the dot on the bar is this month until today: records written down early count in the totals, not in the dot", () => {
+  const more = [...rows, e("2026-09-02", -1000, "Food"), e("2026-08-03", -2000, "Food"), e("2026-10-23", -60000, "House", "insurance")];
+  const cmp = M.compare(M.index(more, cats), budgets, { y: 2026, m: 10 }, "month", "2026-10-03");
+  assert.equal(cmp.cur.expense, 145000 + 2315 + 30000 + 899 + 60000, "the big number is the whole month");
+  assert.equal(cmp.now.expense, 145000 + 2315 + 30000 + 899, "the dot leaves out the insurance due on the 23rd");
+  const past = M.compare(M.index(more, cats), budgets, { y: 2026, m: 10 }, "month", "2026-11-20");
+  assert.equal(past.now, past.cur, "a month that's over: the dot is the whole month");
+  const year = M.compare(M.index(more, cats), budgets, { y: 2026 }, "year", "2026-10-03");
+  assert.equal(year.cur.expense - year.now.expense, 60000, "the year view leaves it out of the dot too");
 });
 
 test("currencies: each record keeps its own; totals convert at the typed rate, or a rough one until there is one", () => {

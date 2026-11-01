@@ -1,5 +1,5 @@
-/* 记账（js/ui/money.js、js/ui/island.js、js/ui/spending.js）。手机：从顶上往下拉出来的那块纯黑面板（不跟日夜走）；电脑：Spending 页，夜里一整块透明 50% 的黑板，
-   白天是白纸（她 2026-11-01 挑的，见下面 [data-theme="light"] .mn.spend）。颜色是自己的一套：钴蓝 = 正常、橙 = 超了、青绿 = 收入、主按钮钴蓝配奶白字、预算是浅天蓝底、House 底座青绿。
+/* 记账（js/ui/money.js、js/ui/island.js、js/ui/spending.js）。手机：从顶上往下拉出来的那块面板；电脑：Spending 页。都跟着日夜走（6 点、18 点，她 2026-11-01 说的）：
+   夜里手机是纯黑、电脑是透明 50% 的黑板；白天都是白纸（电脑那块是她挑的 A，见最后一段）。颜色是自己的一套：钴蓝 = 正常、橙 = 超了、青绿 = 收入、主按钮钴蓝配奶白字、预算是浅天蓝底、House 底座青绿。
    和苦昼短稍微分开一点（同样的字和圆角）：底色角上两团很淡的钴蓝、青绿光；浮起来的层是磨砂玻璃；流水上下沿渐进模糊。
    动效一套：进场 cubic-bezier(.16,1,.3,1) 快出来慢慢停稳、不冲过头（--mn-enter），出场越走越快（--mn-exit）；小按钮、开关用只冲过头 0.5% 的弹簧（--mn-spring）。
    时长：按下 120ms、开关 / 小签 280ms、面板进来 420ms、出去 260ms、数字 450ms、柱子 520ms
@@ -7,11 +7,17 @@
 
 .mn { --mn-blue: #4C72D8; --mn-orange: #EE8A33; --mn-green: #4FB3A9; --mn-pri: #2F52B8; --mn-pri-ink: #F6F0E2;
   --mn-bud: rgba(158, 195, 232, .2); --mn-base: rgba(62, 156, 156, .45); --mn-line: #1A1A22; --mn-mute: #7C7C90; --mn-ink: #F2EEE6;
+  /* 下面这些是原来写死在各处的夜里的颜色，白天在最后那一段换成白纸的（[data-theme="light"] .mn:is(.mn-phone, .spend)） */
+  --mn-bg: #000; --mn-soft: #B9B5AC; --mn-ink2: #E8E4DA; --mn-faint: #55556A; --mn-dim: #5A5A6E; --mn-mo: #9A9AB0; --mn-zero: #3A3A48; --mn-bar0: #24242C; --mn-axis: #8C8CA0;
+  --mn-fill2: rgba(255, 255, 255, .08); --mn-press: rgba(255, 255, 255, .1); --mn-trk: rgba(255, 255, 255, .1); --mn-rng: rgba(255, 255, 255, .14); --mn-ring: #101015; --mn-dot-ring: #000;
+  --mn-line2: #111117; --mn-new: #141C33; --mn-today: #5A5A70; --mn-grabber: #33333F; --mn-tap: rgba(255, 255, 255, .06);
+  --mn-glass: rgba(16, 16, 22, .86); --mn-glass2: rgba(12, 12, 17, .9); --mn-glass3: rgba(28, 28, 36, .86); --mn-snack: rgba(34, 34, 46, .82); --mn-edge: rgba(255, 255, 255, .08);
+  --mn-lift: rgba(0, 0, 0, .35); --mn-pop: rgba(0, 0, 0, .6);
   /* 小签、方块、分组、分段开关：半透明的白，顶边一道细高光（像玻璃的边）；铺在黑底、磨砂的抽屉上都一样 */
   --mn-fill: rgba(255, 255, 255, .055); --mn-hair: inset 0 1px 0 rgba(255, 255, 255, .07);
   --mn-spring: linear(0, .029, .099, .192, .296, .399, .498, .588, .668, .737, .795, .844, .883, .915, .939, .959, .973, .984, .992, .997, 1.001, 1.003, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1);
   --mn-enter: cubic-bezier(.16, 1, .3, 1); --mn-exit: cubic-bezier(.4, 0, 1, 1);
-  color: var(--mn-ink); font: 14px/1.35 "Space Grotesk", -apple-system, "PingFang SC", sans-serif; background: #000; -webkit-tap-highlight-color: transparent; }
+  color: var(--mn-ink); font: 14px/1.35 "Space Grotesk", -apple-system, "PingFang SC", sans-serif; background: var(--mn-bg); -webkit-tap-highlight-color: transparent; }
 .mn *, .mn *::before, .mn *::after { box-sizing: border-box; }
 .mn button { font: inherit; color: inherit; }
 .mn .mn-num { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
@@ -20,10 +26,10 @@
 .mn .mn-13 { font-size: 13px; }
 .mn .mn-plain { all: unset; cursor: pointer; }
 .mn .mn-ic { all: unset; flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; color: var(--mn-ink); cursor: pointer; transition: transform .28s var(--mn-spring), background .2s; }
-.mn .mn-ic:active { transform: scale(.9); background: rgba(255, 255, 255, .08); transition-duration: .12s; }
+.mn .mn-ic:active { transform: scale(.9); background: var(--mn-fill2); transition-duration: .12s; }
 .mn .mn-ic:focus-visible, .mn .mn-chip:focus-visible, .mn .mn-big:focus-visible, .mn .mn-li:focus-visible { outline: 1.5px solid var(--mn-blue); outline-offset: 1px; }
 .mn .mn-ic .ic { width: 21px; height: 21px; }
-.mn .mn-ic.mn-sm { width: 28px; height: 28px; color: #B9B5AC; }
+.mn .mn-ic.mn-sm { width: 28px; height: 28px; color: var(--mn-soft); }
 .mn .mn-ic.mn-sm .ic { width: 17px; height: 17px; }
 /* 回到现在的小点：挂在标题右边外面（不占位，标题照样正中），不在当前那一期才弹出来 */
 .mn .mn-now { all: unset; position: absolute; left: calc(100% - 4px); top: 50%; display: grid; place-items: center; width: 28px; height: 28px; margin-top: -14px; cursor: pointer; opacity: 0; transform: scale(.5); pointer-events: none; transition: opacity .2s, transform .28s var(--mn-spring); }
@@ -63,11 +69,11 @@
 .mn .mn-rw { height: 100%; overflow-x: auto; scrollbar-width: none; cursor: grab; touch-action: none; -webkit-mask-image: linear-gradient(90deg, transparent, #000 30px, #000 calc(100% - 30px), transparent); mask-image: linear-gradient(90deg, transparent, #000 30px, #000 calc(100% - 30px), transparent); }
 .mn .mn-rail { display: flex; width: max-content; height: 100%; }
 .mn .mn-cell { flex: none; display: flex; flex-direction: column; align-items: center; height: 100%; padding-top: 7px; }
-.mn .mn-lb { font-size: 11px; color: #5A5A6E; transition: color .25s, transform .28s var(--mn-spring); }
+.mn .mn-lb { font-size: 11px; color: var(--mn-dim); transition: color .25s, transform .28s var(--mn-spring); }
 .mn .mn-lb.on { color: var(--mn-ink); transform: scale(1.12); }
-.mn .mn-lb.mo { color: #9A9AB0; }
+.mn .mn-lb.mo { color: var(--mn-mo); }
 .mn .mn-bw { flex: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px; }
-.mn .mn-bar { width: var(--w); height: var(--h); border-radius: 3px; background: #24242C; transform-origin: bottom; transition: height .52s var(--mn-enter), width .52s var(--mn-enter), border-radius .52s, background .35s; }
+.mn .mn-bar { width: var(--w); height: var(--h); border-radius: 3px; background: var(--mn-bar0); transform-origin: bottom; transition: height .52s var(--mn-enter), width .52s var(--mn-enter), border-radius .52s, background .35s; }
 .mn .mn-bar.ok { background: var(--mn-blue); }
 .mn .mn-bar.over { background: var(--mn-orange); }
 .mn .mn-tl.col .mn-bar { width: 5px; height: 5px; border-radius: 50%; }
@@ -89,13 +95,13 @@
 .mn .mn-rw2 { position: relative; overflow: hidden; transition: height .25s; }
 .mn .mn-del { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; color: #E8674A; font-size: 12px; opacity: 0; }
 .mn .mn-rw2.swiping .mn-del { opacity: 1; }
-.mn .mn-row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--mn-line); background: #000; cursor: pointer; }
+.mn .mn-row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--mn-line); background: var(--mn-bg); cursor: pointer; }
 .mn .mn-row .mn-r1 { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mn .mn-row .mn-nt { margin-left: 6px; font-size: 13px; color: var(--mn-mute); }
 .mn .mn-row .mn-am { flex: none; font-size: 15px; }
 .mn .mn-am.inc { color: var(--mn-green); }
 .mn .mn-row.mn-new { animation: mn-rin .42s var(--mn-enter); }
-@keyframes mn-rin { from { transform: translateY(-8px); opacity: 0; background: #141C33; } to { background: #000; } }
+@keyframes mn-rin { from { transform: translateY(-8px); opacity: 0; background: var(--mn-new); } to { background: var(--mn-bg); } }
 .mn .mn-empty { padding: 40px 0; text-align: center; font-size: 13px; color: var(--mn-mute); }
 .mn .mn-foot { flex: none; padding-top: 10px; border-top: 1px solid var(--mn-line); }
 .mn .mn-recw { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -121,20 +127,20 @@
 .mn .mn-rn .cl > span { height: 1.1em; line-height: 1.1em; }
 
 /* 一页一页推进去（设定、子页、搜索） */
-.mn .mn-pg { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 0 16px 12px; background: #000; transition: transform .42s var(--mn-enter), opacity .42s var(--mn-enter); }
+.mn .mn-pg { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 0 16px 12px; background: var(--mn-bg); transition: transform .42s var(--mn-enter), opacity .42s var(--mn-enter); }
 .mn .mn-pg.off { transform: translateX(105%); visibility: hidden; transition: transform .26s var(--mn-exit), opacity .26s, visibility 0s .26s; }
 .mn .mn-pg.under { transform: translateX(-30%); opacity: .2; }
 
 /* 图表：手机上是从底下升上来的一整页 */
 .mn .mn-cdim { position: absolute; inset: 0; z-index: 29; background: #000; opacity: 0; pointer-events: none; }
 .mn .mn-csheet { position: absolute; left: 0; right: 0; bottom: 0; top: calc(env(safe-area-inset-top, 0px) + 40px); z-index: 30; display: flex; flex-direction: column; padding: 0 16px; border-radius: 24px 24px 0 0;
-  background: rgba(12, 12, 17, .9); -webkit-backdrop-filter: blur(22px) saturate(1.3); backdrop-filter: blur(22px) saturate(1.3); box-shadow: 0 -1px 0 rgba(255, 255, 255, .1), 0 -18px 40px rgba(0, 0, 0, .35); transform: translateY(110%); }
+  background: var(--mn-glass2); -webkit-backdrop-filter: blur(22px) saturate(1.3); backdrop-filter: blur(22px) saturate(1.3); box-shadow: 0 -1px 0 var(--mn-edge), 0 -18px 40px var(--mn-lift); transform: translateY(110%); }
 .mn .mn-cgrab { position: relative; flex: none; display: flex; align-items: center; justify-content: center; height: 34px; cursor: grab; touch-action: none; }
-.mn .mn-grabber { width: 36px; height: 4px; border-radius: 2px; background: #33333F; }
+.mn .mn-grabber { width: 36px; height: 4px; border-radius: 2px; background: var(--mn-grabber); }
 .mn .mn-done { position: absolute; right: 0; top: 8px; color: var(--mn-blue); font-size: 15px; font-weight: 500; }
 .mn .mn-cbody { flex: 1; min-height: 0; margin: 12px -16px 0; padding: 0 16px 24px; }
 .mn .mn-chart { display: block; width: 100%; overflow: visible; touch-action: none; cursor: crosshair; }
-.mn .mn-chart text { font-size: 11px; fill: #8C8CA0; }
+.mn .mn-chart text { font-size: 11px; fill: var(--mn-axis); }
 .mn .mn-chart .mn-ax { font-family: "JetBrains Mono", ui-monospace, monospace; }
 .mn .mn-cards { margin: 14px -16px 0; padding: 0 16px; }
 .mn .mn-card { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 11px 12px; border-radius: 12px; background: var(--mn-fill); box-shadow: var(--mn-hair); }   /* 宽度跟着里面的字走 */
@@ -143,25 +149,25 @@
 .mn .mn-card.mn-card-hl .v { font-size: 19px; font-weight: 600; color: var(--mn-blue); }
 /* Budget Left 那个数后面的「· 69%」（剩下几成） */
 .mn .mn-kp::before { content: "·"; margin: 0 .3em; color: var(--mn-mute); }
-.mn .mn-up { margin-left: 4px; padding: 0 5px; border-radius: 999px; background: rgba(255, 255, 255, .08); font: 600 9px/1.6 var(--num); letter-spacing: .07em; text-transform: uppercase; }   /* 提前记的、日期还没到（已经算进合计） */
-.mn .mn-track { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.mn .mn-up { margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--mn-fill2); font: 600 9px/1.6 var(--num); letter-spacing: .07em; text-transform: uppercase; }   /* 提前记的、日期还没到（已经算进合计） */
+.mn .mn-track { height: 4px; border-radius: 2px; background: var(--mn-trk); overflow: hidden; }
 .mn .mn-track > i { display: block; height: 100%; width: 0; background: var(--mn-blue); transition: width .52s var(--mn-enter); }
 .mn .mn-track > i.over { background: var(--mn-orange); }
 /* 之前六个月的范围：整条线 = 最少到最多，点 = 这次在哪儿（比最差的还差 = 橙） */
-.mn .mn-range { position: relative; overflow: visible; background: rgba(255, 255, 255, .14); }
-.mn .mn-range > b { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--mn-blue); box-shadow: 0 0 0 2px #101015; transition: left .62s var(--spring-pop), background-color .3s; }   /* 换期时点弹着滑到新位置（只改 left，元素不重建） */
+.mn .mn-range { position: relative; overflow: visible; background: var(--mn-rng); }
+.mn .mn-range > b { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--mn-blue); box-shadow: 0 0 0 2px var(--mn-ring); transition: left .62s var(--spring-pop), background-color .3s; }   /* 换期时点弹着滑到新位置（只改 left，元素不重建） */
 .mn .mn-range > b.over { background: var(--mn-orange); }
 .mn .mn-sect { margin-top: 22px; font-size: 15px; font-weight: 500; }
 .mn .mn-bk { border-bottom: 1px solid var(--mn-line); }
 .mn .mn-brow { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; cursor: pointer; }
 .mn .mn-brow .r { display: flex; align-items: center; gap: 10px; text-align: right; }
-.mn .mn-pie { flex: none; color: #B9B5AC; }
+.mn .mn-pie { flex: none; color: var(--mn-soft); }
 .mn .mn-pie.inc { color: var(--mn-green); }
 .mn .mn-chev { flex: none; width: 14px; height: 14px; color: var(--mn-mute); transition: transform .28s var(--mn-spring); }
 .mn .mn-bk.open .mn-chev { transform: rotate(180deg); }
 .mn .mn-bin { height: 0; overflow: hidden; transition: height .42s var(--mn-enter); }
-.mn .mn-irow { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 0 8px 2px; border-top: 1px solid #111117; font-size: 13px; cursor: pointer; }
-.mn .mn-irow .n { color: #B9B5AC; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mn .mn-irow { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 0 8px 2px; border-top: 1px solid var(--mn-line2); font-size: 13px; cursor: pointer; }
+.mn .mn-irow .n { color: var(--mn-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 记一笔 / 改一笔：手机上是从底下弹上来的面板 + 数字键盘 */
 /* 图：电脑上鼠标停在点得动的地方（完整的时候 House 上面那块；只看 House 以外的时候哪儿都行）是手指形光标；手机图下面一行小字说怎么回来 */
@@ -171,51 +177,51 @@
 .mn .mn-scrim { position: absolute; inset: 0; z-index: 40; background: #000; opacity: 0; pointer-events: none; transition: opacity .3s; }
 .mn .mn-scrim.on { opacity: .55; pointer-events: auto; }
 .mn .mn-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 41; padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px)); border-radius: 26px 26px 0 0;
-  background: rgba(16, 16, 22, .86); -webkit-backdrop-filter: blur(24px) saturate(1.3); backdrop-filter: blur(24px) saturate(1.3); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); transform: translateY(105%); transition: transform .26s var(--mn-exit); }
+  background: var(--mn-glass); -webkit-backdrop-filter: blur(24px) saturate(1.3); backdrop-filter: blur(24px) saturate(1.3); box-shadow: inset 0 1px 0 var(--mn-edge); transform: translateY(105%); transition: transform .26s var(--mn-exit); }
 .mn .mn-sheet.on { transform: none; transition: transform .42s var(--mn-enter); }
 .mn .mn-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .mn .mn-fld { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 40px; border-bottom: 1px solid var(--mn-line); }
 .mn .mn-tx { all: unset; min-width: 0; font: 14px "Space Grotesk", sans-serif; color: var(--mn-ink); }
-.mn .mn-tx::placeholder { color: #55556A; }
+.mn .mn-tx::placeholder { color: var(--mn-faint); }
 .mn .mn-tx:focus { box-shadow: none; }   /* 记账有自己的一套颜色：不要苦昼短夜里那圈青柠光 */
 .mn .mn-amt { font-size: 30px; font-weight: 500; line-height: 36px; }
 .mn .mn-amt .cur { margin-right: 3px; font-size: 17px; font-weight: 400; color: var(--mn-mute); }
-.mn .mn-amt .zero { color: #3A3A48; }
+.mn .mn-amt .zero { color: var(--mn-zero); }
 .mn .mn-amt .in { display: inline-block; animation: mn-rin .28s var(--mn-enter); }
 /* 数字键盘：她说大一点好按——52px 高、24px 字（今天页 Spend 点出来的、面板里改一笔的，都是这一张） */
 .mn .mn-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
 .mn .mn-k { all: unset; display: flex; align-items: center; justify-content: center; height: 52px; border-radius: 14px; font: 400 24px "JetBrains Mono", monospace; cursor: pointer; transition: background .25s, transform .28s var(--mn-spring); }
-.mn .mn-k:active { background: rgba(255, 255, 255, .1); transform: scale(.93); transition-duration: .06s; }   /* 数字键盘按得快：按下的反馈比别处更快 */
+.mn .mn-k:active { background: var(--mn-press); transform: scale(.93); transition-duration: .06s; }   /* 数字键盘按得快：按下的反馈比别处更快 */
 .mn .mn-k.op { font-size: 20px; color: var(--mn-mute); }
 .mn .mn-k.add { grid-row: span 2; height: auto; border-radius: 15px; background: var(--mn-pri); color: var(--mn-pri-ink); font: 500 17px "Space Grotesk", sans-serif; }
 .mn .mn-act { all: unset; font-size: 13px; color: var(--mn-blue); cursor: pointer; }
 .mn .mn-act.warn { color: #E8674A; }
 
 /* 月历：点日期那里弹出来 */
-.mn .mn-cal { position: absolute; z-index: 45; width: 260px; padding: 10px 10px 12px; border-radius: 16px; background: rgba(28, 28, 36, .86); -webkit-backdrop-filter: blur(20px) saturate(1.3); backdrop-filter: blur(20px) saturate(1.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 14px 40px rgba(0, 0, 0, .6); opacity: 0; transform: scale(.94); transform-origin: 90% 0; pointer-events: none; transition: opacity .16s, transform .2s var(--mn-exit); }
+.mn .mn-cal { position: absolute; z-index: 45; width: 260px; padding: 10px 10px 12px; border-radius: 16px; background: var(--mn-glass3); -webkit-backdrop-filter: blur(20px) saturate(1.3); backdrop-filter: blur(20px) saturate(1.3);
+  box-shadow: inset 0 1px 0 var(--mn-edge), 0 14px 40px var(--mn-pop); opacity: 0; transform: scale(.94); transform-origin: 90% 0; pointer-events: none; transition: opacity .16s, transform .2s var(--mn-exit); }
 .mn .mn-cal.on { opacity: 1; transform: none; pointer-events: auto; transition: opacity .2s, transform .28s var(--mn-spring); }
 .mn .mn-cg { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
 .mn .mn-cg.wd { margin-bottom: 4px; text-align: center; }
-.mn .mn-cd { all: unset; display: flex; align-items: center; justify-content: center; height: 30px; border-radius: 9px; font: 13px "JetBrains Mono", monospace; color: #E8E4DA; cursor: pointer; transition: transform .28s var(--mn-spring); }
-.mn .mn-cd.today { box-shadow: inset 0 0 0 1px #5A5A70; }
+.mn .mn-cd { all: unset; display: flex; align-items: center; justify-content: center; height: 30px; border-radius: 9px; font: 13px "JetBrains Mono", monospace; color: var(--mn-ink2); cursor: pointer; transition: transform .28s var(--mn-spring); }
+.mn .mn-cd.today { box-shadow: inset 0 0 0 1px var(--mn-today); }
 .mn .mn-cd.sel { background: var(--mn-pri); color: var(--mn-pri-ink); box-shadow: none; }
 .mn .mn-cd:active { transform: scale(.88); }
 
 /* 币种：标题总数后面的「CAD ▾」、记一笔时金额左边那个；点了弹出一张小清单（和月历一样的玻璃） */
-.mn .mn-curb { all: unset; display: inline-flex; align-items: center; gap: 2px; height: 22px; margin-left: 10px; padding: 0 5px 0 7px; border-radius: 7px; background: var(--mn-fill); box-shadow: var(--mn-hair); font: 500 11px "JetBrains Mono", monospace; letter-spacing: .02em; color: #B9B5AC; cursor: pointer; transition: transform .28s var(--mn-spring), background .2s; }
+.mn .mn-curb { all: unset; display: inline-flex; align-items: center; gap: 2px; height: 22px; margin-left: 10px; padding: 0 5px 0 7px; border-radius: 7px; background: var(--mn-fill); box-shadow: var(--mn-hair); font: 500 11px "JetBrains Mono", monospace; letter-spacing: .02em; color: var(--mn-soft); cursor: pointer; transition: transform .28s var(--mn-spring), background .2s; }
 .mn .mn-curb .ic { width: 12px; height: 12px; opacity: .7; }
 .mn .mn-curb:active { transform: scale(.92); transition-duration: .12s; }
 .mn .mn-curb:focus-visible { outline: 1.5px solid var(--mn-blue); outline-offset: 1px; }
 .mn [data-scur] { min-width: 3ch; }
 .mn .mn-sheet .mn-curb { margin-left: 0; }
 .mn .mn-curm { width: 250px; padding: 6px; transform-origin: 10% 0; }
-.mn .mn-curi { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 38px 34px 1fr 14px; align-items: center; width: 100%; height: 36px; padding: 0 8px; border-radius: 9px; font-size: 13px; color: #E8E4DA; cursor: pointer; }
+.mn .mn-curi { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 38px 34px 1fr 14px; align-items: center; width: 100%; height: 36px; padding: 0 8px; border-radius: 9px; font-size: 13px; color: var(--mn-ink2); cursor: pointer; }
 .mn .mn-curi b { font-weight: 500; }
 .mn .mn-curi .mn-meta { text-align: right; }
 .mn .mn-curi i { font-style: normal; text-align: right; color: var(--mn-blue); }
 .mn .mn-curi.sel { background: rgba(76, 114, 216, .16); }
-.mn .mn-curi:active { background: rgba(255, 255, 255, .06); }
+.mn .mn-curi:active { background: var(--mn-tap); }
 /* 流水里别的钱的那一笔：金额照原样，底下一行小字是换算过的 */
 .mn .mn-row .mn-am { display: flex; flex-direction: column; align-items: flex-end; }
 .mn .mn-am small { margin-top: 2px; font-size: 11px; color: var(--mn-mute); }
@@ -233,13 +239,13 @@
 .mn .mn-li > .grow { flex: 1; min-width: 0; }
 .mn .mn-li.dim { cursor: default; opacity: .55; }
 .mn .mn-li.act { color: var(--mn-blue); }
-.mn .mn-cr { flex: none; width: 15px; height: 15px; color: #55556A; }
+.mn .mn-cr { flex: none; width: 15px; height: 15px; color: var(--mn-faint); }
 .mn .mn-note { margin: 0 14px 12px; font-size: 11px; line-height: 1.6; color: var(--mn-mute); }   /* 左右和分组里的字对齐（分组的内边距也是 14） */
 .mn textarea.mn-tx { display: block; width: 100%; min-height: 140px; padding: 10px 12px; border-radius: 12px; background: var(--mn-fill); font: 12px/1.5 "JetBrains Mono", monospace; white-space: pre; }
-.mn pre.mn-md { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--mn-fill); font: 11px/1.5 "JetBrains Mono", monospace; color: #B9B5AC; white-space: pre-wrap; }
+.mn pre.mn-md { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--mn-fill); font: 11px/1.5 "JetBrains Mono", monospace; color: var(--mn-soft); white-space: pre-wrap; }
 
 .mn .mn-snack { position: absolute; left: 16px; right: 16px; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px;
-  background: rgba(34, 34, 46, .82); -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); font-size: 12px; opacity: 0; transform: translateY(10px); pointer-events: none; transition: transform .42s var(--mn-enter), opacity .2s; }
+  background: var(--mn-snack); -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3); box-shadow: inset 0 1px 0 var(--mn-edge); font-size: 12px; opacity: 0; transform: translateY(10px); pointer-events: none; transition: transform .42s var(--mn-enter), opacity .2s; }
 .mn .mn-snack.on { opacity: 1; transform: none; pointer-events: auto; }
 .mn .mn-status { font-size: 11px; color: var(--mn-mute); }
 .mn .mn-status.bad { color: var(--mn-orange); }
@@ -275,7 +281,7 @@
 /* 今天页点 Spend 出来的（.entry）：幕布不落，只有底下那张记一笔的升上来，后面压暗的是今天页 */
 .mn-phone.entry .mn-curtain, .mn-phone.entry .mn-veil { visibility: hidden; }
 .mn-phone .mn-pg { background: transparent; }
-.mn-phone .mn-pg:not(.mn-home) { background: #000; }
+.mn-phone .mn-pg:not(.mn-home) { background: var(--mn-bg); }
 .mn-phone .mn-home, .mn-phone .mn-pg { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
 .mn-phone .mn-snack { bottom: 64px; }
 .mn.mn-phone .mn-tx, .mn.mn-phone textarea.mn-tx { font-size: 16px; }   /* iPhone 点到 16px 以下的输入框会把整页放大 */
@@ -299,20 +305,16 @@
    控件的形状和大小照苦昼短的（药丸形的分段开关和按钮 12.5–13px/600、32px 的图标按钮），颜色是记账自己的：选中、主按钮钴蓝 */
 .mn.spend { --sp-line: rgba(255, 255, 255, .09); --mn-mute: #9C9CB0;
   --sp-a035: rgba(255, 255, 255, .035); --sp-a045: rgba(255, 255, 255, .045); --sp-a05: rgba(255, 255, 255, .05); --sp-a07: rgba(255, 255, 255, .07); --sp-a08: rgba(255, 255, 255, .08); --sp-a18: rgba(255, 255, 255, .18);
-  --sp-soft: #B9B5AC; --sp-softer: #D8D4CB; --sp-axis: #8C8CA0; --sp-scheme: dark; --mn-dot-ring: #000;
+  --sp-soft: #B9B5AC; --sp-softer: #D8D4CB; --sp-scheme: dark;
   position: relative; min-height: calc(100vh - 56px); margin: -4px 0 0; padding: 22px 28px 40px; border-radius: 22px;
   background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); container-type: inline-size; }
 /* 白天：白纸（她 2026-11-01 从两个样子里挑的 A）——和苦昼短白天别的页一样，半透明白底 + 磨砂、粗墨边 + 硬投影（这一页的主卡片），墨色字；
-   记账的钴蓝 / 橙 / 青绿调深一点，白底上才读得清。夜里、手机上拉下来的记账面板照旧是黑的（手机面板她 10-17 定的纯黑） */
+   记账的钴蓝 / 橙 / 青绿调深一点，白底上才读得清（这些颜色手机面板也一起用，在最后一段）。夜里照旧是黑板 */
 [data-theme="light"] .mn.spend {
-  --mn-ink: #0B0B0B; --mn-mute: #74747C; --mn-blue: #2F52B8; --mn-orange: #D46A16; --mn-green: #23877D; --mn-pri: #2F52B8; --mn-pri-ink: #F6F0E2;
-  --mn-bud: rgba(47, 82, 184, .12); --mn-base: rgba(35, 135, 125, .24); --mn-line: #E5E5DF; --mn-hair: none; --mn-dot-ring: #fff;
   --sp-line: #E5E5DF; --sp-a035: rgba(11, 11, 11, .03); --sp-a045: rgba(11, 11, 11, .035); --sp-a05: rgba(11, 11, 11, .05); --sp-a07: rgba(11, 11, 11, .05); --sp-a08: rgba(11, 11, 11, .06); --sp-a18: rgba(11, 11, 11, .2);
-  --sp-soft: #55555C; --sp-softer: #2C2C33; --sp-axis: #74747C; --sp-scheme: light;
+  --sp-soft: #55555C; --sp-softer: #2C2C33; --sp-scheme: light;
   background: var(--card); border: var(--b); box-shadow: var(--hard-lg); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); }
-[data-theme="light"] .mn.spend .mn-track { background: rgba(11, 11, 11, .08); }
-[data-theme="light"] .mn.spend .mn-range { background: rgba(11, 11, 11, .12); }
-[data-theme="light"] .mn.spend .mn-range > b { box-shadow: 0 0 0 2px #fff; }
+
 .spend h3 { margin: 0; font: 700 13px/1.3 var(--display); letter-spacing: -.01em; color: var(--mn-ink); }
 .spend h3 small { margin-left: 6px; font: 500 11px "JetBrains Mono", monospace; letter-spacing: 0; color: var(--mn-mute); }
 .spend kbd { margin-left: 6px; padding: 0 5px; border: 1px solid var(--sp-a18); border-radius: 5px; font: 11px/16px "JetBrains Mono", monospace; color: inherit; opacity: .75; }
@@ -387,7 +389,7 @@
 .spend .sp-legend .bd { background: var(--mn-bud); }
 .spend .sp-legend .hs { background: var(--mn-base); }
 .spend .mn-chart { display: block; width: 100%; overflow: visible; cursor: crosshair; }
-.spend .mn-chart text { font-size: 11px; fill: var(--sp-axis); }
+.spend .mn-chart text { font-size: 11px; fill: var(--mn-axis); }
 .spend .mn-chart .mn-ax { font-family: "JetBrains Mono", ui-monospace, monospace; }
 
 /* 流水表：表头一条线，行之间细线，金额靠右等宽；按天（月）分组，组头写合计 */
@@ -510,3 +512,19 @@
 @media (prefers-reduced-motion: reduce) {
   .mn *, .mn-phone .mn-curtain, #mn-live, #mn-drop i { transition-property: opacity, color, background-color, border-color, box-shadow !important; animation: none !important; }
 }
+
+/* ---------- 白天（6–18 点，和苦昼短一样跟着钟点）：手机拉下来的面板、电脑 Spending 页都是白纸 ----------
+   她 2026-11-01 说的：手机也以六点为边界出现黑白两版，和电脑同步（电脑那块白纸是她挑的 A）。夜里照旧是黑的。
+   墨色字，记账的钴蓝 / 橙 / 青绿调深一点（白底上才读得清）；从岛里流出来的黑水滴（#mn-goo、#mn-drop）和岛上那颗小药丸（#mn-live）是岛的一部分，白天也是黑的 */
+[data-theme="light"] .mn:is(.mn-phone, .spend) {
+  --mn-ink: #0B0B0B; --mn-mute: #74747C; --mn-line: #E5E5DF; --mn-fill: rgba(11, 11, 11, .05); --mn-hair: none;
+  --mn-blue: #2F52B8; --mn-orange: #D46A16; --mn-green: #23877D; --mn-pri: #2F52B8; --mn-pri-ink: #F6F0E2;
+  --mn-bud: rgba(47, 82, 184, .12); --mn-base: rgba(35, 135, 125, .24);
+  --mn-bg: #FFFFFF; --mn-soft: #55555C; --mn-ink2: #1F1F24; --mn-faint: #A3A3AA; --mn-dim: #A3A3AA; --mn-mo: #55555C; --mn-zero: #C9C9C2; --mn-bar0: #E4E4DE; --mn-axis: #74747C;
+  --mn-fill2: rgba(11, 11, 11, .06); --mn-press: rgba(11, 11, 11, .08); --mn-trk: rgba(11, 11, 11, .08); --mn-rng: rgba(11, 11, 11, .12); --mn-ring: #FFFFFF; --mn-dot-ring: #FFFFFF;
+  --mn-line2: #EFEFEA; --mn-new: #DDE6FB; --mn-today: #A3A3AA; --mn-grabber: #D0D0CA; --mn-tap: rgba(11, 11, 11, .05);
+  --mn-glass: rgba(255, 255, 255, .94); --mn-glass2: rgba(255, 255, 255, .94); --mn-glass3: rgba(255, 255, 255, .97); --mn-snack: rgba(255, 255, 255, .97); --mn-edge: rgba(11, 11, 11, .08);
+  --mn-lift: rgba(0, 0, 0, .1); --mn-pop: rgba(0, 0, 0, .14); }
+/* 面板的底：白纸，角上还是两团很淡的钴蓝、青绿光；下摆也是白的，波边那一丝反光换成很淡的墨线 */
+[data-theme="light"] .mn-phone .mn-inner { background: radial-gradient(80% 45% at 0% 0%, rgba(76, 114, 216, .07), transparent 70%), radial-gradient(70% 38% at 100% 72%, rgba(79, 179, 169, .06), transparent 70%), #FFFFFF; }
+[data-theme="light"] .mn-phone .mn-hem > i { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 14' preserveAspectRatio='none'%3E%3Cpath d='M0 7Q27.5 15 55 7T110 7' fill='none' stroke='%230B0B0B' stroke-opacity='.1' stroke-width='1.6'/%3E%3C/svg%3E") var(--shift, 0px) 0 / 110px 14px repeat-x, #FFFFFF; }

@@ -233,12 +233,19 @@ function upTo(ix, y, m, cut) {
 // 提前记的、日期还没到的也算在里面（记了就算）
 export const metricsOf = (g, B) => ({ expense: g.out, income: g.inc, left: B - (g.out - g.outside), balance: g.inc - g.out, used: B ? (g.out - g.outside) / B : 0,
   leftPct: B - g.base > 0 ? 1 - (g.out - g.outside - g.base) / (B - g.base) : null, room: Math.max(0, B - g.base) });
+// cur = 这一期整份（提前记的也算，四个大数字用它）；now = 这一期到今天为止（不算日期还没到的，横杠上的点用它；过完的一期 = cur）；
+// usual = 之前那几期（到同一天）的中间值，小字「Until today usual ~…」用它（她 2026-11-01 说的：横杠还是之前六个月的范围，点 = 这个月到今天花了多少）
 export function compare(ix, budgets, p, mode, today) {
   const t = parts(today), prev = [];
-  let cur, cutText = "";
+  let cur, now, cutText = "";
   if (mode === "year") {
     const isCur = p.y === t.y, doy = isCur ? dayOfYear(t.y, t.m, t.d) : 0;
     cur = metricsOf(sumOf(ix, { y: p.y }, "year"), yearBudget(budgets, p.y, today));
+    if (isCur) {
+      const g = { out: 0, inc: 0, base: 0, outside: 0 };
+      for (let m = 1; m <= t.m; m++) { const x = m < t.m ? sumOf(ix, { y: t.y, m }, "month") : upTo(ix, t.y, m, t.d); g.out += x.out; g.inc += x.inc; g.base += x.base; g.outside += x.outside; }
+      now = metricsOf(g, yearBudget(budgets, p.y, today));
+    }
     for (let k = 1; k <= 6; k++) {
       const y = p.y - k, all = sumOf(ix, { y }, "year");
       if (!all.n) continue;
@@ -255,6 +262,7 @@ export function compare(ix, budgets, p, mode, today) {
   } else {
     const isCur = p.y === t.y && p.m === t.m;
     cur = metricsOf(sumOf(ix, p, "month"), budgetAt(budgets, p.y, p.m));
+    if (isCur) now = metricsOf(upTo(ix, p.y, p.m, t.d), budgetAt(budgets, p.y, p.m));
     for (let k = 1; k <= 6; k++) {
       const q = addMonths(p.y, p.m, -k), all = sumOf(ix, q, "month");
       if (!all.n) continue;
@@ -263,8 +271,11 @@ export function compare(ix, budgets, p, mode, today) {
     }
     if (isCur) cutText = "by day " + t.d;
   }
-  const range = (k) => { const xs = prev.map((x) => x[k]).filter((v) => v !== null && v !== undefined); return xs.length >= 2 ? [Math.min(...xs), Math.max(...xs)] : null; };
-  return { cur, n: prev.length, cutText, range: { expense: range("expense"), income: range("income"), left: range("left"), leftPct: range("leftPct"), balance: range("balance") } };
+  const xsOf = (k) => prev.map((x) => x[k]).filter((v) => v !== null && v !== undefined).sort((a, b) => a - b);
+  const range = (k) => { const xs = xsOf(k); return xs.length >= 2 ? [xs[0], xs[xs.length - 1]] : null; };
+  const usual = (k) => { const xs = xsOf(k), h = xs.length >> 1; return xs.length >= 2 ? (xs.length % 2 ? xs[h] : (xs[h - 1] + xs[h]) / 2) : null; };
+  const keys = ["expense", "income", "left", "leftPct", "balance"];
+  return { cur, now: now || cur, n: prev.length, cutText, range: Object.fromEntries(keys.map((k) => [k, range(k)])), usual: Object.fromEntries(keys.map((k) => [k, usual(k)])) };
 }
 
 // 推荐：①这个月之前两个月都有、同样金额的底座类别（房租、网费这类），这个月还没记的；②最近 60 天里同一类同一个金额出现得最多的那笔（至少两次）。

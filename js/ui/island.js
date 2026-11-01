@@ -39,10 +39,11 @@ let ST = 0;
 const CX = () => innerWidth / 2;
 const box = (el, l, t, w, h, r) => Object.assign(el.style, { left: l + "px", top: t + "px", width: w + "px", height: h + "px", borderRadius: r });
 
-// 顶上那一条的颜色：拉的时候先换成纯黑，和水滴、面板接上；收起再换回去
+// 顶上那一条的颜色：夜里拉的时候先换成纯黑，和水滴、面板接上；收起再换回去。白天面板是白纸（她 11-01 说手机也分黑白两版），顶上那条本来就是白的，不换
 function statusBar(black) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) return;
+  if (black && document.documentElement.dataset.theme !== "dark") return;
   if (black) { if (!meta.dataset.was) meta.dataset.was = meta.getAttribute("content"); meta.setAttribute("content", "#000000"); }
   else if (meta.dataset.was) { meta.setAttribute("content", document.documentElement.dataset.theme === "dark" ? "#0C0C13" : "#FFFFFF"); delete meta.dataset.was; }
 }

@@ -93,14 +93,14 @@ function tile(label, value, sub, dlt = "") {
   return '<div class="tile"><p class="tl">' + label + '</p><p class="tv">' + value + "</p>" + (sub ? '<p class="ts">' + sub + "</p>" : "") + dlt + "</div>";
 }
 
-// Time 页签顶上一条细条（她挑的，替掉原来两块大卡片）：左边 Build 花了多久、其中多少深度、比上一段；右边 Build + Work 一共多久（字和左边一样大）、
-// 深度平均一天多少（「deep ~0.7h/d」，她 11-01 定的；她 10-31 换掉了原来的 All，
+// Time 页签顶上一条细条（她挑的，替掉原来两块大卡片）：左边 Build 花了多久、其中多少深度、比上一段；右边 Build + Work 一共多久、
+// 深度平均一天多少（「deep ~0.7h/d」）。右边的两个数和左边一个样子：一共多久和 Build 那个数同色（白天钴蓝、夜里青柠），deep 和左边的 deep 一样亮（她 11-01 定的；10-31 换掉了原来的 All，
 // 全部记了多久、没记的挪到饼图底下那一行）。b、bp = 只看 Build 的这一段和上一段，w = 只看 Work 的这一段（这段时间没有 Work 就不写右边）；没有 Build 就只有全部那一半（带比上一段）
 function timeStrip(s, p, b, bp, name, w) {
   const n = (v, cls = "") => '<b class="num' + (cls ? " " + cls : "") + '">' + fmtHours(v) + "</b>";
   if (!b) return '<div class="st-strip"><span>All ' + n(s.spent) + ' <span class="ss-m">· ◆ ' + fmtHours(s.deep) + (s.days ? " · ~" + fmtHours(s.avgSpent) + " a day" : "") + "</span></span>" + delta(s.spent, p.spent, fmtHours) + "</div>";
   return '<div class="st-strip"><span>' + esc(name) + " " + n(b.spent, "ss-b") + "</span><span>◆ deep " + n(b.deep) + "</span>" + delta(b.spent, bp.spent, fmtHours) +
-    (w && w.spent > 0 ? '<span class="ss-all">' + esc(name) + " + " + esc(w.name) + " " + n(b.spent + w.spent) + (b.days ? ' <span class="ss-m">(deep ~' + fmtHours((b.deep + w.deep) / b.days) + "/d)</span>" : "") + "</span>" : "") + "</div>";
+    (w && w.spent > 0 ? '<span class="ss-all">' + esc(name) + " + " + esc(w.name) + " " + n(b.spent + w.spent, "ss-b") + (b.days ? ' (deep <b class="num">~' + fmtHours((b.deep + w.deep) / b.days) + "/d</b>)" : "") + "</span>" : "") + "</div>";
 }
 
 // 柱子 / 热力图右上角：Build | All

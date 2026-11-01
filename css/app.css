@@ -855,7 +855,6 @@ body.phone .settings .page-head { margin-top: 4px; }
 [data-theme="dark"] .st-strip .ss-b { color: var(--accent); }
 .st-strip .delta { display: inline; margin: 0; }
 .st-strip .ss-all { margin-left: auto; }
-.st-strip .ss-all b { font-size: 13px; }
 .chart figcaption { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .chart figcaption p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
 .chart figcaption > div:first-child { flex: 1 1 220px; min-width: 0; }   /* 那句话长了自己折行，图例留在右边 */

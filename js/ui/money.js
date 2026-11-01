@@ -149,14 +149,14 @@ export function chartView(svg, { onTap = null } = {}) {
     const poly = (arr) => "M" + arr.map((v, i) => X(i + 1).toFixed(1) + " " + Y(v).toFixed(1)).join(" L") + " L" + X1 + " " + Y0 + " L" + X0 + " " + Y0 + "Z";
     // 预算那一块、House 那一块：月和年一样，一天一个点（House 记在哪天就在哪天涨上去）
     let h0 = (c.budgetLine[c.n] ? '<path class="ar" d="' + poly(c.budgetLine.slice(1)) + '" fill="var(--mn-bud)"/>' : "") + (c.baseLine[c.n] ? '<path class="ar" d="' + poly(c.baseLine.slice(1)) + '" fill="var(--mn-base)"/>' : "");
-    h0 += [c.top, c.top / 2].map((v) => '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#fff" stroke-opacity=".07"/><text class="mn-ax" x="6" y="' + (Y(v) + 12) + '">' + esc(M.curInfo(M.showing()).sym) + Math.round(v / 100).toLocaleString("en-US") + "</text>").join("");
-    if (c.last) h0 += '<path class="ln" pathLength="1" d="' + pts.slice(0, c.last).map((q, i) => (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1)).join(" ") + '" fill="none" stroke="#F2EEE6" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>';
-    if (c.isCur && c.last && c.last < c.n) h0 += '<path class="fc" d="' + pts.slice(c.last - 1).map((q, i) => (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1)).join(" ") + '" fill="none" stroke="#F2EEE6" stroke-opacity=".5" stroke-width="1.4" stroke-dasharray="4 4" stroke-linejoin="round"/>';
+    h0 += [c.top, c.top / 2].map((v) => '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="var(--mn-ink)" stroke-opacity=".07"/><text class="mn-ax" x="6" y="' + (Y(v) + 12) + '">' + esc(M.curInfo(M.showing()).sym) + Math.round(v / 100).toLocaleString("en-US") + "</text>").join("");
+    if (c.last) h0 += '<path class="ln" pathLength="1" d="' + pts.slice(0, c.last).map((q, i) => (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1)).join(" ") + '" fill="none" stroke="var(--mn-ink)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>';
+    if (c.isCur && c.last && c.last < c.n) h0 += '<path class="fc" d="' + pts.slice(c.last - 1).map((q, i) => (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1)).join(" ") + '" fill="none" stroke="var(--mn-ink)" stroke-opacity=".5" stroke-width="1.4" stroke-dasharray="4 4" stroke-linejoin="round"/>';
     const xl = mode === "month" ? [[1, M.MON[p.m - 1] + " 1"], [Math.ceil(c.n / 2), M.MON[p.m - 1] + " " + Math.ceil(c.n / 2)], [c.n, M.MON[p.m - 1] + " " + c.n]] : [[1, "Jan"], [M.dayOfYear(p.y, 7, 1), "Jul"], [c.n, "Dec"]];
-    h0 += '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y0 + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".14"/>' + xl.map(([i, txt], k) => '<text x="' + X(i) + '" y="' + (H - 5) + '" text-anchor="' + (k === 0 ? "start" : k === 2 ? "end" : "middle") + '">' + txt + "</text>").join("") +
-      '<line data-csl y1="' + (Y1 - 14) + '" y2="' + Y0 + '" stroke="#fff" stroke-opacity=".35" style="pointer-events:none"/><circle data-csp r="4.5" fill="var(--mn-blue)" stroke="#000" stroke-width="1.5" style="pointer-events:none"/>' +
+    h0 += '<line x1="' + X0 + '" x2="' + X1 + '" y1="' + Y0 + '" y2="' + Y0 + '" stroke="var(--mn-ink)" stroke-opacity=".14"/>' + xl.map(([i, txt], k) => '<text x="' + X(i) + '" y="' + (H - 5) + '" text-anchor="' + (k === 0 ? "start" : k === 2 ? "end" : "middle") + '">' + txt + "</text>").join("") +
+      '<line data-csl y1="' + (Y1 - 14) + '" y2="' + Y0 + '" stroke="var(--mn-ink)" stroke-opacity=".35" style="pointer-events:none"/><circle data-csp r="4.5" fill="var(--mn-blue)" stroke="var(--mn-dot-ring, #000)" stroke-width="1.5" style="pointer-events:none"/>' +
       // 读数在竖线右边：上面是哪天，下面是到那天一共多少（靠右边放不下就挪到左边）
-      '<g data-lab style="pointer-events:none"><text data-lt class="mn-ax" y="' + (Y1 - 4) + '" style="font-size:11px;fill:#8C8CA0"></text><text data-lv class="mn-ax" y="' + (Y1 + 12) + '" style="font-size:13px;fill:#F2EEE6"></text></g>';
+      '<g data-lab style="pointer-events:none"><text data-lt class="mn-ax" y="' + (Y1 - 4) + '" style="font-size:11px;fill:var(--sp-axis, #8C8CA0)"></text><text data-lv class="mn-ax" y="' + (Y1 + 12) + '" style="font-size:13px;fill:var(--mn-ink)"></text></g>';
     svg.innerHTML = h0;
     if (animate && !quiet()) {
       svg.querySelectorAll(".ar").forEach((a) => a.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 520, delay: delay * 1000, fill: "backwards" }));
@@ -180,7 +180,9 @@ export function chartView(svg, { onTap = null } = {}) {
     if (!sl) return;
     sl.setAttribute("x1", x); sl.setAttribute("x2", x); sp.setAttribute("cx", x); sp.setAttribute("cy", y);
     const lt = svg.querySelector("[data-lt]"), lv = svg.querySelector("[data-lv]"), w = Math.max(lt.getComputedTextLength?.() || 60, lv.getComputedTextLength?.() || 60);
-    const right = x + 8 + w <= CS.W - 2, lx = right ? x + 8 : x - 8;
+    // 最左边那几天：读数挪到刻度字（「$5,000」）右边，不压在它上面
+    const ax = svg.querySelector("text.mn-ax:not([data-lt]):not([data-lv])"), axR = ax ? 12 + (ax.getComputedTextLength?.() || 40) : 0;
+    const right = x + 8 + w <= CS.W - 2, lx = right ? Math.max(x + 8, axR) : x - 8;
     for (const el of [lt, lv]) { el.setAttribute("x", lx.toFixed(1)); el.setAttribute("text-anchor", right ? "start" : "end"); }
   }
   function cread(i) {

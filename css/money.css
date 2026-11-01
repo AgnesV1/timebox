@@ -1,5 +1,5 @@
-/* 记账（js/ui/money.js、js/ui/island.js、js/ui/spending.js）。手机：从顶上往下拉出来的那块纯黑面板；电脑：Spending 页，一整块透明 50% 的黑板。
-   不跟日夜走，颜色是自己的一套：钴蓝 = 正常、橙 = 超了、青绿 = 收入、主按钮钴蓝配奶白字、预算是浅天蓝底、House 底座青绿。
+/* 记账（js/ui/money.js、js/ui/island.js、js/ui/spending.js）。手机：从顶上往下拉出来的那块纯黑面板（不跟日夜走）；电脑：Spending 页，夜里一整块透明 50% 的黑板，
+   白天是白纸（她 2026-11-01 挑的，见下面 [data-theme="light"] .mn.spend）。颜色是自己的一套：钴蓝 = 正常、橙 = 超了、青绿 = 收入、主按钮钴蓝配奶白字、预算是浅天蓝底、House 底座青绿。
    和苦昼短稍微分开一点（同样的字和圆角）：底色角上两团很淡的钴蓝、青绿光；浮起来的层是磨砂玻璃；流水上下沿渐进模糊。
    动效一套：进场 cubic-bezier(.16,1,.3,1) 快出来慢慢停稳、不冲过头（--mn-enter），出场越走越快（--mn-exit）；小按钮、开关用只冲过头 0.5% 的弹簧（--mn-spring）。
    时长：按下 120ms、开关 / 小签 280ms、面板进来 420ms、出去 260ms、数字 450ms、柱子 520ms
@@ -297,12 +297,25 @@
 /* 底色是透明 50% 的黑 + 磨砂，透得出苦昼短的天；白天天太亮，背后再压暗一点（brightness），字才看得清。
    板里不再套框（苦昼短「框能少就少」）：一排数、图表、流水、按类别之间只用细线（--sp-line）和留白分开。
    控件的形状和大小照苦昼短的（药丸形的分段开关和按钮 12.5–13px/600、32px 的图标按钮），颜色是记账自己的：选中、主按钮钴蓝 */
-.mn.spend { --sp-line: rgba(255, 255, 255, .09); --mn-mute: #9C9CB0; position: relative; min-height: calc(100vh - 56px); margin: -4px 0 0; padding: 22px 28px 40px; border-radius: 22px;
+.mn.spend { --sp-line: rgba(255, 255, 255, .09); --mn-mute: #9C9CB0;
+  --sp-a035: rgba(255, 255, 255, .035); --sp-a045: rgba(255, 255, 255, .045); --sp-a05: rgba(255, 255, 255, .05); --sp-a07: rgba(255, 255, 255, .07); --sp-a08: rgba(255, 255, 255, .08); --sp-a18: rgba(255, 255, 255, .18);
+  --sp-soft: #B9B5AC; --sp-softer: #D8D4CB; --sp-axis: #8C8CA0; --sp-scheme: dark; --mn-dot-ring: #000;
+  position: relative; min-height: calc(100vh - 56px); margin: -4px 0 0; padding: 22px 28px 40px; border-radius: 22px;
   background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); container-type: inline-size; }
-[data-theme="light"] .mn.spend { -webkit-backdrop-filter: blur(12px) saturate(1.2) brightness(.58); backdrop-filter: blur(12px) saturate(1.2) brightness(.58); }
+/* 白天：白纸（她 2026-11-01 从两个样子里挑的 A）——和苦昼短白天别的页一样，半透明白底 + 磨砂、粗墨边 + 硬投影（这一页的主卡片），墨色字；
+   记账的钴蓝 / 橙 / 青绿调深一点，白底上才读得清。夜里、手机上拉下来的记账面板照旧是黑的（手机面板她 10-17 定的纯黑） */
+[data-theme="light"] .mn.spend {
+  --mn-ink: #0B0B0B; --mn-mute: #74747C; --mn-blue: #2F52B8; --mn-orange: #D46A16; --mn-green: #23877D; --mn-pri: #2F52B8; --mn-pri-ink: #F6F0E2;
+  --mn-bud: rgba(47, 82, 184, .12); --mn-base: rgba(35, 135, 125, .24); --mn-line: #E5E5DF; --mn-hair: none; --mn-dot-ring: #fff;
+  --sp-line: #E5E5DF; --sp-a035: rgba(11, 11, 11, .03); --sp-a045: rgba(11, 11, 11, .035); --sp-a05: rgba(11, 11, 11, .05); --sp-a07: rgba(11, 11, 11, .05); --sp-a08: rgba(11, 11, 11, .06); --sp-a18: rgba(11, 11, 11, .2);
+  --sp-soft: #55555C; --sp-softer: #2C2C33; --sp-axis: #74747C; --sp-scheme: light;
+  background: var(--card); border: var(--b); box-shadow: var(--hard-lg); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); }
+[data-theme="light"] .mn.spend .mn-track { background: rgba(11, 11, 11, .08); }
+[data-theme="light"] .mn.spend .mn-range { background: rgba(11, 11, 11, .12); }
+[data-theme="light"] .mn.spend .mn-range > b { box-shadow: 0 0 0 2px #fff; }
 .spend h3 { margin: 0; font: 700 13px/1.3 var(--display); letter-spacing: -.01em; color: var(--mn-ink); }
 .spend h3 small { margin-left: 6px; font: 500 11px "JetBrains Mono", monospace; letter-spacing: 0; color: var(--mn-mute); }
-.spend kbd { margin-left: 6px; padding: 0 5px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 5px; font: 11px/16px "JetBrains Mono", monospace; color: inherit; opacity: .75; }
+.spend kbd { margin-left: 6px; padding: 0 5px; border: 1px solid var(--sp-a18); border-radius: 5px; font: 11px/16px "JetBrains Mono", monospace; color: inherit; opacity: .75; }
 .spend :is(.sp-seg > button, .sp-nb, .sp-ic, .sp-add, .sp-cat, .sp-row, .sp-ra, .sp-sign, .sp-save, .sp-link, .sp-rec, .sp-pill, .sp-more):focus-visible { outline: 1.5px solid var(--mn-blue); outline-offset: 2px; }
 .spend .sp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
@@ -315,33 +328,33 @@
 .spend .sp-tnav h2 { min-width: 0; padding: 0 2px; white-space: nowrap; }
 .spend .sp-tnav .sp-nb { padding: 2px 9px; font-size: 19px; line-height: 1.2; }
 .spend .sp-now[hidden] { display: none; }
-.spend .sp-up { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: rgba(255, 255, 255, .08); font: 600 9.5px/1.5 var(--num); letter-spacing: .07em; text-transform: uppercase; color: var(--mn-mute); vertical-align: 1px; }
+.spend .sp-up { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--sp-a08); font: 600 9.5px/1.5 var(--num); letter-spacing: .07em; text-transform: uppercase; color: var(--mn-mute); vertical-align: 1px; }
 .spend .sp-status { margin: 4px 0 0; font-size: 12px; color: var(--mn-mute); }
 .spend .sp-status.bad { color: var(--mn-orange); }
 .spend .sp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.spend .sp-seg { position: relative; display: inline-flex; padding: 2px; border-radius: 999px; background: rgba(255, 255, 255, .08); }
+.spend .sp-seg { position: relative; display: inline-flex; padding: 2px; border-radius: 999px; background: var(--sp-a08); }
 .spend .sp-seg > i { position: absolute; top: 2px; bottom: 2px; left: 2px; width: 0; border-radius: 999px; background: var(--mn-pri); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16); transition: left .28s var(--mn-spring), width .28s var(--mn-spring); }
-.spend .sp-seg > button { all: unset; position: relative; z-index: 1; padding: 4px 11px; border-radius: 999px; font: 600 12.5px/1.4 var(--body); color: #B9B5AC; cursor: pointer; transition: color .2s; }
+.spend .sp-seg > button { all: unset; position: relative; z-index: 1; padding: 4px 11px; border-radius: 999px; font: 600 12.5px/1.4 var(--body); color: var(--sp-soft); cursor: pointer; transition: color .2s; }
 .spend .sp-seg > button.on { color: var(--mn-pri-ink); }
-.spend .sp-nb { all: unset; padding: 4px 9px; border-radius: 999px; font: 600 13px/1.4 var(--body); color: #D8D4CB; cursor: pointer; transition: background .15s, opacity .15s; }
+.spend .sp-nb { all: unset; padding: 4px 9px; border-radius: 999px; font: 600 13px/1.4 var(--body); color: var(--sp-softer); cursor: pointer; transition: background .15s, opacity .15s; }
 .spend .sp-nb:disabled { opacity: .35; cursor: default; }
 /* 回到现在：一个小圆点（在别的时期时是实心青柠，已经在现在就淡掉） */
 .spend .sp-now { display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; }
 .spend .sp-now i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent, #CCFF00); }
-.spend .sp-find { display: inline-flex; align-items: center; gap: 7px; width: 210px; height: 32px; padding: 0 8px 0 11px; border-radius: 999px; background: rgba(255, 255, 255, .07); box-shadow: var(--mn-hair); color: var(--mn-mute); cursor: text; }
+.spend .sp-find { display: inline-flex; align-items: center; gap: 7px; width: 210px; height: 32px; padding: 0 8px 0 11px; border-radius: 999px; background: var(--sp-a07); box-shadow: var(--mn-hair); color: var(--mn-mute); cursor: text; }
 .spend .sp-find .ic { width: 15px; height: 15px; flex: none; }
 .spend .sp-find input { all: unset; flex: 1; min-width: 0; font: 13px var(--body); color: var(--mn-ink); }
 .spend .sp-find input::placeholder { color: var(--mn-mute); }
 .spend .sp-find input::-webkit-search-cancel-button { display: none; }
 .spend .sp-find:focus-within { box-shadow: inset 0 0 0 1.5px var(--mn-blue); }
 .spend .sp-find:focus-within kbd { display: none; }
-.spend .sp-ic { all: unset; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; color: #D8D4CB; cursor: pointer; transition: background .15s; }
+.spend .sp-ic { all: unset; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; color: var(--sp-softer); cursor: pointer; transition: background .15s; }
 .spend .sp-ic .ic { width: 18px; height: 18px; }
 .spend .sp-add { all: unset; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px 0 12px; border-radius: 999px; background: var(--mn-pri); color: var(--mn-pri-ink); font: 600 13px var(--body); cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16); transition: transform .28s var(--mn-spring), filter .15s; }
 .spend .sp-add .ic { width: 15px; height: 15px; }
 .spend .sp-add:active { transform: scale(.96); transition-duration: .12s; }
 @media (hover: hover) {
-  .spend .sp-nb:not(:disabled):hover, .spend .sp-ic:hover { background: rgba(255, 255, 255, .08); }
+  .spend .sp-nb:not(:disabled):hover, .spend .sp-ic:hover { background: var(--sp-a08); }
   .spend .sp-add:hover { filter: brightness(1.12); }
 }
 
@@ -364,17 +377,17 @@
 .spend .sp-main { min-width: 0; }
 .spend .sp-chart { margin: 0; }
 .spend .sp-chart figcaption { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px 18px; margin-bottom: 12px; }
-.spend .sp-lede { margin: 5px 0 0; font-size: 12.5px; color: #B9B5AC; }
+.spend .sp-lede { margin: 5px 0 0; font-size: 12.5px; color: var(--sp-soft); }
 .spend .sp-lede b { font: 500 12.5px "JetBrains Mono", monospace; color: var(--mn-ink); }
 .spend .sp-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--mn-mute); }
 .spend .sp-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .spend .sp-legend i { display: inline-block; width: 14px; height: 8px; border-radius: 2px; }
-.spend .sp-legend .ln { height: 2px; border-radius: 1px; background: #F2EEE6; }
-.spend .sp-legend .tr { height: 0; border-top: 1.5px dashed rgba(242, 238, 230, .6); border-radius: 0; }
+.spend .sp-legend .ln { height: 2px; border-radius: 1px; background: var(--mn-ink); }
+.spend .sp-legend .tr { height: 0; border-top: 1.5px dashed color-mix(in srgb, var(--mn-ink) 60%, transparent); border-radius: 0; }
 .spend .sp-legend .bd { background: var(--mn-bud); }
 .spend .sp-legend .hs { background: var(--mn-base); }
 .spend .mn-chart { display: block; width: 100%; overflow: visible; cursor: crosshair; }
-.spend .mn-chart text { font-size: 11px; fill: #8C8CA0; }
+.spend .mn-chart text { font-size: 11px; fill: var(--sp-axis); }
 .spend .mn-chart .mn-ax { font-family: "JetBrains Mono", ui-monospace, monospace; }
 
 /* 流水表：表头一条线，行之间细线，金额靠右等宽；按天（月）分组，组头写合计 */
@@ -383,7 +396,7 @@
 .spend .sp-pills { display: inline-flex; gap: 6px; }
 .spend .sp-pill { all: unset; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px 0 11px; border-radius: 999px; background: rgba(76, 114, 216, .24); font-size: 12px; cursor: pointer; }
 .spend .sp-pill span { opacity: .7; }
-.spend .sp-pill[data-act="recent"] { padding: 0 11px; background: rgba(255, 255, 255, .08); color: #D8D4CB; }
+.spend .sp-pill[data-act="recent"] { padding: 0 11px; background: var(--sp-a08); color: var(--sp-softer); }
 .spend .sp-pill[data-act="recent"].on { background: var(--mn-pri); color: var(--mn-pri-ink); }
 .spend .sp-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13.5px; }
 .spend .sp-table col.d { width: 78px; }
@@ -396,53 +409,53 @@
 .spend .sp-table thead th { padding-top: 6px; padding-bottom: 7px; font: 600 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--mn-mute); border-bottom: 1px solid var(--sp-line); }
 .spend .sp-table .r { text-align: right; }
 .spend .sp-table .c, .spend .sp-table .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.spend .sp-table td.n { color: #B9B5AC; }
+.spend .sp-table td.n { color: var(--sp-soft); }
 .spend .sp-table td.d { color: var(--mn-mute); font-size: 12.5px; }
 .spend .sp-table td.r { font-size: 14px; }
 .spend .sp-table .in { color: var(--mn-green); }
-.spend .sp-grp :is(th, td) { padding-top: 18px; padding-bottom: 6px; font: 600 12px var(--body); color: #D8D4CB; border-bottom: 1px solid var(--sp-line); }
-.spend .sp-grp td.r { font: 500 12px "JetBrains Mono", monospace; color: #B9B5AC; }
+.spend .sp-grp :is(th, td) { padding-top: 18px; padding-bottom: 6px; font: 600 12px var(--body); color: var(--sp-softer); border-bottom: 1px solid var(--sp-line); }
+.spend .sp-grp td.r { font: 500 12px "JetBrains Mono", monospace; color: var(--sp-soft); }
 .spend .sp-grp small { margin-left: 6px; font: 500 11px "JetBrains Mono", monospace; color: var(--mn-mute); }
-.spend .sp-row td { border-bottom: 1px solid rgba(255, 255, 255, .05); }
+.spend .sp-row td { border-bottom: 1px solid var(--sp-a05); }
 .spend .sp-row { cursor: pointer; }
 .spend .sp-row:focus-visible { outline-offset: -2px; }
 .spend .sp-ra { all: unset; padding: 2px 6px; border-radius: 6px; font-size: 12px; color: var(--mn-blue); cursor: pointer; opacity: 0; transition: opacity .12s; }
 .spend .sp-ra.x { padding: 0 6px; font-size: 16px; line-height: 1; color: #E8674A; }
 .spend .sp-row:is(:hover, :focus-visible, :focus-within) .sp-ra { opacity: 1; }
-@media (hover: hover) { .spend .sp-row:hover td { background: rgba(255, 255, 255, .035); } .spend .sp-ra:hover { background: rgba(255, 255, 255, .08); } }
+@media (hover: hover) { .spend .sp-row:hover td { background: var(--sp-a035); } .spend .sp-ra:hover { background: var(--sp-a08); } }
 @media (hover: none) { .spend .sp-ra { opacity: 1; } }
 .spend .sp-row.new td { animation: sp-new 1.6s var(--mn-enter); }
 @keyframes sp-new { from { background: rgba(76, 114, 216, .3); } }
 .spend .sp-none { padding: 28px 0; font-size: 13px; color: var(--mn-mute); text-align: left; }
 .spend .sp-more { all: unset; display: block; margin: 12px 0 0; font-size: 12.5px; color: var(--mn-blue); cursor: pointer; }
 /* 加：页头下面一整行；改：表里原地那一行。直接打字 */
-.spend .sp-addbar { margin: -4px 0 18px; padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, .045); box-shadow: var(--mn-hair); }
+.spend .sp-addbar { margin: -4px 0 18px; padding: 14px 16px; border-radius: 14px; background: var(--sp-a045); box-shadow: var(--mn-hair); }
 .spend .sp-form td { padding: 12px 0 12px; border-bottom: 1px solid var(--sp-line); }
 .spend .sp-fl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.spend .sp-fi { box-sizing: border-box; height: 32px; padding: 0 10px; border: 0; border-radius: 9px; background: rgba(255, 255, 255, .07); box-shadow: var(--mn-hair); font: 13.5px var(--body); color: var(--mn-ink); color-scheme: dark; }
+.spend .sp-fi { box-sizing: border-box; height: 32px; padding: 0 10px; border: 0; border-radius: 9px; background: var(--sp-a07); box-shadow: var(--mn-hair); font: 13.5px var(--body); color: var(--mn-ink); color-scheme: var(--sp-scheme); }
 .spend .sp-fi:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--mn-blue); }
 .spend .sp-fi::placeholder { color: #6E6E82; }
 .spend .sp-f-amt { width: 118px; text-align: right; font: 500 15px "JetBrains Mono", monospace; }
 .spend .sp-f-cat { max-width: 170px; }
 .spend .sp-f-cur { width: 76px; font: 500 12.5px "JetBrains Mono", monospace; }
 /* 页头的「看哪种钱」：和搜索框一样的淡底小药丸 */
-.spend .sp-curs { height: 32px; padding: 0 10px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .07); box-shadow: var(--mn-hair); font: 500 12.5px "JetBrains Mono", monospace; color: #D8D4CB; color-scheme: dark; cursor: pointer; }
+.spend .sp-curs { height: 32px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--sp-a07); box-shadow: var(--mn-hair); font: 500 12.5px "JetBrains Mono", monospace; color: var(--sp-softer); color-scheme: var(--sp-scheme); cursor: pointer; }
 .spend .sp-curs:focus-visible { outline: 1.5px solid var(--mn-blue); outline-offset: 2px; }
 /* 流水表里别的钱的那一笔：底下一行小字是换算过的 */
 .spend .sp-conv { display: block; margin-top: 1px; font: 11px "JetBrains Mono", monospace; color: var(--mn-mute); }
 .spend .sp-f-note { flex: 1 1 150px; min-width: 120px; }
 .spend .sp-f-date { width: 142px; }
-.spend .sp-sign { all: unset; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: rgba(255, 255, 255, .07); font: 500 17px "JetBrains Mono", monospace; color: #F2EEE6; cursor: pointer; }
+.spend .sp-sign { all: unset; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--sp-a07); font: 500 17px "JetBrains Mono", monospace; color: var(--mn-ink); cursor: pointer; }
 .spend .sp-sign.in { background: rgba(79, 179, 169, .22); color: var(--mn-green); }
 .spend .sp-fb { display: inline-flex; align-items: center; gap: 12px; margin-left: auto; }
-.spend .sp-link { all: unset; font-size: 12.5px; color: #B9B5AC; cursor: pointer; }
+.spend .sp-link { all: unset; font-size: 12.5px; color: var(--sp-soft); cursor: pointer; }
 .spend .sp-link.warn { color: #E8674A; }
 .spend .sp-save { all: unset; display: inline-flex; align-items: center; height: 32px; padding: 0 12px 0 14px; border-radius: 999px; background: var(--mn-pri); color: var(--mn-pri-ink); font: 600 13px var(--body); cursor: pointer; }
 .spend .sp-ferr { margin: 6px 0 0 40px; font-size: 12px; color: #E8674A; }
 .spend .sp-ferr:empty { display: none; }
 .spend .sp-recs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0 40px; font-size: 11px; color: var(--mn-mute); }
 .spend .sp-recs > span { margin-right: 4px; }
-.spend .sp-rec { all: unset; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(255, 255, 255, .07); box-shadow: var(--mn-hair); font-size: 12px; color: var(--mn-ink); cursor: pointer; }
+.spend .sp-rec { all: unset; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: var(--sp-a07); box-shadow: var(--mn-hair); font-size: 12px; color: var(--mn-ink); cursor: pointer; }
 .spend .sp-rec .mn-num { opacity: .7; }
 @media (hover: hover) { .spend .sp-rec:hover, .spend .sp-pill:hover { filter: brightness(1.2); } .spend .sp-link:hover { color: var(--mn-ink); } }
 
@@ -454,11 +467,11 @@
 .spend .sp-cn small { margin-left: 4px; font-size: 10.5px; color: var(--mn-mute); }
 .spend .sp-cv { font-size: 13px; text-align: right; }
 .spend .sp-cp { font-size: 11px; text-align: right; color: var(--mn-mute); }
-.spend .sp-cb { position: absolute; left: 8px; right: 8px; bottom: 5px; height: 2px; border-radius: 1px; background: rgba(255, 255, 255, .07); }
+.spend .sp-cb { position: absolute; left: 8px; right: 8px; bottom: 5px; height: 2px; border-radius: 1px; background: var(--sp-a07); }
 .spend .sp-cb::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: var(--w); border-radius: inherit; background: var(--mn-blue); transition: width .52s var(--mn-enter); }
 .spend .sp-cb.in::after { background: var(--mn-green); }
 .spend .sp-cat.on { background: rgba(76, 114, 216, .2); box-shadow: inset 0 0 0 1px rgba(76, 114, 216, .55); }
-@media (hover: hover) { .spend .sp-cat:not(.on):hover { background: rgba(255, 255, 255, .05); } }
+@media (hover: hover) { .spend .sp-cat:not(.on):hover { background: var(--sp-a05); } }
 .spend .sp-foot { margin: 10px 8px 0; font-size: 11px; color: var(--mn-mute); }
 .spend .sp-empty { margin: 0; padding: 14px 8px; font-size: 13px; color: var(--mn-mute); }
 

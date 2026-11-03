@@ -212,7 +212,7 @@ export function ctx() {
   return ctxCache;
 }
 
-// 按了 Chore 又不到一分钟就停的那天：Chores 那条建了、没记到时间，不列出来（不然条上、日历里多一个小点）
+// 按了 Chore 又不到一分钟就停的那天：Chores 那条建了、没记到时间，不列出来（不然条上多一个小点）
 export function tasksOn(date) {
   return all("tasks").filter((t) => t.date === date && !(E.isChore(t) && !t.times && !(Number(t.actual) > 0))).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
 }

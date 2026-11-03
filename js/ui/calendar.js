@@ -65,7 +65,9 @@ function blockHTML(b, d, pool) {
 // 分母是那天的 box（右上角的数，她是 10h）。超过 box = 整条静止的红（强制，不闪）；没超 box、超过 7 小时（LONG_DAY）= 闪。
 // 金条那天都不红（Leisure 占得多的那天她自己改成金条）。大类的 Counts as progress 和这里无关（那是给季度表的）
 function cellHTML(c, d, { month = false, outside = false, scores = null, still = false, pool = false } = {}) {
-  const tasks = store.tasksOn(d);
+  // Chore 键记下的那条不上日历（她 2026-11-02 说的：没排，只是按了键，总会有一些事突然要做）：不画，也不算进「排了的」。
+  // 以前的日子顶上那条是实际记下的总时间，这段时间照算；Chores 大类下自己排的任务照常显示
+  const tasks = store.tasksOn(d).filter((t) => !store.isChore(t));
   const unscored = scores && SC.unscored(scores, store.scoreOf(d), d, c.today);
   const ghosts = E.ghostsOn(c, d);
   const sum = E.daySummary(c, d);

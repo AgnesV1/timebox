@@ -158,7 +158,7 @@ Started or stopped late: while timing, click "Since 09:10" in the bar to set the
 
 **Chore key (same on computer and phone)**: a small round key at the top right of today's list starts timing housework; press again to stop. While timing, five emoji sort the segment —
 🍳 cooking, ☎️ email / calls / messages, 🗃️ paperwork / filing, 🪪 IDs and other must-dos, 🏠 housework and tidying; tap again to clear; none = unsorted.
-A day's housework is one Chores task (one more segment per press) and stays out of the normal list; segments are grouped by emoji into one line of chips ("🍳 40m ×3 · 8m = 48m"), and opening it shows each segment.
+A day's housework is one Chores task (one more segment per press) and stays out of the normal list and off the calendar, since nobody planned it (its time still counts in a past day's bar, which is everything logged; tasks you schedule under Chores show as usual); segments are grouped by emoji into one line of chips ("🍳 40m ×3 · 8m = 48m"), and opening it shows each segment.
 
 **Deep work (◆ Deep)**: tasks that need full focus can be marked Deep — ◆ Deep when adding a task, the ◆ next to Start in the bar (also while timing), or the editor on the computer.
 Tick "Deep work by default" in a plan's editor and all its tasks (including automatic and past ones) count as deep; each task can still be changed.

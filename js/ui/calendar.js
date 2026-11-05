@@ -1,4 +1,4 @@
-// 日历（电脑）：周视图 / 月视图，右边是 Pool。
+// 日历（电脑）：周视图 / 月视图，右边是 Pool；Year 视图一年 12 个小月历，只有数字，靠筛选标日子（计算在 js/year.js），不放任务，也不开 Pool。
 // 把 Pool 里的一项拖到某天 = 那天这个计划下面多一条；计划名本身拖过去 = 那天这个计划空的一行（Swimming 这种）。
 // 一个计划那天是一张便利贴：Pool 关着只写计划名，鼠标停上去展开成一行一项；Pool 开着（排计划的时候）直接一行一项、右边写分钟，日期后面写那天排了几小时
 //   （她 2026-10-27 挑的甲；每一项能单独拖到别的天）；
@@ -13,16 +13,14 @@ import * as store from "../store.js";
 import * as E from "../engine.js";
 import * as L from "../lists.js";
 import { esc, on, icon } from "../dom.js";
-import { addDays, addMonths, diffDays, startOfWeek, startOfMonth, daysInMonth, range, fmtShort, fmtHours, WEEKDAYS, MONTHS_LONG, weekday } from "../dates.js";
+import { addDays, addMonths, diffDays, startOfWeek, startOfMonth, daysInMonth, range, fmtShort, fmtHours, isoOf, WEEKDAYS, MONTHS, MONTHS_LONG, weekday } from "../dates.js";
+import * as Y from "../year.js";
 import * as SC from "../scores.js";
 import { isPayday } from "../offdays.js";
 import { colorOf, badgeOf, projectOptions, groupsOf, toast } from "./common.js";
 import { ideasPoolHTML } from "./ideas.js";
 import { showDate } from "./today.js";
 import { openTaskEditor } from "./editor.js";
-
-// 顶上那条超过这么多分钟（还没超过 box）就闪（她 2026-10-27 要的警示线；暂定，之后可能取消）
-const LONG_DAY = 7 * 60;
 
 let anchor = "";
 let adding = "";      // 正在哪一天的格子里加任务
@@ -33,12 +31,12 @@ const weekStart = () => store.prefs().weekStartsOn;
 
 function chipHTML(t) {
   const p = badgeOf(t);
-  return '<div class="ev st-' + (t.status || "open") + (t.optional ? " opt" : "") + '" data-drag="task:' + t.id + '" data-act="edit-task" data-id="' + t.id + '" style="--c:' + colorOf(t) + '" title="' + esc(t.title + (p ? " · " + p.name : "")) + '">' +
+  return '<div class="ev st-' + (t.status || "open") + (t.optional ? " opt" : "") + '" role="button" tabindex="0" data-drag="task:' + t.id + '" data-act="edit-task" data-id="' + t.id + '" style="--c:' + colorOf(t) + '" title="' + esc(t.title + (p ? " · " + p.name : "")) + '">' +
     '<span class="t">' + (E.isRoutine(t) ? '<i class="rt">↻</i>' : "") + esc(t.title) + "</span>" + (Number(t.est) > 0 ? '<span class="m num">' + Number(t.est) + "</span>" : "") + "</div>";
 }
 
 function ghostHTML(g) {
-  return '<div class="ev ghost" data-drag="ghost:' + esc(g.key) + '" data-act="open-ghost" data-key="' + esc(g.key) + '" style="--c:' + esc(g.plan.color) + '" title="' + esc(g.title + " · repeats") + '">' +
+  return '<div class="ev ghost" role="button" tabindex="0" data-drag="ghost:' + esc(g.key) + '" data-act="open-ghost" data-key="' + esc(g.key) + '" style="--c:' + esc(g.plan.color) + '" title="' + esc(g.title + " · repeats") + '">' +
     '<span class="t"><i class="rt">↻</i>' + esc(g.title) + "</span>" + (Number(g.est) > 0 ? '<span class="m num">' + Number(g.est) + "</span>" : "") + "</div>";
 }
 
@@ -53,7 +51,7 @@ function blockHTML(b, d, pool) {
   const spent = b.row ? E.spentMin(b.row) : 0;
   const st = b.row?.status || (lines.length && lines.every((t) => t.status === "done") ? "done" : "open");
   const name = b.row?.title || plan.name, list = lines.map(li).join("");
-  return '<div class="ev blk' + (pool ? " blk-ls" : "") + " st-" + st + (b.row?.optional ? " opt" : "") + '" data-drag="blk:' + esc(plan.id) + "|" + d + '" data-act="open-day" data-date="' + d + '" style="--c:' + esc(plan.color || "var(--c-None)") + '" title="' +
+  return '<div class="ev blk' + (pool ? " blk-ls" : "") + " st-" + st + (b.row?.optional ? " opt" : "") + '" role="button" tabindex="0" data-drag="blk:' + esc(plan.id) + "|" + d + '" data-act="open-day" data-date="' + d + '" style="--c:' + esc(plan.color || "var(--c-None)") + '" title="' +
     esc(name + (name !== plan.name ? " · " + plan.name : "") + (lines.length ? " · " + lines.length + " thing" + (lines.length > 1 ? "s" : "") : "") + (spent ? " · " + fmtHours(spent) + " logged" : "")) + '">' +
     '<span class="t"><span class="bt">' + esc(name) + "</span>" + (pool ? list : "") + "</span>" +
     (!pool && lines.length ? '<div class="full"><span class="bt">' + esc(name) + "</span>" + list + "</div>" : "") + "</div>";
@@ -62,8 +60,8 @@ function blockHTML(b, d, pool) {
 // 排计划的样子（Pool 开着，而且是今天和以后——以前的日子不跟着 Pool 变，她 2026-10-27 说的）：计划那张一行一项、别的任务也写分钟，
 // 日期后面是那天排了几小时（计划那一块算下面几项，js/lists.js 的 dayMin；以后的日子加上固定星期几的预览，Gym 这种也算进 box）。
 // 顶上那条（她 2026-10-28 定的）：以前的日子 = 实际记下的总时间，今天和以后 = 排了的（就是日期后面那个数，含固定星期几的预览）——都算所有大类。
-// 分母是那天的 box（右上角的数，她是 10h）。超过 box = 整条静止的红（强制，不闪）；没超 box、超过 7 小时（LONG_DAY）= 闪。
-// 金条那天都不红（Leisure 占得多的那天她自己改成金条）。大类的 Counts as progress 和这里无关（那是给季度表的）
+// 分母是那天的 box（右上角的数，她是 10h）。超过 box = 整条静止的红（强制，不闪）；没超 box、超过 7 小时（js/year.js 的 LONG_DAY）= 闪。
+// 金条那天都不红（Leisure 占得多的那天她自己改成金条）。大类的 Counts as progress 和这里无关（那是给季度表的）。这条规则在 js/year.js 的 dayLoad，Year 视图也用它
 function cellHTML(c, d, { month = false, outside = false, scores = null, still = false, pool = false } = {}) {
   // Chore 键记下的那条不上日历（她 2026-11-02 说的：没排，只是按了键，总会有一些事突然要做）：不画，也不算进「排了的」。
   // 以前的日子顶上那条是实际记下的总时间，这段时间照算；Chores 大类下自己排的任务照常显示
@@ -72,16 +70,13 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
   const ghosts = E.ghostsOn(c, d);
   const sum = E.daySummary(c, d);
   const blocks = L.dayBlocks(c, tasks);
-  const planned = L.dayMin(blocks) + ghosts.reduce((a, g) => a + (Number(g.est) || 0), 0);
   const capOver = c.capacity.overrides[d] !== undefined;
   const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d), ahead = pool && d >= c.today;
-  const past = d < c.today, val = past ? sum.done : planned;
-  const over = !gold && sum.cap > 0 && val > sum.cap;
-  const cls = ["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", over ? "over" : "", ahead ? "cal-plan" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
+  const past = d < c.today, { val, planned, over, long } = Y.dayLoad(c, d, gold);
+  const cls =["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", over ? "over" : "", ahead ? "cal-plan" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
   const all = [...blocks.map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d, ahead))), ...ghosts.map(ghostHTML)];
   const loadPct = over ? 100 : sum.cap ? Math.min(100, (val / sum.cap) * 100) : 0;
-  const long = !gold && !over && val > LONG_DAY;   // 金条那天不变红
-  let h = '<div class="' + cls + '" data-drop="day:' + d + '">' +
+  let h ='<div class="' + cls + '" data-drop="day:' + d + '">' +
     '<div class="cell-head"><span class="dn-w"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"' + (unscored ? ' title="Not scored yet"' : "") + "><span>" + (month ? "" : WEEKDAYS[wd]) + "</span><b>" + Number(d.slice(8)) + "</b>" + (isPayday(d) ? '<span class="payday" title="Payday">$</span>' : "") + (unscored ? '<i class="dsc-dot" aria-label="Not scored yet"></i>' : "") + "</button>" +
     (ahead && planned > 0 ? '<span class="cal-hrs num" title="Planned this day">' + fmtHours(planned) + "</span>" : "") +
     (wd === 0 || wd === 6 ? "" : '<button type="button" class="offday-t' + (off.off ? " on" : "") + '" data-act="off-day" data-date="' + d + '" aria-pressed="' + off.off + '" title="' + esc(off.off ? (off.holiday || "Day off") + " — click to clear" : "Mark as a day off") + '">💤</button>') + "</span>" +
@@ -100,12 +95,108 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
   return h + "</div>";
 }
 
+// ---------- Year ----------
+// 她 2026-11-04 挑的：筛选可以叠，填色的中了几样就斜着分色（最多 3 段，都写在读数那一行），标签上写这一年有几天。
+// 假期和通勤画成框（她说的），和填色叠得上；今天是数字底下一个小点（框被它们占了）。
+// 超 box = 实心红块，超 7 小时 = 红字（落在别的色块上看不清，就在底边画一道红线）。颜色每次现读，白天夜里跟着变。
+// 读数那一行：鼠标或键盘在哪一天就写哪一天，没停在数字上写今天。鼠标停在标签上：只显示这一层，移开就回去（只重画数字，标签不动）。
+// 键盘：数字区只占一个 Tab，方向键一天一天走、上下一周。
+const MARKS = { over: "Over the box", rest: "Rest", commute: "Commute" };
+
+let yrPeek = "";      // 鼠标停在哪个标签上
+let yrClicked = "";   // 刚点的那个标签：鼠标还在它上面就不预览，不然点了关掉反而只剩它
+let yrHover = "";     // 鼠标或键盘在哪一天
+let yrCursor = "";    // Tab 进数字区先到哪一天
+
+const yearOf = () => Number((anchor || store.today()).slice(0, 4));
+const yearOn = () => new Set(yrPeek ? [yrPeek] : store.local().yearLayers || []);
+
+function yearPaint(groups) {
+  const css = getComputedStyle(document.documentElement), token = (name) => css.getPropertyValue(name).trim();
+  const paint = { over: token("--warn"), rest: "#F5C542", holiday: token("--yr-holiday"), commute: token("--ink") };
+  for (const g of groups) paint[Y.groupLayer(g.name)] = g.color || "var(--muted)";
+  return paint;
+}
+
+function yearWords(day, on, groups) {
+  const hits = Y.hitsOf(day, on, groups), long = on.has(Y.OVER) && day.over === 1;
+  return [WEEKDAYS[weekday(day.date)] + ", " + fmtShort(day.date), ...hits.map((h) => (h === "holiday" ? day.holiday : MARKS[h] || h.slice(2))), ...(long ? ["Over 7 hours"] : [])].join(" · ");
+}
+
+function yearDayHTML(day, c, on, groups, paint, cursor) {
+  const hits = Y.hitsOf(day, on, groups);
+  const fills = hits.filter((h) => !Y.FRAMES.has(h)).slice(0, 3).map((h) => paint[h]);
+  const frames = hits.filter((h) => Y.FRAMES.has(h)).map((h, i) => "inset 0 0 0 " + 1.5 * (i + 1) + "px " + paint[h]).join(",");
+  const long = on.has(Y.OVER) && day.over === 1;
+  const stop = (i) => Math.round((i * 100) / fills.length) + "%";
+  // 分色的那块：一黑一白的两段，黑字白字都有半边看不见，数字描一圈反色
+  const ink = fills.length ? Y.inkOn(fills) : "";
+  const fill = !fills.length ? ""
+    : fills.length === 1 ? "background:" + fills[0] + ";color:" + ink
+    : "background:linear-gradient(135deg," + fills.map((x, i) => x + " " + stop(i) + " " + stop(i + 1)).join(",") + ");color:" + ink + ";--yr-halo:" + (ink === "#FFFFFF" ? "#0B0B0B" : "#FFFFFF");
+  const style = [fill, frames ? "--yr-frame:" + frames : ""].filter(Boolean).join(";");
+  const cls = ["yr-d", day.date > c.today ? "yr-ahead" : "", day.date === c.today ? "yr-today" : "", long ? "yr-long" : "", fills.length ? "yr-fill" : "", fills.length > 1 ? "yr-split" : ""].filter(Boolean).join(" ");
+  return '<button type="button" class="' + cls + '" data-act="open-day" data-date="' + day.date + '" tabindex="' + (day.date === cursor ? 0 : -1) + '" aria-label="' + esc(yearWords(day, on, groups)) + '"' + (style ? ' style="' + esc(style) + '"' : "") + ">" + Number(day.date.slice(8)) + "</button>";
+}
+
+function yearMonthsHTML(c, y, groups, paint) {
+  const days = Y.yearDays(c, y), on = yearOn();
+  const inYear = (d) => d && Number(d.slice(0, 4)) === y;
+  const cursor = inYear(yrCursor) ? yrCursor : inYear(c.today) ? c.today : isoOf(y, 1, 1);
+  let at = 0;
+  return MONTHS.map((name, m) => {
+    const first = isoOf(y, m + 1, 1), n = daysInMonth(first), blank = diffDays(startOfWeek(first, weekStart()), first);
+    const cells = days.slice(at, at + n).map((d) => yearDayHTML(d, c, on, groups, paint, cursor)).join("");
+    at += n;
+    return '<section class="yr-month"><button type="button" class="yr-name" data-act="cal-month" data-date="' + first + '">' + name + '</button><div class="yr-days">' + "<span></span>".repeat(blank) + cells + "</div></section>";
+  }).join("");
+}
+
+// 读数那一行写什么：停着的那天，没停就是今天（看别的年份时空着）
+function yearReadText(c, y, groups) {
+  const date = yrHover || c.today, day = Number(date.slice(0, 4)) === y ? Y.yearDays(c, y).find((d) => d.date === date) : null;
+  return day ? yearWords(day, yearOn(), groups) : "";
+}
+
+function paintYearRead() {
+  const el = document.querySelector(".yr-read");
+  if (el) { const c = store.ctx(); el.textContent = yearReadText(c, yearOf(), c.groups || []); }
+}
+
+// 预览标签时只换数字；键盘焦点正好在数字上就放回同一天
+function repaintYear() {
+  const grid = document.querySelector(".yr-grid");
+  if (!grid) return;
+  const c = store.ctx(), groups = c.groups || [], focused = grid.contains(document.activeElement) ? document.activeElement.dataset.date : "";
+  grid.innerHTML = yearMonthsHTML(c, yearOf(), groups, yearPaint(groups));
+  if (focused) grid.querySelector('[data-act="open-day"][data-date="' + focused + '"]')?.focus({ preventScroll: true });
+  paintYearRead();
+}
+
+function yearHTML(c, y) {
+  const groups = c.groups || [], counts = Y.yearCounts(Y.yearDays(c, y), groups), paint = yearPaint(groups);
+  const on = new Set(store.local().yearLayers || []);
+  const chip = (id, label, swatch) => '<button type="button" class="yr-chip' + (on.has(id) ? " yr-on" : "") + '" data-act="yr-layer" data-layer="' + esc(id) + '" aria-pressed="' + on.has(id) + '">' +
+    (swatch ? '<i style="background:' + esc(swatch) + '"></i>' : "") + esc(label) + '<small class="num">' + counts[id] + "</small></button>";
+  const chips = chip(Y.DAYS, "Rest + Commute + Holiday") + chip(Y.OVER, "Overworked", paint.over) + groups.map((g) => chip(Y.groupLayer(g.name), g.name, paint[Y.groupLayer(g.name)])).join("");
+  const key = (color, word) => '<span><i style="background:' + color + '"></i>' + word + "</span>";
+  const box = (color, word) => '<span><i style="box-shadow:inset 0 0 0 1.5px ' + color + '"></i>' + word + "</span>";
+  const legend = [...(on.has(Y.DAYS) ? [key(paint.rest, "Rest"), box(paint.holiday, "Holiday"), box(paint.commute, "Commute")] : []),
+    ...(on.has(Y.OVER) ? [key(paint.over, "Over the box"), '<span class="yr-long-key">Over 7 hours</span>'] : [])].join("");
+  // Settings 里的 Archive 只留今年和去年，更早的任务可能在表格里
+  const older = y < Number(c.today.slice(0, 4)) - 1 ? '<p class="yr-note">Tasks from this far back may have moved to the Archive tab of your Sheet.</p>' : "";
+  return '<div class="yr">' + older + '<div class="yr-chips">' + chips + '</div><p class="yr-read" aria-hidden="true">' + esc(yearReadText(c, y, groups)) + '</p><div class="yr-grid">' + yearMonthsHTML(c, y, groups, paint) + "</div>" + (legend ? '<div class="yr-legend">' + legend + "</div>" : "") + "</div>";
+}
+
 export function calendarHTML(c) {
   if (!anchor) anchor = c.today;
-  const week = mode() === "week", scores = store.scoreSetup(), pool = Boolean(store.local().pool);
+  const view = mode(), week = view === "week", scores = store.scoreSetup(), pool = Boolean(store.local().pool);
   const still = Boolean(document.getElementById("sky")?.classList.contains("still"));   // 设置里关了动效：金条不反光
   let title, body;
-  if (week) {
+  if (view === "year") {
+    title = anchor.slice(0, 4);
+    body = yearHTML(c, Number(title));
+  } else if (week) {
     const s = startOfWeek(anchor, weekStart());
     const e = addDays(s, 6);
     title = fmtShort(s) + " – " + (s.slice(5, 7) === e.slice(5, 7) ? Number(e.slice(8)) : fmtShort(e));
@@ -124,8 +215,8 @@ export function calendarHTML(c) {
     '<header class="page-head"><div><h2>' + title + "</h2></div>" +
     '<div class="tools"><button type="button" class="nav" data-act="cal-today">Today</button>' +
     '<button type="button" class="nav" data-act="cal-prev" aria-label="Previous">' + icon("left") + '</button><button type="button" class="nav" data-act="cal-next" aria-label="Next">' + icon("right") + "</button>" +
-    '<span class="seg"><button type="button" data-act="cal-mode" data-mode="week"' + (week ? ' class="on"' : "") + '>Week</button><button type="button" data-act="cal-mode" data-mode="month"' + (!week ? ' class="on"' : "") + ">Month</button></span>" +
-    '<button type="button" class="nav' + (store.local().pool ? " on" : "") + '" data-act="pool-toggle">' + icon("pool") + " Pool</button></div></header>" +
+    '<span class="seg">' + [["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([m, word]) => '<button type="button" data-act="cal-mode" data-mode="' + m + '"' + (view === m ? ' class="on"' : "") + ">" + word + "</button>").join("") + "</span>" +
+    (view === "year" ? "" : '<button type="button" class="nav' + (store.local().pool ? " on" : "") + '" data-act="pool-toggle">' + icon("pool") + " Pool</button>") + "</div></header>" +
     body + "</div>";
 }
 
@@ -166,12 +257,19 @@ export function poolHTML(c) {
 export function initCalendar(rerender) {
   on(document, "click", ".calendar [data-act], .pool-inner [data-act], .page-tools [data-act]", (e, el) => {
     const act = el.dataset.act;
-    const step = (n) => { anchor = mode() === "week" ? addDays(anchor || store.today(), 7 * n) : addMonths(anchor || store.today(), n); rerender(); };
+    const step = (n) => { anchor = mode() === "week" ? addDays(anchor || store.today(), 7 * n) : addMonths(anchor || store.today(), mode() === "year" ? 12 * n : n); rerender(); };
     if (act === "cal-prev") step(-1);
     else if (act === "cal-next") step(1);
     else if (act === "cal-today") { anchor = store.today(); rerender(); }
     else if (act === "cal-mode") store.setLocal({ calMode: el.dataset.mode });
-    else if (act === "pool-toggle") store.setLocal({ pool: !store.local().pool });
+    else if (act === "cal-month") { anchor = el.dataset.date; store.setLocal({ calMode: "month" }); }   // Year 上点月份名
+    else if (act === "yr-layer") {
+      const on = new Set(store.local().yearLayers || []);
+      if (!on.delete(el.dataset.layer)) on.add(el.dataset.layer);
+      yrPeek = "";
+      yrClicked = el.dataset.layer;
+      store.setLocal({ yearLayers: [...on] });
+    } else if (act === "pool-toggle") store.setLocal({ pool: !store.local().pool });
     else if (act === "edit-task") openTaskEditor(el.dataset.id);
     else if (act === "open-ghost") { const id = store.materialize(el.dataset.key); if (id) openTaskEditor(id); }
     else if (act === "commute") store.toggleCommute(el.dataset.date);
@@ -189,6 +287,35 @@ export function initCalendar(rerender) {
       input?.focus();
       input?.select();
     }
+  });
+
+  // 便利贴是 div：Tab 走得到（见 chipHTML 们），回车 / 空格和点一下一样
+  on(document, "keydown", ".calendar .ev[role=button]", (e, el) => {
+    if ((e.key === "Enter" || e.key === " ") && e.target === el) { e.preventDefault(); el.click(); }
+  });
+
+  // Year：鼠标在标签上 = 预览这一层，在数字上 = 读数写这一天；从格子之间的缝经过不算离开
+  document.addEventListener("mouseover", (e) => {
+    if (mode() !== "year" || !e.target.closest) return;
+    const layer = e.target.closest(".yr-chip")?.dataset.layer || "";
+    if (layer !== yrClicked) yrClicked = "";
+    const peek = yrClicked ? "" : layer || (e.target.closest(".yr-chips") ? yrPeek : "");
+    if (peek !== yrPeek) { yrPeek = peek; repaintYear(); }
+    const hover = e.target.closest(".yr-d")?.dataset.date || (e.target.closest(".yr-grid") ? yrHover : "");
+    if (hover !== yrHover) { yrHover = hover; paintYearRead(); }
+  });
+  on(document, "focusin", ".yr-d", (e, el) => { yrHover = el.dataset.date; paintYearRead(); });
+  on(document, "focusout", ".yr-d", () => { yrHover = ""; paintYearRead(); });
+  on(document, "keydown", ".yr-d", (e, el) => {
+    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const next = document.querySelector('.yr-d[data-date="' + addDays(el.dataset.date, step) + '"]');
+    if (!next) return;
+    el.tabIndex = -1;
+    next.tabIndex = 0;
+    yrCursor = next.dataset.date;
+    next.focus();
   });
 
   // 改某天的 box：回车或离开就存；清空 = 用每周默认；Esc 放弃

@@ -11,7 +11,7 @@ import { paintPatterns } from "./patterns.js";
 import { initFx, setFx, confetti, refreshFxColors, tintSky } from "./fx.js";
 import { toast, ballHTML } from "./ui/common.js";
 import * as L from "./lists.js";
-import { initModal, closeModal } from "./ui/modal.js";
+import { initModal, closeModal, describe, focusAgain } from "./ui/modal.js";
 import { initSelect } from "./ui/select.js";
 import { todayHTML, initToday, shownDate, showDate, marquees } from "./ui/today.js";
 import { calendarHTML, poolHTML, initCalendar, handleDrop } from "./ui/calendar.js";
@@ -123,10 +123,11 @@ function captureKeep() {
     });
   }
   const a = document.activeElement;
-  return { keep, active: a?.dataset?.keep && keepRoot(a) ? keepRoot(a) + "|" + a.dataset.keep : "" };
+  const button = a?.matches?.("#main button, #main a[href], #main [role=button], #side button, #side a[href], #pool button, #pool [role=button], #dock button") ? describe(a, { cls: false }) : "";
+  return { keep, active: a?.dataset?.keep && keepRoot(a) ? keepRoot(a) + "|" + a.dataset.keep : "", button };
 }
 
-function restoreKeep({ keep, active }) {
+function restoreKeep({ keep, active, button }) {
   for (const [k, v] of Object.entries(keep)) {
     const cut = k.indexOf("|");
     const el = document.querySelector("#" + k.slice(0, cut) + ' [data-keep="' + k.slice(cut + 1) + '"]');
@@ -138,6 +139,8 @@ function restoreKeep({ keep, active }) {
       try { el.setSelectionRange(v.start, v.end); } catch { /* number / date 输入框不支持 */ }
     }
   }
+  // 按钮也一样：重画以后焦点不掉到 body 上，用键盘的人连按回车翻页、不用从头 Tab
+  if (button && (!document.activeElement || document.activeElement === document.body)) focusAgain(button);
 }
 
 let raf = 0;
@@ -190,7 +193,7 @@ function draw() {
   reading.want(view === "reading");
   if (view === "reading" && lastView !== "reading" && sync.configured()) sync.sync();
   lastView = view;
-  const showPool = !phone && view === "calendar" && store.local().pool;
+  const showPool = !phone && view === "calendar" && store.local().pool && store.local().calMode !== "year";   // Year 上不排东西，开关本身不动
   pool.hidden = !showPool;
   pool.innerHTML = showPool ? poolHTML(c) : "";
   const hadDock = document.body.classList.contains("has-dock");

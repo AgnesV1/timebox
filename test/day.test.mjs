@@ -87,7 +87,7 @@ test("heat grid: per day per hour, averages by weekday, weeks newest first, comm
   assert.equal(weeks[0].days[3], null, "Thursday hasn't happened");
 });
 
-test("store: commute days toggle, and old ones are tidied away", async () => {
+test("store: commute days toggle, and old ones stay for the year view", async () => {
   const store = await import("../js/store.js?commute");
   const t = store.today();
   store.toggleCommute(t);
@@ -96,7 +96,7 @@ test("store: commute days toggle, and old ones are tidied away", async () => {
   store.setSetting("commute", { days: { ...store.ctx().commute.days, "2020-01-01": true } });
   store.toggleCommute(t);
   assert.equal(store.isCommuteDay(t), false);
-  assert.deepEqual(store.setting("commute").days, {}, "a day from years ago is dropped");
+  assert.deepEqual(store.setting("commute").days, { "2020-01-01": true }, "a day from years ago stays");
 });
 
 test("reading errors read as advice, not Google's raw message", async () => {

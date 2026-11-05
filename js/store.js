@@ -51,7 +51,7 @@ function blank() {
     cursor: 0,     // 上次从表格拉到的时间点
     schema: SCHEMA,
     needFull: false,   // 下次同步整表重拉（本机刚升级过数据格式）
-    local: { url: "", secret: "", themeHold: null, fx: true, calMode: "week", pool: true, serverVersion: 0 }   // 只存在这台设备上
+    local: { url: "", secret: "", themeHold: null, fx: true, calMode: "week", yearLayers: ["days", "over"], pool: true, serverVersion: 0 }   // 只存在这台设备上
   };
 }
 
@@ -205,6 +205,8 @@ export function ctx() {
     level: prefs().level !== false,
     weekStartsOn: prefs().weekStartsOn,
     commute: setting("commute", null),
+    offday: setting("offday", null),
+    superRest: setting("super-rest", null),
     life: setting("life", null),
     side: sides(),
     groups: groups()
@@ -615,12 +617,12 @@ export function setSetting(key, value) {
   change(() => put("settings", { id: key, key, value }));
 }
 
-// 电脑日历里一天天点的标记：Settings 里一条 {days: {"2026-10-08": true}}，一年前的顺手清掉；v 是 undefined = 去掉那天
+// 电脑日历里一天天点的标记：Settings 里一条 {days: {"2026-10-08": true}}；v 是 undefined = 去掉那天。
+// 以前的都留着（日历的 Year 视图要看往年的；一年也就一两百个日期）
 const dayMarks = (key) => setting(key, null)?.days || {};
 
 function markDay(key, date, v, msg) {
-  const cut = addDays(today(), -366);
-  const days = Object.fromEntries(Object.entries(dayMarks(key)).filter(([d, x]) => typeof x === "boolean" && d >= cut));
+  const days = Object.fromEntries(Object.entries(dayMarks(key)).filter(([, x]) => typeof x === "boolean"));
   if (v === undefined) delete days[date];
   else days[date] = v;
   change(() => put("settings", { id: key, key, value: { days } }), msg);

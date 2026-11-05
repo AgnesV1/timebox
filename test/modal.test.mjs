@@ -1,7 +1,7 @@
 // 弹层关掉以后焦点回哪：页面重画过、原来的按钮换成新的了，按开的时候记下的选择器找新的那个
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { selectorOf } from "../js/ui/modal.js";
+import { selectorOf, describe } from "../js/ui/modal.js";
 
 test("the button that opened a dialog can be found again after the page is redrawn", () => {
   // 今天页一行的 ⋯（编辑）：那一行的 data-id + 按钮的 data-act
@@ -14,4 +14,13 @@ test("the button that opened a dialog can be found again after the page is redra
   assert.equal(selectorOf({ act: "x", up: ["data-id", 'a"b\\c'] }), '[data-id="a\\"b\\\\c"] [data-act="x"]');
   // 什么都没有：不找（关掉以后放到标题上）
   assert.equal(selectorOf({}), "");
+});
+
+test("a redraw finds the same button by its data, and doesn't guess from a class alone", () => {
+  globalThis.document ??= { body: {} };
+  const el =(attrs, cls = "") => ({ hasAttribute: (k) => k in attrs, getAttribute: (k) => attrs[k], dataset: { act: attrs["data-act"] }, classList: [cls], parentElement: null });
+  assert.equal(describe(el({ "data-act": "open-day", "data-date": "2026-03-11" }), { cls: false }), '[data-act="open-day"][data-date="2026-03-11"]');
+  assert.equal(describe(el({ "data-act": "yr-layer", "data-layer": "g:Work" }), { cls: false }), '[data-act="yr-layer"][data-layer="g:Work"]');
+  assert.equal(describe(el({}, "yr-name"), { cls: false }), "", "only a class: leave the focus alone");
+  assert.equal(describe(el({}, "pname")), ".pname", "a dialog closing may still use the class");
 });

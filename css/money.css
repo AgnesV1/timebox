@@ -515,11 +515,11 @@
 @media (hover: hover) { .sp-set .mtable .sp-cin:hover { border-color: var(--line); } }
 .sp-set .mtable .sp-cin:focus { border-color: var(--edge); background: var(--bg); }
 .sp-set tr.dim td { opacity: .55; }
-.sp-set .sp-warn { color: var(--warn); }
+.sp-set .sp-warn { color: var(--warn-text); }
 .sp-set .sp-expm { min-width: 120px; text-align: center; }
 .sp-set .sp-md { max-height: 220px; margin: 10px 0 0; padding: 10px 12px; overflow: auto; border-radius: 10px; background: var(--surface); font: 11px/1.5 "JetBrains Mono", monospace; white-space: pre-wrap; }
 .sp-set .sp-imp { width: 100%; font: 12px/1.5 "JetBrains Mono", monospace; }
-.sp-set .sp-sets.bad { color: var(--warn); }
+.sp-set .sp-sets.bad { color: var(--warn-text); }
 .sp-set .sp-role { padding: 3px 8px; font-size: 12.5px; }
 
 /* 系统要求减少动态：不挪、不转、不弹，淡入淡出和颜色变化留着（状态变了还看得出来） */
@@ -531,7 +531,7 @@
    她 2026-11-01 说的：手机也以六点为边界出现黑白两版，和电脑同步（电脑那块白纸是她挑的 A）。夜里照旧是黑的。
    墨色字，记账的钴蓝 / 橙 / 青绿调深一点（白底上才读得清）；从岛里流出来的黑水滴（#mn-goo、#mn-drop）和岛上那颗小药丸（#mn-live）是岛的一部分，白天也是黑的 */
 [data-theme="light"] .mn:is(.mn-phone, .spend) {
-  --mn-ink: #0B0B0B; --mn-mute: #74747C; --mn-line: #E5E5DF; --mn-fill: rgba(11, 11, 11, .05); --mn-hair: none;
+  --mn-ink: #0B0B0B; --mn-mute: #6E6E76; --mn-line: #E5E5DF; --mn-fill: rgba(11, 11, 11, .05); --mn-hair: none;
   --mn-blue: #2F52B8; --mn-orange: #D46A16; --mn-green: #23877D; --mn-pri: #2F52B8; --mn-pri-ink: #F6F0E2;
   --mn-bud: rgba(47, 82, 184, .12); --mn-base: rgba(35, 135, 125, .24);
   --mn-bg: #FFFFFF; --mn-soft: #55555C; --mn-ink2: #1F1F24; --mn-faint: #A3A3AA; --mn-dim: #A3A3AA; --mn-mo: #55555C; --mn-zero: #C9C9C2; --mn-bar0: #E4E4DE; --mn-axis: #74747C;

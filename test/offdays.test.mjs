@@ -40,7 +40,7 @@ test("offState: holidays are off unless cleared, picked days are off, weekends a
 
 test("store: day off and super rest day toggle; going back to the default leaves no record", async () => {
   const store = await import("../js/store.js?offdays");
-  const hol = [...O.holidays(Number(store.today().slice(0, 4)) + 1).keys()][2];   // 明年的 Good Friday（一年前的记录会被清掉，所以用以后的日子）
+  const hol = [...O.holidays(Number(store.today().slice(0, 4)) + 1).keys()][2];   // 明年的 Good Friday
   const thu = addDays(hol, -1);
   store.toggleOffDay(hol);
   assert.equal(store.offDay(hol).off, false, "a holiday cleared as a work day");
@@ -54,4 +54,20 @@ test("store: day off and super rest day toggle; going back to the default leaves
   store.toggleSuperRest(hol);
   assert.equal(store.isSuperRest(hol), false);
   assert.deepEqual(store.setting("super-rest").days, {});
+});
+
+test("store: marks from long ago stay when another day is marked, so the year view can show past years", async () => {
+  const store = await import("../js/store.js?oldmarks");
+  const old = addDays(store.today(), -800), wed = "2024-03-13";
+  store.toggleCommute(old);
+  store.toggleSuperRest(old);
+  store.toggleOffDay(wed);
+  store.toggleCommute(store.today());
+  store.toggleSuperRest(store.today());
+  store.toggleOffDay(addDays(store.today(), 1));
+  assert.equal(store.isCommuteDay(old), true);
+  assert.equal(store.isSuperRest(old), true);
+  assert.equal(store.offDay(wed).off, true);
+  assert.equal(store.ctx().superRest.days[old], true, "the marks reach the calculations too");
+  assert.equal(store.ctx().offday.days[wed], true);
 });

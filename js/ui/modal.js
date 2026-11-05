@@ -6,7 +6,7 @@
 
 let onClose = null, opener = null, openerSel = "";
 const BEHIND = [".app", "#dock", "#sun"];
-const KEYS = ["data-id", "data-project", "data-goal", "data-idea"];
+const KEYS = ["data-id", "data-project", "data-goal", "data-idea", "data-date", "data-mode", "data-layer", "data-k", "data-v", "data-w", "data-drag"];
 const q = (v) => '"' + String(v).replace(/["\\]/g, "\\$&") + '"';
 
 // { act, own: [[属性, 值]…], up: [属性, 值] | null, cls } → 选择器（纯字符串，测试里直接调）
@@ -16,19 +16,22 @@ export function selectorOf({ act = "", own = [], up = null, cls = "" } = {}) {
   if (!me) return "";
   return (up ? "[" + up[0] + "=" + q(up[1]) + "] " : "") + me;
 }
-// 一个按钮 → 上面那个描述
-function describe(el) {
+// 一个按钮 → 上面那个描述。cls = false：只靠 class 的不算（整页重画时同一个 class 有好多个，找回来多半是别的）
+export function describe(el, { cls = true } = {}) {
   if (!el || el === document.body) return "";
   const own = KEYS.filter((k) => el.hasAttribute(k)).map((k) => [k, el.getAttribute(k)]);
   let up = null;
   for (let p = el.parentElement; p && p !== document.body && !up; p = p.parentElement) { const k = KEYS.find((x) => p.hasAttribute(x)); if (k) up = [k, p.getAttribute(k)]; }
-  return selectorOf({ act: el.dataset?.act || "", own, up, cls: el.classList?.[0] || "" });
+  return selectorOf({ act: el.dataset?.act || "", own, up, cls: cls ? el.classList?.[0] || "" : "" });
 }
+const usable = (el) => el && el.isConnected && !el.closest("[inert]") && el.getClientRects().length;
+const found = (sel) => { try { return [...document.querySelectorAll("#main " + sel + ", #side " + sel + ", #pool " + sel + ", #dock " + sel)].find(usable) || null; } catch { return null; } };
+// 整页重画以后把焦点放回同一个按钮（js/main.js）；它没了就算了，不乱跳
+export function focusAgain(sel) { found(sel)?.focus({ preventScroll: true }); }
 // 焦点放回去：原来那个还在就用它；不在了按选择器找新的；都没有就是这一页的第一个标题
 function giveBack(back, sel) {
-  const ok = (el) => el && el.isConnected && !el.closest("[inert]") && el.getClientRects().length;
-  let el = ok(back) ? back : null;
-  if (!el && sel) { try { el = [...document.querySelectorAll("#main " + sel + ", #side " + sel + ", #dock " + sel)].find(ok) || null; } catch { el = null; } }
+  let el = usable(back) ? back : null;
+  if (!el && sel) el = found(sel);
   if (!el) {
     el = document.querySelector("#main h1, #main h2, #main h3");
     if (el && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");

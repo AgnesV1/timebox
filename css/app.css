@@ -13,9 +13,11 @@
 :root, [data-theme="light"] {
   color-scheme: light;
   --page: #F3F3EE; --bg: #FFFFFF; --surface: #F2F2EE; --surface2: #E8E8E2; --track: #EDEDE7;
-  --ink: #0B0B0B; --muted: #74747C; --line: #EBEBE6; --edge: #0B0B0B;
+  --ink: #0B0B0B; --muted: #6E6E76; --line: #EBEBE6; --edge: #0B0B0B;
   --c-Main: #B2E600; --c-Work: #2F5BFF; --c-Fun: #FF3EA5; --c-Chore: #FF7A1A; --c-None: #B4B4BC;
   --accent: #C6FF00; --accent-ink: #0B0B0B; --hot: #FF3EA5; --blue: #2F5BFF; --warn: #FF2E55; --ok: #27B35A;
+  --warn-text: #D6123B;   /* 红字：--warn 铺成色块才够亮，当字只有 3.3:1 */
+  --yr-holiday: #5F8F00;   /* Year 假期的框：青柠在白底上看不见，白天用深一点的 */
   --meter: linear-gradient(90deg, #C6FF00, #FF3EA5 70%, #2F5BFF);
   --b: 1.5px solid var(--edge); --b-soft: 1.5px solid #E2E2DC; --b-ctl: 1px solid #CDCDC6;
   --hard: 2px 2px 0 var(--edge); --hard-lg: 3px 3px 0 var(--edge); --glow: none;
@@ -41,6 +43,8 @@
   --ink: #F4F4F8; --muted: #8A8AA2; --line: #1C1C29; --edge: #2C2C3E;
   --c-Main: #CCFF00; --c-Work: #00E5FF; --c-Fun: #FF2BD6; --c-Chore: #FF9100; --c-None: #5C5C70;
   --accent: #CCFF00; --accent-ink: #0C0C13; --hot: #FF2BD6; --blue: #00E5FF; --warn: #FF4D6D; --ok: #5CFF9D;
+  --warn-text: #FF4D6D;
+  --yr-holiday: #CCFF00;
   --meter: linear-gradient(90deg, #CCFF00, #00E5FF 60%, #FF2BD6);
   --b: 1px solid var(--edge); --b-soft: 1px solid #222232; --b-ctl: var(--b);
   --hard: 0 0 0 1px rgba(204, 255, 0, .05), 0 0 24px rgba(204, 255, 0, .06) inset; --hard-lg: 0 0 40px rgba(0, 229, 255, .06); --glow: 0 0 14px rgba(204, 255, 0, .5);
@@ -66,6 +70,9 @@ button { cursor: pointer; touch-action: manipulation; -webkit-user-select: none;
 a { color: inherit; }
 .num { font-family: var(--num); font-variant-numeric: tabular-nums; }
 .ic { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* 浏览器自己画的那几样也跟主题：选中文字是青柠，滚动条是淡墨（量过：Mac 上还是自动隐藏，不占宽度） */
+::selection { background: var(--accent); color: var(--accent-ink); }
+html { scrollbar-color: color-mix(in srgb, var(--ink) 28%, transparent) transparent; }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }   /* 白天用墨色：青柠在白底上几乎看不见 */
 [data-theme="dark"] :focus-visible { outline-color: var(--accent); }
 input, select, textarea { min-width: 0; padding: 7px 10px; border: var(--b-soft); border-radius: var(--r-sm); background: var(--bg); transition: border-color .15s; }
@@ -83,7 +90,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border: 1px solid transparent; border-radius: 999px; background: var(--tonal); font-weight: 600; font-size: 13px; white-space: nowrap; text-decoration: none; transition: transform .15s var(--ease), box-shadow .15s; }
 .btn:active { transform: scale(.96); }
 .btn.primary, .btn.cta { border: var(--b); background: var(--accent); color: var(--accent-ink); box-shadow: var(--hard); }
-.btn.danger { color: var(--warn); }
+.btn.danger { color: var(--warn-text); }
 [data-theme="dark"] .btn.primary, [data-theme="dark"] .btn.cta { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: var(--glow); }
 .icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--muted); }
 @media (hover: hover) { .icon-btn:hover { background: var(--surface); color: var(--ink); } }
@@ -226,7 +233,7 @@ body.side-min .sync-pill span { display: none; }
 .sync-pill { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7.5px; padding: 7px 10px; border: 1.5px solid transparent; border-radius: 999px; background: transparent; font-size: 12px; color: var(--muted); }
 .sync-pill span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; line-height: 1.3; text-align: left; }   /* 长的状态（Update Code.gs in your Sheet first — saved here）折行写全，不再截成「Update Code.gs in y…」 */
 .sync-pill .ic { width: 15px; height: 15px; margin: 0 3px; }   /* 图标占 18px 宽、字从同一条线开始，和上面侧栏各项对齐（同步中的小转圈也一样） */
-.sync-pill.bad, .sync-status.bad { color: var(--warn); }
+.sync-pill.bad, .sync-status.bad { color: var(--warn-text); }
 .sync-status { font-size: 12.5px; color: var(--muted); }
 
 /* 页头 */
@@ -446,7 +453,7 @@ body.side-min .sync-pill span { display: none; }
 .strip i { flex-basis: 0; min-width: 0; border-radius: 999px; border: 1.5px solid var(--edge); }
 [data-theme="dark"] .strip i { border: 0; }
 .stripmeta { display: flex; justify-content: space-between; font: 500 12px var(--num); color: var(--muted); }
-.stripmeta.over { color: var(--warn); }
+.stripmeta.over { color: var(--warn-text); }
 
 /* 账单、过期 */
 .bill { margin-top: 10px; padding: 8px 11px; border-radius: 14px; background: #FFF0F8; font-size: 13.5px; line-height: 1.5; }
@@ -633,10 +640,41 @@ body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
 .ev.blk .full { display: none; position: absolute; left: -5px; right: -5px; top: -5px; z-index: 6; padding: 7px 8px 6px; background: color-mix(in srgb, var(--c) 24%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) 75%, var(--paper)), 0 12px 26px rgba(11, 11, 11, .28); font-size: 11.5px; line-height: 1.4; }
 [data-theme="dark"] .ev.blk .full { background: color-mix(in srgb, var(--c) 28%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) 75%, var(--paper)), 0 0 0 1px var(--line), 0 14px 30px rgba(0, 0, 0, .6); }
 .ev.blk .full .bt { display: block; margin-bottom: 3px; }
+.ev.blk:focus-visible .full { display: block; }
 @media (hover: hover) { .ev.blk:hover .full { display: block; } }
 .cell.drop-on .ev.blk .full { display: block; }
 body.dragging .ev.blk .full { pointer-events: none; }
 .month .cell.outside { opacity: .45; }
+/* Year（她 2026-11-04 挑的）：12 个小月历，只有数字；筛选打开的日子填色，中了几样斜着分色（颜色写在每个数字的 style 上）。假期和通勤是框（--yr-frame）。超 7 小时只是红字，落在色块上改成底边一道红线 */
+.yr-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.yr-read { height: 20px; margin: 0 0 8px; overflow: hidden; font-size: 12.5px; font-weight: 600; line-height: 20px; white-space: nowrap; text-overflow: ellipsis; }
+.yr-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.yr-chip i { width: 9px; height: 9px; border-radius: 3px; }
+.yr-chip small { font: 500 11.5px var(--num); color: color-mix(in srgb, var(--ink) 62%, transparent); }
+@media (hover: hover) { .yr-chip:not(.yr-on):hover { background: color-mix(in srgb, var(--ink) 12%, transparent); } }
+.yr-chip.yr-on { background: var(--ink); color: var(--bg); }
+.yr-chip.yr-on small { color: inherit; opacity: .7; }
+.yr-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px 26px; max-width: 1180px; }
+.yr-name { display: block; margin: -4px 0 2px -4px; padding: 4px; border: 0; background: none; font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.yr-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.yr-d { position: relative; display: grid; place-items: center; height: 25px; padding: 0; border: 0; border-radius: 6px; background: none; font: 500 12px var(--num); font-variant-numeric: tabular-nums; color: var(--ink); box-shadow: var(--yr-frame, 0 0 transparent), var(--yr-mark, 0 0 transparent); }
+.yr-d:focus-visible { outline-offset: 0; }
+.yr-d.yr-ahead { color: var(--muted); }
+/* 今天：和周 / 月视图一个说法，白天青柠底 + 硬投影（那天中了筛选就让给色块，只留投影）、夜里一圈青柠光；框给假期和通勤了 */
+.yr-d.yr-today { z-index: 1; font-weight: 700; --yr-mark: 2px 2px 0 var(--ink); }
+[data-theme="light"] .yr-d.yr-today:not(.yr-fill) { background: var(--accent); }
+[data-theme="dark"] .yr-d.yr-today { --yr-mark: 0 0 12px 2px var(--accent); }
+.yr-d.yr-long { color: var(--warn-text); font-weight: 700; }
+.yr-d.yr-long.yr-fill { box-shadow: inset 0 -2px 0 var(--warn), var(--yr-frame, 0 0 transparent), var(--yr-mark, 0 0 transparent); }
+.yr-d.yr-split { text-shadow: 0 0 2px var(--yr-halo), 0 0 2px var(--yr-halo), 0 0 3px var(--yr-halo); }
+@media (hover: hover) { .yr-d:hover, .yr-name:hover { text-decoration: underline; text-underline-offset: 3px; } }
+.yr-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; max-width: 1180px; margin-top: 18px; font-size: 12px; color: var(--muted); }
+.yr-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.yr-legend i { width: 11px; height: 11px; border-radius: 3px; }
+.yr-long-key { color: var(--warn-text); font-weight: 700; }
+.yr-note { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }
+@media (max-width: 1040px) { .yr-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 780px) { .yr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 [data-drag] { -webkit-user-select: none; user-select: none; }
 body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-select: none; user-select: none; }
 .drag-src { opacity: .35; }
@@ -706,7 +744,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
 .pcard .pweek { margin-top: 8px; }
 .health { flex-shrink: 0; padding: 3px 9px; border-radius: 999px; background: var(--surface); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
 .h-safe { color: var(--ok); }
-.h-danger { color: var(--warn); }
+.h-danger { color: var(--warn-text); }
 
 /* ---------- 弹出层 ---------- */
 #modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px 24px; overflow: auto; background: rgba(11, 11, 11, .32); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
@@ -850,7 +888,7 @@ body.phone .settings .page-head { margin-top: 4px; }
 .ts { margin: 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
 .delta { display: block; margin-top: 8px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .delta.good { color: var(--ok); }
-.delta.bad { color: var(--warn); }
+.delta.bad { color: var(--warn-text); }
 /* Time 页签顶上那条细条：Build 的时长、深度、比上一段 …… 右边全部一共 */
 .st-strip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; margin: 0 0 12px; padding: 2px 0; font-size: 12.5px; color: var(--muted); }
 .st-strip b { font-size: 15px; color: var(--ink); }
@@ -1269,7 +1307,7 @@ body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
 /* Spend 左边：当月预算还剩多少，灰的（正好 0 也是灰的）；超了才是警示色 */
 .add-left { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .add-left b { font-weight: 600; }
-.add-left.over { color: var(--warn); }
+.add-left.over { color: var(--warn-text); }
 .add-spend { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 13px 0 11px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 700; color: var(--ink); }
 .add-spend .ic { width: 17px; height: 17px; }
 .add-spend:active { transform: scale(.96); }
@@ -1295,7 +1333,7 @@ body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
 .tm { display: inline-flex; align-items: center; gap: 4px; padding: 2px 3px 2px 9px; border: 1px solid transparent; border-radius: 999px; background: var(--tonal); font-size: 12px; color: var(--muted); }
 .tm .num { color: var(--ink); }
 .tm-x { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; font-size: 14px; line-height: 1; color: var(--muted); }
-@media (hover: hover) { .tm-x:hover { background: var(--surface); color: var(--warn); } }
+@media (hover: hover) { .tm-x:hover { background: var(--surface); color: var(--warn-text); } }
 .tm.sum { padding-right: 9px; background: transparent; }
 /* 一段的钟点点了能改头尾 */
 .tm-at { padding: 0; border: 0; background: none; color: var(--ink); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
@@ -1365,7 +1403,7 @@ body.phone .logtime input, body.phone .add input, body.phone .add select, body.p
 .yl-x { flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 15px; line-height: 1; opacity: 0; }
 .yl-row:is(:hover, :focus-within) .yl-x { opacity: 1; }
 @media (hover: none) { .yl-x { opacity: 1; } }
-@media (hover: hover) { .yl-x:hover { color: var(--warn); } .yl-row:hover { background: var(--surface2); } }
+@media (hover: hover) { .yl-x:hover { color: var(--warn-text); } .yl-row:hover { background: var(--surface2); } }
 .yl-empty { margin: 4px 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .yl-in { width: 100%; padding: 7px 10px; font-size: 13px; }
 .yl-sugs:not(:empty) { display: grid; gap: 1px; margin-top: 6px; }
@@ -1389,7 +1427,7 @@ body.phone .logtime input, body.phone .add input, body.phone .add select, body.p
 @media (hover: hover) { .rpick:hover { background: var(--surface); } }
 .rdone { color: var(--muted); }
 .rmore { margin-top: 6px; font-size: 12px; }
-.rstuck { margin: 0; font-size: 12.5px; color: var(--warn); }
+.rstuck { margin: 0; font-size: 12.5px; color: var(--warn-text); }
 .rstuck b { color: var(--ink); }
 [data-rstuck]:empty { display: none; }
 .vibe { width: 40px; height: 34px; border: 0; border-radius: 8px; background: transparent; font-size: 19px; line-height: 1; filter: grayscale(.8); opacity: .7; }
@@ -1571,8 +1609,8 @@ body.phone .rpick { padding: 8px 6px; }
 [data-theme="dark"] .lvdot { box-shadow: 0 0 6px var(--lv); }
 .lvtag { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--lv) 18%, transparent); color: var(--ink); font: 700 11px var(--body); }
 .lvsum { display: inline-flex; align-items: center; gap: 6px; }
-.lvsum .over { color: var(--warn); }
-.lvsum .over b { color: var(--warn); }
+.lvsum .over { color: var(--warn-text); }
+.lvsum .over b { color: var(--warn-text); }
 .lvbar { display: inline-flex; width: 64px; height: 7px; border-radius: 999px; overflow: hidden; background: var(--track); }
 .lvbar i { display: block; height: 100%; background: var(--lv); }
 
@@ -1660,12 +1698,12 @@ body.phone .rpick { padding: 8px 6px; }
 .mw-title h3 { margin: 0; font: 700 16px var(--display); letter-spacing: -.01em; }
 .shopday { padding: 3px 10px; border-radius: 999px; background: var(--surface); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .shopday.due { background: var(--hot); color: #fff; }
-.shopday.late { color: var(--warn); }
+.shopday.late { color: var(--warn-text); }
 .shopday.done { color: var(--ok); }
 .shopday.skip { color: var(--muted); }
 .mw-sum { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--muted); }
 .mw-sum b { font: 700 13px var(--num); color: var(--ink); }
-.mw-sum .budget.over b { color: var(--warn); }
+.mw-sum .budget.over b { color: var(--warn-text); }
 .mweek-head .tools { margin-left: auto; }
 .mweek-head .btn { padding: 5px 11px; font-size: 12.5px; }
 .mweek-head .link { font-size: 12px; }
@@ -1689,7 +1727,7 @@ body.phone .rpick { padding: 8px 6px; }
 .mbl { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
 .mbl li { padding: 2px 5px 2px 8px; border-radius: 7px; background: var(--surface); box-shadow: inset 3px 0 0 var(--lv); font-size: 11.5px; line-height: 1.3; overflow-wrap: anywhere; }
 .mday-foot { display: flex; justify-content: space-between; margin-top: auto; font: 600 10.5px var(--num); color: var(--muted); }
-.mday-foot .hi { color: var(--warn); }
+.mday-foot .hi { color: var(--warn-text); }
 .moff, .mempty { margin: auto 0; font-size: 12px; color: var(--muted); text-align: center; }
 .mempty { opacity: 0; transition: opacity .15s; }
 .mday:hover .mempty, .mday:focus-visible .mempty { opacity: 1; }
@@ -1895,7 +1933,7 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .gl:hover .gdue.dflt, .gdue.dflt:focus { max-width: 64px; padding: 0 1px; opacity: 1; }
 .gx { width: 14px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; opacity: 0; }
 .gl:hover .gx, .gl.editing .gx, .gx:focus-visible { opacity: 1; }
-@media (hover: hover) { .gx:hover { color: var(--warn); } }
+@media (hover: hover) { .gx:hover { color: var(--warn-text); } }
 .gwhen { display: inline-flex; gap: 3px; }
 .goals .gwhen select { padding: 1px 17px 1px 6px; border-radius: 6px; background-position: right 4px center; background-size: 9px; font: 600 11px var(--num); }
 /* 一段多出来的折成「+2 more」；标题旁的「+」鼠标移到这一段才出来，点了才出加一条的框 */
@@ -2091,13 +2129,13 @@ body.phone .chain { font-size: 13px; }
 .today-side .note:first-child { margin-top: 0; }
 .note p { flex: 1; margin: 0; }
 .note .link { flex-shrink: 0; font-size: 12px; }
-.note.warn p b { color: var(--warn); }
+.note.warn p b { color: var(--warn-text); }
 
 /* ---------- 「和谁」：名字的小签 + 加人；任务带的记录（Notes / Remember） ---------- */
 .with { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 .wchip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 4px 2px 9px; border: 1px solid transparent; border-radius: 999px; background: var(--tonal); font-size: 12px; font-weight: 600; }
 .wchip button { width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 13px; line-height: 1; }
-@media (hover: hover) { .wchip button:hover { color: var(--warn); } }
+@media (hover: hover) { .wchip button:hover { color: var(--warn-text); } }
 .with .wadd { padding: 3px 24px 3px 9px; border-style: dashed; border-radius: 999px; font-size: 12px; color: var(--muted); }
 .with .wnew { width: 150px; padding: 3px 9px; border: var(--b-ctl); border-radius: 999px; font-size: 12px; }
 .tmeet { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
@@ -2124,7 +2162,7 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 .fr-bar .link { font-size: 12px; }
 .fchip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 5px 3px 10px; border: 1px solid transparent; border-radius: 999px; background: var(--tonal); font-size: 12px; }
 .fchip button { width: 16px; height: 16px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 13px; line-height: 1; }
-@media (hover: hover) { .fchip button:hover { color: var(--warn); } }
+@media (hover: hover) { .fchip button:hover { color: var(--warn-text); } }
 .fchip.open { padding-right: 3px; }
 .fchip input { width: 120px; padding: 1px 7px; border: 0; background: var(--bg); border-radius: 999px; font-size: 12px; }
 .ftable { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; }   /* 列宽固定：自己填的那几列再长也不会把 Last / Next 挤出卡片，长字以省略号结尾 */
@@ -2139,7 +2177,7 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 @media (hover: hover) { .ftable tbody tr:hover { background: var(--surface); outline: none; } }
 .ftable td.num { color: var(--muted); font-size: 12px; }
 .fnext small { margin-left: 4px; color: var(--muted); }
-.fnext.late, .fnext.late small { color: var(--warn); }
+.fnext.late, .fnext.late small { color: var(--warn-text); }
 .fmeets { margin: 0; padding: 0; list-style: none; }
 .fmeets li { display: grid; grid-template-columns: 96px 150px minmax(0, 1fr); gap: 2px 10px; padding: 7px 4px; border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer; }
 .fmeets li:last-child { border-bottom: 0; }
@@ -2157,7 +2195,7 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 .ft-name { justify-self: start; font-weight: 700; font-size: 13px; color: var(--ink); text-decoration: none; }
 @media (hover: hover) { .ft-name:hover { text-decoration: underline; } }
 .ft-main small { font-size: 11.5px; color: var(--muted); }
-.ftodo li.late small { color: var(--warn); }
+.ftodo li.late small { color: var(--warn-text); }
 .fdone { flex: 1 1 100%; display: flex; align-items: center; gap: 8px; }
 .fdone input { flex: 1; min-width: 0; padding: 5px 9px; border: var(--b-ctl); font-size: 13px; }
 .fdone .btn { padding: 5px 12px; font-size: 12.5px; }
@@ -2207,7 +2245,7 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 .oc-head b { flex: 0 0 48px; font-size: 12px; }
 .oc-head span { font-weight: 700; }
 .oc-head small { margin-left: auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
-.fup li.late .oc-head small { color: var(--warn); }
+.fup li.late .oc-head small { color: var(--warn-text); }
 .oc-people { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 56px; }
 .ochip { padding: 3px 10px; border: 1px solid transparent; border-radius: 999px; background: var(--tonal); font-size: 12px; font-weight: 600; text-align: left; }
 @media (hover: hover) { .ochip:hover { background: var(--surface2); } }
@@ -2324,7 +2362,7 @@ select.open { border-color: var(--edge); }
 .idea-row .idea-kinds .chip { padding: 1px 7px; font-size: 13px; line-height: 1.3; color: var(--muted); }
 .idea-row.planned .idea-text { font-weight: 500; color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .idea-row.missed .idea-text { color: var(--muted); }
-.idea-row.missed .idea-when { color: var(--warn); }
+.idea-row.missed .idea-when { color: var(--warn-text); }
 .idea-row.editing { gap: 8px; padding: 8px 0; }
 .idea-row.editing .idea-kinds .chip.on { color: var(--accent-ink); }
 .idea-in { flex: 1 1 200px; min-width: 0; padding: 6px 10px; border: var(--b-ctl); border-radius: 10px; background: var(--bg); font-size: 14px; font-weight: 600; }
@@ -2436,7 +2474,7 @@ select.open { border-color: var(--edge); }
 .dish-got li { display: inline-flex; align-items: center; gap: 5px; padding: 2px 4px 2px 9px; border: 1px solid transparent; border-radius: 999px; background: var(--tonal); font-size: 12px; }
 .dish-got li span { color: var(--muted); }
 .dish-got li button { width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 13px; line-height: 1; }
-@media (hover: hover) { .dish-got li button:hover { color: var(--warn); } }
+@media (hover: hover) { .dish-got li button:hover { color: var(--warn-text); } }
 .dish-got + .msub { margin: 5px 0 0; font-size: 11.5px; }
 /* 阅读页：搜到的想看的旁边那两个标优先级的小按钮；表单里 Priority 那一行的字宽一点 */
 .rprios { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: 1px; }

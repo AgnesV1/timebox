@@ -19,7 +19,7 @@ import { ideasHTML } from "./ideas.js";
 
 let edit = null;        // 正在改的那条：{ id, field: "text" | "when" }
 let pastOpen = false;   // 往期展开着
-let pastKey = "";       // 往期看的是哪一季（"2026-3"；空 = 最近的那一季）
+let pastKey = "";       // 往期看的是哪一年（"2026"；空 = 最近的那一年）
 let railTop = 0, railTab = "";   // 右栏滚到哪了：整页重画时放回去（不然在往期里打个勾整栏跳回顶上）
 let adding = "";        // 哪一段开着「加一条」的框（栏的 key）
 let northEdit = false;  // North star 那段字正在改
@@ -137,13 +137,13 @@ export function northHTML() {
 }
 
 // ---------- 往期 ----------
-// 最底下一行：Past（点了展开 / 收起）+ 季度下拉 + 这一季做完了几条；展开后一小组一小组：那一年的年度目标、这一季的季度目标、三个月的月度目标。
+// 最底下一行：Past（点了展开 / 收起）+ 年份下拉 + 这一年做完了几条；展开后一小组一小组：年目标、各季的季目标、各月的月目标（新的在前）。
 // 一条一行：小把手（没做完的才有：拖回 / 点了挑现在的某一段）、勾（补勾也行）、字、月份。行是 .gh 不是 .gl：悬停不画线、也不能连
 function pastHTML(goals, T) {
   const list = G.past(goals, T);
   if (!list.length) return "";
   const cur = list.find((x) => x.key === pastKey) || list[0];
-  const own = [...cur.quarter, ...cur.months.flatMap((x) => x.items)], done = own.filter((g) => g.done).length;
+  const own = [...cur.year, ...cur.quarters.flatMap((x) => x.items), ...cur.months.flatMap((x) => x.items)], done = own.filter((g) => g.done).length;
   const row = (g) => '<li class="gh' + (g.done ? " done" : "") + '" data-goal="' + esc(g.id) + '" data-drag-show>' +
     (g.done ? "" : '<span class="ggrip" data-drag="goal:' + esc(g.id) + '" role="button" tabindex="0" aria-haspopup="listbox" aria-label="Move back to a current section" title="Drag to a current section, or click"></span>') +
     '<input type="checkbox" data-g="done"' + (g.done ? " checked" : "") + ' aria-label="Done"><span class="gh-t" title="' + esc(g.text) + '">' + esc(g.text) + "</span>" +
@@ -151,9 +151,9 @@ function pastHTML(goals, T) {
   const group = (title, items) => (items.length ? "<h5>" + esc(title) + "</h5><ul>" + items.map(row).join("") + "</ul>" : "");
   return '<section class="gpast' + (pastOpen ? " open" : "") + '" aria-label="Past goals">' +
     '<div class="gpast-h"><button type="button" class="gpast-t" data-act="past-toggle" aria-expanded="' + pastOpen + '">Past</button>' +
-    '<select data-g="pastq" aria-label="Which quarter">' + list.map((x) => '<option value="' + x.key + '"' + (x === cur ? " selected" : "") + ">" + esc(x.label) + "</option>").join("") + "</select>" +
+    '<select data-g="pastq" aria-label="Which year">' + list.map((x) => '<option value="' + x.key + '"' + (x === cur ? " selected" : "") + ">" + esc(x.label) + "</option>").join("") + "</select>" +
     (own.length ? '<small class="msub">' + done + " of " + own.length + " done</small>" : "") + "</div>" +
-    (pastOpen ? '<div class="gpast-b">' + group(cur.y + " · Year", cur.year) + group("Q" + cur.q + " · Quarter", cur.quarter) + cur.months.map((x) => group(x.label, x.items)).join("") + "</div>" : "") + "</section>";
+    (pastOpen ? '<div class="gpast-b">' + group("Year", cur.year) + cur.quarters.map((x) => group(x.label, x.items)).join("") + cur.months.map((x) => group(x.label, x.items)).join("") + "</div>" : "") + "</section>";
 }
 
 function listHTML(c) {

@@ -322,3 +322,8 @@ test("store: lines added with indented ones under them put those in the note", a
   assert.deepEqual([store.itemCfg(a).note, store.itemCfg(a).steps], ["fins\n4 × 25m easy\n2 × 50m hard · 10min", []]);
   assert.equal(store.itemCfg(b).note, "");
 });
+
+test("Today's minutes: a bare number under an hour, hours and minutes from there", () => {
+  assert.deepEqual([5, 30, 59, 60, 90, 193, 180, 0, null].map(L.estText), ["5", "30", "59", "1h", "1h30", "3h13", "3h", "", ""]);
+  assert.equal(L.sizeOf(30), "30m", "the pool lists keep their m");
+});

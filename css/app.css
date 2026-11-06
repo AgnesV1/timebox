@@ -483,7 +483,7 @@ body.side-min .sync-pill span { display: none; }
 [data-theme="dark"] .row.opt::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
 .row.dragging { z-index: 3; transition: none; border-radius: 18px; box-shadow: 0 14px 34px rgba(0, 0, 0, .15); }
 .est { width: 30px; flex-shrink: 0; align-self: flex-start; text-align: right; cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-.est b { display: block; font-size: 15px; font-weight: 700; line-height: 1.3; }
+.est b { display: block; font-size: 12.5px; font-weight: 700; line-height: 1.3; letter-spacing: -.02em; }   /* 每一行都写成 30、1h30、3h（她 11-06 定的），大小也一样 */
 .grip { display: block; width: 10px; height: 9px; margin: 4px 0 0 auto; opacity: .5; background: radial-gradient(circle, var(--muted) 1.2px, transparent 1.5px) 0 0/5px 4.5px; }
 .bar { width: 4px; flex-shrink: 0; min-height: 18px; border-radius: 999px; background: var(--bar); }
 [data-theme="dark"] .bar { box-shadow: 0 0 10px var(--bar); }
@@ -493,7 +493,6 @@ body.side-min .sync-pill span { display: none; }
 .task .more { color: var(--muted); }
 /* 计划那一行（整块计时）+ 下面一行一项，像便条（2026-10-25 她挑的甲：一行一项、带大概多久）。勾选框白天墨底青柠勾，夜里青柠底 */
 .row.plan .task { font-weight: 700; }
-.row.plan .est b { font-size: 12.5px; letter-spacing: -.02em; }
 .row.plan.virtual .est { cursor: default; }
 .ls-cnt { font-size: 12px; font-weight: 600; color: var(--muted); }
 .ls-lines { margin: 5px 0 2px; }

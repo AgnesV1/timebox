@@ -137,7 +137,8 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
     (running ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : total ? '<span class="num">' + fmtMin(total) + "</span>" : "") +
     (t.status ? '<b class="stw">' + STATUS_WORD[t.status] + "</b>" : "") + "</span>";
   return '<div class="row st-' + (t.status || "open") + (t.optional ? " opt" : "") + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + (open ? " open" : "") + '" data-id="' + t.id + '" style="--i:' + tasks.indexOf(t) + '">' +
-    '<div class="est num" data-drag-row title="Drag to reorder"><b>' + t.est + '</b><i class="grip"></i></div>' +
+    // 左边那一格的大概多久：每一行一个写法（30、1h30、3h，L.estText；她 2026-11-06 定的）
+    '<div class="est num" data-drag-row title="Drag to reorder"><b>' + (L.estText(t.est) || "—") + '</b><i class="grip"></i></div>' +
     '<div class="bar" style="--bar:' + colorOf(t) + '"></div>' +
     '<div class="body"><div class="line">' +
     '<div class="task" data-act="desc">' + (t.optional ? '<span class="tag">Optional</span>' : "") + esc(t.title) +
@@ -169,11 +170,11 @@ function lineHTML(t, phone) {
   const spent = store.timeTotal(t.id);   // 以前的整块计划留下来的、记过时间的那几条
   let h = '<div class="ls-ln' + (t.status ? " " + t.status : "") + '"><button type="button" class="ls-cb" data-act="ls-tick" data-line="' + t.id + '" aria-pressed="' + done + '" aria-label="' + esc((done ? "Not done: " : "Done: ") + t.title) + '">✓</button>' +
     '<button type="button" class="ls-tx" data-act="ls-open" data-line="' + t.id + '" aria-expanded="' + open + '">' + esc(t.title) + (t.status === "delay" ? " <small>back to the pool</small>" : "") + "</button>" +
-    '<span class="ls-sz">' + [steps.length ? ticked + "/" + steps.length : "", spent ? fmtMin(spent) + " logged" : L.sizeOf(t.est)].filter(Boolean).join(" · ") + "</span></div>";
+    '<span class="ls-sz">' + [steps.length ? ticked + "/" + steps.length : "", spent ? fmtMin(spent) + " logged" : L.estText(t.est)].filter(Boolean).join(" · ") + "</span></div>";
   if (!open) return h;
   if (steps.length) {
     h += '<div class="ls-steps">' + steps.map((s, k) => '<div class="ls-step' + (s.done ? " done" : "") + '"><button type="button" class="ls-cb" data-act="ls-step" data-line="' + t.id + '" data-k="' + k + '" aria-pressed="' + s.done + '" aria-label="' + esc(s.t) + '">✓</button>' +
-      '<span class="ls-tx">' + esc(s.t) + '</span><span class="ls-sz">' + L.sizeOf(s.min) + "</span></div>").join("") + "</div>";
+      '<span class="ls-tx">' + esc(s.t) + '</span><span class="ls-sz">' + L.estText(s.min) + "</span></div>").join("") + "</div>";
   }
   const note = t.itemId ? store.itemCfg(t.itemId).note : "";
   const back = !phone && !t.status ? '<button type="button" class="link" data-act="ls-back" data-line="' + t.id + '">Back to the pool</button>' : "";
@@ -209,7 +210,7 @@ function planRowHTML(c, b, tasks, phone, openId) {
   const ids = [t?.id, ...lines.map((x) => x.id)].filter(Boolean).join(" ");
   return '<div class="row plan st-' + (t?.status || "open") + (t?.optional ? " opt" : "") + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + (open ? " open" : "") + (t ? "" : " virtual") + '"' + (t ? ' data-id="' + t.id + '"' : "") +
     ' data-ids="' + ids + '" data-plan="' + esc(plan.id) + '" data-date="' + d + '" style="--i:' + (t ? tasks.indexOf(t) : 0) + '">' +
-    '<div class="est num" data-drag-row title="Drag to reorder"><b>' + (L.sizeOf(sum) || "—") + '</b><i class="grip"></i></div>' +
+    '<div class="est num" data-drag-row title="Drag to reorder"><b>' + (L.estText(sum) || "—") + '</b><i class="grip"></i></div>' +
     '<div class="bar" style="--bar:' + esc(plan.color || "var(--c-None)") + '"></div>' +
     '<div class="body"><div class="line"><div class="task" data-act="desc">' + esc(t?.title || plan.name) + (t && E.isRoutine(t) ? ' <span class="rt" title="Routine">↻</span>' : "") +
     (t?.deep ? ' <span class="dp" title="Deep work">◆ Deep</span>' : "") + (t?.desc && !(open && openDesc.has(t.id)) ? '<span class="more"> ⋯</span>' : "") + "</div>" + side +
@@ -230,7 +231,7 @@ const listRowsHTML = (c, tasks, phone, openId) => L.dayBlocks(c, tasks).map((b) 
 // 以后某天：自动排的计划画成淡色预览（只看，不存；到那天才变成任务）
 function ghostsHTML(c, d) {
   return E.ghostsOn(c, d).map((g) => '<div class="row ghost" title="' + (g.kind === "regular" ? "Repeats — shows up on the day" : "Projected share — shows up on the day") + '">' +
-    '<div class="est num"><b>' + g.est + '</b></div><div class="bar" style="--bar:' + esc(g.plan.color) + '"></div>' +
+    '<div class="est num"><b>' + (L.estText(g.est) || "—") + '</b></div><div class="bar" style="--bar:' + esc(g.plan.color) + '"></div>' +
     '<div class="body"><div class="line"><div class="task">' + esc(g.title) + (g.kind === "regular" ? ' <span class="rt">↻</span>' : "") + "</div></div></div></div>").join("");
 }
 
@@ -241,7 +242,7 @@ function overdueHTML(c) {
   if (!od.length) return "";
   return '<section class="overdue"><div class="od-head"><b>' + od.length + " left behind</b><span>from earlier days</span>" +
     '<button type="button" class="link" data-act="od-toggle">' + (overdueOpen ? "Hide" : "Show") + "</button></div>" +
-    (overdueOpen ? "<ul>" + od.map((t) => '<li><i style="background:' + colorOf(t) + '"></i><span>' + esc(t.title) + "</span><em>" + fmtShort(t.date) + " · " + t.est + "m</em></li>").join("") + "</ul>" : "") +
+    (overdueOpen ? "<ul>" + od.map((t) => '<li><i style="background:' + colorOf(t) + '"></i><span>' + esc(t.title) + "</span><em>" + fmtShort(t.date) + (L.sizeOf(t.est) ? " · " + L.sizeOf(t.est) : "") + "</em></li>").join("") + "</ul>" : "") +
     '<div class="od-actions"><button type="button" class="btn" data-act="all-today">All to today</button></div></section>';
 }
 

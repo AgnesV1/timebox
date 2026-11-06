@@ -56,21 +56,30 @@ test("once its month is over a goal leaves the board, finished or not", () => {
   assert.equal(G.isOld(g("x", "north", ""), "2030-01-01"), false);
   assert.equal(G.isOld(g("x", "month", ""), "2030-01-01"), false, "no due date, never old");
 });
-test("past holds only goals that are over, in the quarter of their month, newest first", () => {
+test("past holds only goals that are over, by year, then year, quarter and month goals, newest first", () => {
   const goals = [
     g("jul", "month", "2026-07", { done: "2026-07" }), g("aug", "month", "2026-08"), g("q3", "quarter", "2026-09", { done: "2026-09" }),
     g("sepToo", "month", "2026-09"), g("oct", "month", "2026-10"), g("y26", "year", "2026-12"), g("ySep", "year", "2026-09"),
     g("mar25", "month", "2025-03"), g("y25", "year", "2025-12", { done: "2025-11" }), g("y24", "year", "2024-12"), g("north", "north", "")
   ];
   const p = G.past(goals, "2026-11-02");
-  assert.deepEqual(p.map((x) => x.label), ["2026 Q4", "2026 Q3", "2025 Q4", "2025 Q1", "2024 Q4"]);
-  const q3 = p.find((x) => x.label === "2026 Q3");
-  assert.deepEqual(q3.quarter.map((x) => x.id), ["q3"]);
-  assert.deepEqual(q3.months.map((x) => x.label + ":" + x.items.map((y) => y.id).join(",")), ["Jul:jul", "Aug:aug", "Sep:sepToo"]);
-  assert.deepEqual(q3.year.map((x) => x.id), ["ySep"], "only the year goal that is over; December's is still on the board");
-  assert.ok(!p.some((x) => x.year.some((y) => y.id === "y26")), "this year's December goal is never folded into Past early");
-  assert.deepEqual(p.find((x) => x.label === "2025 Q4").year.map((x) => x.id), ["y25"]);
-  assert.deepEqual(G.past(goals, "2026-07-15").map((x) => x.label), ["2025 Q4", "2025 Q1", "2024 Q4"], "nothing from this year is over yet in July");
+  assert.deepEqual(p.map((x) => x.label), ["2026", "2025", "2024"]);
+  const y26 = p[0];
+  assert.deepEqual(y26.year.map((x) => x.id), ["ySep"], "only the year goal that is over; December's is still on the board");
+  assert.deepEqual(y26.quarters.map((x) => x.label + ":" + x.items.map((y) => y.id).join(",")), ["Q3:q3"]);
+  assert.deepEqual(y26.months.map((x) => x.label + ":" + x.items.map((y) => y.id).join(",")), ["Oct:oct", "Sep:sepToo", "Aug:aug", "Jul:jul"], "newest month first");
+  assert.deepEqual(p[1].months.map((x) => x.label), ["Mar"]);
+  assert.deepEqual(p[1].year.map((x) => x.id), ["y25"], "a ticked one sits in the year of the month it was finished");
+  assert.deepEqual(G.past(goals, "2026-07-15").map((x) => x.label), ["2025", "2024"], "nothing from this year is over yet in July");
+});
+
+test("a ticked goal goes by the month it was finished: that's the month on its row", () => {
+  const goals = [g("doneOct", "year", "2026-12", { done: "2026-10" }), g("doneNov", "year", "2026-12", { done: "2026-11" }), g("open", "year", "2026-12")];
+  const b = G.board(goals, "2026-11-06");
+  assert.deepEqual([colsOf(b).month, colsOf(b).nmonth, b.old], [["doneNov✓"], ["open"], 1], "finished in October: Past; in November: This month; not finished: by the month it's due");
+  assert.equal(G.isOld(goals[0], "2026-11-06"), true);
+  assert.deepEqual(G.past(goals, "2026-11-06")[0].year.map((x) => x.id), ["doneOct"]);
+  assert.equal(G.monthOfGoal(goals[2]), "2026-12");
 });
 test("text and tag are typed together", () => {
   assert.deepEqual(G.parseGoal("  Run a half marathon #Fitness "), { text: "Run a half marathon", tag: "Fitness" });
@@ -92,13 +101,14 @@ test("in a column: open goals first, then by the project order of their tag, the
   ];
   const order = ["build", "work", "friends", "leisure", "fitness", "chores"];
   const rank = (tag) => { const t = String(tag || "").toLowerCase(); return !t ? Infinity : order.includes(t) ? order.indexOf(t) : order.length; };
-  const next = G.board(goals, "2026-10-11", { rank }).cols.find((c) => c.key === "y2027").items.map((x) => x.goal.id);
-  assert.deepEqual(next, ["b1", "b2", "fit", "x", "none", "w"]);
+  const b = G.board(goals, "2026-10-11", { rank });
+  assert.deepEqual(b.cols.find((c) => c.key === "y2027").items.map((x) => x.goal.id), ["b1", "b2", "fit", "x", "none"]);
+  assert.deepEqual(b.cols.find((c) => c.key === "month").items.map((x) => x.goal.id), ["w"], "finished in October, so it's under This month");
 });
 test("a goal that is over is skipped by chains: the one under it hangs off the one above", () => {
   const y = (id, due, extra) => g(id, "year", due, extra);
   const chain = [g("life", "north", ""), y("feb2", "2027-02", { up: "life" }), g("mar2", "month", "2027-03", { up: "feb2" })];
-  assert.deepEqual(G.past(chain, "2027-03-02").map((x) => x.label + ":" + x.year.map((v) => v.id).join(",")), ["2027 Q1:feb2"]);
+  assert.deepEqual(G.past(chain, "2027-03-02").map((x) => x.label + ":" + x.year.map((v) => v.id).join(",")), ["2027:feb2"]);
   assert.deepEqual(G.chainUp(chain, "mar2", G.visibleSet(chain, "2027-03-02")).map((x) => x.id), ["mar2", "life"]);
   assert.deepEqual(colsOf(G.board([y("d", "2027-06", { dated: false })], "2027-01-05")).year, ["d"], "an old dated: false is ignored now; June is the rest of the year");
 });

@@ -15,7 +15,9 @@ export const CONTINUED = "Continued";   // 剩下的步骤已经拖到别的天�
 export const BACK = "Back to the pool";
 
 const num = (v) => Number(v) || 0;
-// 大概多久，写在项旁边的短样子：30m、2h、1h45；没写是空
+// 今天页左边那一格、项旁边的大概多久：不到一小时只写数字（30），够一小时写 1h30、3h（她 2026-11-06 定的）；没写是空
+export const estText = (m) => { const v = Math.round(num(m)); return v <= 0 ? "" : v < 60 ? String(v) : Math.floor(v / 60) + "h" + (v % 60 ? String(v % 60).padStart(2, "0") : ""); };
+// 大概多久，写在项旁边的短样子：30m、2h、1h45；没写是空（Pool、计划编辑框里用，那里分钟旁边还有次数，不写 m 分不清）
 export const sizeOf = (m) => { const v = Math.round(num(m)); return v <= 0 ? "" : v < 60 ? v + "m" : Math.floor(v / 60) + "h" + (v % 60 ? String(v % 60).padStart(2, "0") : ""); };
 export const isChore = (t) => String(t?.id || "").startsWith("chore-");
 export const isLine = (t) => Boolean(t?.projectId && t.itemId);

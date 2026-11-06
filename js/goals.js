@@ -47,9 +47,13 @@ export function whenText(when, colYear) {
   return MONTHS[m - 1] + (y !== colYear ? " " + y : "");
 }
 
-// 过期了没有：截止月已经过去了（月、季、年目标都一样，她 2026-11-05 晚定的）。North star、没写期限的永远不过期
+// 一条目标算在哪个月：勾了的算做完的那个月，没勾的算截止月——就是那一行右边写的那个月（「✓ Oct」「Dec」）。
+// 她 2026-11-06 说的：设了 Oct 的还没折叠、Nov 的在 Next month——那几条都勾了，显示的是做完的月份，以前却按截止月放
+export const monthOfGoal = (g) => (g?.done || g?.due || "");
+
+// 过期了没有：它那个月已经过去了（月、季、年目标都一样）。North star、没写期限的永远不过期
 export function isOld(g, today) {
-  return spanOf(g) !== "north" && Boolean(g?.due) && monthOf(g.due) < monthOf(today);
+  return spanOf(g) !== "north" && Boolean(monthOfGoal(g)) && monthOf(monthOfGoal(g)) < monthOf(today);
 }
 
 // → { cols: [{...column, items: [{ goal, done, ahead, when }]}], old: 过期了、收进往期的有几条 }
@@ -61,7 +65,7 @@ export function board(goals, today, { rank = () => 0 } = {}) {
   for (const g of goals) {
     if (spanOf(g) === "north") { cols[cols.length - 1].items.push({ goal: g, done: Boolean(g.done), ahead: false, when: g.done ? whenText(g.done, 0) : "" }); continue; }
     if (isOld(g, today)) { old++; continue; }
-    const at = monthOf(g.due || today), done = Boolean(g.done);
+    const at = monthOf(monthOfGoal(g) || today), done = Boolean(g.done);
     let col = timed.find((c) => at >= c.from && at <= c.to), ahead = false;
     if (!col) { col = last; ahead = true; }
     col.items.push({ goal: g, done, ahead, when: whenText(done ? g.done : g.due, col.y) });
@@ -71,28 +75,28 @@ export function board(goals, today, { rank = () => 0 } = {}) {
   return { cols, old };
 }
 
-// 往期：只放过期的（她 2026-11-05 晚说的：没过期的年目标以前也被带进来，像是被折叠了）。按截止月落进那一季（2026 Q3），
-// 分成那一季到期的年目标、季目标、三个月各自的月目标。新的在前。
-// → [{ key: "2026-3", label: "2026 Q3", y, q, year: [目标], quarter: [目标], months: [{ m, label: "Jul", items: [目标] }] }]
+// 往期：只放过期的，按年看（她 2026-11-06 说的「折叠区域用年筛选就好」）。按它那个月（monthOfGoal）落进那一年，
+// 分成年目标、各季的季目标、各月的月目标；季和月新的在前，年份新的在前。
+// → [{ key: "2026", label: "2026", y, year: [目标], quarters: [{ q, label: "Q3", items }], months: [{ m, label: "Jul", items }] }]
 export function past(goals, today) {
   const at = new Map();
-  const get = (y, q) => {
-    const k = y + "-" + q;
-    if (!at.has(k)) at.set(k, { key: k, label: y + " Q" + q, y, q, year: [], quarter: [], months: new Map() });
-    return at.get(k);
+  const get = (y) => {
+    if (!at.has(y)) at.set(y, { y, year: [], quarters: new Map(), months: new Map() });
+    return at.get(y);
   };
+  const push = (map, k, g) => { if (!map.has(k)) map.set(k, []); map.get(k).push(g); };
   for (const g of goals.filter((x) => isOld(x, today))) {
-    const [y, m] = split(g.due), x = get(y, quarter(m)), span = spanOf(g);
-    if (span === "month") { if (!x.months.has(m)) x.months.set(m, []); x.months.get(m).push(g); }
-    else if (span === "quarter") x.quarter.push(g);
+    const [y, m] = split(monthOfGoal(g)), x = get(y), span = spanOf(g);
+    if (span === "month") push(x.months, m, g);
+    else if (span === "quarter") push(x.quarters, quarter(m), g);
     else x.year.push(g);
   }
-  const byDue = (a, b) => String(a.due).localeCompare(String(b.due)) || (Number(a.order) || 0) - (Number(b.order) || 0);
-  return [...at.values()].sort((a, b) => b.y - a.y || b.q - a.q).map((x) => ({
-    key: x.key, label: x.label, y: x.y, q: x.q,
-    year: x.year.sort(byDue),
-    quarter: x.quarter.sort(byDue),
-    months: [...x.months].sort((a, b) => a[0] - b[0]).map(([m, items]) => ({ m, label: MONTHS[m - 1], items: items.sort(byDue) }))
+  const byMonth = (a, b) => monthOfGoal(a).localeCompare(monthOfGoal(b)) || (Number(a.order) || 0) - (Number(b.order) || 0);
+  return [...at.values()].sort((a, b) => b.y - a.y).map((x) => ({
+    key: String(x.y), label: String(x.y), y: x.y,
+    year: x.year.sort(byMonth),
+    quarters: [...x.quarters].sort((a, b) => b[0] - a[0]).map(([q, items]) => ({ q, label: "Q" + q, items: items.sort(byMonth) })),
+    months: [...x.months].sort((a, b) => b[0] - a[0]).map(([m, items]) => ({ m, label: MONTHS[m - 1], items: items.sort(byMonth) }))
   }));
 }
 

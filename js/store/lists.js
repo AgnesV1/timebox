@@ -170,7 +170,7 @@ export default function (core) {
       if (!raw.trim()) continue;
       const body = raw.trim().replace(/^[-*+•·|]\s+(\[[ xX]\]\s+)?/, "");
       const x = PT.parseLine(body);
-      if (/^\s{2,}/.test(raw) && rows.length) rows[rows.length - 1].steps.push({ t: x.title, min: x.est || 0 });
+      if (/^\s{2,}/.test(raw) && rows.length) rows[rows.length - 1].steps.push({ t: x.title, min: x.est || 0, raw: body });   // 缩进的行接进那一项的备注
       else rows.push({ ...x, steps: [] });
     }
     let order = all("items").filter((i) => i.projectId === planId).reduce((m, i) => Math.max(m, Number(i.order) || 0), 0);
@@ -180,7 +180,7 @@ export default function (core) {
         const id = newId();
         const est = r.est ?? (r.steps.reduce((a, s) => a + s.min, 0) || 0);
         put("items", { id, projectId: planId, module: section || "", title: r.title, est, origEst: null, order: ++order });
-        plan = cfgPatch(plan, id, { n: r.n ?? 1, perWeek: r.perWeek || 0, steps: r.steps, note: r.note || "" });
+        plan = cfgPatch(plan, id, { n: r.n ?? 1, perWeek: r.perWeek || 0, steps: [], note: L.noteWith(r.note || "", r.steps) });
         ids.push(id);
       }
       put("projects", plan);
@@ -229,7 +229,8 @@ export default function (core) {
         const itemId = prev || newId();
         const row = prev ? get("items", prev) : { id: itemId, projectId: id, origEst: null };
         put("items", { ...row, title: it.title, module: it.section, est: it.est, order: ++order });
-        p = cfgPatch(p, itemId, { n: it.n, perWeek: it.perWeek, steps: it.steps, note: it.note, later: it.later });
+        // 缩进的那几行接进备注（不再是能勾的步骤，她 2026-11-05 晚定的）
+        p = cfgPatch(p, itemId, { n: it.n, perWeek: it.perWeek, steps: [], note: L.noteWith(it.note, it.steps), later: it.later });
       }
       put("projects", p);
       gone = m.gone.map((o) => ({ id: o.id, title: o.title, used: linesOf(o.id).length > 0 }));
@@ -241,6 +242,19 @@ export default function (core) {
   // 记下换的那天；旧的 Total 计划变成普通的计划（项留着，都是 Once）；以前「总时长」那一大块（和计划同名的项）、
   // 还有以前在计划上直接加任务时顺手建的项（分区 Added）拿掉，它们的任务变回计划自己的一条（她 2026-10-26 说没挑 Pool 的就该是计划本身，不拆成子项）
   // 以前每一次的名字后面带的 #k 拿掉（她 2026-10-27 说没用）
+  // 以前存的步骤并进备注（她 2026-11-05 晚说的：只勾 task，没用过这么细的步骤）：还有 steps 的项，按行接到备注后面、steps 清空；
+  // 只动有 steps 的，做过一次就不会再动。打开页面、拉完数据时跑（js/main.js）
+  function adoptSteps() {
+    const fix = all("projects").filter((p) => Object.values(p.rule?.items || {}).some((c) => Array.isArray(c?.steps) && c.steps.length));
+    if (!fix.length) return;
+    change(() => {
+      for (const p of fix) {
+        const items = Object.fromEntries(Object.entries(p.rule.items).map(([id, c]) => [id, c?.steps?.length ? { ...c, note: L.noteWith(c.note, c.steps), steps: [] } : c]));
+        put("projects", { ...p, rule: { ...p.rule, items } });
+      }
+    }, "", { quiet: true });
+  }
+
   function adoptLists() {
     const fix = [];
     for (const p of all("projects")) {
@@ -269,5 +283,5 @@ export default function (core) {
     return fix.length > 0;
   }
 
-  return { itemCfg, setItemCfg, setPlanNotes, setSectionLater, rowOf, ensureRow, placeItem, moveLine, moveBlock, blockToPool, tickLine, tickStep, backToPool, settleLists, addPoolLines, planShape, planText, pastePlan, adoptLists };
+  return { itemCfg, setItemCfg, setPlanNotes, setSectionLater, rowOf, ensureRow, placeItem, moveLine, moveBlock, blockToPool, tickLine, tickStep, backToPool, settleLists, addPoolLines, planShape, planText, pastePlan, adoptLists, adoptSteps };
 }

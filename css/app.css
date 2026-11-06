@@ -511,6 +511,7 @@ body.side-min .sync-pill span { display: none; }
 .ls-sz { flex: none; font: 500 12px var(--num); color: var(--muted); white-space: nowrap; }
 .ls-steps { margin: 2px 0 6px 7px; padding-left: 15px; border-left: 1px solid var(--line); }
 .ls-more { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 6px 23px; font-size: 12px; color: var(--muted); }
+.ls-more > span { white-space: pre-line; }   /* 备注可能有好几行（步骤并进来的） */
 .ls-pnotes { margin: 8px 0 4px; padding: 8px 10px; max-height: 340px; overflow: auto; border-radius: 10px; background: var(--tonal); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; }
 body.phone .ls-ln, body.phone .ls-step { min-height: 30px; font-size: 14.5px; }
 body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
@@ -798,7 +799,9 @@ body.modal-open { overflow: hidden; }
 .ls-sec { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .ls-sec .chip { margin-left: auto; padding: 2px 9px; font-size: 11.5px; letter-spacing: 0; text-transform: none; }
 .ls-it { display: grid; grid-template-columns: minmax(0, 1fr) 52px 48px 128px; gap: 8px; align-items: baseline; padding: 5px 2px; border-top: 1px solid var(--line); font-size: 13.5px; cursor: pointer; }
-.ls-it.later { opacity: .45; }
+.ls-it.later, .ls-it.waiting { opacity: .45; }
+.ls-mon-s { display: flex; gap: 6px; }
+.ls-mon-s select { min-width: 0; }
 .ls-it.open { align-items: center; cursor: default; }
 .ls-it.open input { min-width: 0; padding: 5px 8px; font-size: 13px; }
 .ls-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

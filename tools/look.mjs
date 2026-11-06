@@ -180,7 +180,7 @@ const SHOTS = [
   // 计划的编辑框：Pool 按分区列，点一项展开
   { device: "desk", name: "projects-plan", hash: "projects", act: async (page) => { await tap('.pcard[data-project="seed-b2"] .pname')(page); await page.waitForTimeout(300); await tap(".project-editor .ls-it")(page); } },
   { device: "desk", name: "projects-edit-goal", hash: "projects", act: tap('.goals .gl[data-goal="q1"] .gt') },
-  { device: "desk", name: "projects-add-goal", hash: "projects", act: async (page) => { await hover('.goals [data-col="next"] h4', 300)(page); await tap('.goals [data-col="next"] .gplus')(page); await page.keyboard.type("Run 10k #Fitness"); } },
+  { device: "desk", name: "projects-add-goal", hash: "projects", act: async (page) => { await hover('.goals [data-col="nmonth"] h4', 300)(page); await tap('.goals [data-col="nmonth"] .gplus')(page); await page.keyboard.type("Run 10k #Fitness"); } },
   { device: "desk", name: "projects-hover-north", hash: "projects", act: hover('.pj-north .ns-g[data-goal="n2"]', 1600) },
   { device: "desk", name: "projects-north-edit", hash: "projects", act: async (page) => { await tap('.pj-north .ns-g[data-goal="n2"]')(page); await page.keyboard.press("Control+End"); await page.keyboard.type(" Write every week.", { delay: 5 }); await page.keyboard.down("Shift"); for (let i = 0; i < 17; i++) await page.keyboard.press("ArrowLeft"); await page.keyboard.up("Shift"); await page.waitForTimeout(200); } },
   { device: "desk", name: "projects-ideas", hash: "projects", act: tap('.goals [data-act="rail-tab"][data-v="ideas"]') },

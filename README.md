@@ -12,12 +12,12 @@ Design rules (colours, type, components, motion, and what design tools must leav
    - fixed weekdays it shows up on by itself (Gym Mon / Wed / Fri, 40 minutes each), or nothing — you drag it onto a day when you like; "about N a week" is just a reference number
    - dates (from – to), shown on its card as "day 4 of 40"
    - **Notes**: phases, rules, how you do things — open them from the plan's row on Today while you work
-   - a **pool**: the concrete things to do. Each item has a name and, optionally, how many times (Once, ×11, or Any), about how long (only a guide — nothing is calculated from it), about N a week, **steps**, a note, a section and **Later** (out of the pool, not counted, until you switch it back). A plan with nothing in its pool is just its row.
+   - a **pool**: the concrete things to do. Each item has a name and, optionally, how many times (Once, ×11, or Any), about how long (only a guide — nothing is calculated from it), about N a week, a note, a section and **Later** (out of the pool, not counted, until you switch it back). A plan you drag (When I drag it) can also switch on **Items have a month**: an item given a month shows in the pool from the first of the month before (December's from November 1), so it can be planned ahead, and stays out until then. A plan with nothing in its pool is just its row.
 2. **A plan is one row a day**, timed as a whole like any task (select it, Start in the bar). Items dragged in from its pool sit under it like notes: tick one when it's done — that's one time of that item. An item with steps opens into a checklist; ticking the last step ticks the item. Item names carry their number (`Mock test #3`).
 3. Nothing is spread over days for you. On the computer, drag items from the Pool beside the calendar; adding a task under the plan with an item's exact name picks that item too. A plan with nothing added that day is just its row — nothing asks you to fill it.
-4. **What isn't ticked goes back to the pool** once its day is over (its count comes back). Half-done steps stay on that day as a record, and the rest waits in the pool as the same time (`Mock test #1 · 4 steps left`) — drag it out again to carry on.
+4. **What isn't ticked goes back to the pool** once its day is over (its count comes back). Items no longer have steps of their own (since 2026-11-05 they fold into the note); a task from before that still has steps keeps them: half-done steps stay on that day as a record, and the rest waits in the pool as the same time (`Mock test #1 · 4 steps left`).
 5. The top of Today shows time done / about how long today's picked items add up to · the day's **box** (its usable time, set per weekday or per day in the calendar).
-6. A whole plan can be **pasted as text** (Markdown: `## sections`, `- [ ] item · 30min · ×11 · a note`, steps indented under their item, a line like `L3 ×2, L5 ×3` for weekly amounts; anything else is kept in Notes). You see what was found before Create plan. **Copy as text** gives the plan back in the same form; edit it anywhere and paste it again to update — items are matched by name or by a code like L3, so times already done stay, and items no longer in the text are offered as Keep / Later / Delete.
+6. A whole plan can be **pasted as text** (Markdown: `## sections`, `- [ ] item · 30min · ×11 · a note`, lines indented under an item join its note, a line like `L3 ×2, L5 ×3` for weekly amounts; anything else is kept in Notes). You see what was found before Create plan. **Copy as text** gives the plan back in the same form; edit it anywhere and paste it again to update — items are matched by name or by a code like L3, so times already done stay, and items no longer in the text are offered as Keep / Later / Delete.
 
 ## 1. The Google Sheet side
 
@@ -62,11 +62,11 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   - **North star**: a paragraph across the whole page. Normally its first two lines show (scroll inside it for the rest; a fade at the bottom means there's more); **More** at the right opens it in full and **Less** folds it again, remembered on that device.
     Put `[ ]` around words (or select some and click **Frame as goal**) and each framed phrase is a North star goal;
     click the paragraph to edit, ⌘↵ or clicking outside saves. Rewording inside a frame keeps the same goal (its parent and links stay); removing the frame deletes that goal (undo in the toast).
-  - **Goals | Ideas**: Goals are stacked by time: This month, Next month, This quarter, Next quarter, the rest of this year's quarters (in January: Q3 and Q4), This year, Next year, then three more years (in 2026 that's 2028, 2029, 2030; they move with the date).
-    Once its year comes, a year goal with a date (its month changed in the date pickers) moves into the nearest section that holds that month — This month, Next month, or its quarter — and is over once that month is; a year goal without a date (dragged into a year, or still on December, the default) stays in This year until the year ends.
+  - **Goals | Ideas**: Goals are stacked by time: This month, Next month, This quarter (only in a quarter's first month, holding its third), This year (the months left after those, when there are any), Next year, then three more years (in 2026 that's 2028, 2029, 2030; they move with the date).
+    Every goal — month, quarter or year — sits in the section that holds the month it's due: in November 2026 a year goal due in December is under Next month.
     Each goal has a tag, the month you mean to finish it, and once ticked, the month you actually did — both can be clicked and changed. Sections roll forward with the date.
-    Once a goal's month / quarter / year is over, finished or not, it leaves these sections for **Past** at the bottom: pick a quarter (`2026 Q3`) and open it to see that quarter's goals,
-    its three months' goals and that year's goals, ticked or not, with "N of M done". You can still tick one there (it counts as done in the month it was due), or drag an unfinished one back to a current section by its grip;
+    Once the month it's due is over, finished or not, a goal leaves these sections for **Past** at the bottom (and only then): pick a quarter (`2026 Q3`) and open it to see the year, quarter and month goals that were due in it,
+    ticked or not, with "N of M done". You can still tick one there (it counts as done in the month it was due), or drag an unfinished one back to a current section by its grip;
     inside a section goals are ordered by their tag's project order (Build first, untagged last). A small grip shows on the left of a goal when you hover it: drag it to another section to give the goal that section's default due date (or click the grip to pick a section; undo in the toast).
     Ideas is the idea pool described below; the North star stays at the top either way.
   **Goals, projects and plans can be linked** to say what each thing is for: rest the mouse on a goal, a framed phrase in the North star, a project name or a plan card
@@ -100,8 +100,8 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   Plan in the idea pool uses the same defaults. Which projects can pick ideas: the Ideas column in Settings → Projects.
   On the phone: with the `Idea` switch on in the add-task row, Add saves to the pool instead (it lands in Unsorted; sort it on the computer); the light bulb in the top bar opens the look-up page (search names and notes, read only). All of it is stored in the Settings tab, one row each (`idea:…`).
   The sections hold plans. Click "New plan" or a project's "+ Plan": a name is enough (Swimming); "Shows up" is When I drag it or On set days (minutes per weekday),
-  with About … a week, dates, a colour and Notes; or Paste text for a whole plan. In a plan's editor the pool is listed by section — name · about how long · times · done / a week / steps;
-  click an item to change it (steps one per line, `Listening set · 35min`), switch a section or an item to Later, and add more one per line (`L5 shadowing · 20min · ×18`).
+  with About … a week, dates, a colour and Notes; or Paste text for a whole plan. In a plan's editor the pool is listed by section — name · about how long · times · done / a week / month;
+  click an item to change it (name, minutes, times, a week, note, section, and its month when the plan has Items have a month), switch a section or an item to Later, and add more one per line (`L5 shadowing · 20min · ×18`).
   Cards show how the plan shows up, its dates and day, the time spent, this week per item (those with about N a week) and what's left in the pool. Rename renames the project and its plans with it
 - **Repeat shortcuts**: in the add-task box, pick "↻ Every day / Weekdays / Every <weekday>" and "for good / for 1 week …", then Add —
   that creates a Regular + Auto plan; a task's ⋯ → Repeat does the same and lets each weekday have its own minutes.
@@ -244,7 +244,7 @@ Offline, entries wait on the device and go out once you're back online.
 
 **Phone**: see tasks, time them, mark results, add tasks, add to the reading log. The top row is the five days before and after today; tap a day to see it.
 Only the opened row has Done / Delay / Drop (other rows just show their status on the right); after Done you enter how long and when it ended, Delay and Drop ask for a reason;
-a plan is one row with its items under it, ticked the same way (steps too); picking from the pool and moving things between days happen on the computer;
+a plan is one row with its items under it, ticked the same way; picking from the pool and moving things between days happen on the computer;
 press and drag the minutes on the left to reorder (the phone has no ↑ ↓; the computer keeps them, plus Alt+↑↓); add tasks at the bottom of the list ("Gym 40" — a trailing number is minutes). The project is a small chip; tapping it opens a dropdown of projects with their plans.
 **Spend** at the bottom right of the add-task box records a transaction (see Spending below); to its left, in grey, what's left of this month's budget (`$1,356 left`; still grey at $0, only past the budget does it turn red). Planning and settings happen on the computer.
 
@@ -298,8 +298,8 @@ Cards, the sidebar and the bars are translucent (lightly frosted by day), so the
 **What's where in the Sheet**: Tasks / Projects / Items and a few more tabs are visible (plus Archive once you've archived). Tasks' `Group` column = the project a task belongs to
 (it can belong straight to a project with `Project` left empty). Each row of Projects is a plan: `Group` = the project,
 `Project` = the plan's name, `Kind` is Regular for every plan (older Total plans were moved over), `Place` is Auto for fixed weekdays and Pool otherwise, `Start` / `Deadline` its dates,
-and the hidden `Rule` column holds the weekdays, about N a week, Notes and each pool item's settings (times, a week, steps, note, Later). Each row of Items is a pool item (name, section in `Module`, about how long in `Est min`).
-A plan's row for a day is the task with no Item ID (new ones have IDs starting `pd:`); an item dragged onto a day is a task with that Item ID, and its steps are `- [ ]` / `- [x]` lines in its Description;
+and the hidden `Rule` column holds the weekdays, about N a week, Notes and each pool item's settings (times, a week, note, Later, month), and `months` when Items have a month is on. Each row of Items is a pool item (name, section in `Module`, about how long in `Est min`).
+A plan's row for a day is the task with no Item ID (new ones have IDs starting `pd:`); an item dragged onto a day is a task with that Item ID, and the steps of an older one are `- [ ]` / `- [x]` lines in its Description;
 the day a device switched to this way of planning is `lists-from` in Settings (unticked items go back to the pool only from then on); automatic task IDs start with `rt:` (fixed weekdays) or `au:` (old daily shares);
 timer records are in Tasks' `Times` column, deep work in `Deep` (ticked = yes, editable in the Sheet);
 the running timer, per-day capacity changes, commute days, the reading Sheet link, the pie defaults and the deep goal (`life`) are in the (hidden) Settings tab.

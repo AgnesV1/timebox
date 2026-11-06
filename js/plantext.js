@@ -97,7 +97,7 @@ export function parse(text) {
     const m = ITEM.exec(t);
     if (m && item && indentOf(line) >= 2) {
       const s = parseLine(m[2]);
-      item.steps.push({ t: s.title, min: s.est || 0 });
+      item.steps.push({ t: s.title, min: s.est || 0, raw: m[2].trim() });   // raw：原文那一行（并进备注时照原样）
       continue;
     }
     if (m && indentOf(line) < 2) {
@@ -155,9 +155,13 @@ export function format(plan) {
       if (i.n === 0) bits.push("any");
       else if (i.n > 1) bits.push("×" + i.n);
       if (i.perWeek > 0) bits.push(i.perWeek + "/week");
-      if (i.note) bits.push(i.note);
+      // 备注只有一行：跟在项后面；好几行（步骤并进来的）：全写成缩进的行，粘回来时缩进的行又接回备注（js/lists.js 的 noteWith）。
+      // 不把第一行放在项后面，免得里面的「30min」被当成这一项的时长
+      const lines = String(i.note || "").split("\n").map((x) => x.trim()).filter(Boolean);
+      if (lines.length === 1) bits.push(lines[0]);
       out.push("- [ ] " + bits.join(" · "));
-      for (const st of i.steps || []) out.push("  - [ ] " + st.t + (Number(st.min) > 0 ? " · " + fmtDur(st.min) : ""));
+      for (const st of i.steps || []) out.push("  - [ ] " + (st.raw || st.t + (Number(st.min) > 0 ? " · " + fmtDur(st.min) : "")));
+      if (lines.length > 1) for (const line of lines) out.push("  - [ ] " + line);
     }
   }
   return out.join("\n") + "\n";

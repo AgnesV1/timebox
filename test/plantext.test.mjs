@@ -91,7 +91,8 @@ test("a whole plan: sections, items, steps, weekly amounts, later, notes", () =>
   assert.deepEqual([daily.items[0].n, daily.items[0].est], [30, 20]);
   const mock = weekend.items[0];
   assert.deepEqual([mock.title, mock.n, mock.est], ["模拟考", 4, 195], "×4 comes from the heading; minutes add up from the steps");
-  assert.deepEqual(mock.steps, [{ t: "听力", min: 30 }, { t: "阅读", min: 60 }, { t: "复盘", min: 105 }]);
+  assert.deepEqual(mock.steps.map(({ t, min }) => ({ t, min })), [{ t: "听力", min: 30 }, { t: "阅读", min: 60 }, { t: "复盘", min: 105 }]);
+  assert.ok(mock.steps.every((s) => s.raw.startsWith(s.t)), "each indented line keeps its own text, for the note it joins");
   assert.deepEqual(pool.items.map((i) => [i.code, i.n, i.perWeek]), [["L1", 8, 2], ["W1", 30, 6], ["", 0, 0]], "weekly amounts by code, only in their own section");
   assert.deepEqual([reserve.items[0].perWeek, reserve.items[0].n, reserve.items[0].note], [0, 3, "（换新题库）"]);
   assert.match(p.notes, /^- 目标：一次考到 B2/);

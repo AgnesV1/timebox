@@ -1,6 +1,7 @@
 // 计划的 Pool 和每天那一行（她 2026-10-25 定的「所有计划一个逻辑」）：纯计算，不碰存储。
 // 计划 = 项目下面的一块（Swimming、IELTS）。它的 Pool 是一项项具体的 todo：Items 表一行一项（名字、分区 module、大概分钟 est、顺序），
-// 附加的设置在计划的 rule.items[项 id]：做几次 n（1 = Once，0 = Any）、about N a week、步骤、备注、Later。
+// 附加的设置在计划的 rule.items[项 id]：做几次 n（1 = Once，0 = Any）、about N a week、备注、Later、月份（month，计划开了 rule.months 才管用）。
+// 步骤（steps）2026-11-05 晚并进了备注（她只勾 task，没用过这么细的），新的不再有；已经排到某天的旧任务里的步骤照旧能勾。
 // 某天某计划 = 一行：那天这个计划「没挂项」的任务，整块计时，时间都记在它身上；
 // 拖进那天的项 = 挂着 itemId 的任务，只是便条（大概多久、不计时），Done = 这一次做了；有步骤的，步骤在它的 Description 里（`- [ ] 听力 · 35min`）。
 // 过了那天还没勾的回 Pool（settle）；勾了一半步骤的，勾了的留在那天（标 Delay），剩下的在 Pool 里接着做，算同一次。
@@ -8,7 +9,7 @@
 import { addDays, startOfWeek } from "./dates.js";
 import { parseDur, fmtDur } from "./plantext.js";
 
-export const DEFAULT = { n: 1, perWeek: 0, steps: [], note: "", later: false };
+export const DEFAULT = { n: 1, perWeek: 0, steps: [], note: "", later: false, month: "" };
 export const cfgOf = (plan, itemId) => ({ ...DEFAULT, ...(plan?.rule?.items?.[itemId] || {}) });
 export const CONTINUED = "Continued";   // 剩下的步骤已经拖到别的天接着做了：这条 Delay 不再算「回了 Pool 的那次」
 export const BACK = "Back to the pool";
@@ -99,24 +100,37 @@ const active = (p) => !p.status || p.status === "active";
 const byOrder = (a, b) => num(a.order) - num(b.order);
 
 // Pool：每个在用的计划一组——计划自己（拖了 = 那天空的一行），和它还能拖的项（Later 的、做满了的不列），按分区、顺序排
+// 小项目带月份（她 2026-11-05 晚要的）：计划开了 Items have a month（rule.months），一项写了月份（YYYY-MM），
+// 就从那个月的前一个月 1 号起才进 Pool——「提前一个月显示在 pool，我排的时候能看到」。开关关了，月份照存但不管用
+export function waiting(cfg, plan, today) {
+  if (!plan?.rule?.months || !/^\d{4}-\d{2}$/.test(cfg?.month || "")) return false;
+  const [y, m] = cfg.month.split("-").map(Number);
+  return String(today).slice(0, 7) < (m === 1 ? y - 1 + "-12" : y + "-" + String(m - 1).padStart(2, "0"));
+}
+
+// 备注后面接上步骤，一行一个（步骤并进备注时用：粘贴时缩进的那几行、以前存的 steps）；粘贴来的照原文那一行
+export const noteWith = (note, steps) => [note, ...(steps || []).map((s) => s.raw || (s.t + (num(s.min) > 0 ? " · " + fmtDur(s.min) : "")))]
+  .map((x) => String(x || "").trim()).filter(Boolean).join("\n");
+
 export function pool(ctx) {
   return (ctx.projects || []).filter(active).map((plan) => ({
     plan,
-    items: itemsOf(ctx, plan.id).slice().sort(byOrder).map((i) => stateOf(ctx, i)).filter((x) => !x.cfg.later && x.count.left > 0)
+    items: itemsOf(ctx, plan.id).slice().sort(byOrder).map((i) => stateOf(ctx, i)).filter((x) => !x.cfg.later && x.count.left > 0 && !waiting(x.cfg, plan, ctx.today))
   }));
 }
 
-// 计划的 Pool 一共：几项、还要几次（Any 不算）、多久（大概分钟 × 还要几次）、Later 几项
+// 计划的 Pool 一共：几项、还要几次（Any 不算）、多久（大概分钟 × 还要几次）、Later 几项、还没到月份的几项
 export function poolTotals(ctx, plan) {
-  let items = 0, times = 0, min = 0, later = 0;
+  let items = 0, times = 0, min = 0, later = 0, waits = 0;
   for (const i of itemsOf(ctx, plan.id)) {
     const s = stateOf(ctx, i);
     if (s.cfg.later) { later++; continue; }
+    if (waiting(s.cfg, plan, ctx.today)) { waits++; continue; }
     if (s.count.left <= 0) continue;
     items++;
     if (Number.isFinite(s.count.left)) { times += s.count.left; min += num(i.est) * s.count.left; }
   }
-  return { items, times, min, later };
+  return { items, times, min, later, waiting: waits };
 }
 
 // ---------- 每天那一行 ----------

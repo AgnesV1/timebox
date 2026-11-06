@@ -247,7 +247,9 @@ export function poolHTML(c) {
       if ((x.item.module || "") !== mod) { mod = x.item.module || ""; if (mod) h += '<div class="pg-mod">' + esc(mod) + "</div>"; }
       const carry = x.count.carry[0];
       const label = carry ? x.item.title + " · " + carry.steps.length + " step" + (carry.steps.length > 1 ? "s" : "") + " left" : x.item.title;
-      const meta = [L.sizeOf(x.item.est), x.cfg.n > 1 ? x.count.left + " left" : x.cfg.n === 0 ? "any" : "", x.cfg.perWeek ? "wk " + x.week.placed + "/" + x.cfg.perWeek : ""].filter(Boolean).join(" · ");
+      // 计划开了 Items have a month 的，写上那一项的月份（提前一个月就出现在这里了）
+      const month = p.rule?.months && /^\d{4}-\d{2}$/.test(x.cfg.month || "") ? MONTHS[Number(x.cfg.month.slice(5, 7)) - 1] + (x.cfg.month.slice(0, 4) !== c.today.slice(0, 4) ? " " + x.cfg.month.slice(0, 4) : "") : "";
+      const meta = [L.sizeOf(x.item.est), x.cfg.n > 1 ? x.count.left + " left" : x.cfg.n === 0 ? "any" : "", x.cfg.perWeek ? "wk " + x.week.placed + "/" + x.cfg.perWeek : "", month].filter(Boolean).join(" · ");
       h += '<div class="pi" data-drag="item:' + esc(x.item.id) + '" role="button" tabindex="0" aria-haspopup="listbox" style="--c:' + esc(p.color) + '" title="' + esc(x.cfg.note || "") + '"><i class="g"></i><span>' + esc(label) + '</span><b class="num">' + esc(meta) + "</b></div>";
     }
     h += "</section>";

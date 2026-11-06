@@ -22,7 +22,7 @@ import * as G from "../goals.js";
 import * as L from "../lists.js";
 import * as PT from "../plantext.js";
 import { esc, on, icon } from "../dom.js";
-import { diffDays, fmtShort, fmtHours, startOfMonth, WEEKDAYS } from "../dates.js";
+import { diffDays, fmtShort, fmtHours, startOfMonth, WEEKDAYS, MONTHS } from "../dates.js";
 import { groupsOf, chainHTML, toast } from "./common.js";
 import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
 import { goalsHTML, northHTML } from "./goals.js";
@@ -69,7 +69,7 @@ function cardHTML(c, p, track) {
     lines = [
       [when, datesText(p, c.today), spent ? "<b>" + fmtHours(spent) + "</b> so far" : ""].filter(Boolean).join(" · "),
       week.length ? "This week · " + week.join(" · ") : "",
-      "Pool " + (tot.times ? "<b>" + tot.times + "</b> left" : tot.items ? "<b>" + tot.items + "</b> to pick from" : "all done") + (tot.later ? " · " + tot.later + " later" : "")
+      "Pool " + (tot.times ? "<b>" + tot.times + "</b> left" : tot.items ? "<b>" + tot.items + "</b> to pick from" : "all done") + (tot.later ? " · " + tot.later + " later" : "") + (tot.waiting ? " · " + tot.waiting + " waiting for its month" : "")
     ];
   } else {
     const from = startOfMonth(c.today);
@@ -223,8 +223,14 @@ function dragFields(p) {
   const r = R.ruleOf(p);
   return '<div class="field-row three"><label class="field"><span>About … a week</span><input class="num" type="number" min="0" max="21" data-rf="perWeek" value="' + (Number(r.perWeek) > 0 ? Number(r.perWeek) : "") + '" placeholder="—"></label>' +
     '<label class="field"><span>From (optional)</span><input type="date" data-pf="start" value="' + esc(p.start || "") + '"></label>' +
-    '<label class="field"><span>To (optional)</span><input type="date" data-pf="deadline" value="' + esc(p.deadline || "") + '"></label></div>';
+    '<label class="field"><span>To (optional)</span><input type="date" data-pf="deadline" value="' + esc(p.deadline || "") + '"></label></div>' +
+    // 小项目带月份（她 2026-11-05 晚要的）：只有 When I drag it 的计划有；开了以后点开一项能挑月份，那个月的前一个月起才进 Pool
+    '<label class="check"><input type="checkbox" data-pmonths' + (p.rule?.months ? " checked" : "") + '> Items have a month <span class="msub">— each shows in the Pool from the month before</span></label>';
 }
+
+// 一项的月份写成「Dec」，不是今年的带上年份「Jan 2027」
+const monthText = (ym) => MONTHS[Number(ym.slice(5, 7)) - 1] + (ym.slice(0, 4) !== store.today().slice(0, 4) ? " " + ym.slice(0, 4) : "");
+const hasMonth = (x) => Boolean(x.plan?.rule?.months) && /^\d{4}-\d{2}$/.test(x.cfg.month || "");
 
 // Notes：平时收成一行（第一句 · 多少字），点开是大框；阶段、规则、标准流程都放这儿，做那一项时在今天页点开能看
 function notesHTML(p) {
@@ -236,28 +242,40 @@ function notesHTML(p) {
   return '<label class="field"><span>Notes — phases, rules, how you do things</span><textarea data-pnotes data-keep="pnotes-' + esc(p.id || "new") + '" rows="' + (text ? 10 : 4) + '">' + esc(text) + "</textarea></label>";
 }
 
-// Pool 一行的第四格：做了几次 / 每周 / 几步
+// Pool 一行的第四格：做了几次 / 每周 / 月份
 function extraText(x) {
-  return [x.cfg.n > 1 && x.count.done ? x.count.done + "/" + x.cfg.n : "", x.cfg.perWeek ? "about " + x.cfg.perWeek + "/wk" : "", x.cfg.steps.length ? x.cfg.steps.length + " steps" : ""].filter(Boolean).join(" · ");
+  return [x.cfg.n > 1 && x.count.done ? x.count.done + "/" + x.cfg.n : "", x.cfg.perWeek ? "about " + x.cfg.perWeek + "/wk" : "", hasMonth(x) ? monthText(x.cfg.month) : ""].filter(Boolean).join(" · ");
 }
 
 function itemRowHTML(x) {
-  return '<div class="ls-it' + (x.cfg.later ? " later" : "") + '" data-item="' + esc(x.item.id) + '" data-act="item-open" role="button" tabindex="0">' +
-    '<span class="ls-nm">' + esc(x.item.title) + (x.cfg.note ? '<span class="ls-nt">' + esc(x.cfg.note) + "</span>" : "") + "</span>" +
+  // 还没到月份的那几项照 Later 的样子淡下去
+  const wait = L.waiting(x.cfg, x.plan, store.today());
+  return '<div class="ls-it' + (x.cfg.later ? " later" : "") + (wait ? " waiting" : "") + '" data-item="' + esc(x.item.id) + '" data-act="item-open" role="button" tabindex="0"' + (wait ? ' title="Not in the Pool yet"' : "") + ">" +
+    '<span class="ls-nm">' + esc(x.item.title) + (x.cfg.note ? '<span class="ls-nt">' + esc(x.cfg.note.split("\n")[0] + (x.cfg.note.includes("\n") ? " …" : "")) + "</span>" : "") + "</span>" +
     '<span class="ls-n">' + L.sizeOf(x.item.est) + '</span><span class="ls-n">' + timesText(x.cfg.n) + '</span><span class="ls-n">' + esc(extraText(x)) + "</span></div>";
 }
 
-// 点开的那一项：同一排换成输入框（名字、大概分钟、几次、每周），下面是步骤和备注
+// 这一项的月份：月、年两个下拉（「—」= 没有）；计划开了 Items have a month 才有
+function monthFieldHTML(x) {
+  if (!x.plan?.rule?.months) return "";
+  const cur = hasMonth(x) ? x.cfg.month : "", y0 = Number(store.today().slice(0, 4)), y = cur ? Number(cur.slice(0, 4)) : y0, m = cur ? Number(cur.slice(5, 7)) : 0;
+  const years = [];
+  for (let k = Math.min(y, y0); k <= Math.max(y, y0 + 3); k++) years.push(k);
+  return '<div class="field ls-mon"><span>Month</span><span class="ls-mon-s"><select data-lf="mm" aria-label="Month"><option value="">—</option>' +
+    MONTHS.map((n, i) => '<option value="' + (i + 1) + '"' + (i + 1 === m ? " selected" : "") + ">" + n + "</option>").join("") + '</select><select data-lf="my" aria-label="Year">' +
+    years.map((k) => '<option value="' + k + '"' + (k === y ? " selected" : "") + ">" + k + "</option>").join("") + "</select></span></div>";
+}
+
+// 点开的那一项：同一排换成输入框（名字、大概分钟、几次、每周），下面是备注（步骤 2026-11-05 晚并进了备注）
 function itemOpenHTML(x) {
-  const id = esc(x.item.id), steps = x.cfg.steps.map((s) => s.t + (Number(s.min) > 0 ? " · " + PT.fmtDur(s.min) : "")).join("\n");
+  const id = esc(x.item.id), noteRows = String(x.cfg.note || "").split("\n").length;
   const used = x.count.done ? x.count.done + " done" + (x.count.open ? " · " + x.count.open + " on a day" : "") : x.count.open ? x.count.open + " on a day" : "Not started";
   return '<div class="ls-it open" data-item="' + id + '"><input data-lf="title" value="' + esc(x.item.title) + '" aria-label="Name">' +
     '<input class="num" type="number" min="0" step="5" data-lf="est" value="' + (Number(x.item.est) || "") + '" placeholder="min" aria-label="About how many minutes">' +
     '<input data-lf="n" value="' + (x.cfg.n === 1 ? "" : x.cfg.n === 0 ? "any" : x.cfg.n) + '" placeholder="Once" aria-label="How many times: a number, or any">' +
     '<input class="num" type="number" min="0" max="21" data-lf="perWeek" value="' + (x.cfg.perWeek || "") + '" placeholder="— /wk" aria-label="About how many a week"></div>' +
-    '<div class="ls-ex" data-item="' + id + '"><label class="field"><span>Steps — one per line</span><textarea data-lf="steps" rows="' + Math.max(3, x.cfg.steps.length) + '" placeholder="Listening set · 35min">' + esc(steps) + "</textarea></label>" +
-    '<label class="field"><span>Note</span><textarea data-lf="note" rows="3">' + esc(x.cfg.note) + "</textarea></label>" +
-    '<div class="ls-exf"><label class="field"><span>Section</span><input data-lf="module" value="' + esc(x.item.module || "") + '" list="ls-secs"></label>' +
+    '<div class="ls-ex" data-item="' + id + '"><label class="field"><span>Note</span><textarea data-lf="note" rows="' + Math.min(10, Math.max(3, noteRows)) + '">' + esc(x.cfg.note) + "</textarea></label>" +
+    '<div class="ls-exf">' + monthFieldHTML(x) + '<label class="field"><span>Section</span><input data-lf="module" value="' + esc(x.item.module || "") + '" list="ls-secs"></label>' +
     '<span class="hint">' + used + '</span><button type="button" class="chip' + (x.cfg.later ? " on" : "") + '" data-act="item-later" aria-pressed="' + x.cfg.later + '">' + (x.cfg.later ? "Later ✓" : "Later") + "</button>" +
     '<button type="button" class="btn ghosty" data-act="item-close">Close</button>' +
     '<button type="button" class="btn danger" data-act="item-del">' + icon("trash") + " Delete</button></div></div>";
@@ -277,9 +295,10 @@ function poolEditHTML(c, p) {
   let h = goneHTML();
   if (!st.length) return h + '<div class="ls-ph">Pool <small>empty</small></div><p class="hint">With nothing in the pool, the plan is just one row on the day you drag it to. Add things below, or Paste text.</p>';
   const live = st.filter((x) => !x.cfg.later), later = st.length - live.length;
+  const waits = live.filter((x) => L.waiting(x.cfg, p, store.today())).length;   // 算在这个计划里，只是还没进日历上的 Pool
   const times = live.reduce((a, x) => a + (x.cfg.n > 0 ? x.cfg.n : 0), 0);
   const min = live.reduce((a, x) => a + (Number(x.item.est) || 0) * (x.cfg.n > 0 ? x.cfg.n : 1), 0);
-  h += '<div class="ls-ph">Pool <small>' + [live.length + " item" + (live.length === 1 ? "" : "s"), times ? times + " times" : "", min ? "≈" + fmtHours(min) : "", later ? later + " later" : ""].filter(Boolean).join(" · ") + "</small></div>";
+  h += '<div class="ls-ph">Pool <small>' + [live.length + " item" + (live.length === 1 ? "" : "s"), times ? times + " times" : "", min ? "≈" + fmtHours(min) : "", later ? later + " later" : "", waits ? waits + " waiting for its month" : ""].filter(Boolean).join(" · ") + "</small></div>";
   const secs = [];
   for (const x of st) {
     const k = x.item.module || "";
@@ -300,7 +319,7 @@ function poolEditHTML(c, p) {
 // 一行一条加进 Pool（和粘贴同一套写法），缩进的是上一条的步骤
 function addLinesHTML(c, p) {
   const secs = [...new Set(L.itemsOf(c, p.id).map((i) => i.module || "").filter(Boolean))];
-  return '<form class="ls-add" autocomplete="off"><textarea name="lines" rows="2" data-keep="ls-add-' + esc(p.id) + '" placeholder="One per line — L5 shadowing · 20min · ×18&#10;  steps go indented underneath"></textarea>' +
+  return '<form class="ls-add" autocomplete="off"><textarea name="lines" rows="2" data-keep="ls-add-' + esc(p.id) + '" placeholder="One per line — L5 shadowing · 20min · ×18&#10;  lines indented underneath go into its note"></textarea>' +
     '<div class="ls-addr"><input name="section" list="ls-secs" data-keep="ls-sec-' + esc(p.id) + '" placeholder="Section (optional)" aria-label="Section"><button type="submit" class="btn cta">' + icon("plus") + " Add to the pool</button></div>" +
     '<datalist id="ls-secs">' + secs.map((s) => '<option value="' + esc(s) + '">').join("") + "</datalist></form>";
 }
@@ -322,7 +341,7 @@ function pastePreviewHTML(c, p) {
   let h = "<h4>We found</h4>";
   if (parsed.name || parsed.start) h += pvRow(parsed.start ? "Plan · dates" : "Plan", esc([parsed.name, parsed.start && parsed.end ? fmtShort(parsed.start) + " – " + fmtShort(parsed.end) : ""].filter(Boolean).join(" · ")));
   for (const s of sum.sections) {
-    h += '<div class="r"><span>' + esc(s.name || "Pool") + " · " + s.count + "</span><span>" + [s.times ? s.times + " times" : "", s.steps ? s.steps + " steps" : "", s.min ? fmtHours(s.min) : ""].filter(Boolean).join(" · ") +
+    h += '<div class="r"><span>' + esc(s.name || "Pool") + " · " + s.count + "</span><span>" + [s.times ? s.times + " times" : "", s.steps ? "+" + s.steps + " note lines" : "", s.min ? fmtHours(s.min) : ""].filter(Boolean).join(" · ") +
       ' <button type="button" class="chip' + (s.later ? " on" : "") + '" data-act="paste-later" data-sec="' + esc(s.name) + '" aria-pressed="' + s.later + '">' + (s.later ? "Later ✓" : "Later") + "</button></span></div>";
   }
   if (parsed.notes) h += pvRow("Kept as notes", esc(heads.length ? heads.join(" · ") : parsed.notes.split("\n").length + " lines"));
@@ -335,7 +354,7 @@ function pastePreviewHTML(c, p) {
 }
 
 function pasteHTML(c, p) {
-  return '<div class="ls-paste"><label class="field"><span>Paste the whole plan — ## sections, - [ ] items · 30min · ×11, steps indented underneath</span>' +
+  return '<div class="ls-paste"><label class="field"><span>Paste the whole plan — ## sections, - [ ] items · 30min · ×11, lines indented underneath become its note</span>' +
     '<textarea data-paste data-keep="ls-paste" placeholder="# My plan&#10;&#10;## Pool&#10;- [ ] L3 listening set · 2h · ×11&#10;- [ ] Mock test · ×5&#10;  - [ ] Listening · 35min">' + esc(paste.text || "") + "</textarea></label>" +
     '<div class="ls-pv" data-paste-pv>' + pastePreviewHTML(c, p) + "</div></div>";
 }
@@ -413,6 +432,7 @@ function readDraft(box) {
   box.querySelectorAll("[data-rf]").forEach((el) => { draft.rule[el.dataset.rf] = el.value; });
   if (box.querySelector("[data-rday]")) draft.rule.days = readDays(box);
   draft.rule.deep = Boolean(box.querySelector("[data-pdeep]")?.checked);
+  if (box.querySelector("[data-pmonths]")) draft.rule.months = box.querySelector("[data-pmonths]").checked;
   const n = box.querySelector("[data-pnotes]");
   if (n) draft.notes = n.value;
 }
@@ -488,8 +508,6 @@ const timesIn = (v) => {
   const n = Number(s.replace(/^[×x]\s*/, ""));
   return n > 0 ? Math.round(n) : 1;
 };
-const stepsIn = (v) => String(v || "").split("\n").map((l) => l.trim().replace(/^[-*+]\s+(\[[ xX]\]\s+)?/, "")).filter(Boolean)
-  .map((l) => { const x = PT.parseLine(l); return { t: x.title, min: x.est || 0 }; });
 
 export function initProjects(rerender) {
   on(document, "click", ".projects [data-act], .project-editor [data-act]", (e, el) => {
@@ -600,6 +618,14 @@ export function initProjects(rerender) {
     refreshProjectEditor();
   });
 
+  // Items have a month：已有的计划直接存（新建框里的等 Create，见 readDraft）
+  on(document, "change", ".project-editor [data-pmonths]", (e, el) => {
+    const pid = el.closest("[data-pid]").dataset.pid, p = pid && store.get("projects", pid);
+    if (!p) return;
+    store.saveProject({ id: pid, rule: { ...(p.rule || {}), months: el.checked } });
+    refreshProjectEditor();
+  });
+
   // 默认深度：已有的计划一改，它的任务跟着一起改（新建框里的等 Create）
   on(document, "change", ".project-editor [data-pdeep]", (e, el) => {
     const pid = el.closest("[data-pid]").dataset.pid;
@@ -631,8 +657,11 @@ export function initProjects(rerender) {
     else if (f === "module") store.updateItem(id, { module: v.trim() });
     else if (f === "n") store.setItemCfg(id, { n: timesIn(v) });
     else if (f === "perWeek") store.setItemCfg(id, { perWeek: Math.max(0, Math.round(Number(v) || 0)) });
-    else if (f === "steps") store.setItemCfg(id, { steps: stepsIn(v) });
     else if (f === "note") store.setItemCfg(id, { note: v.trim() });
+    else if (f === "mm" || f === "my") {
+      const box = el.closest(".ls-mon"), mm = box.querySelector("[data-lf=mm]").value, my = box.querySelector("[data-lf=my]").value;
+      store.setItemCfg(id, { month: mm ? my + "-" + String(mm).padStart(2, "0") : "" });
+    }
   });
 
   on(document, "submit", ".project-editor .ls-add", (e, form) => {

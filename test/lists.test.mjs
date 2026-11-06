@@ -47,7 +47,7 @@ test("the pool: each live plan, its items that are left, Later and finished ones
   const p = L.pool(c);
   assert.deepEqual(p.map((g) => g.plan.id), ["ielts", "swim"], "archived plans aren't in the pool; a plan with nothing in it still is");
   assert.deepEqual(p[0].items.map((x) => [x.item.id, x.count.left, x.week.done]), [["l3", 1, 1]]);
-  assert.deepEqual(L.poolTotals(c, c.projects[0]), { items: 1, times: 1, min: 120, later: 1 });
+  assert.deepEqual(L.poolTotals(c, c.projects[0]), { items: 1, times: 1, min: 120, later: 1, waiting: 0 });
 });
 
 test("a day grouped by plan: the row, its lines, plain tasks in between", () => {
@@ -125,7 +125,11 @@ test("store: paste a plan, drag items onto days, tick steps, back to the pool, p
   const items = store.all("items").filter((i) => i.projectId === plan.id).sort((a, b) => a.order - b.order);
   assert.deepEqual(items.map((i) => i.title + ":" + i.module), ["Book the exam:One-off", "Mock test:Weekend", "L3 listening set:Pool", "Words:Pool", "R2 reading:Reserve"]);
   const id = (title) => items.find((i) => i.title === title).id;
-  assert.deepEqual(store.itemCfg(id("Mock test")).steps, [{ t: "Listening", min: 30 }, { t: "Reading", min: 60 }]);
+  assert.deepEqual(store.itemCfg(id("Mock test")).steps, [], "indented lines aren't steps any more…");
+  assert.equal(store.itemCfg(id("Mock test")).note, "Listening · 30min\nReading · 1h", "…they join the note, word for word");
+  assert.equal(items.find((i) => i.title === "Mock test").est, 90, "minutes still add up from them");
+  // 并进备注之前存的步骤：拖进今天照旧带着，能一步步勾
+  store.setItemCfg(id("Mock test"), { steps: [{ t: "Listening", min: 30 }, { t: "Reading", min: 60 }] });
   assert.equal(store.itemCfg(id("L3 listening set")).perWeek, 2);
   assert.equal(store.itemCfg(id("R2 reading")).later, true);
 
@@ -172,7 +176,32 @@ test("store: paste a plan, drag items onto days, tick steps, back to the pool, p
   assert.equal(store.itemCfg(id("L3 listening set")).n, 5);
   assert.ok(after.some((i) => i.title === "Score sheet"));
   assert.deepEqual(res.gone.map((g) => g.title + ":" + g.used), ["Book the exam:true"]);
-  assert.match(store.planText(plan.id), /- \[ \] Mock test · ×3\n  - \[ \] Listening · 30min/);
+  const text = store.planText(plan.id);
+  assert.match(text, /- \[ \] Mock test · 1h30min · ×3\n  - \[ \] Listening · 30min\n  - \[ \] Reading · 1h\n/, "a note of several lines goes under the item, the minutes stay on it");
+  store.pastePlan(text, { planId: plan.id });
+  assert.deepEqual([store.itemCfg(id("Mock test")).note, store.get("items", id("Mock test")).est], ["Listening · 30min\nReading · 1h", 90], "copied out and pasted back, the note is the same");
+
+  // 以前存的步骤：打开时并进备注，只做一次
+  store.setItemCfg(id("Words"), { note: "flashcards", steps: [{ t: "New words", min: 10 }, { t: "Review", min: 0 }] });
+  store.adoptSteps();
+  assert.deepEqual([store.itemCfg(id("Words")).note, store.itemCfg(id("Words")).steps], ["flashcards\nNew words · 10min\nReview", []]);
+  store.adoptSteps();
+  assert.equal(store.itemCfg(id("Words")).note, "flashcards\nNew words · 10min\nReview", "nothing left to fold the second time");
+});
+
+test("items with a month stay out of the pool until the month before, when the plan says so", () => {
+  const item = (id) => ({ id, projectId: "ielts", title: id, est: 30, order: 1 });
+  const c = (today, months = true) => ctx({ today, projects: [plan("ielts", {}, { rule: { months, items: { dec: { month: "2026-12" }, jan: { month: "2027-01" }, none: {} } } })],
+    items: [item("dec"), item("jan"), item("none")] });
+  const ids = (x) => L.pool(x)[0].items.map((i) => i.item.id).sort();
+  assert.deepEqual(ids(c("2026-10-31")), ["none"], "in October neither month has come close");
+  assert.deepEqual(ids(c("2026-11-01")), ["dec", "none"], "December's shows from November 1, so it can be planned ahead");
+  assert.deepEqual(ids(c("2026-12-15")), ["dec", "jan", "none"]);
+  assert.deepEqual(ids(c("2026-10-31", false)), ["dec", "jan", "none"], "with the switch off the months don't count");
+  assert.equal(L.poolTotals(c("2026-11-05"), c("2026-11-05").projects[0]).waiting, 1);
+  assert.equal(L.waiting({ month: "2027-01" }, { rule: { months: true } }, "2026-12-01"), false, "January's shows from December");
+  assert.equal(L.waiting({ month: "bad" }, { rule: { months: true } }, "2026-01-01"), false);
+  assert.equal(L.noteWith("", [{ raw: "Listening · 30min" }, { t: "Reading", min: 60 }]), "Listening · 30min\nReading · 1h");
 });
 
 test("store: the day after, unticked go back to the pool and empty rows go", async () => {
@@ -284,4 +313,12 @@ test("a day's planned minutes: a plan counts its items (its own minutes only wit
   ];
   assert.equal(L.dayMin(L.dayBlocks(c, tasks)), 30 + 105 + 45 + 20, "IELTS's own 60 isn't added on top of its items");
   assert.equal(L.dayMin([]), 0);
+});
+
+test("store: lines added with indented ones under them put those in the note", async () => {
+  const store = await import("../js/store.js?addnote");
+  const plan = store.saveProject({ name: "Swim", group: "Fitness", kind: "regular", place: "pool" });
+  const [a, b] = store.addPoolLines(plan, "Drills", "Kick sets · 20min · fins\n  4 × 25m easy\n  2 × 50m hard · 10min\nTurns · 15min");
+  assert.deepEqual([store.itemCfg(a).note, store.itemCfg(a).steps], ["fins\n4 × 25m easy\n2 × 50m hard · 10min", []]);
+  assert.equal(store.itemCfg(b).note, "");
 });

@@ -505,6 +505,13 @@ export function buildGroup(ctx) {
   const list = ctx.groups || [];
   return (list.find((g) => g.name === "Build") || list.find((g) => GR.trackOf(g) === "progress"))?.name || "";
 }
+// 本月目标（Stats 顶上那条右边，她 2026-11-05 要的）：到昨天为止本该做到「目标 × 过了几天 ÷ 本月天数」，
+// 实际比它多就是正的、少就是负的；今天做的算超出，1 号是 0。都是分钟
+export function monthGap(goal, done, today) {
+  const expected = (goal * (Number(today.slice(8)) - 1)) / daysInMonth(startOfMonth(today));
+  return { expected, gap: done - expected };
+}
+
 // Leisure 那个大类（饼图上 On the side 那段光跟着它）：叫 Leisure 的；没有就第一个「只有 Deep 算成长」的；再没有就是空
 export function leisureGroup(ctx) {
   const list = ctx.groups || [];

@@ -97,11 +97,25 @@ function tile(label, value, sub, dlt = "") {
 // 深度平均一天多少（「deep ~0.7h/d」）。右边的两个数和左边一个样子：一共多久和 Build 那个数同色（白天钴蓝、夜里青柠），deep 和左边的 deep 一样亮（她 11-01 定的；10-31 换掉了原来的 All，
 // 全部记了多久、没记的挪到饼图底下那一行）。b、bp = 只看 Build 的这一段和上一段，w = Work、Chores 合起来的这一段（{ name: "Work + Chores", spent, deep }，
 // 这段时间都没有就不写右边）；没有 Build 就只有全部那一半（带比上一段）
-function timeStrip(s, p, b, bp, name, w) {
+function timeStrip(s, p, b, bp, name, w, goal = "") {
   const n = (v, cls = "") => '<b class="num' + (cls ? " " + cls : "") + '">' + fmtHours(v) + "</b>";
-  if (!b) return '<div class="st-strip"><span>All ' + n(s.spent) + ' <span class="ss-m">· ◆ ' + fmtHours(s.deep) + (s.days ? " · ~" + fmtHours(s.avgSpent) + " a day" : "") + "</span></span>" + delta(s.spent, p.spent, fmtHours) + "</div>";
+  if (!b) return '<div class="st-strip"><span>All ' + n(s.spent) + ' <span class="ss-m">· ◆ ' + fmtHours(s.deep) + (s.days ? " · ~" + fmtHours(s.avgSpent) + " a day" : "") + "</span></span>" + delta(s.spent, p.spent, fmtHours) + goal + "</div>";
   return '<div class="st-strip"><span>' + esc(name) + " " + n(b.spent, "ss-b") + "</span><span>◆ deep " + n(b.deep) + "</span>" + delta(b.spent, bp.spent, fmtHours) +
-    (w && w.spent > 0 ? '<span class="ss-all">' + esc(name) + " + " + esc(w.name) + " " + n(b.spent + w.spent, "ss-b") + (b.days ? ' (deep <b class="num">~' + fmtHours((b.deep + w.deep) / b.days) + "/d</b>)" : "") + "</span>" : "") + "</div>";
+    (w && w.spent > 0 ? '<span class="ss-all">' + esc(name) + " + " + esc(w.name) + " " + n(b.spent + w.spent, "ss-b") + (b.days ? ' (deep <b class="num">~' + fmtHours((b.deep + w.deep) / b.days) + "/d</b>)" : "") + "</span>" : "") + goal + "</div>";
+}
+
+// 本月目标（她 2026-11-05 要的，「一个很临时的限定窗口」）：只在 Month、看的是这个月时出现；存 Settings 的 month-goal = { month, hours }，
+// 过了这个月就当没设，不往下带。gap 按进度算（js/stats.js 的 monthGap），看的是本月 1 号到今天 Build + Work + Chores 全部记下的，
+// 不跟筛选和 Deep only 走（目标定的是总量）。输入框只有一条底线，改完离开或回车就存，清空 = 不要了。
+// 用 text 不用 number：同步重画时要把光标放回原处（js/main.js 的 restoreKeep），number 框放不回去，会跳到最前面
+function goalHTML(c) {
+  const ym = c.today.slice(0, 7), saved = store.setting("month-goal", null);
+  const hours = saved?.month === ym ? Number(saved.hours) || 0 : 0;
+  const names = [...new Set([S.buildGroup(c), "Work", "Chores"])].filter((x) => x && c.groups.some((g) => g.name === x));
+  const done = names.reduce((a, x) => a + S.summarize(S.onlyGroup(c, x), ym + "-01", c.today).spent, 0);
+  const { gap } = S.monthGap(hours * 60, done, c.today);
+  return '<span class="ss-goal">' + MONTHS[Number(ym.slice(5)) - 1] + ' goal <input class="ss-goal-in num" type="text" inputmode="decimal" autocomplete="off" data-keep="st-goal" value="' + (hours || "") + '" aria-label="This month\'s goal in hours">h' +
+    (hours ? ' · gap <b class="num ss-gap' + (gap < 0 ? " neg" : "") + '">' + (gap < 0 ? "−" : "+") + fmtHours(Math.abs(gap)) + "</b>" : "") + "</span>";
 }
 
 // 柱子 / 热力图右上角：Build | All
@@ -570,7 +584,8 @@ export function statsHTML(c) {
       ts = { ...ts, daily: ts.daily.map((x) => ({ ...x, side: side[x.date] || 0 })) };
       glow = litColor(c.groups.find((g) => g.name === leis)?.color || "");
     }
-    body = timeStrip(s, prev, b, bp, bName, w) + '<div class="st-two">' + timeTrendHTML(ts, bOn ? viewSeg("trend", bName) : "", glow) + pieHTML(sc.c, s, rest, haze, sc.on) + "</div>" +
+    const goal = kind === "month" && r.from === c.today.slice(0, 7) + "-01" ? goalHTML(c) : "";
+    body = timeStrip(s, prev, b, bp, bName, w, goal) + '<div class="st-two">' + timeTrendHTML(ts, bOn ? viewSeg("trend", bName) : "", glow) + pieHTML(sc.c, s, rest, haze, sc.on) + "</div>" +
       heatHTML(hv ? bc : sc.c, hv ? b : s, hv ? "plan" : sc.by, bOn ? viewSeg("heat", bName) : "") +
       typicalHTML(sc.c, s, sc.by) +
       sheetHTML(sc.c, s, sc.by);
@@ -625,6 +640,13 @@ export function initStats(rerender) {
     const len = diffDays(custom.from, custom.to) + 1;
     custom = { from: addDays(custom.from, n * len), to: addDays(custom.to, n * len) };
   };
+  on(document, "change", ".ss-goal-in", (e, el) => {
+    const v = el.value.trim(), n = Number(v.replace(",", "."));
+    if (v === "") store.setSetting("month-goal", null);
+    else if (Number.isFinite(n) && n >= 0) store.setSetting("month-goal", { month: store.today().slice(0, 7), hours: n });
+    else el.value = store.setting("month-goal", null)?.hours ?? "";   // 不是数字：放回原来的
+  });
+  on(document, "keydown", ".ss-goal-in", (e, el) => { if (e.key === "Enter") el.blur(); });
   on(document, "click", ".stats [data-act]", (e, el) => {
     const act = el.dataset.act, T = store.today();
     if (act === "period") {

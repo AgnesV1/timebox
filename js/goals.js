@@ -1,7 +1,8 @@
 // 目标板的纯计算（Projects 页最上面）。一条目标：
 //   { id, text, tag, span: "month" | "quarter" | "year" | "north", due: "YYYY-MM"（打算哪个月做到）, done: "YYYY-MM"（实际哪个月做到，空 = 还没）, order,
 //     up: 上级目标的 id（一条只有一个上级，可以一层层往上串）, by: ["g:项目名", "p:计划 id"]（哪些项目 / 计划为它服务，多对多） }
-// 栏目按「今天」现算：这个月、这个季度、下个季度、今年，再加明年（Next year）和之后三年，最后一栏 North star（没有日期）。时间走了栏目自己滚：
+// 栏目按「今天」现算：这个月、下个月、这个季度、下个季度、今年剩下的季度、今年，再加明年（Next year）和之后三年，最后一栏 North star（没有日期）。
+//   到了那一年，写了日期的年目标按月份分进最近的那一栏（本月 / 下个月 / 季度），没写日期的留在 This year（她 2026-11-05 定的，isDated）。时间走了栏目自己滚：
 //   那一期过去了的目标（isOld，做没做完都一样）不再进栏，收进最底下的「往期」（past，按季度看，她 2026-10 定的）；
 //   连线和「For …」链条也越过它们，接到往上第一条还在的（visibleSet / lift）。比最后一个年份还远的先放在那一年（ahead）。
 // 对齐的链条：每天的任务 → 它的计划（没有计划就是它的项目）→ 服务的目标 → 上级 → 再上级……（见最下面的 chainsFor）
@@ -22,16 +23,24 @@ function slot(span, when) {
   return span === "month" ? y * 12 + m - 1 : span === "quarter" ? y * 4 + quarter(m) - 1 : y;
 }
 
+// 年目标写没写日期：在改月份 / 年份的下拉里改过期限就是写了（dated: true）；拖进年份那几栏就是没写（dated: false）。
+// 旧数据没有这一项：期限不是 12 月的算写了（加在年份栏里默认是 12 月）
+export const isDated = (g) => spanOf(g) === "year" && Boolean(g?.due) && (typeof g.dated === "boolean" ? g.dated : split(g.due)[1] !== 12);
+
 // due = 在这一栏里新加的目标默认哪个月做到（这一期的最后一个月）
 export function columns(today) {
   const [y, m] = split(today), q = quarter(m);
+  const nm = m === 12 ? { y: y + 1, m: 1 } : { y, m: m + 1 };
   const nq = q === 4 ? { y: y + 1, q: 1 } : { y, q: q + 1 };
   const cols = [
     { key: "month", span: "month", y, slot: y * 12 + m - 1, title: "This month", sub: MONTHS[m - 1], due: ymOf(y, m) },
+    { key: "nmonth", span: "month", y: nm.y, slot: y * 12 + m, title: "Next month", sub: MONTHS[nm.m - 1] + (nm.y !== y ? " " + nm.y : ""), due: ymOf(nm.y, nm.m) },
     { key: "quarter", span: "quarter", y, slot: y * 4 + q - 1, title: "This quarter", sub: "Q" + q, due: ymOf(y, q * 3) },
-    { key: "next", span: "quarter", y: nq.y, slot: y * 4 + q, title: "Next quarter", sub: "Q" + nq.q + (nq.y !== y ? " " + nq.y : ""), due: ymOf(nq.y, nq.q * 3) },
-    { key: "year", span: "year", y, slot: y, title: "This year", sub: String(y), due: ymOf(y, 12) }
+    { key: "next", span: "quarter", y: nq.y, slot: y * 4 + q, title: "Next quarter", sub: "Q" + nq.q + (nq.y !== y ? " " + nq.y : ""), due: ymOf(nq.y, nq.q * 3) }
   ];
+  // 今年下个季度之后还剩的季度（一月时是 Q3、Q4；到了第三、第四季度就没有了）：写了日期的年目标要有地方落
+  for (let k = q + 2; k <= 4; k++) cols.push({ key: "q" + k, span: "quarter", y, slot: y * 4 + k - 1, title: "Q" + k, sub: "", due: ymOf(y, k * 3) });
+  cols.push({ key: "year", span: "year", y, slot: y, title: "This year", sub: String(y), due: ymOf(y, 12) });
   // 明年叫 Next year（小字写年份），再往后三年直接写年份：今年是 2026 就是 Next year 2027 → 2028 → 2029 → 2030
   for (let k = 1; k <= YEARS_AHEAD; k++) cols.push({ key: "y" + (y + k), span: "year", y: y + k, slot: y + k, title: k === 1 ? "Next year" : String(y + k), sub: k === 1 ? String(y + 1) : "", due: ymOf(y + k, 12), far: true });
   cols.push({ key: "north", span: "north", y: Infinity, slot: 0, title: "North star", sub: "", due: "", far: true });
@@ -45,16 +54,21 @@ export function whenText(when, colYear) {
   return MONTHS[m - 1] + (y !== colYear ? " " + y : "");
 }
 
-// 过期了没有：月 / 季 / 年目标，它那一期已经过去了（这个月的月目标、这一季的季目标、今年的年目标都还不算）。North star、没写期限的永远不过期
+// 过期了没有：月 / 季 / 年目标，它那一期已经过去了（这个月的月目标、这一季的季目标、今年的年目标都还不算）。North star、没写期限的永远不过期。
+// 写了日期的年目标按月算：那个月过去就过期，收进往期（她 2026-11-05 定的）
 export function isOld(g, today) {
   const span = spanOf(g);
-  return span !== "north" && Boolean(g?.due) && slot(span, g.due) < slot(span, today);
+  if (span === "north" || !g?.due) return false;
+  return isDated(g) ? slot("month", g.due) < slot("month", today) : slot(span, g.due) < slot(span, today);
 }
 
 // → { cols: [{...column, items: [{ goal, done, ahead, when }]}], old: 过期了、收进往期的有几条 }
 // 每一栏里：没做完的在前；再按标签排——rank(tag) 给的先后（项目的顺序：Build、Work、Friends…，没标签的最后）；同一个标签里早到期的在前
 export function board(goals, today, { rank = () => 0 } = {}) {
   const cols = columns(today).map((c) => ({ ...c, items: [] }));
+  const year = split(today)[0];
+  // 今年写了日期的年目标：落进包含那个月的最近一栏（本月 / 下个月，不然是那一季）
+  const near = (due) => cols.find((c) => c.span === "month" && c.slot === slot("month", due)) || cols.find((c) => c.span === "quarter" && c.slot === slot("quarter", due));
   let old = 0;
   for (const g of goals) {
     const span = spanOf(g);
@@ -62,7 +76,7 @@ export function board(goals, today, { rank = () => 0 } = {}) {
     if (isOld(g, today)) { old++; continue; }
     const mine = cols.filter((c) => c.span === span), last = mine[mine.length - 1];
     const s = slot(span, g.due || today), done = Boolean(g.done);
-    let col = mine.find((c) => c.slot === s), ahead = false;
+    let col = (isDated(g) && split(g.due)[0] === year && near(g.due)) || mine.find((c) => c.slot === s), ahead = false;
     if (!col) { col = last; ahead = true; }
     col.items.push({ goal: g, done, ahead, when: whenText(done ? g.done : g.due, col.y) });
   }
@@ -87,7 +101,8 @@ export function past(goals, today) {
     if (span === "month") { const x = get(y, quarter(m)); if (!x.months.has(m)) x.months.set(m, []); x.months.get(m).push(g); }
     else if (span === "quarter") get(y, quarter(m)).quarter.push(g);
   }
-  for (const g of old) if (spanOf(g) === "year") { const y = split(g.due)[0]; if (![...at.values()].some((x) => x.y === y)) get(y, 4); }
+  // 年目标：写了日期的落在那个月的那一季；没写的，那一年一个季度都没落进来就放在 Q4。它们都算那一年的年度目标（下面的 year）
+  for (const g of old) if (spanOf(g) === "year") { const [y, m] = split(g.due); if (isDated(g)) get(y, quarter(m)); else if (![...at.values()].some((x) => x.y === y)) get(y, 4); }
   const byDue = (a, b) => String(a.due).localeCompare(String(b.due)) || (Number(a.order) || 0) - (Number(b.order) || 0);
   const years = goals.filter((g) => spanOf(g) === "year" && g.due);
   return [...at.values()].sort((a, b) => b.y - a.y || b.q - a.q).map((x) => ({

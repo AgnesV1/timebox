@@ -198,10 +198,12 @@ export function goalDrop(payload, target) {
   const id = payload.slice(payload.indexOf(":") + 1), key = target.slice(target.indexOf(":") + 1);
   const g = store.goals().find((x) => x.id === id), col = G.columns(store.today()).find((c) => c.key === key);
   if (!g || !col || col.span === "north") return;
-  if (g.span === col.span && g.due === col.due) return;
+  if (g.span === col.span && g.due === col.due && !(col.span === "year" && G.isDated(g))) return;
   edit = null;
   openCols.add(key);   // 落到折起来的那几条里也看得到
-  store.saveGoal({ ...g, span: col.span, due: col.due }, "Moved to " + col.title + (col.sub ? " (" + col.sub + ")" : ""));
+  // 拖进年份那几栏 = 没写日期（今年的就挂在 This year）；拖进月、季的栏，「写没写日期」用不上，去掉
+  const { dated: _d, ...rest } = g;
+  store.saveGoal({ ...rest, span: col.span, due: col.due, ...(col.span === "year" ? { dated: false } : {}) }, "Moved to " + col.title + (col.sub ? " (" + col.sub + ")" : ""));
 }
 
 export function initGoals(rerender) {
@@ -329,7 +331,8 @@ export function initGoals(rerender) {
     else if (f === "m" || f === "y") {
       const box = el.closest(".gwhen");
       const when = G.ymOf(Number(box.querySelector("[data-g=y]").value), Number(box.querySelector("[data-g=m]").value));
-      store.saveGoal({ ...g, [g.done ? "done" : "due"]: when });
+      // 年目标改了期限 = 写了日期：到了那一年按这个月份进最近的栏（js/goals.js 的 isDated）
+      store.saveGoal({ ...g, [g.done ? "done" : "due"]: when, ...(!g.done && g.span === "year" ? { dated: true } : {}) });
     }
   });
 

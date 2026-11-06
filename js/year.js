@@ -52,8 +52,11 @@ export function yearDays(ctx, y) {
 export const DAYS = "days", OVER = "over";
 export const groupLayer = (name) => "g:" + name;
 
-// 假期和通勤画成框（她 2026-11-04 说的），别的填色；框和填色叠得上
-export const FRAMES = new Set(["holiday", "commute"]);
+// 怎么画（她 2026-11-05 改的）：假期、休息日画成框；通勤和 Work、Chores 是右上角的小点；别的（超 box、其它大类）填色。三样叠得上
+export const FRAMES = new Set(["rest", "holiday"]);
+// 右边一竖排的点，从上到下固定这三个位置；没中的位置空着，位置本身也说明是哪个
+export const DOTS = [groupLayer("Work"), groupLayer("Chores"), "commute"];
+export const shapeOf = (hit) => (FRAMES.has(hit) ? "frame" : DOTS.includes(hit) ? "dot" : "fill");
 
 // 这一天在打开的几层里中了哪几样，按上色的先后：超 box → 休息 / 假期 / 通勤 → 大类（按大类清单的顺序）。超 7 小时不填色，页面上另外标
 export function hitsOf(day, on, groups) {

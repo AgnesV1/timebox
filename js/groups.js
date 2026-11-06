@@ -6,8 +6,10 @@
 //   track    Projects 页上看它什么（进度 / 每周够不够钟点 / Relax 在不在范围里 / 多久没联系 / 不看），见最下面的 trackOf；min = 够不够的那个钟点（分钟）
 // 任务可以直接挂在大类上（task.group），不一定要挂在哪个计划下面。只算数，不碰页面和存储。
 
-// 颜色照油画颜料来：绿 viridian、蓝 ultramarine、橘 cadmium orange、紫 mauve、白 ivory、棕 burnt sienna、赭黄 ochre、茜红 alizarin
-export const PALETTE = ["#3E8E6E", "#3F62B5", "#E07A2B", "#8B62AE", "#E6DCC3", "#9A5A36", "#D2A52E", "#B5413F"];
+// 颜色照油画颜料来：绿 viridian、蓝 ultramarine、橘 cadmium orange、紫 mauve、白 ivory、棕 raw umber、赭黄 ochre、茜红 alizarin
+// （棕原来是浅一点的 burnt sienna #9A5A36，她 2026-11-05 要深一点，见下面的 recolor）
+export const PALETTE = ["#3E8E6E", "#3F62B5", "#E07A2B", "#8B62AE", "#E6DCC3", "#6A3A22", "#D2A52E", "#B5413F"];
+const OLD_BROWN = "#9A5A36";
 const [GREEN, BLUE, ORANGE, PURPLE, IVORY, BROWN, OCHRE, CRIMSON] = PALETTE;
 
 export const DEFAULTS = [
@@ -32,15 +34,22 @@ export function byGroupOrder(groups) {
 
 // 圆盘上用的霓虹版：色块压在金属上，要比油画色亮得多。八个颜色一个对一个（绿 → 薄荷霓虹、蓝 → 电光蓝、橘 → 霓虹橙、紫 → 霓虹紫、
 // 白 → 纯白、棕 → 琥珀、赭黄 → 霓虹黄、茜红 → 霓虹红）；自己另选的颜色没有对应的，返回空（圆盘那边会把它调亮）
-const NEON = { [GREEN]: "#00E58F", [BLUE]: "#3A6BFF", [ORANGE]: "#FF6A00", [PURPLE]: "#B44CFF", [IVORY]: "#FFFFFF", [BROWN]: "#FFB300", [OCHRE]: "#FFE500", [CRIMSON]: "#FF2D4A" };
+const NEON = { [GREEN]: "#00E58F", [BLUE]: "#3A6BFF", [ORANGE]: "#FF6A00", [PURPLE]: "#B44CFF", [IVORY]: "#FFFFFF", [BROWN]: "#FFB300", [OLD_BROWN]: "#FFB300", [OCHRE]: "#FFE500", [CRIMSON]: "#FF2D4A" };
 export const neon = (c) => NEON[String(c || "").toUpperCase()] || "";
 
-// 三个大类换过默认颜色（Fitness 橘 → 白、Leisure 紫 → 橘、Friends 白 → 紫）：三个都还是原来那套才换，换过一次就不再满足、不会重复；
-// 自己改过其中任何一个的不动。→ [{ name, color }]（要换的；没有就是空）
-const RECOLOR = [["Fitness", ORANGE, IVORY], ["Leisure", PURPLE, ORANGE], ["Friends", IVORY, PURPLE]];
+// 大类的默认颜色换过几次，一批一批换：一批里的都还是原来那套才换，换过一次就不再满足、不会重复；自己改过其中任何一个的，那一批都不动。
+//   2026-10：Fitness 橘 → 白、Leisure 紫 → 橘、Friends 白 → 紫
+//   2026-11-05：Chores 的棕深一点（她说的）
+// → [{ name, color }]（要换的；没有就是空）
+const RECOLOR = [
+  [["Fitness", ORANGE, IVORY], ["Leisure", PURPLE, ORANGE], ["Friends", IVORY, PURPLE]],
+  [["Chores", OLD_BROWN, BROWN]]
+];
 export function recolor(list) {
-  const hits = RECOLOR.map(([name, from, to]) => { const g = (list || []).find((x) => match(x.name) === name); return g && String(g.color || "").toUpperCase() === from ? { name: g.name, color: to } : null; });
-  return hits.every(Boolean) ? hits : [];
+  return RECOLOR.flatMap((batch) => {
+    const hits = batch.map(([name, from, to]) => { const g = (list || []).find((x) => match(x.name) === name); return g && String(g.color || "").toUpperCase() === from ? { name: g.name, color: to } : null; });
+    return hits.every(Boolean) ? hits : [];
+  });
 }
 
 // 以前那套亮色 → 现在的颜色（没归进大类的计划换一次）

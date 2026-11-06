@@ -323,6 +323,12 @@ test("projects: default colours changed once, and each has a neon twin for the d
   assert.deepEqual(GR.recolor(old.map((g) => (g.name === "Leisure" ? { ...g, color: GREEN } : g))), [], "one of them was changed by hand: leave all three");
   assert.deepEqual(GR.recolor(GR.DEFAULTS), [], "already the new colours");
   assert.deepEqual(GR.recolor([]), []);
+  const BROWN = GR.PALETTE[5];
+  assert.equal(GR.DEFAULTS.find((g) => g.name === "Chores").color, BROWN);
+  assert.deepEqual(GR.recolor([{ name: "Chores", color: "#9a5a36" }]), [{ name: "Chores", color: BROWN }], "Chores on the earlier brown moves to the deeper one");
+  assert.deepEqual(GR.recolor([{ name: "Chores", color: "#123456" }]), [], "a brown picked by hand stays");
+  assert.deepEqual(GR.recolor([...old, { name: "Chores", color: "#9A5A36" }]).map((x) => x.name), ["Gym", "Leisure", "Friends", "Chores"], "the batches are separate");
+  assert.equal(GR.neon("#9A5A36"), GR.neon(BROWN), "both browns glow amber on the dial");
   assert.equal(new Set(GR.PALETTE.map(GR.neon)).size, 8, "eight different neons");
   assert.equal(GR.neon(IVORY.toLowerCase()), "#FFFFFF");
   assert.equal(GR.neon("#123456"), "", "a colour picked by hand has none");

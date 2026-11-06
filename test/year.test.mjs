@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import * as Y from "../js/year.js";
 
 const T = "2026-11-04";   // 周三
-const GROUPS = [{ name: "Work", color: "#3F62B5" }, { name: "Fitness", color: "#E6DCC3" }, { name: "Chores", color: "#9A5A36" }];
+const GROUPS = [{ name: "Work", color: "#3F62B5" }, { name: "Fitness", color: "#E6DCC3" }, { name: "Chores", color: "#6A3A22" }];
 const ctx = (over = {}) => ({ today: T, projects: [], items: [], tasks: [], capacity: { default: 600, weekly: null, overrides: {} }, groups: GROUPS, weekStartsOn: "monday", commute: null, offday: null, superRest: null, ...over });
 const day = (c, d) => Y.yearDays(c, Number(d.slice(0, 4))).find((x) => x.date === d);
 
@@ -88,12 +88,13 @@ test("hitsOf: only the open layers, in painting order; over 7 hours isn't filled
   assert.deepEqual(Y.hitsOf(d, new Set(), GROUPS), []);
 });
 
-test("holiday and commute are drawn as frames; everything else fills the day", () => {
-  assert.deepEqual([...Y.FRAMES].sort(), ["commute", "holiday"]);
-  const d = { date: "2026-03-04", rest: true, holiday: "Day off", commute: true, over: 2, groups: new Set(["Work"]) };
-  const hits = Y.hitsOf(d, new Set(["days", "over", "g:Work"]), GROUPS);
-  assert.deepEqual(hits.filter((h) => !Y.FRAMES.has(h)), ["over", "rest", "g:Work"]);
-  assert.deepEqual(hits.filter((h) => Y.FRAMES.has(h)), ["holiday", "commute"]);
+test("rest and holiday are frames, commute, Work and Chores are dots, everything else fills the day", () => {
+  const shapes = (hits) => hits.map((h) => h + ":" + Y.shapeOf(h));
+  const d = { date: "2026-03-04", rest: true, holiday: "Day off", commute: true, over: 2, groups: new Set(["Work", "Chores", "Fitness", "Build"]) };
+  const hits = Y.hitsOf(d, new Set(["days", "over", "g:Work", "g:Chores", "g:Fitness"]), [...GROUPS, { name: "Build", color: "#3E8E6E" }]);
+  assert.deepEqual(shapes(hits), ["over:fill", "rest:frame", "holiday:frame", "commute:dot", "g:Work:dot", "g:Fitness:fill", "g:Chores:dot"]);
+  assert.equal(Y.shapeOf("g:Build"), "fill");
+  assert.deepEqual(Y.DOTS, ["g:Work", "g:Chores", "commute"], "fixed spots, top to bottom");
 });
 
 test("yearCounts: a day counts once per layer; over 7 hours counts as overworked", () => {

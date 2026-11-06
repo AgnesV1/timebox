@@ -82,7 +82,7 @@ function sidebarHTML(c, view) {
   // 每段的图标是那个大类的油画色（排时间 = Build、备餐 = Chores、阅读 = Leisure、人 = Friends），大类改了颜色这里跟着变
   const tint = (name, fallback) => store.groups().find((g) => g.name === name)?.color || fallback;
   const blocks = [["todo", "Build", "#3E8E6E", [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", projectAlerts(c) || ""], ["stats", "Stats", ""]]],
-    ["meals", "Chores", "#9A5A36", [["meals", "Meals", deals || ""]]], ["read", "Leisure", "#E07A2B", [["reading", "Reading", ""]]], ["friends", "Friends", "#8B62AE", [["friends", "Friends", friendsDue(c.today) || ""]]],
+    ["meals", "Chores", "#6A3A22", [["meals", "Meals", deals || ""]]], ["read", "Leisure", "#E07A2B", [["reading", "Reading", ""]]], ["friends", "Friends", "#8B62AE", [["friends", "Friends", friendsDue(c.today) || ""]]],
     ["money", "", "#3F62B5", [["spending", "Spending", ""]]]];   // 记账：不是大类，用油画的那个蓝
   // 当前页那一项底下垫一块青柠（.snav-pill）：换页时它从旧的那项滑到新的那项（换页过渡里有名字，css 里 snav-pill）
   const link = ([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '" title="' + t + '">' + (view === v ? '<i class="snav-pill" aria-hidden="true"></i>' : "") + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>";

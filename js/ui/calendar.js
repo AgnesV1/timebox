@@ -97,7 +97,7 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
 
 // ---------- Year ----------
 // 她 2026-11-04 挑的：筛选可以叠，填色的中了几样就斜着分色（最多 3 段，都写在读数那一行），标签上写这一年有几天。
-// 假期和通勤画成框（她说的），和填色叠得上；今天是数字底下一个小点（框被它们占了）。
+// 怎么画在 js/year.js 的 shapeOf：假期、休息日是框（两个都中就套两层），通勤和 Work、Chores 是右边一竖排固定位置的小点（她 11-05 改的），别的填色。
 // 超 box = 实心红块，超 7 小时 = 红字（落在别的色块上看不清，就在底边画一道红线）。颜色每次现读，白天夜里跟着变。
 // 读数那一行：鼠标或键盘在哪一天就写哪一天，没停在数字上写今天。鼠标停在标签上：只显示这一层，移开就回去（只重画数字，标签不动）。
 // 键盘：数字区只占一个 Tab，方向键一天一天走、上下一周。
@@ -113,7 +113,7 @@ const yearOn = () => new Set(yrPeek ? [yrPeek] : store.local().yearLayers || [])
 
 function yearPaint(groups) {
   const css = getComputedStyle(document.documentElement), token = (name) => css.getPropertyValue(name).trim();
-  const paint = { over: token("--warn"), rest: "#F5C542", holiday: token("--yr-holiday"), commute: token("--ink") };
+  const paint = { over: token("--warn"), rest: token("--yr-rest"), holiday: token("--yr-holiday"), commute: token("--ink") };
   for (const g of groups) paint[Y.groupLayer(g.name)] = g.color || "var(--muted)";
   return paint;
 }
@@ -125,8 +125,10 @@ function yearWords(day, on, groups) {
 
 function yearDayHTML(day, c, on, groups, paint, cursor) {
   const hits = Y.hitsOf(day, on, groups);
-  const fills = hits.filter((h) => !Y.FRAMES.has(h)).slice(0, 3).map((h) => paint[h]);
-  const frames = hits.filter((h) => Y.FRAMES.has(h)).map((h, i) => "inset 0 0 0 " + 1.5 * (i + 1) + "px " + paint[h]).join(",");
+  const fills = hits.filter((h) => Y.shapeOf(h) === "fill").slice(0, 3).map((h) => paint[h]);
+  const frames = hits.filter((h) => Y.shapeOf(h) === "frame").map((h, i) => "inset 0 0 0 " + 1.5 * (i + 1) + "px " + paint[h]).join(",");
+  const dots = hits.some((h) => Y.shapeOf(h) === "dot")
+    ? '<span class="yr-pips" aria-hidden="true">' + Y.DOTS.map((h) => (hits.includes(h) ? '<i style="background:' + esc(paint[h]) + '"></i>' : '<i class="yr-pip-off"></i>')).join("") + "</span>" : "";
   const long = on.has(Y.OVER) && day.over === 1;
   const stop = (i) => Math.round((i * 100) / fills.length) + "%";
   // 分色的那块：一黑一白的两段，黑字白字都有半边看不见，数字描一圈反色
@@ -136,7 +138,7 @@ function yearDayHTML(day, c, on, groups, paint, cursor) {
     : "background:linear-gradient(135deg," + fills.map((x, i) => x + " " + stop(i) + " " + stop(i + 1)).join(",") + ");color:" + ink + ";--yr-halo:" + (ink === "#FFFFFF" ? "#0B0B0B" : "#FFFFFF");
   const style = [fill, frames ? "--yr-frame:" + frames : ""].filter(Boolean).join(";");
   const cls = ["yr-d", day.date > c.today ? "yr-ahead" : "", day.date === c.today ? "yr-today" : "", long ? "yr-long" : "", fills.length ? "yr-fill" : "", fills.length > 1 ? "yr-split" : ""].filter(Boolean).join(" ");
-  return '<button type="button" class="' + cls + '" data-act="open-day" data-date="' + day.date + '" tabindex="' + (day.date === cursor ? 0 : -1) + '" aria-label="' + esc(yearWords(day, on, groups)) + '"' + (style ? ' style="' + esc(style) + '"' : "") + ">" + Number(day.date.slice(8)) + "</button>";
+  return '<button type="button" class="' + cls + '" data-act="open-day" data-date="' + day.date + '" tabindex="' + (day.date === cursor ? 0 : -1) + '" aria-label="' + esc(yearWords(day, on, groups)) + '"' + (style ? ' style="' + esc(style) + '"' : "") + ">" + dots + Number(day.date.slice(8)) + "</button>";
 }
 
 function yearMonthsHTML(c, y, groups, paint) {
@@ -177,11 +179,12 @@ function yearHTML(c, y) {
   const groups = c.groups || [], counts = Y.yearCounts(Y.yearDays(c, y), groups), paint = yearPaint(groups);
   const on = new Set(store.local().yearLayers || []);
   const chip = (id, label, swatch) => '<button type="button" class="yr-chip' + (on.has(id) ? " yr-on" : "") + '" data-act="yr-layer" data-layer="' + esc(id) + '" aria-pressed="' + on.has(id) + '">' +
-    (swatch ? '<i style="background:' + esc(swatch) + '"></i>' : "") + esc(label) + '<small class="num">' + counts[id] + "</small></button>";
+    (swatch ? "<i" + (Y.DOTS.includes(id) ? ' class="yr-round"' : "") + ' style="background:' + esc(swatch) + '"></i>' : "") + esc(label) + '<small class="num">' + counts[id] + "</small></button>";
   const chips = chip(Y.DAYS, "Rest + Commute + Holiday") + chip(Y.OVER, "Overworked", paint.over) + groups.map((g) => chip(Y.groupLayer(g.name), g.name, paint[Y.groupLayer(g.name)])).join("");
   const key = (color, word) => '<span><i style="background:' + color + '"></i>' + word + "</span>";
   const box = (color, word) => '<span><i style="box-shadow:inset 0 0 0 1.5px ' + color + '"></i>' + word + "</span>";
-  const legend = [...(on.has(Y.DAYS) ? [key(paint.rest, "Rest"), box(paint.holiday, "Holiday"), box(paint.commute, "Commute")] : []),
+  const dot = (color, word) => '<span><i class="yr-round" style="background:' + color + '"></i>' + word + "</span>";
+  const legend = [...(on.has(Y.DAYS) ? [box(paint.rest, "Rest"), box(paint.holiday, "Holiday"), dot(paint.commute, "Commute")] : []),
     ...(on.has(Y.OVER) ? [key(paint.over, "Over the box"), '<span class="yr-long-key">Over 7 hours</span>'] : [])].join("");
   // Settings 里的 Archive 只留今年和去年，更早的任务可能在表格里
   const older = y < Number(c.today.slice(0, 4)) - 1 ? '<p class="yr-note">Tasks from this far back may have moved to the Archive tab of your Sheet.</p>' : "";

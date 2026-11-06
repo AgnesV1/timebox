@@ -5,6 +5,17 @@ import * as S from "../js/stats.js";
 const TODAY = "2026-10-05";
 const ctx = (over = {}) => ({ today: TODAY, projects: [], items: [], tasks: [], capacity: { default: 240, weekly: null, overrides: {} }, log: {}, level: true, ...over });
 
+test("month goal: the gap is against where the goal says you'd be by yesterday", () => {
+  const h = (x) => x * 60, hrs = (r) => Math.round((r.gap / 60) * 10) / 10;
+  assert.equal(hrs(S.monthGap(h(150), h(23.2), "2026-11-05")), 3.2, "4 of 30 days gone: 20h due, 23.2h done");
+  assert.equal(S.monthGap(h(150), h(23.2), "2026-11-05").expected, h(20));
+  assert.equal(S.monthGap(h(150), 0, "2026-11-01").gap, 0, "the 1st starts at zero");
+  assert.equal(S.monthGap(h(150), h(30), "2026-11-15").gap / 60, -40, "halfway less a day, behind");
+  assert.equal(S.monthGap(h(31), h(30), "2026-10-31").gap / 60, 0, "a 31-day month: 30 days gone by the 31st");
+  assert.equal(S.monthGap(h(30), h(29), "2026-11-30").gap / 60, 0, "a 30-day month");
+  assert.equal(S.monthGap(0, h(5), "2026-11-10").gap / 60, 5, "no goal: everything is ahead");
+});
+
 test("period ranges and the one before", () => {
   assert.deepEqual(S.periodRange("season", TODAY), { from: "2026-10-01", to: "2026-12-31" });
   assert.deepEqual(S.periodRange("season", "2027-02-14"), { from: "2027-01-01", to: "2027-03-31" });

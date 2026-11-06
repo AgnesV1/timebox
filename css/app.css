@@ -18,6 +18,7 @@
   --accent: #C6FF00; --accent-ink: #0B0B0B; --hot: #FF3EA5; --blue: #2F5BFF; --warn: #FF2E55; --ok: #27B35A;
   --warn-text: #D6123B;   /* 红字：--warn 铺成色块才够亮，当字只有 3.3:1 */
   --yr-holiday: #5F8F00;   /* Year 假期的框：青柠在白底上看不见，白天用深一点的 */
+  --yr-rest: #B8860B;   /* Year 休息日的金框：金条渐变里最深的那一截，白底上才看得清 */
   --meter: linear-gradient(90deg, #C6FF00, #FF3EA5 70%, #2F5BFF);
   --b: 1.5px solid var(--edge); --b-soft: 1.5px solid #E2E2DC; --b-ctl: 1px solid #CDCDC6;
   --hard: 2px 2px 0 var(--edge); --hard-lg: 3px 3px 0 var(--edge); --glow: none;
@@ -45,6 +46,7 @@
   --accent: #CCFF00; --accent-ink: #0C0C13; --hot: #FF2BD6; --blue: #00E5FF; --warn: #FF4D6D; --ok: #5CFF9D;
   --warn-text: #FF4D6D;
   --yr-holiday: #CCFF00;
+  --yr-rest: #F5C542;
   --meter: linear-gradient(90deg, #CCFF00, #00E5FF 60%, #FF2BD6);
   --b: 1px solid var(--edge); --b-soft: 1px solid #222232; --b-ctl: var(--b);
   --hard: 0 0 0 1px rgba(204, 255, 0, .05), 0 0 24px rgba(204, 255, 0, .06) inset; --hard-lg: 0 0 40px rgba(0, 229, 255, .06); --glow: 0 0 14px rgba(204, 255, 0, .5);
@@ -657,7 +659,7 @@ body.dragging .ev.blk .full { pointer-events: none; }
 .yr-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px 26px; max-width: 1180px; }
 .yr-name { display: block; margin: -4px 0 2px -4px; padding: 4px; border: 0; background: none; font-size: 12.5px; font-weight: 700; color: var(--ink); }
 .yr-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-.yr-d { position: relative; display: grid; place-items: center; height: 25px; padding: 0; border: 0; border-radius: 6px; background: none; font: 500 12px var(--num); font-variant-numeric: tabular-nums; color: var(--ink); box-shadow: var(--yr-frame, 0 0 transparent), var(--yr-mark, 0 0 transparent); }
+.yr-d { position: relative; display: grid; place-items: center; height: 25px; padding: 0 8px 0 0; border: 0; border-radius: 6px; background: none; font: 500 12px var(--num); font-variant-numeric: tabular-nums; color: var(--ink); box-shadow: var(--yr-frame, 0 0 transparent), var(--yr-mark, 0 0 transparent); }
 .yr-d:focus-visible { outline-offset: 0; }
 .yr-d.yr-ahead { color: var(--muted); }
 /* 今天：和周 / 月视图一个说法，白天青柠底 + 硬投影（那天中了筛选就让给色块，只留投影）、夜里一圈青柠光；框给假期和通勤了 */
@@ -665,12 +667,20 @@ body.dragging .ev.blk .full { pointer-events: none; }
 [data-theme="light"] .yr-d.yr-today:not(.yr-fill) { background: var(--accent); }
 [data-theme="dark"] .yr-d.yr-today { --yr-mark: 0 0 12px 2px var(--accent); }
 .yr-d.yr-long { color: var(--warn-text); font-weight: 700; }
+/* 右边一竖排三个固定位置的点（从上到下 Work、Chores、通勤，她 11-05 挑的）；数字整体往左让 4px（.yr-d 右边留 8px），每列还是对齐的。
+   落在色块上的套一圈底色，分得开 */
+.yr-pips { position: absolute; top: 50%; right: 4px; display: flex; flex-direction: column; gap: 2px; transform: translateY(-50%); pointer-events: none; }
+.yr-pips i { width: 4px; height: 4px; border-radius: 50%; }
+.yr-pips .yr-pip-off { visibility: hidden; }
+.yr-fill .yr-pips i { box-shadow: 0 0 0 1px var(--bg); }
+.yr-chip i.yr-round { border-radius: 50%; }
 .yr-d.yr-long.yr-fill { box-shadow: inset 0 -2px 0 var(--warn), var(--yr-frame, 0 0 transparent), var(--yr-mark, 0 0 transparent); }
 .yr-d.yr-split { text-shadow: 0 0 2px var(--yr-halo), 0 0 2px var(--yr-halo), 0 0 3px var(--yr-halo); }
 @media (hover: hover) { .yr-d:hover, .yr-name:hover { text-decoration: underline; text-underline-offset: 3px; } }
 .yr-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; max-width: 1180px; margin-top: 18px; font-size: 12px; color: var(--muted); }
 .yr-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .yr-legend i { width: 11px; height: 11px; border-radius: 3px; }
+.yr-legend i.yr-round { width: 7px; height: 7px; border-radius: 50%; }
 .yr-long-key { color: var(--warn-text); font-weight: 700; }
 .yr-note { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }
 @media (max-width: 1040px) { .yr-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -896,6 +906,15 @@ body.phone .settings .page-head { margin-top: 4px; }
 [data-theme="dark"] .st-strip .ss-b { color: var(--accent); }
 .st-strip .delta { display: inline; margin: 0; }
 .st-strip .ss-all { margin-left: auto; }
+/* 本月目标：接在 Build + Work + Chores 后面（那一段没有就自己靠右）；输入框只有一条底线（她 11-05 说的「横线形态」），落后时 gap 是红字 */
+.st-strip .ss-goal { margin-left: auto; color: #8E8E96; }   /* 她 11-05 要淡一点：字、数字、横线都淡，gap 照旧 */
+[data-theme="dark"] .st-strip .ss-goal { color: #6C6C84; }
+.st-strip .ss-all + .ss-goal { margin-left: 0; }
+.ss-goal-in { width: 46px; padding: 1px 0 2px; border: 0; border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 14%, transparent); border-radius: 0; background: transparent; font: 600 15px var(--num); color: var(--muted); text-align: center; }
+.ss-goal-in:focus-visible { color: var(--ink); }
+.ss-goal-in:focus-visible { outline: none; border-bottom-color: var(--ink); }
+[data-theme="dark"] .ss-goal-in:focus-visible { border-bottom-color: var(--accent); box-shadow: 0 7px 8px -7px rgba(204, 255, 0, .7); }
+.st-strip .ss-gap.neg { color: var(--warn-text); }
 .chart figcaption { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .chart figcaption p { margin: 4px 0 0; font-size: 13px; color: var(--muted); text-wrap: pretty; }
 .chart figcaption > div:first-child { flex: 1 1 220px; min-width: 0; }   /* 那句话长了自己折行，图例留在右边 */

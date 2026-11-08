@@ -18,7 +18,7 @@ import * as store from "../store.js";
 import { esc, icon } from "../dom.js";
 import { toast } from "./common.js";
 import { openModal, modalSheet } from "./modal.js";
-import { IX, cents, roll, kfmt, paceNote, paceTip, periodTitle, chartView, shownEntries, budgetsShown, amtOf, convOf, setShowCur, setRate, fetchRates, RATES, rateNote, curLabel, fx } from "./money.js";
+import { IX, cents, roll, kfmt, paceNote, paceTip, periodTitle, chartView, shownEntries, budgetsShown, amtOf, convOf, setShowCur, setRate, fetchRates, RATES, rateNote, curLabel, findText, fx } from "./money.js";
 
 const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const today = () => store.today();
@@ -168,7 +168,7 @@ export function createSpending() {
     const q = V.q.trim().toLowerCase();
     // Recent：最近记 / 改过的那几笔，不管哪一期（改动时间新的在前）
     if (V.recent && !q) return SP.entries().slice().sort((a, b) => (b.u || 0) - (a.u || 0)).slice(0, RECENT);
-    if (q) return SP.entries().filter((e) => (e.c + " " + e.n + " " + (Math.abs(e.v) / 100).toFixed(2) + " " + M.money(e.v, M.curOf(e)) + " " + curLabel(M.curOf(e))).toLowerCase().includes(q)).sort(M.byNewest);
+    if (q) return SP.entries().filter((e) => findText(e).includes(q)).sort(M.byNewest);
     return SP.entries().filter((e) => M.inPeriod(e, V.cur, V.mode) && (!V.filt || e.c === V.filt)).sort(M.byNewest);
   }
   const amountHTML = (e) => (e.v > 0 ? "+" : "−") + cents(M.money(e.v, M.curOf(e))) + (convOf(e) ? '<small class="sp-conv">' + esc(convOf(e)) + "</small>" : "");

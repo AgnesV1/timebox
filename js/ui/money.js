@@ -50,6 +50,14 @@ let fxSeen = null;
 export function fxChanged() { const k = fxKey(); if (fxSeen === null) { fxSeen = k; return false; } if (k === fxSeen) return false; fxSeen = k; return true; }
 // 一种钱怎么写：「RMB ¥」；汇率的来历：「ECB · Oct 20」/「you · Oct 21」/「rough」
 export const curLabel = (k) => M.curInfo(k).code;
+// 搜索用的那一串字（类别 + 备注 + 金额的几种写法 + 币种，小写）：每一笔算一次就记住——改一笔是换成新的对象，自然重算。
+// 以前每敲一个字把几千笔的金额全格式化一遍（手机、电脑的搜索都用它）
+const findCache = new WeakMap();
+export function findText(e) {
+  let s = findCache.get(e);
+  if (s === undefined) { s = (e.c + " " + e.n + " " + (Math.abs(e.v) / 100).toFixed(2) + " " + M.money(e.v, M.curOf(e)) + " " + curLabel(M.curOf(e))).toLowerCase(); findCache.set(e, s); }
+  return s;
+}
 export function rateNote(k) {
   const r = fx().rates?.[k];
   if (k === "cad") return "";
@@ -295,11 +303,21 @@ export function createView() {
   // 时间轴是接着的：一开始画一段，滚到头附近再往前 / 往后接一段（日 = 三个月一接、月 = 一年、年 = 六年），最早接到 2000 年
   const step = (it, k, mode = V.mode) => (mode === "day" ? M.parts(M.addDaysISO(M.iso(it.y, it.m, it.d), k)) : mode === "month" ? { ...M.addMonths(it.y, it.m, k), d: 1 } : { y: it.y + k, m: 1, d: 1 });
   const CHUNK = { day: 92, month: 12, year: 6 };
+  // 日：只画选中那天前后一段（今天附近 = 前 150 天、后 60 天；翻到很早的某天 = 那天前后 150 天），再早再晚的拖到头附近才接上（extend）。
+  //   以前从记过的第一笔一天一格画起：几年的账就是几千格，表格里一笔日期写坏了的（比如 1899-12-30）就是几万格，手机切到 Day 卡死、再切 Year 也要等拆完（2026-11-07）
+  // 月 / 年：往前到记过的第一笔，最早 2000 年（和 extend 一样），日期写坏的那笔不会拖出一百多年
   function itemsFor(mode) {
-    const t = todayP(), first = SP.firstDay();
-    let from = mode === "day" ? M.parts(M.addDaysISO(today(), -150)) : mode === "month" ? { y: t.y - 2, m: 1, d: 1 } : { y: t.y - 8, m: 1, d: 1 };
-    for (const p of [first, V.cur]) if (p && M.ord(p.y, p.m, mode === "day" ? p.d : 1) < M.ord(from.y, from.m, from.d)) from = mode === "day" ? { y: p.y, m: p.m, d: p.d } : { y: p.y, m: 1, d: 1 };
-    const to = mode === "day" ? M.parts(M.addDaysISO(today(), 60)) : mode === "month" ? { y: t.y + 1, m: 12, d: 1 } : { y: t.y + 3, m: 1, d: 1 };
+    const t = todayP(), first = SP.firstDay(), c = V.cur;
+    if (mode === "day") {
+      const near = Math.abs(Date.UTC(c.y, c.m - 1, c.d) - Date.UTC(t.y, t.m - 1, t.d)) < 150 * 864e5, at = M.iso(c.y, c.m, c.d);
+      const lo = near ? M.addDaysISO(at < today() ? at : today(), -150) : M.addDaysISO(at, -150), hi = near ? M.addDaysISO(at > today() ? at : today(), 60) : M.addDaysISO(at, 150);
+      const o = [];
+      for (let it = M.parts(lo < "2000-01-01" ? "2000-01-01" : lo); M.iso(it.y, it.m, it.d) <= hi && inBounds(it); it = step(it, 1, mode)) o.push(it);
+      return o;
+    }
+    let from = mode === "month" ? { y: t.y - 2, m: 1, d: 1 } : { y: t.y - 8, m: 1, d: 1 };
+    for (const p of [first, c]) if (p && p.y >= 2000 && M.ord(p.y, p.m, 1) < M.ord(from.y, from.m, from.d)) from = { y: p.y, m: 1, d: 1 };
+    const to = mode === "month" ? { y: t.y + 1, m: 12, d: 1 } : { y: t.y + 3, m: 1, d: 1 };
     const o = [];
     for (let it = from; M.ord(it.y, it.m, it.d) <= M.ord(to.y, to.m, to.d); it = step(it, 1, mode)) o.push(it);
     return o;
@@ -933,9 +951,17 @@ export function createView() {
       fr.innerHTML = (recent.length ? '<div class="mn-meta" style="padding:14px 0 2px">Recently added</div>' + recent.map(rowHTML).join("") : "") + '<div class="mn-empty">Type a note, a category, or an amount</div>';
       return;
     }
-    const hit = SP.entries().filter((e) => (e.c + " " + e.n + " " + (Math.abs(e.v) / 100).toFixed(2) + " " + M.money(e.v, M.curOf(e)) + " " + curLabel(M.curOf(e))).toLowerCase().includes(q)).sort(M.byNewest), groups = new Map();
+    const hit = SP.entries().filter((e) => findText(e).includes(q)).sort(M.byNewest), groups = new Map();
     for (const e of hit) { const k = e.d.slice(0, 7); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); }
-    fr.innerHTML = hit.length ? [...groups].map(([k, a]) => { const p = M.parts(k + "-01"); return '<div class="mn-meta" style="padding:14px 0 2px">' + M.MONTH[p.m - 1] + " " + p.y + " · " + a.length + "</div>" + a.slice(0, 40).map(rowHTML).join(""); }).join("") : '<div class="mn-empty">Nothing matches</div>';
+    // 一共最多画最新的 150 笔（一个月最多 40）：以前只限每个月，敲一个「1」几年的账就是几千行，手机上每敲一个字卡一下（2026-11-07）
+    let room = 150, shown = 0;
+    const html = [...groups].map(([k, a]) => {
+      if (room <= 0) return "";
+      const p = M.parts(k + "-01"), rows = a.slice(0, Math.min(40, room));
+      room -= rows.length; shown += rows.length;
+      return '<div class="mn-meta" style="padding:14px 0 2px">' + M.MONTH[p.m - 1] + " " + p.y + " · " + a.length + "</div>" + rows.map(rowHTML).join("");
+    }).join("");
+    fr.innerHTML = hit.length ? html + (shown < hit.length ? '<div class="mn-empty">' + shown + " of " + hit.length + " shown — type more to narrow it down</div>" : "") : '<div class="mn-empty">Nothing matches</div>';
   }
 
   // ---------- 点哪儿做什么 ----------
@@ -1002,7 +1028,7 @@ export function createView() {
     if (!a) return;
     const act = a.dataset.act, t = todayP();
     if (act === "add") startNew();
-    else if (act === "reset") { if (!quiet()) a.querySelector(".ic")?.animate([{ transform: "rotate(0)" }, { transform: "rotate(-360deg)" }], { duration: 520, easing: SPR }); goTo(V.items.findIndex((it) => M.samePeriod(it, t, V.mode))); }
+    else if (act === "reset") { if (!quiet()) a.querySelector(".ic")?.animate([{ transform: "rotate(0)" }, { transform: "rotate(-360deg)" }], { duration: 520, easing: SPR }); const i = V.items.findIndex((it) => M.samePeriod(it, t, V.mode)); if (i >= 0) goTo(i); else { V.cur = t; buildRail(false); renderTitle(); renderBody(); } }   // 日模式翻得很远时，时间轴上没有今天：重画一段
     else if (act === "prev") goTo(V.sel - 1);
     else if (act === "next") goTo(V.sel + 1);
     else if (act === "set") { renderSet(); push("set"); }

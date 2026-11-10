@@ -7,7 +7,7 @@ var SECRET = 'CHANGE_ME';
 // 类型 text / num / date / bool / json / status（Done / Delay / Drop）/ pstatus / clock（钟点 09:10，存成文字）。
 // 标记 calc = 脚本自己算，App 不写；hide = setup 时把这列藏起来（右键可取消隐藏）。
 var VERSION = 6;   // 页面和脚本对版本：页面不是这个版本就不收它的数据，免得新旧格式混在一起
-var REV = '2026-11-09';   // 这份脚本是哪天的（改 Code.gs 顺手更新）：部署完在浏览器开 exec 网址，核对表格里跑的是不是这版
+var REV = '2026-11-10';   // 这份脚本是哪天的（改 Code.gs 顺手更新）：部署完在浏览器开 exec 网址，核对表格里跑的是不是这版
 var T = {
   // 计时记录在 Times 一格里：「09:10-09:40 30m; 20m」。Project = 挂在哪个计划上（脚本填名字）；Group = 属于哪个大类（可以不挂计划、直接挂在大类上）
   tasks: { sheet: 'Tasks', key: 'id', main: 'title', cols: [
@@ -229,29 +229,86 @@ function timesText_(list) {
 
 // 第 6 版：Partial / Later 并成 Delay（「Partial｜原因」这种只换前面那个词）；
 // 时间只看记下的了——以前没计时就标了 Done 的（Times、Actual 都空着），补一段不带钟点的记录 = 预计，以前的统计数字不变。
-// 动之前先把 Tasks 整页复制成「Backup Tasks 日期」。Updated 不动（设备上更晚的改动照样算数），Synced 记成现在，各设备下次同步会拉到
+// 动之前先把 Tasks 整页复制成「Backup Tasks 日期」。Updated 不动（设备上更晚的改动照样算数），Synced 记成现在，各设备下次同步会拉到。
+// **只跑一次（recordsFixed 这道闸，2026-11-10 加的）**：这条补记录只为 10-28 的老数据迁移准备。新设计里
+// 计划下勾的项、没计时就标 Done 的任务本来就没有记录——11-09 重跑 setup 时被这条补了一遍，那几天的总时长翻了倍
+// （cleanRecords 擦的就是那批）。计划下的项（Item ID 非空）无论如何不补：它们的时间记在计划那一行上
 function delayAndRecords_(ss) {
+  var P = PropertiesService.getScriptProperties();
+  if (P.getProperty('recordsFixed')) return;
+  var seal = function () { P.setProperty('recordsFixed', String(Date.now())); };
   var sh = sheetOf_('tasks'), names = head_(sh), col = cols_(T.tasks, names), data = body_(sh, names), now = Date.now();
-  if (col.status < 0 || !data.length) return;
+  if (col.status < 0 || !data.length) { seal(); return; }
   var status = [], times = [], actual = [], synced = [], hits = 0;
   data.forEach(function (row) {
     var raw = String(row[col.status] || '').trim(), word = raw.split(/\s*[｜|]\s*/)[0], hit = false;
     var s = row[col.status], tm = col.times >= 0 ? row[col.times] : '', a = col.actual >= 0 ? row[col.actual] : '';
     if (raw && WORDS[word.toLowerCase()] === 'delay' && word !== 'Delay') { s = 'Delay' + raw.slice(word.length); hit = true; }
     var done = raw && WORDS[word.toLowerCase()] === 'done', est = Number(row[col.est]) || 0;
-    if (done && col.times >= 0 && col.actual >= 0 && String(tm || '').trim() === '' && !(Number(a) > 0) && est > 0 && String(row[col.id] || '').indexOf('chore-') !== 0) {
+    var item = col.itemId >= 0 && String(row[col.itemId] || '').trim() !== '';
+    if (done && !item && col.times >= 0 && col.actual >= 0 && String(tm || '').trim() === '' && !(Number(a) > 0) && est > 0 && String(row[col.id] || '').indexOf('chore-') !== 0) {
       tm = Math.round(est) + 'm'; a = est; hit = true;
     }
     if (hit) hits++;
     status.push(s); times.push(tm); actual.push(a); synced.push(hit ? now : row[col.synced]);
   });
-  if (!hits) return;
+  if (!hits) { seal(); return; }
   var to = 'Backup Tasks ' + Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd');
   if (!ss.getSheetByName(to)) sh.copyTo(ss).setName(to);
   setCol_(sh, col.status, status);
   if (col.times >= 0) setCol_(sh, col.times, times);
   if (col.actual >= 0) setCol_(sh, col.actual, actual);
   if (col.synced >= 0) setCol_(sh, col.synced, synced);
+  seal();
+}
+
+// ================= 2026-11-10 修数据：擦掉 11-09 重跑 setup 时多补出来的记录 =================
+// 那天 delayAndRecords_ 把表里所有「勾了 Done、没计时」的行都补了一段 = 预计的记录（计划下勾的项、规律计划做了没计时的
+// 那几次、普通的没计时 Done 全中招），那几天在页面上的总时长翻倍。照最新的「Backup Tasks 日期」备份擦：
+// 备份里 Times / Actual 本来空着、现在是「整数分钟 = 预计、没有钟点」的，擦回空（Done 照旧）；
+// 计划下的项（Item ID 非空、日期在 2026-10-26 当天或之后）就算备份里已经带着这种记录也擦——10-28 那次 setup 也错补过它们。
+// 更老的行一概不动：10-28 给老任务补的那批是故意的（以前的统计数字不变）。
+// 动之前把 Tasks 复制成「Backup Tasks clean 日期」；擦完 Synced = 现在，各设备下次同步自己恢复；顺手把闸（recordsFixed）合上。
+// 用法：在 Apps Script 编辑器里选 cleanRecords 点「运行」，跑一次就行，日志里说擦了几行
+function cleanRecords() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var dated = ss.getSheets().map(function (s) { return s.getName(); }).filter(function (n) { return /^Backup Tasks \d{4}-\d{2}-\d{2}$/.test(n); }).sort();
+    var bk = dated.length ? ss.getSheetByName(dated[dated.length - 1]) : null;
+    var empty = {};   // 最新备份里 Times 和 Actual 都空着的 ID（= 补记录之前本来没有记录）
+    if (bk) {
+      var bn = head_(bk), bid = bn.indexOf('ID'), btm = bn.indexOf('Times'), bac = bn.indexOf('Actual min');
+      if (bid < 0 || btm < 0 || bac < 0) bk = null;
+      else body_(bk, bn).forEach(function (r) {
+        var id = String(r[bid] || '').trim();
+        if (id && String(r[btm] || '').trim() === '' && String(r[bac] || '').trim() === '') empty[id] = true;
+      });
+    }
+    var sh = sheetOf_('tasks'), names = head_(sh), col = cols_(T.tasks, names), data = body_(sh, names), tz = tz_(), now = Date.now();
+    var times = [], actual = [], synced = [], hits = 0;
+    data.forEach(function (row) {
+      var tm = String(col.times >= 0 ? row[col.times] : '').trim(), a = col.actual >= 0 ? row[col.actual] : '', est = Number(row[col.est]) || 0;
+      var phantom = est > 0 && tm === Math.round(est) + 'm' && Number(a) === est;   // 补出来的样子：整数分钟 = 预计，没有钟点
+      var id = String(row[col.id] || '').trim();
+      var item = col.itemId >= 0 && String(row[col.itemId] || '').trim() !== '' && day_(row[col.date], tz) >= '2026-10-26';
+      if (phantom && (empty[id] || item)) { times.push(''); actual.push(''); synced.push(now); hits++; }
+      else { times.push(col.times >= 0 ? row[col.times] : ''); actual.push(a); synced.push(col.synced >= 0 ? row[col.synced] : ''); }
+    });
+    if (hits) {
+      var to = 'Backup Tasks clean ' + Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd');
+      if (!ss.getSheetByName(to)) sh.copyTo(ss).setName(to);
+      if (col.times >= 0) setCol_(sh, col.times, times);
+      if (col.actual >= 0) setCol_(sh, col.actual, actual);
+      if (col.synced >= 0) setCol_(sh, col.synced, synced);
+      touch_(['tasks'], now);
+    }
+    PropertiesService.getScriptProperties().setProperty('recordsFixed', String(now));
+    Logger.log(hits ? 'Cleaned ' + hits + ' rows. Devices pick the fix up on their next sync.' : 'Nothing to clean.');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // Time 页（一段一行）并进 Tasks 的 Times 列，Actual = 加起来。任务的 Updated 不动，设备上更晚的改动照样算数

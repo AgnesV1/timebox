@@ -98,6 +98,7 @@ test("version 6: Partial / Later become Delay, untimed Done gets a record, with 
   tick();
   const all0 = g.post({ secret: "CHANGE_ME", pull: true, since: 0 });
   tick();
+  delete g.props.recordsFixed;   // 开头那次 setup 在空表上把闸合上了；这个测试测的是闸出现前的迁移本身
   g.sandbox.setup();
   const rows = sh.objects(), by = (id) => rows.find((r) => r.ID === id);
   assert.deepEqual([by("a").Status, by("b").Status, by("c").Status, by("e").Status], ["Delay", "Delay｜rain", "Done", "Drop"]);
@@ -687,6 +688,57 @@ test("editing a row by hand in the sheet reaches the next pull", async () => {
   const at = Number(row.updated);
   g.sandbox.editStamp_({ range: sh.getRange(2, head.indexOf("Updated") + 1, 1, 1) });
   assert.equal(Number(sh.getRange(2, head.indexOf("Updated") + 1).getValue()), at);
+});
+
+// ---- 补记录那条迁移的闸，和 cleanRecords 擦掉 11-09 多补的 ----
+
+test("the record backfill skips pool items and runs only once", () => {
+  const g = load(CODE);
+  g.sandbox.setup();   // 空表：闸已合上
+  g.post({ secret: SEC, push: { rows: { tasks: [
+    { id: "it-1", date: "2026-11-05", title: "L2 vocab", est: 30, status: "done", itemId: "pool-1", projectId: "p1", updated: 1000 },
+    { id: "pl-1", date: "2026-11-05", title: "Quick fix", est: 20, status: "done", updated: 1000 }
+  ] } } });
+  g.sandbox.setup();
+  const by = (id) => g.ss.getSheetByName("Tasks").objects().find((r) => r.ID === id);
+  assert.equal(by("it-1").Times, "", "闸合着：重跑 setup 谁都不补");
+  assert.equal(by("pl-1").Times, "");
+  delete g.props.recordsFixed;   // 就算闸没合上（老世界）……
+  g.sandbox.setup();
+  assert.equal(by("it-1").Times, "", "……计划下勾的项也不补");
+  assert.deepEqual([by("pl-1").Times, by("pl-1")["Actual min"]], ["20m", 20], "老迁移本来的活照旧");
+});
+
+test("cleanRecords wipes what the setup rerun stamped, and nothing older", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  g.post({ secret: SEC, push: { rows: { tasks: [
+    { id: "A", date: "2026-11-01", title: "Item ticked", est: 30, status: "done", itemId: "i-a", projectId: "p1", updated: 1000 },
+    { id: "B", date: "2026-11-03", title: "Done untimed", est: 20, status: "done", updated: 1000 },
+    { id: "C", date: "2026-11-02", title: "Item timed", est: 30, status: "done", itemId: "i-c", projectId: "p1", times: "09:00-09:30 30m", actual: 30, updated: 1000 },
+    { id: "E", date: "2025-05-01", title: "Old backfilled", est: 45, status: "done", times: "45m", actual: 45, updated: 1000 },
+    { id: "F", date: "2025-06-01", title: "Old item backfilled", est: 30, status: "done", itemId: "i-f", projectId: "p1", times: "30m", actual: 30, updated: 1000 }
+  ] } } });
+  // 备份 = 重跑 setup 之前的样子；然后手工照老 setup 的样子给 A、B 补上假记录
+  g.ss.getSheetByName("Tasks").copyTo(g.ss).setName("Backup Tasks 2026-11-09");
+  const sh = g.ss.getSheetByName("Tasks"), head = sh.rows[0];
+  const at = (h) => head.indexOf(h) + 1;
+  const rowNo = (id) => { for (let r = 2; r <= sh.getLastRow(); r++) if (String(sh.cell(r, at("ID"))) === id) return r; return 0; };
+  sh.put(rowNo("A"), at("Times"), "30m"); sh.put(rowNo("A"), at("Actual min"), 30);
+  sh.put(rowNo("B"), at("Times"), "20m"); sh.put(rowNo("B"), at("Actual min"), 20);
+  const since = Date.now();
+  g.sandbox.cleanRecords();
+  const by = (id) => sh.objects().find((r) => r.ID === id);
+  assert.deepEqual([by("A").Times, by("A")["Actual min"], by("A").Status], ["", "", "Done"], "补出来的擦掉，Done 留着");
+  assert.deepEqual([by("B").Times, by("B")["Actual min"]], ["", ""]);
+  assert.deepEqual([by("C").Times, by("C")["Actual min"]], ["09:00-09:30 30m", 30], "真计时的不动");
+  assert.deepEqual([by("E").Times, by("E")["Actual min"]], ["45m", 45], "10-28 给老任务补的那批照旧");
+  assert.deepEqual([by("F").Times, by("F")["Actual min"]], ["30m", 30], "10-26 以前的条目任务也照旧");
+  assert.ok(g.ss.getSheets().some((s) => s.name.startsWith("Backup Tasks clean ")));
+  assert.ok(g.props.recordsFixed, "闸顺手合上");
+  // 设备下一次增量拉取就拿到擦干净的 A、B
+  const pulled = g.post({ secret: SEC, pull: true, since }).pull.tables.tasks.map((t) => t.id);
+  assert.ok(pulled.includes("A") && pulled.includes("B"));
 });
 
 test("doGet names the script's rev, for checking a deploy landed", () => {

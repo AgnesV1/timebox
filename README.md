@@ -312,14 +312,27 @@ Spending has its own Sheet: Transactions (Date, Kind, Category, Note, Amount, Cu
 ## How syncing works
 
 - Every record has an ID and a modified time; when two devices change the same record, the later change wins
-- Changes are pushed 2.5 seconds after you make them (spending: 0.6 seconds), again when you leave the page or lock the phone (spending included), and everything syncs again when you come back to the page or the window, reconnect, or every 30 seconds while the page is showing.
+- Changes are pushed 2.5 seconds after you make them (spending: 0.6 seconds), again when you leave the page or lock the phone (spending included), and everything syncs again when you come back to the page or the window, reconnect, or on a timer while the page is showing: every 10 seconds in the few minutes after you've touched the keyboard or mouse, every 30 seconds otherwise.
   A sync that brings nothing new doesn't redraw the page
+- The script keeps a stamp per tab (when it was last written, in Script Properties). A poll that pushes nothing is answered from the stamps alone — no tabs opened, no lock taken — and a pull only reads
+  the tabs written since the device last asked. That's what makes the 10-second timer affordable
 - Spending rides along only when it's needed: something waiting to go, the spending page open (the phone's pull-down or Spending on the computer), or 10 minutes since it last came in;
   opening it asks right away. The whole ledger is compared once a day (it used to be every half hour, a few hundred KB each time). The script remembers when it last wrote the
   spending Sheet, so a check with nothing new answers without opening that Sheet; rows typed straight into the Sheet come in with the daily full check
 - Everything is saved on the device first, so it works offline and goes out once you're back online
-- The Sheet is for looking and analysing, not planning: edits made directly in the Sheet only reach the device after
-  "Reload everything from the Sheet" in Settings
+- Edits typed straight into the Sheet count too: an installed onEdit trigger (created by `setup`) stamps the rows you touch, and devices pick them up on their next poll.
+  New rows you add by hand get their ID and stamp on the next sync. If the trigger is ever missing, "Reload everything from the Sheet" in Settings still brings everything in
+
+### If the data ever goes wrong
+
+Last-writer-wins has no undo across devices: if bad data syncs out, every device happily keeps it. The way back, in this order:
+
+1. Close the page on every device first (phone included) — an open page would push the bad rows right back.
+2. In the Google Sheet: File → Version history → restore the version from before things went wrong.
+3. On each device, drop the local copy so the restored Sheet wins: open the page, and in Settings use "Reload everything from the Sheet" — but note it keeps unpushed local changes, which is exactly what you don't want here. So on the computer, clear the stored copy first (DevTools → Application → Local Storage → delete `kuzhouduan-v1`), then reload; on the phone, remove and re-add the site, or clear its website data.
+4. Open devices one at a time and let each finish its first sync before the next.
+
+A cheap habit that makes this painless: once a month or so, File → Download the Sheet as .xlsx and keep it somewhere safe. That also covers the day the Google account itself has a problem.
 
 ## Development
 

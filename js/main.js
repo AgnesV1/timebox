@@ -345,9 +345,15 @@ document.addEventListener("visibilitychange", () => {
   else { tickDay(); syncThenLog(); }
 });
 addEventListener("online", () => syncThenLog());
-// 页面看得见的时候每 30 秒拉一次（她 10-25 要的：手机上改了，电脑这边没事就拉一下）；拉回来没变化不重画（store / spend 的 quiet）。
-// 点回这个窗口（focus）时离上次同步超过 10 秒也马上拉一次
-setInterval(() => { if (document.visibilityState === "visible") syncThenLog(); }, 30000);
+// 页面看得见的时候轮询（她 10-25 要的：手机上改了，电脑这边没事就拉一下）：刚动过键鼠的三分钟里每 10 秒，
+// 没动静回到每 30 秒。表格那边对「什么都没变」的轮询有快路径（Code.gs 看章就答，不开表格），10 秒也便宜；
+// 拉回来没变化不重画（store / spend 的 quiet）。点回这个窗口（focus）时离上次同步超过 10 秒也马上拉一次
+let beat = 0;
+setInterval(() => {
+  if (document.visibilityState !== "visible") return;
+  beat++;
+  if (Date.now() - lastInput < 180000 || beat % 3 === 0) syncThenLog();
+}, 10000);
 addEventListener("focus", () => { if (Date.now() - sync.lastAt > 10000) syncThenLog(); });
 setInterval(() => { tickDay(); tintSky(); }, 60000);   // 天色跟着钟点慢慢变（js/day.js 的 skyAt）
 

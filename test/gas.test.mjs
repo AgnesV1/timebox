@@ -617,3 +617,81 @@ test("tidy: delete records older than two weeks are cleared when the page asks",
   g.post({ secret: SEC, tidy: true });
   assert.deepEqual(del.objects().map((r) => r.ID), ["recent"]);
 });
+
+// ---- 章（touched）：没变化的轮询不开表格；有变化只读动过的表 ----
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));   // 隔开时间戳：章和 since 的比较是严格的
+
+test("a quiet poll answers from the stamps without opening the sheets", async () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  const map = JSON.parse(g.props.touched);
+  ["tasks", "projects", "items", "log", "settings", "friends", "meets", "deleted"].forEach((k) => assert.ok(map[k] > 0, "setup stamps " + k));
+  g.post({ secret: SEC, push: { rows: { tasks: [{ id: "a1", date: "2026-10-06", title: "Gym", est: 40, updated: 1000 }] } } });
+  await sleep(5);
+  const first = g.post({ secret: SEC, pull: true, since: 0 });
+  assert.equal(first.pull.tables.tasks.length, 1);
+  await sleep(5);
+  const before = g.ss.reads;
+  const quiet = g.post({ secret: SEC, pull: true, since: first.now });
+  assert.equal(g.ss.reads, before, "nothing changed since the cursor: no sheet is read");
+  assert.deepEqual(quiet.pull, { tables: {}, deleted: [] });
+  assert.ok(quiet.now <= Date.now() && quiet.now >= first.now - 2000, "the cursor keeps moving, held back two seconds");
+  // a write right after a quiet poll is never lost
+  g.post({ secret: SEC, push: { rows: { tasks: [{ id: "a2", date: "2026-10-07", title: "Read", est: 30, updated: 2000 }] } } });
+  await sleep(5);
+  const next = g.post({ secret: SEC, pull: true, since: quiet.now });
+  assert.equal(next.pull.tables.tasks.some((t) => t.id === "a2"), true);
+});
+
+test("a pull reads only the tables written since the cursor", async () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  g.post({ secret: SEC, push: { rows: {
+    tasks: [{ id: "a1", date: "2026-10-06", title: "Gym", est: 40, updated: 1000 }],
+    friends: [{ id: "f1", name: "Ada", updated: 1000 }]
+  } } });
+  await sleep(5);
+  const base = g.post({ secret: SEC, pull: true, since: 0 });
+  await sleep(5);
+  g.post({ secret: SEC, push: { rows: { tasks: [{ id: "a2", date: "2026-10-07", title: "Read", est: 30, updated: 2000 }] } } });
+  await sleep(5);
+  const r0 = { ...g.ss.readFrom };
+  const res = g.post({ secret: SEC, pull: true, since: base.now });
+  assert.equal(res.pull.tables.tasks.some((t) => t.id === "a2"), true);
+  assert.equal(res.pull.tables.friends.length, 0);
+  assert.equal((g.ss.readFrom.Friends || 0) - (r0.Friends || 0), 0, "Friends wasn't written since the cursor, so it isn't read");
+  assert.ok((g.ss.readFrom.Tasks || 0) > (r0.Tasks || 0), "Tasks was written, so it is read");
+});
+
+test("editing a row by hand in the sheet reaches the next pull", async () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  assert.equal(g.triggers.length, 1, "setup installs the edit trigger");
+  g.sandbox.setup();
+  assert.equal(g.triggers.length, 1, "running setup again doesn't add a second one");
+  g.post({ secret: SEC, push: { rows: { tasks: [{ id: "a1", date: "2026-10-06", title: "Gym", est: 40, updated: 1000 }] } } });
+  await sleep(5);
+  const base = g.post({ secret: SEC, pull: true, since: 0 });
+  const was = base.pull.tables.tasks[0];
+  await sleep(5);
+  const sh = g.ss.getSheetByName("Tasks");
+  const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  sh.put(2, head.indexOf("Task") + 1, "Pool");
+  g.sandbox.editStamp_({ range: sh.getRange(2, head.indexOf("Task") + 1, 1, 1) });
+  const res = g.post({ secret: SEC, pull: true, since: base.now });
+  const row = res.pull.tables.tasks.find((t) => t.id === "a1");
+  assert.equal(row.title, "Pool");
+  assert.ok(Number(row.updated) > Number(was.updated), "the hand edit wins over older device edits");
+  // 改的就是 Updated 那一格本身：不再盖一遍
+  const at = Number(row.updated);
+  g.sandbox.editStamp_({ range: sh.getRange(2, head.indexOf("Updated") + 1, 1, 1) });
+  assert.equal(Number(sh.getRange(2, head.indexOf("Updated") + 1).getValue()), at);
+});
+
+test("doGet names the script's rev, for checking a deploy landed", () => {
+  const g = load(CODE);
+  const res = JSON.parse(g.sandbox.doGet().getContent());
+  assert.equal(res.version, 6);
+  assert.match(String(res.rev), /^\d{4}-\d{2}-\d{2}$/);
+});

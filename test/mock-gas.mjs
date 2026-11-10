@@ -7,7 +7,14 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 class Range {
   constructor(sh, r, c, nr, nc) { Object.assign(this, { sh, r, c, nr, nc }); }
+  getSheet() { return this.sh; }
+  getRow() { return this.r; }
+  getColumn() { return this.c; }
+  getLastRow() { return this.r + this.nr - 1; }
+  getLastColumn() { return this.c + this.nc - 1; }
   getValues() {
+    this.sh.ss.reads++;   // 测试看这个数：快路径不该碰表格
+    this.sh.ss.readFrom[this.sh.name] = (this.sh.ss.readFrom[this.sh.name] || 0) + 1;
     const out = [];
     for (let i = 0; i < this.nr; i++) {
       const row = [];
@@ -88,7 +95,7 @@ class Sheet {
 }
 
 class Spreadsheet {
-  constructor(name = "Untitled") { this.sheets = []; this.name = name; }
+  constructor(name = "Untitled") { this.sheets = []; this.name = name; this.reads = 0; this.readFrom = {}; }
   getName() { return this.name; }
   getSheetByName(n) { return this.sheets.find((s) => s.name === n) || null; }
   insertSheet(n) { const s = new Sheet(this, n); this.sheets.push(s); return s; }
@@ -103,12 +110,14 @@ export function load(codePath, ss = new Spreadsheet()) {
   const byUrl = (url) => { const k = Object.keys(others).find((u) => String(url).startsWith(u)); if (!k) throw new Error("Spreadsheet not found"); return others[k]; };
   const logs = [];
   const props = {};   // Script Properties
+  const triggers = [];   // setup 建的 onEdit 触发器（只记名字）
   const pad = (n) => String(n).padStart(2, "0");
   const validation = { requireValueInList() { return this; }, requireValueInRange() { return this; }, build() { return {}; } };
   const sandbox = {
     SpreadsheetApp: { getActiveSpreadsheet: () => ss, openByUrl: byUrl, openById: (id) => byUrl(Object.keys(others).find((u) => u.includes("/d/" + id)) || "?"), flush() {}, newDataValidation: () => Object.create(validation) },
     Utilities: { getUuid: () => crypto.randomUUID(), formatDate: (d, tz, f) => (f === "HH:mm" ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    ScriptApp: { getProjectTriggers: () => triggers.slice(), newTrigger: (fn) => ({ forSpreadsheet: () => ({ onEdit: () => ({ create: () => { triggers.push({ getHandlerFunction: () => fn }); } }) }) }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = String(v); }, deleteProperty: (k) => { delete props[k]; } }) },
     ContentService: { MimeType: { JSON: "json" }, createTextOutput: (s) => ({ setMimeType() { return this; }, getContent: () => s }) },
     Logger: { log: (m) => logs.push(m) },
@@ -119,5 +128,5 @@ export function load(codePath, ss = new Spreadsheet()) {
   const post = (body) => JSON.parse(sandbox.doPost({ postData: { contents: JSON.stringify({ version: sandbox.VERSION || 6, ...body }) } }).getContent());
   // 测试用：再开一个表格（比如阅读记录），网页里填它的链接
   const spreadsheet = (url) => (others[url] = others[url] || new Spreadsheet());
-  return { ss, sandbox, logs, post, spreadsheet };
+  return { ss, sandbox, logs, post, spreadsheet, props, triggers };
 }

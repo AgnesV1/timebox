@@ -7,6 +7,7 @@ var SECRET = 'CHANGE_ME';
 // 类型 text / num / date / bool / json / status（Done / Delay / Drop）/ pstatus / clock（钟点 09:10，存成文字）。
 // 标记 calc = 脚本自己算，App 不写；hide = setup 时把这列藏起来（右键可取消隐藏）。
 var VERSION = 6;   // 页面和脚本对版本：页面不是这个版本就不收它的数据，免得新旧格式混在一起
+var REV = '2026-11-09';   // 这份脚本是哪天的（改 Code.gs 顺手更新）：部署完在浏览器开 exec 网址，核对表格里跑的是不是这版
 var T = {
   // 计时记录在 Times 一格里：「09:10-09:40 30m; 20m」。Project = 挂在哪个计划上（脚本填名字）；Group = 属于哪个大类（可以不挂计划、直接挂在大类上）
   tasks: { sheet: 'Tasks', key: 'id', main: 'title', cols: [
@@ -69,29 +70,38 @@ var COLORS = ['#3E8E6E', '#3F62B5', '#E07A2B', '#8B62AE', '#E6DCC3', '#9A5A36', 
 // 之后的精简（都可以重复跑）：Time 页并进 Tasks 的 Times 列、Day capacity 并进 Settings、
 // 用不着的列删掉、Groups 页删掉；搬完的旧页改名「Old …」藏起来，确认没问题后可以自己右键删。
 function setup() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  rename_(ss, '任务', 'Tasks');
-  rename_(ss, '每日时长', 'Day capacity');
-  var old = isOld_(ss);
-  if (old) backup_(ss);
-  Object.keys(T).forEach(ensure_);
-  deletedSheet_();
-  validate_();
-  Object.keys(T).forEach(function (name) { readAll_(name, true); });   // 没有 ID 的行补上
-  if (old) migrate_();
-  delayAndRecords_(ss);
-  timeIntoTasks_(ss);
-  capacityIntoSettings_(ss);
-  routinesIntoProjects_();
-  fillDefaults_();
-  dropColumns_();
-  dropGroups_(ss);
-  pruneDeleted_();
-  friendCols_();
-  recount_();
-  recountFriends_();
-  hideSheets_(ss);
-  Logger.log(old ? 'Migrated the old sheet. Backups: ' + backupNames_(ss).join(', ') : 'Setup done.');
+  // 拿和 doPost 同一把锁：跑 setup 挪列补列的那几秒，设备的推送排队等它，不会按旧列号写歪
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    rename_(ss, '任务', 'Tasks');
+    rename_(ss, '每日时长', 'Day capacity');
+    var old = isOld_(ss);
+    if (old) backup_(ss);
+    Object.keys(T).forEach(ensure_);
+    deletedSheet_();
+    validate_();
+    Object.keys(T).forEach(function (name) { readAll_(name, true); });   // 没有 ID 的行补上
+    if (old) migrate_();
+    delayAndRecords_(ss);
+    timeIntoTasks_(ss);
+    capacityIntoSettings_(ss);
+    routinesIntoProjects_();
+    fillDefaults_();
+    dropColumns_();
+    dropGroups_(ss);
+    pruneDeleted_();
+    friendCols_();
+    recount_();
+    recountFriends_();
+    hideSheets_(ss);
+    editTrigger_();
+    touch_(Object.keys(T).concat(['deleted']), Date.now());   // 整理过表：每台设备下次都真拉一遍，之后快路径才敢开
+    Logger.log(old ? 'Migrated the old sheet. Backups: ' + backupNames_(ss).join(', ') : 'Setup done.');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function rename_(ss, from, to) {
@@ -616,14 +626,19 @@ function remove_(dels, now) {
 
 function pull_(since) {
   var out = { tables: {}, deleted: [] };
+  // 章比 since 旧的表这次没人动过，不用读；没有章的表老老实实读（刚部署、还没跑 setup）
+  var map = since ? touchedMap_() : null;
+  var skip = function (name) { if (!map) return false; var at = Number(map[name]) || 0; return at > 0 && at < since; };
   Object.keys(T).forEach(function (name) {
-    out.tables[name] = readAll_(name, true).filter(function (r) { return !since || (Number(r.synced) || 0) >= since; });
+    out.tables[name] = skip(name) ? [] : readAll_(name, true).filter(function (r) { return !since || (Number(r.synced) || 0) >= since; });
   });
-  var sh = deletedSheet_();
-  if (sh.getLastRow() > 1) {
-    sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues().forEach(function (r) {
-      if (!since || Number(r[3]) >= since) out.deleted.push({ table: String(r[0]), id: String(r[1]), at: Number(r[2]) });
-    });
+  if (!skip('deleted')) {
+    var sh = deletedSheet_();
+    if (sh.getLastRow() > 1) {
+      sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues().forEach(function (r) {
+        if (!since || Number(r[3]) >= since) out.deleted.push({ table: String(r[0]), id: String(r[1]), at: Number(r[2]) });
+      });
+    }
   }
   return out;
 }
@@ -1288,7 +1303,7 @@ function spendWrite_(tab, rows) {
 }
 
 // 记账表格上次被这里写过的时刻（Script Properties 的 spendAt）。拉的时候这次没东西要写、那之后也没人写过 = 不打开那张表格，直接回「没变化」——
-// 平常每 30 秒、点回窗口的那一下就省下打开表格、读几千行（她 2026-10-28 说手机拉下来慢）。
+// 平常每 10–30 秒、点回窗口的那一下就省下打开表格、读几千行（她 2026-10-28 说手机拉下来慢）。
 // 表格里手改、手加的行照旧等整份拉（一天一次）或者下一次有人写的时候才回来
 function spendQuiet_(req, since) {
   if (!since || (req.put || []).length || (req.del || []).length || Array.isArray(req.budgets) || Array.isArray(req.cats)) return false;
@@ -1391,13 +1406,72 @@ function spend_(req) {
 // 返回 { ok, now, pull: { tables, deleted } }。所有请求排队执行，所以 since 不会漏掉数据。
 // 还可以带：tidy（清过期的删除记录）、quarter（季度表那一天的几格）、archive（{before}，旧任务搬进 Archive 页）、reading（阅读表格）、spend（记账表格）
 
+// ================= 章：每张表（和删除记录）最后一次被写的时间，存在 Script Properties（和记账的 spendAt 一个路数） =================
+// 写入方拿到锁之后、动表之前先盖章；平时什么都没带的轮询先看章，上次拉过之后没人写过就直接回空的——
+// 不开表格、不拿锁。网页那边协议不变，新旧页面都照常。
+
+var TOUCHED_KEY = 'touched';
+function touchedMap_() {
+  var raw = PropertiesService.getScriptProperties().getProperty(TOUCHED_KEY);
+  if (!raw) return null;   // 还没盖过章（刚部署）：当作全都动过
+  try { return JSON.parse(raw) || null; } catch (e) { return null; }
+}
+
+function touch_(names, now) {
+  var map = touchedMap_() || {};
+  names.forEach(function (n) { map[n] = Math.max(Number(map[n]) || 0, now); });
+  PropertiesService.getScriptProperties().setProperty(TOUCHED_KEY, JSON.stringify(map));
+}
+
+// 上次拉过（since）之后，每张表和删除记录都没人写过？少一个章都算写过（稳妥）
+function fresh_(since) {
+  var map = touchedMap_();
+  if (!map) return false;
+  var names = Object.keys(T).concat(['deleted']);
+  for (var i = 0; i < names.length; i++) {
+    var at = Number(map[names[i]]) || 0;
+    if (!at || at >= since) return false;
+  }
+  return true;
+}
+
+// ================= 手改表格：盖上那几行的 Updated / Synced，设备下一次轮询就拉回去 =================
+// 安装式 onEdit（setup 建的；脚本自己的写入不触发，不会转圈）。手改的行 Updated = 现在，比设备上更早的改动赢；
+// 以前手改已有行的格子只有整表重拉才回得去。出什么错都不打扰她改表格。
+
+function editStamp_(e) {
+  try {
+    if (!e || !e.range) return;
+    var sh = e.range.getSheet(), name = '';
+    Object.keys(T).forEach(function (k) { if (T[k].sheet === sh.getName()) name = k; });
+    if (!name) return;
+    var names = head_(sh), col = cols_(T[name], names);
+    if (col.updated < 0 || col.synced < 0) return;
+    var c1 = e.range.getColumn(), c2 = e.range.getLastColumn();
+    if (c1 === c2 && (c1 === col.updated + 1 || c1 === col.synced + 1)) return;   // 改的就是这两列本身
+    var top = Math.max(e.range.getRow(), 2), bottom = Math.min(e.range.getLastRow(), Math.max(sh.getLastRow(), 1));
+    if (bottom < top) return;
+    var now = Date.now(), ones = [];
+    for (var i = top; i <= bottom; i++) ones.push([now]);
+    sh.getRange(top, col.updated + 1, ones.length, 1).setValues(ones);
+    sh.getRange(top, col.synced + 1, ones.length, 1).setValues(ones);
+    touch_([name], now);
+  } catch (err) { /* 盖不上就算了：整表重拉兜底 */ }
+}
+
+// setup 跑的时候建（有了就不再建）。建触发器要多一个权限，Google 可能再问一次授权
+function editTrigger_() {
+  var has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'editStamp_'; });
+  if (!has) ScriptApp.newTrigger('editStamp_').forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet()).onEdit().create();
+}
+
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// 浏览器直接打开 …/exec 能看到这一行，说明部署好了
+// 浏览器直接打开 …/exec 能看到这一行，说明部署好了；rev 对得上才是这次粘的脚本
 function doGet() {
-  return json_({ ok: true, app: '苦昼短', version: VERSION });
+  return json_({ ok: true, app: '苦昼短', version: VERSION, rev: REV });
 }
 
 function doPost(e) {
@@ -1406,12 +1480,29 @@ function doPost(e) {
   if (body.secret !== SECRET) return json_({ error: 'denied' });
   // 还没刷新的旧版页面发来的是旧格式，直接不写，免得把表弄乱（它的改动还留在设备上，刷新成新版再推）
   if (!(Number(body.version) >= VERSION)) return json_({ error: 'old page' });
+  var push = body.push || {}, rows = push.rows || {}, dels = push.deletes || [];
+  var pushNames = Object.keys(rows).filter(function (name) { return T[name] && rows[name] && rows[name].length; });
+  var writes = pushNames.length > 0 || dels.length > 0 || Boolean(body.tidy || body.archive || body.quarter || body.reading || body.spend);
+  // 平时的轮询什么都没带：看章就够了，不开表格、不拿锁（电脑的轮询不再排在手机推送后面）。
+  // 回的 now 退 2 秒：章刚写、这边还没读到的那一瞬不丢数据（下一轮拿着退过的 since 会真查一遍）
+  if (!writes) {
+    var ts0 = Date.now(), since0 = Number(body.since) || 0;
+    if (!body.pull) return json_({ ok: true, now: ts0, version: VERSION, tables: Object.keys(T) });   // 只是来问版本的
+    if (since0 > 0 && fresh_(since0)) return json_({ ok: true, now: ts0 - 2000, version: VERSION, tables: Object.keys(T), pull: { tables: {}, deleted: [] } });
+  }
   var lock = LockService.getScriptLock();
   try { lock.waitLock(25000); } catch (err) { return json_({ error: 'busy' }); }
   try {
     var now = Date.now(), touched = 0, out = { ok: true };
     PLAN_NAMES = null;
-    var push = body.push || {}, rows = push.rows || {}, dels = push.deletes || [], dead = deadMap_();
+    // 动表之前先盖章：免锁的快路径要么看到章，要么比它更早（它回的 now 退了 2 秒），两头都不漏
+    var stamp = [];
+    var mark = function (n) { if (stamp.indexOf(n) < 0) stamp.push(n); };
+    pushNames.forEach(mark);
+    dels.forEach(function (d) { if (T[d.table]) { mark(d.table); mark('deleted'); } });
+    if (body.archive) { mark('tasks'); mark('deleted'); }
+    if (stamp.length) touch_(stamp, now);
+    var dead = pushNames.length ? deadMap_() : null;
     // Settings 先写：Friends 页的列按网页里排好的顺序建好，再写每个人的那几格
     var fields = (rows.settings || []).some(function (r) { return (r.key || r.id) === 'friend-fields'; });
     Object.keys(rows).sort(function (a, b) { return (a === 'settings' ? 0 : 1) - (b === 'settings' ? 0 : 1); }).forEach(function (name) {

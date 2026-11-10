@@ -348,7 +348,8 @@ function normalize(t, raw) {
   return r;
 }
 
-// 拉回来的：changed 数真正变了的行，一条都没变就 quiet（只刷同步状态那个小点，不整页重画——现在每 30 秒拉一次）
+// 拉回来的：changed 数真正变了的行，一条都没变就 quiet（只刷同步状态那个小点，不整页重画——最密每 10 秒拉一次）
+let cursorSaved = 0;   // 上次把 cursor 写进盘的时候：空拉只动 cursor，不整份写盘（见最底下）
 export function applyPull(pull, now, { full = false } = {}) {
   if (!pull) return;
   rev++;
@@ -387,7 +388,8 @@ export function applyPull(pull, now, { full = false } = {}) {
   }
   if (now) S.cursor = now;
   if (full) S.needFull = false;
-  persist();
+  // 空拉只动了 cursor：最多 5 分钟存一次盘。刷新后 since 旧一点点，表格那边多走一次快路径，无害
+  if (changed || full || Date.now() - cursorSaved > 3e5) { persist(); cursorSaved = Date.now(); }
   if (changed) ctxCache = null;
   emit({ pulled: true, ...(changed ? {} : { quiet: true }) });
 }

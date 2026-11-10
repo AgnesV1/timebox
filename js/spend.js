@@ -157,7 +157,7 @@ export function apply(res, sent) {
     for (const id of Object.keys(S.put)) if (S.entries[id]) keep[id] = S.entries[id];
     S.entries = keep;
   }
-  // changed：真正变了几处（拉回来的和本机一样就不叫界面重画——现在每 30 秒拉一次）
+  // changed：真正变了几处（拉回来的和本机一样就不叫界面重画——最密每 10 秒拉一次）
   let changed = full ? 1 : 0;
   const was0 = JSON.stringify([S.budgets, S.cats]);
   for (const r of res.rows || []) {

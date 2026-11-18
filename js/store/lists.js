@@ -55,7 +55,7 @@ export default function (core) {
     const hit = rowOf(planId, date);
     if (hit) return hit.id;
     const id = L.rowId(planId, date, (x) => Boolean(get("tasks", x)));
-    change(() => put("tasks", { id, date, title: p.name, est: Number(p.rule?.min) || 0, actual: null, status: "", reason: "", optional: false, deep: planDeep(planId),
+    change(() => put("tasks", { id, date, title: p.name, est: L.planMin(p), actual: null, status: "", reason: "", optional: false, deep: planDeep(planId),
       projectId: planId, group: "", itemId: "", times: "", desc: "", order: nextOrder(date) }, { generated: true }));
     return id;
   }
@@ -77,7 +77,8 @@ export default function (core) {
         steps = carry.steps.map((s) => ({ ...s, done: false }));
       } else steps = (cfg.steps || []).map((s) => ({ t: s.t, min: Number(s.min) || 0, done: false }));
       const title = item.title;
-      const est = carry ? steps.reduce((a, s) => a + (Number(s.min) || 0), 0) || Number(item.est) || 0 : Number(item.est) || 0;
+      const own = L.estOf(item, plan);   // 这一项自己写的时间，没写就是计划的默认
+      const est = carry ? steps.reduce((a, s) => a + (Number(s.min) || 0), 0) || own : own;
       put("tasks", { id, date, title, est, actual: null, status: "", reason: "", optional: false, deep: planDeep(plan.id), projectId: plan.id, group: "", itemId,
         times: "", desc: L.withSteps("", steps), order: nextOrder(date) });
     }, "Added " + item.title);
@@ -208,15 +209,15 @@ export default function (core) {
   const planText = (planId) => { const s = planShape(planId); return s ? PT.format(s) : ""; };
 
   // 粘贴：planId 空 = 新建（放进 group 这个项目，文字里没写计划名就用 name）；有 = 按名字 / 代号更新那个计划。
-  // laterOf(分区名) = 预览里她勾的 Later（不给就按认出来的）。返回 { planId, gone: 新文字里没有的旧项 [{ id, title, used }] }
-  function pastePlan(text, { planId = "", group = "", laterOf = null, name = "" } = {}) {
+  // laterOf(分区名) = 预览里她勾的 Later（不给就按认出来的）；min = 新建框里填的 Default minutes。返回 { planId, gone: 新文字里没有的旧项 [{ id, title, used }] }
+  function pastePlan(text, { planId = "", group = "", laterOf = null, name = "", min = 0 } = {}) {
     const parsed = PT.parse(text);
     if (!parsed.sections.length && !parsed.name) return null;
     const flat = parsed.sections.flatMap((s) => s.items.map((i) => ({ ...i, section: s.name, later: laterOf ? Boolean(laterOf(s.name)) : s.later })));
     let id = planId, gone = [];
     change(() => {
       if (!id) {
-        id = saveProject({ name: parsed.name || name || "New plan", group, kind: "regular", place: "pool", start: parsed.start, deadline: parsed.end, rule: { notes: parsed.notes, items: {} } });
+        id = saveProject({ name: parsed.name || name || "New plan", group, kind: "regular", place: "pool", start: parsed.start, deadline: parsed.end, rule: { notes: parsed.notes, items: {}, min } });
       }
       let p = get("projects", id);
       p = { ...p, name: parsed.name || p.name, start: parsed.start || p.start || "", deadline: parsed.end || p.deadline || "", rule: { ...(p.rule || {}), notes: parsed.notes } };

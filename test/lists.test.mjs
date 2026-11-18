@@ -115,6 +115,33 @@ Weekly: L3 ×2, W1 ×1
 - [ ] R2 reading · 1h · ×2
 `;
 
+test("a plan's default minutes: what it and its untimed items get on a day", async () => {
+  const pool = plan("P", {}, { rule: { min: 45, items: {} } });
+  assert.equal(L.planMin(pool), 45);
+  assert.equal(L.estOf({ est: 0 }, pool), 45, "no time of its own: the plan's");
+  assert.equal(L.estOf({ est: 20 }, pool), 20, "its own time wins");
+  assert.equal(L.planMin(plan("A", {}, { place: "auto", rule: { min: 45, days: [0, 0, 60, 0, 40, 0, 0] } })), 60, "fixed days: their minutes, not a leftover default");
+  assert.equal(L.planMin(plan("B", {}, { rule: { days: [0, 60, 0, 0, 0, 0, 0] } })), 0, "dragged plans don't read leftover weekdays");
+  const c = ctx({ projects: [pool], items: [{ id: "a", projectId: "P", title: "A", est: 0, order: 1 }, { id: "b", projectId: "P", title: "B", est: 20, order: 2 }] });
+  assert.equal(L.poolTotals(c, pool).min, 65, "the pool's total counts what dragging would give");
+
+  const store = await import("../js/store.js?default-minutes");
+  const day = "2030-01-07";
+  const id = store.saveProject({ name: "Swim", place: "pool", rule: { min: 40 } });
+  assert.equal(store.get("tasks", store.ensureRow(id, day)).est, 40, "dragging the plan's name");
+  store.addPoolLines(id, "", "Drills\nLaps · 15min");
+  const of = (title) => store.all("items").find((i) => i.projectId === id && i.title === title).id;
+  const drills = store.placeItem(of("Drills"), day), laps = store.placeItem(of("Laps"), day);
+  assert.deepEqual([store.get("tasks", drills).est, store.get("tasks", laps).est], [40, 15]);
+  assert.equal(store.get("items", of("Drills")).est, 0, "the item itself stays without a time, so Copy as text doesn't gain one");
+  store.saveProject({ id, rule: { ...store.get("projects", id).rule, min: 90 } });
+  assert.equal(store.get("tasks", drills).est, 40, "changing the default leaves what's already placed");
+  const pasted = store.pastePlan("# Run\n\n## Pool\n\n- [ ] Hills\n", { min: 30 });
+  assert.equal(store.get("projects", pasted.planId).rule.min, 30, "a new plan made by pasting keeps the minutes typed first");
+  store.pastePlan("# Run\n\n## Pool\n\n- [ ] Hills\n- [ ] Tempo\n", { planId: pasted.planId });
+  assert.equal(store.get("projects", pasted.planId).rule.min, 30, "pasting again keeps them too");
+});
+
 test("store: paste a plan, drag items onto days, tick steps, back to the pool, paste again", async () => {
   const store = await import("../js/store.js?lists");
   const day = store.today(), next = L.stepsOf;

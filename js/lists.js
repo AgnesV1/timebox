@@ -19,6 +19,11 @@ const num = (v) => Number(v) || 0;
 export const estText = (m) => { const v = Math.round(num(m)); return v <= 0 ? "" : v < 60 ? String(v) : Math.floor(v / 60) + "h" + (v % 60 ? String(v % 60).padStart(2, "0") : ""); };
 // 大概多久，写在项旁边的短样子：30m、2h、1h45；没写是空（Pool、计划编辑框里用，那里分钟旁边还有次数，不写 m 分不清）
 export const sizeOf = (m) => { const v = Math.round(num(m)); return v <= 0 ? "" : v < 60 ? v + "m" : Math.floor(v / 60) + "h" + (v % 60 ? String(v % 60).padStart(2, "0") : ""); };
+// 拖到某天默认多久（她 2026-11-17 要的：拖进去不用再改时间）：拖的计划看编辑框里的 Default minutes（rule.min）；
+// 固定星期几的计划没有这一格，用它排的那几天里第一个有分钟数的
+export const planMin = (plan) => { const r = plan?.rule || {}; return plan?.place === "auto" ? num((r.days || []).find((v) => num(v) > 0)) : num(r.min); };
+// Pool 里一项拖出去算多久：自己写了就用自己的，没写用计划的默认
+export const estOf = (item, plan) => num(item?.est) || planMin(plan);
 export const isChore = (t) => String(t?.id || "").startsWith("chore-");
 export const isLine = (t) => Boolean(t?.projectId && t.itemId);
 export const isRow = (t) => Boolean(t?.projectId) && !t.itemId && !isChore(t);
@@ -130,7 +135,7 @@ export function poolTotals(ctx, plan) {
     if (waiting(s.cfg, plan, ctx.today)) { waits++; continue; }
     if (s.count.left <= 0) continue;
     items++;
-    if (Number.isFinite(s.count.left)) { times += s.count.left; min += num(i.est) * s.count.left; }
+    if (Number.isFinite(s.count.left)) { times += s.count.left; min += estOf(i, plan) * s.count.left; }
   }
   return { items, times, min, later, waiting: waits };
 }

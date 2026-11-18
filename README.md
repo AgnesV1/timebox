@@ -100,7 +100,7 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   Plan in the idea pool uses the same defaults. Which projects can pick ideas: the Ideas column in Settings → Projects.
   On the phone: with the `Idea` switch on in the add-task row, Add saves to the pool instead (it lands in Unsorted; sort it on the computer); the light bulb in the top bar opens the look-up page (search names and notes, read only). All of it is stored in the Settings tab, one row each (`idea:…`).
   The sections hold plans. Click "New plan" or a project's "+ Plan": a name is enough (Swimming); "Shows up" is When I drag it or On set days (minutes per weekday),
-  with About … a week, dates, a colour and Notes; or Paste text for a whole plan. In a plan's editor the pool is listed by section — name · about how long · times · done / a week / month;
+  with Default minutes (what the plan, and any item without its own time, gets when dragged onto a day), About … a week, dates, a colour and Notes; or Paste text for a whole plan. In a plan's editor the pool is listed by section — name · about how long · times · done / a week / month;
   click an item to change it (name, minutes, times, a week, note, section, and its month when the plan has Items have a month), switch a section or an item to Later, and add more one per line (`L5 shadowing · 20min · ×18`).
   Cards show how the plan shows up, its dates and day, the time spent, this week per item (those with about N a week) and what's left in the pool. Rename renames the project and its plans with it
 - **Repeat shortcuts**: in the add-task box, pick "↻ Every day / Weekdays / Every <weekday>" and "for good / for 1 week …", then Add —
@@ -123,7 +123,7 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   Dragging the whole sticky moves that day's unticked items; back to the Pool puts them back; clicking it opens the day on Today. The month view draws only the weeks the month touches.
   Two warnings on that bar: past the box it turns a steady red (no pulse); past 7 hours but still within the box it pulses every 5 seconds, rose by day and red at night (for now).
   A gold super rest day never turns red — a day that went mostly to Leisure can be marked gold instead.
-  The Pool is on the right, by project and plan: drag an item onto a day (or click it, or Tab to it and press Enter, for a "Put on…" menu) and it joins that plan's row there; drag a plan's name for just its row.
+  The Pool is on the right, by project and plan: drag an item onto a day (or click it, or Tab to it and press Enter, for a "Put on…" menu) and it joins that plan's row there; drag a plan's name for just its row. Either arrives with its time filled in: the item's own, otherwise the plan's Default minutes (a fixed-day plan uses its weekday minutes).
   The box at the top adds lines to a plan's pool. Other calendar tasks can be dragged to other days, or back to the Pool to unschedule them. In the faint previews of future days, a fixed-day plan's occurrence can be dragged away or opened.
   The number at the top right of a cell is that day's usable time; click it to change
 - `Today`: today's list on the left — each plan one row with its items under it; on the right time done / picked · the day's box, and what was left behind on earlier days.

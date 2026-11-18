@@ -206,20 +206,30 @@ export function parseDates(text) {
 export const formatDates = (list) => (list || []).map((x) => formatDay(x) + (x.label ? " " + x.label : "")).join("; ");
 
 // Greetings 那一格里勾了哪几个节
+const greetParts = (text) => String(text ?? "").split(/[,;，、\n]+/).map((s) => s.trim()).filter(Boolean);
+const isHoliday = (h, s) => plain(s) === plain(h.name) || plain(s) === plain(h.key);
 export function greetKeys(text) {
-  const have = String(text ?? "").split(/[,;，、\n]+/).map(plain).filter(Boolean);
-  return HOLIDAYS.filter((h) => have.includes(plain(h.name)) || have.includes(plain(h.key))).map((h) => h.key);
+  const have = greetParts(text);
+  return HOLIDAYS.filter((h) => have.some((s) => isHoliday(h, s))).map((h) => h.key);
 }
 export const formatGreet = (keys) => HOLIDAYS.filter((h) => (keys || []).includes(h.key)).map((h) => h.name).join(", ");
+// 这个节加上 / 去掉；格子里这里不认识的字（表格里手写的）原样留着
+export function withGreet(text, key, on) {
+  const keys = greetKeys(text).filter((k) => k !== key).concat(on ? [key] : []);
+  const other = greetParts(text).filter((s) => !HOLIDAYS.some((h) => isHoliday(h, s)));
+  return [formatGreet(keys), ...other].filter(Boolean).join(", ");
+}
 
 const slug = (s) => plain(s).slice(0, 24) || "day";
+const shiftDay = (d, n) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+const occasionId = (friendId, key, date) => "oc:" + friendId + ":" + key + ":" + date.slice(0, 4);
 
 // 一个人在 from..to 之间的日子：[{ id, friend, kind: birthday / holiday / date, key, label, date, gift }]
 export function occasions(friend, names, from, to) {
   const more = friend.more || {}, out = [], years = [];
   for (let y = Number(from.slice(0, 4)); y <= Number(to.slice(0, 4)); y++) years.push(y);
   const push = (kind, key, label, date, gift = "") => {
-    if (date && date >= from && date <= to) out.push({ id: "oc:" + friend.id + ":" + key + ":" + date.slice(0, 4), friend, kind, key, label, date, gift });
+    if (date && date >= from && date <= to) out.push({ id: occasionId(friend.id, key, date), friend, kind, key, label, date, gift });
   };
   const b = names.birthday ? parseDay(more[names.birthday]) : null;
   if (b) for (const y of years) push("birthday", "birthday", "Birthday", dayIn(y, b.m, b.d), names.gift ? String(more[names.gift] || "").trim() : "");
@@ -236,8 +246,7 @@ export function occasions(friend, names, from, to) {
 // 接下来的日子（往后 ahead 天；过了还没做的往前留 back 天），同一天同一件事的人排在一起：
 // → { groups: [{ date, label, kind, late, items: [{ ...occasion, done }] }], due: 三天之内（含过了的）还没做的有几个 }
 export function comingUp(friends, names, today, { ahead = 30, back = 7 } = {}, isDone = () => false) {
-  const shift = (d, n) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
-  const from = shift(today, -back), to = shift(today, ahead), soon = shift(today, 3);
+  const from = shiftDay(today, -back), to = shiftDay(today, ahead), soon = shiftDay(today, 3);
   const groups = new Map();
   let due = 0;
   for (const f of friends) for (const oc of occasions(f, names, from, to)) {
@@ -251,4 +260,25 @@ export function comingUp(friends, names, today, { ahead = 30, back = 7 } = {}, i
   const list = [...groups.values()].sort((a, b) => a.date.localeCompare(b.date) || a.label.localeCompare(b.label));
   for (const g of list) g.items.sort((a, b) => low(a.friend.name).localeCompare(low(b.friend.name)));
   return { groups: list, due };
+}
+
+// 问候清单（她 2026-11-17 要的）：每个节一组，最近的在前 → [{ key, name, date, late, people: [{ id, friend, done }], done: 问候了几个 }]。
+// date 是这个节「这一次」：过了的、还有人没问候、过去不到 back 天的还是它（好补上），不然就是下一次。
+// 勾 = Coming up 里点名字的同一条记录（id 一样），两边一起变
+export function greetings(friends, names, today, isDone = () => false, back = 7) {
+  const from = shiftDay(today, -back), y0 = Number(today.slice(0, 4)), out = [];
+  for (const h of HOLIDAYS) {
+    const who = names.greet ? friends.filter((f) => greetKeys(f.more?.[names.greet]).includes(h.key)) : [];
+    for (let y = y0 - 1; y <= y0 + 2; y++) {
+      const date = h.on(y);
+      if (!date || date < from) continue;
+      const people = who.map((friend) => { const id = occasionId(friend.id, h.key, date); return { id, friend, done: Boolean(isDone(id)) }; })
+        .sort((a, b) => low(a.friend.name).localeCompare(low(b.friend.name)));
+      const done = people.filter((p) => p.done).length;
+      if (date < today && done === people.length) continue;
+      out.push({ key: h.key, name: h.name, date, late: date < today, people, done });
+      break;
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
 }

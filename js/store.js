@@ -801,7 +801,7 @@ export function startChore(tag = "") {
 export const { sides, sideOf, sideFilled, setSide } = sideStore(core);
 
 const fr = friendStore(core);
-export const { friends, meets, meetOfTask, friendFields, lastContact, saveFriend, deleteFriend, saveMeet, deleteMeet, setTaskMeet, importFriends, friendSpecial, adoptMarks, occasionDone, toggleOccasion, doneNext } = fr;
+export const { friends, meets, meetOfTask, friendFields, lastContact, saveFriend, deleteFriend, saveMeet, deleteMeet, setTaskMeet, importFriends, friendSpecial, adoptMarks, occasionDone, toggleOccasion, greetings, setGreet, doneNext } = fr;
 const { moveMeet } = fr;
 
 const idea = ideaStore(core);

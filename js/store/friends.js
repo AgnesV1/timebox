@@ -96,12 +96,23 @@ export default function (core) {
     if (stale.length) change(() => stale.forEach((f) => put("friends", { ...f, more: { ...f.more, [field]: F.freshMarks(f.more[field]) } })), "", { quiet: true });
   }
   const occasionDone = (id) => Boolean(get("meets", id));
-  // 到了日子点一下：在这个人的记录里记一条（id 是固定的，一年里这个日子只记一次）；再点一下 = 其实没做，把那条删掉
-  function toggleOccasion(id, friendId, note) {
-    if (get("meets", id)) { change(() => drop("meets", id), "Marked as not done"); return; }
+  // 到了日子点一下：在这个人的记录里记一条（id 是固定的，一年里这个日子只记一次）；再点一下 = 其实没做，把那条删掉。
+  // silent：问候清单里打勾不弹提示（勾本身就看得见，再点一下就是撤销）
+  function toggleOccasion(id, friendId, note, { silent = false } = {}) {
+    if (get("meets", id)) { change(() => drop("meets", id), silent ? "" : "Marked as not done"); return; }
     const f = get("friends", friendId);
     if (!f) return;
-    change(() => put("meets", { id, date: today(), friends: [friendId], note: String(note || ""), watch: "", taskId: "" }), "Noted for " + (f.name || "them"));
+    change(() => put("meets", { id, date: today(), friends: [friendId], note: String(note || ""), watch: "", taskId: "" }), silent ? "" : "Noted for " + (f.name || "them"));
+  }
+
+  // 问候清单：每个节要问候谁、这一次问候了没有
+  const greetings = () => F.greetings(friends(), friendSpecial(), today(), occasionDone);
+  // 这个节要不要问候这个人：改的是他 Greetings 那一格，和编辑框里的 Greet on 同一份
+  function setGreet(friendId, key, on) {
+    const f = get("friends", friendId);
+    if (!f) return;
+    const field = friendSpecial().greet || F.SPECIAL_NAME.greet;
+    saveFriend({ id: friendId, more: { ...(f.more || {}), [field]: F.withGreet(f.more?.[field], key, on) } });
   }
 
   function moveMeet(fromTask, toTask, date) {
@@ -121,5 +132,5 @@ export default function (core) {
     }, "Logged with " + (f.name || "them"));
   }
 
-  return { friends, meets, meetOfTask, friendFields, lastContact, saveFriend, deleteFriend, saveMeet, deleteMeet, setTaskMeet, importFriends, friendSpecial, adoptMarks, occasionDone, toggleOccasion, doneNext, moveMeet };
+  return { friends, meets, meetOfTask, friendFields, lastContact, saveFriend, deleteFriend, saveMeet, deleteMeet, setTaskMeet, importFriends, friendSpecial, adoptMarks, occasionDone, toggleOccasion, greetings, setGreet, doneNext, moveMeet };
 }

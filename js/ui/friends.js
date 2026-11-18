@@ -3,6 +3,7 @@
 // 三个记号（🏛️ 🧠 ✨）：每个人可以点亮其中几个——表里那一行、点开的编辑框里都能点；筛选条上点亮哪个就只看带那个的人。
 // 特别的日子：点开一个人，Dates 那块记生日、哪几个节要问候、自己的关键日子；页面右边 Coming up 列接下来的，
 // 到了日子点一下名字 = 在他的记录里记一条。Gift 字段填了东西的人，生日那条带 🎁。
+// 问候清单：页面右边 Greetings，每个节列要问候的人，问候了打勾（和 Coming up 里点名字是同一条记录）；Edit 挑这个节问候谁。
 // 已经记在别的表格里的人：People 那块右上角 Import，整片粘进来。带着表头那一行（Name、各字段的名字）就按表头对列，
 // 没带就按字段的顺序；不算资料的列里「5.17 一句话」是一次记录。
 // 还有「和谁」那一小块（withHTML）：今天页点开的任务行、加任务框、任务编辑框都用它，手机上也有。
@@ -150,6 +151,16 @@ function comingHTML(c) {
       : '<p class="empty">Nothing in the next ' + (upSpan > 31 ? "year" : "30 days") + ". Open a person to add a birthday, greetings or a key date.</p>") + "</section>";
 }
 
+// 问候清单：节的那一行和 Coming up 一样，底下是要问候的人，问候了打勾；人的顺序不跟着勾变，免得点着点着跳走
+function greetingsHTML(c) {
+  const person = (g, x) => '<button type="button" class="greet-p' + (x.done ? " done" : "") + '" role="checkbox" aria-checked="' + x.done + '" data-act="greet-tick" data-id="' + esc(x.id) + '" data-friend="' + esc(x.friend.id) + '" data-note="' + esc(g.name) + '">' +
+    '<i class="ls-cb" aria-hidden="true">✓</i><span>' + esc(x.friend.name || "Untitled") + "</span></button>";
+  const row = (g) => '<li class="' + (g.late ? "late" : "") + '"><div class="oc-head"><b class="num">' + fmtShort(g.date) + "</b><span>" + esc(g.name) + "</span>" +
+    (g.people.length ? '<em class="greet-n num">' + g.done + "/" + g.people.length + "</em>" : "") + "<small>" + F.ago(g.date, c.today) + '</small></div><div class="greet-who">' + g.people.map((x) => person(g, x)).join("") +
+    '<button type="button" class="link greet-edit" data-act="greet-edit" data-k="' + g.key + '" aria-label="Who to greet on ' + esc(g.name) + '">' + (g.people.length ? "Edit" : "Add people") + "</button></div></li>";
+  return '<section class="card"><header class="fr-head"><h3>Greetings</h3></header><ul class="fup">' + store.greetings().map(row).join("") + "</ul></section>";
+}
+
 export function friendsHTML(c) {
   const all = store.friends(), last = store.lastContact(), fields = plainFields();
   where = where.filter((w) => fields.includes(w.field));
@@ -158,7 +169,7 @@ export function friendsHTML(c) {
     '<button type="button" class="btn cta" data-act="new-friend">' + icon("plus") + " Person</button>" +
     '<button type="button" class="btn" data-act="new-meet">' + icon("plus") + " Catch-up</button>" +
     '<button type="button" class="icon-btn" data-act="fr-fields" title="Fields" aria-label="Fields">' + icon("settings") + "</button></div></header>" +
-    '<div class="fr-grid"><div class="fr-main">' + peopleHTML(all, shown, fields, last, c.today) + recentHTML(c.today) + '</div><aside class="fr-side">' + comingHTML(c) + todoHTML(F.todo(all, c.today), c.today) + "</aside></div></div>";
+    '<div class="fr-grid"><div class="fr-main">' + peopleHTML(all, shown, fields, last, c.today) + recentHTML(c.today) + '</div><aside class="fr-side">' + comingHTML(c) + todoHTML(F.todo(all, c.today), c.today) + greetingsHTML(c) + "</aside></div></div>";
 }
 
 // 侧栏角标：到今天为止该做的事 + 三天之内（含过了没做的）的日子
@@ -238,7 +249,20 @@ function importEditorHTML() {
     '<div class="sheet-foot"><span class="hint" data-import-count></span><button type="submit" class="btn primary">Import</button></div></form>';
 }
 
-const editorHTML = () => (editing.kind === "friend" ? friendEditorHTML() : editing.kind === "meet" ? meetEditorHTML() : editing.kind === "import" ? importEditorHTML() : fieldsEditorHTML());
+// 这个节问候谁：所有人一个勾，勾了就存；打开时已经在清单里的排在前面，人多时顶上能搜
+function greetEditorHTML() {
+  const h = F.HOLIDAYS.find((x) => x.key === editing.key);
+  if (!h) return "";
+  const all = store.friends(), field = spName("greet");
+  const on = (f) => F.greetKeys(f.more?.[field]).includes(h.key);
+  const one = (f) => '<label class="check" data-name="' + esc(low(f.name)) + '"><input type="checkbox" data-greet-who="' + esc(f.id) + '"' + (on(f) ? " checked" : "") + "><span>" + esc(f.name || "Untitled") + "</span></label>";
+  return '<div class="greet-editor" data-k="' + h.key + '"><h2 class="sheet-title">' + esc(h.name) + " <small>who to greet</small></h2>" +
+    (all.length > 8 ? '<input type="search" class="greet-q" data-greet-q placeholder="Search" autocomplete="off" aria-label="Search people">' : "") +
+    (all.length ? '<div class="greet-all">' + [...all.filter(on), ...all.filter((f) => !on(f))].map(one).join("") + "</div>" : '<p class="empty">Nobody here yet.</p>') +
+    '<div class="sheet-foot"><span></span><button type="button" class="btn primary" data-modal-close>Done</button></div></div>';
+}
+
+const editorHTML = () => (editing.kind === "friend" ? friendEditorHTML() : editing.kind === "meet" ? meetEditorHTML() : editing.kind === "import" ? importEditorHTML() : editing.kind === "greet" ? greetEditorHTML() : fieldsEditorHTML());
 
 function openEditor(next, focus = "") {
   editing = next;
@@ -350,6 +374,8 @@ export function initFriends(rerender) {
     }
     else if (act === "up-span") { upSpan = Number(el.dataset.v) || 30; rerender(); }
     else if (act === "oc-toggle") store.toggleOccasion(el.dataset.oc, el.dataset.friend, el.dataset.note);
+    else if (act === "greet-tick") store.toggleOccasion(id, el.dataset.friend, el.dataset.note, { silent: true });
+    else if (act === "greet-edit") openEditor({ kind: "greet", key: el.dataset.k }, "[data-greet-q]");
     else if (act === "kd-x") { const list = F.parseDates(person()?.more?.[spName("dates")]); list.splice(Number(el.dataset.i), 1); setSpecial("dates", F.formatDates(list)); }
     else if (act === "todo-done") { doneFor = id; rerender(); afterRender(() => document.querySelector(".fdone input")?.select()); }
     else if (act === "done-cancel") { doneFor = ""; rerender(); }
@@ -458,6 +484,13 @@ export function initFriends(rerender) {
     if (!x.rows.length || stuck(x, form.rows.value)) { form.rows.focus(); return; }
     closeModal();
     store.importFriends(x.rows, x.added);
+  });
+
+  // ---- 这个节问候谁：勾了就存，搜索只是藏起对不上的（框里的勾不重画） ----
+  on(document, "change", ".greet-editor [data-greet-who]", (e, el) => store.setGreet(el.dataset.greetWho, el.closest("[data-k]").dataset.k, el.checked));
+  on(document, "input", ".greet-editor [data-greet-q]", (e, el) => {
+    const needle = low(el.value);
+    el.closest(".greet-editor").querySelectorAll("[data-name]").forEach((x) => { x.hidden = !x.dataset.name.includes(needle); });
   });
 
   // ---- 字段清单 ----

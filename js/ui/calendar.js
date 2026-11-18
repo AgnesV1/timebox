@@ -51,9 +51,13 @@ function blockHTML(b, d, pool) {
   const spent = b.row ? E.spentMin(b.row) : 0;
   const st = b.row?.status || (lines.length && lines.every((t) => t.status === "done") ? "done" : "open");
   const name = b.row?.title || plan.name, list = lines.map(li).join("");
+  // 排计划时只有那一行、下面没有项：分钟写在名字右边（拖进来带着默认时间，一眼看得到）
+  const head = pool && !lines.length && Number(b.row?.est) > 0
+    ? '<span class="li"><span class="bt">' + esc(name) + '</span><i class="lm num">' + Number(b.row.est) + "</i></span>"
+    : '<span class="bt">' + esc(name) + "</span>";
   return '<div class="ev blk' + (pool ? " blk-ls" : "") + " st-" + st + (b.row?.optional ? " opt" : "") + '" role="button" tabindex="0" data-drag="blk:' + esc(plan.id) + "|" + d + '" data-act="open-day" data-date="' + d + '" style="--c:' + esc(plan.color || "var(--c-None)") + '" title="' +
     esc(name + (name !== plan.name ? " · " + plan.name : "") + (lines.length ? " · " + lines.length + " thing" + (lines.length > 1 ? "s" : "") : "") + (spent ? " · " + fmtHours(spent) + " logged" : "")) + '">' +
-    '<span class="t"><span class="bt">' + esc(name) + "</span>" + (pool ? list : "") + "</span>" +
+    '<span class="t">' + head + (pool ? list : "") + "</span>" +
     (!pool && lines.length ? '<div class="full"><span class="bt">' + esc(name) + "</span>" + list + "</div>" : "") + "</div>";
 }
 
@@ -240,8 +244,8 @@ export function poolHTML(c) {
   groupsOf(groups.map((g) => g.plan)).forEach((pg) => pg.subs.forEach((p) => {
     const { items } = groups.find((g) => g.plan === p);
     if (pg.name !== lastGroup) { lastGroup = pg.name; if (pg.name) h += '<div class="pg-group">' + esc(pg.name) + "</div>"; }
-    const min = items.reduce((a, x) => a + (Number(x.item.est) || 0) * (Number.isFinite(x.count.left) ? x.count.left : 0), 0);
-    h += '<section class="pg"><div class="pg-head pg-plan" data-drag="plan:' + esc(p.id) + '" role="button" tabindex="0" aria-haspopup="listbox" title="Drag onto a day: ' + esc(p.name) + ' that day" style="--pc:' + esc(p.color) + '"><i></i><span>' + esc(p.name) + "</span><em>" + (items.length ? (min ? fmtHours(min) : items.length + " left") : "any day") + "</em></div>";
+    const min = items.reduce((a, x) => a + L.estOf(x.item, p) * (Number.isFinite(x.count.left) ? x.count.left : 0), 0);
+    h += '<section class="pg"><div class="pg-head pg-plan" data-drag="plan:' + esc(p.id) + '" role="button" tabindex="0" aria-haspopup="listbox" title="Drag onto a day: ' + esc(p.name) + ' that day" style="--pc:' + esc(p.color) + '"><i></i><span>' + esc(p.name) + "</span><em>" + (items.length ? (min ? fmtHours(min) : items.length + " left") : L.sizeOf(L.planMin(p)) || "any day") + "</em></div>";
     let mod = null;
     for (const x of items) {
       if ((x.item.module || "") !== mod) { mod = x.item.module || ""; if (mod) h += '<div class="pg-mod">' + esc(mod) + "</div>"; }
@@ -249,7 +253,7 @@ export function poolHTML(c) {
       const label = carry ? x.item.title + " · " + carry.steps.length + " step" + (carry.steps.length > 1 ? "s" : "") + " left" : x.item.title;
       // 计划开了 Items have a month 的，写上那一项的月份（提前一个月就出现在这里了）
       const month = p.rule?.months && /^\d{4}-\d{2}$/.test(x.cfg.month || "") ? MONTHS[Number(x.cfg.month.slice(5, 7)) - 1] + (x.cfg.month.slice(0, 4) !== c.today.slice(0, 4) ? " " + x.cfg.month.slice(0, 4) : "") : "";
-      const meta = [L.sizeOf(x.item.est), x.cfg.n > 1 ? x.count.left + " left" : x.cfg.n === 0 ? "any" : "", x.cfg.perWeek ? "wk " + x.week.placed + "/" + x.cfg.perWeek : "", month].filter(Boolean).join(" · ");
+      const meta = [L.sizeOf(L.estOf(x.item, p)), x.cfg.n > 1 ? x.count.left + " left" : x.cfg.n === 0 ? "any" : "", x.cfg.perWeek ? "wk " + x.week.placed + "/" + x.cfg.perWeek : "", month].filter(Boolean).join(" · ");
       h += '<div class="pi" data-drag="item:' + esc(x.item.id) + '" role="button" tabindex="0" aria-haspopup="listbox" style="--c:' + esc(p.color) + '" title="' + esc(x.cfg.note || "") + '"><i class="g"></i><span>' + esc(label) + '</span><b class="num">' + esc(meta) + "</b></div>";
     }
     h += "</section>";

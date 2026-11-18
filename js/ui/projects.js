@@ -218,10 +218,11 @@ function daysFields(p) {
     '<label class="field"><span>Ends (empty = keeps going)</span><input type="date" data-rf="end" value="' + esc(r.end || "") + '"></label></div>';
 }
 
-// 拖到哪天的：about N a week（只是参考数，卡片和 Pool 里显示这周几次）、起止（卡片上写第几天）
+// 拖到哪天的：默认分钟（计划和没写时间的项拖过去就是这么久）、about N a week（只是参考数，卡片和 Pool 里显示这周几次）、起止（卡片上写第几天）
 function dragFields(p) {
   const r = R.ruleOf(p);
-  return '<div class="field-row three"><label class="field"><span>About … a week</span><input class="num" type="number" min="0" max="21" data-rf="perWeek" value="' + (Number(r.perWeek) > 0 ? Number(r.perWeek) : "") + '" placeholder="—"></label>' +
+  return '<div class="field-row four"><label class="field" title="What this plan, and any item without its own time, gets when you drag it onto a day"><span>Default minutes</span><input class="num" type="number" min="0" step="5" data-rf="min" value="' + (Number(r.min) > 0 ? Number(r.min) : "") + '" placeholder="—"></label>' +
+    '<label class="field"><span>About … a week</span><input class="num" type="number" min="0" max="21" data-rf="perWeek" value="' + (Number(r.perWeek) > 0 ? Number(r.perWeek) : "") + '" placeholder="—"></label>' +
     '<label class="field"><span>From (optional)</span><input type="date" data-pf="start" value="' + esc(p.start || "") + '"></label>' +
     '<label class="field"><span>To (optional)</span><input type="date" data-pf="deadline" value="' + esc(p.deadline || "") + '"></label></div>' +
     // 小项目带月份（她 2026-11-05 晚要的）：只有 When I drag it 的计划有；开了以后点开一项能挑月份，那个月的前一个月起才进 Pool
@@ -252,7 +253,7 @@ function itemRowHTML(x) {
   const wait = L.waiting(x.cfg, x.plan, store.today());
   return '<div class="ls-it' + (x.cfg.later ? " later" : "") + (wait ? " waiting" : "") + '" data-item="' + esc(x.item.id) + '" data-act="item-open" role="button" tabindex="0"' + (wait ? ' title="Not in the Pool yet"' : "") + ">" +
     '<span class="ls-nm">' + esc(x.item.title) + (x.cfg.note ? '<span class="ls-nt">' + esc(x.cfg.note.split("\n")[0] + (x.cfg.note.includes("\n") ? " …" : "")) + "</span>" : "") + "</span>" +
-    '<span class="ls-n">' + L.sizeOf(x.item.est) + '</span><span class="ls-n">' + timesText(x.cfg.n) + '</span><span class="ls-n">' + esc(extraText(x)) + "</span></div>";
+    '<span class="ls-n">' + L.sizeOf(L.estOf(x.item, x.plan)) + '</span><span class="ls-n">' + timesText(x.cfg.n) + '</span><span class="ls-n">' + esc(extraText(x)) + "</span></div>";
 }
 
 // 这一项的月份：月、年两个下拉（「—」= 没有）；计划开了 Items have a month 才有
@@ -271,7 +272,7 @@ function itemOpenHTML(x) {
   const id = esc(x.item.id), noteRows = String(x.cfg.note || "").split("\n").length;
   const used = x.count.done ? x.count.done + " done" + (x.count.open ? " · " + x.count.open + " on a day" : "") : x.count.open ? x.count.open + " on a day" : "Not started";
   return '<div class="ls-it open" data-item="' + id + '"><input data-lf="title" value="' + esc(x.item.title) + '" aria-label="Name">' +
-    '<input class="num" type="number" min="0" step="5" data-lf="est" value="' + (Number(x.item.est) || "") + '" placeholder="min" aria-label="About how many minutes">' +
+    '<input class="num" type="number" min="0" step="5" data-lf="est" value="' + (Number(x.item.est) || "") + '" placeholder="' + (L.planMin(x.plan) || "min") + '" aria-label="About how many minutes">' +
     '<input data-lf="n" value="' + (x.cfg.n === 1 ? "" : x.cfg.n === 0 ? "any" : x.cfg.n) + '" placeholder="Once" aria-label="How many times: a number, or any">' +
     '<input class="num" type="number" min="0" max="21" data-lf="perWeek" value="' + (x.cfg.perWeek || "") + '" placeholder="— /wk" aria-label="About how many a week"></div>' +
     '<div class="ls-ex" data-item="' + id + '"><label class="field"><span>Note</span><textarea data-lf="note" rows="' + Math.min(10, Math.max(3, noteRows)) + '">' + esc(x.cfg.note) + "</textarea></label>" +
@@ -297,7 +298,7 @@ function poolEditHTML(c, p) {
   const live = st.filter((x) => !x.cfg.later), later = st.length - live.length;
   const waits = live.filter((x) => L.waiting(x.cfg, p, store.today())).length;   // 算在这个计划里，只是还没进日历上的 Pool
   const times = live.reduce((a, x) => a + (x.cfg.n > 0 ? x.cfg.n : 0), 0);
-  const min = live.reduce((a, x) => a + (Number(x.item.est) || 0) * (x.cfg.n > 0 ? x.cfg.n : 1), 0);
+  const min = live.reduce((a, x) => a + L.estOf(x.item, p) * (x.cfg.n > 0 ? x.cfg.n : 1), 0);
   h += '<div class="ls-ph">Pool <small>' + [live.length + " item" + (live.length === 1 ? "" : "s"), times ? times + " times" : "", min ? "≈" + fmtHours(min) : "", later ? later + " later" : "", waits ? waits + " waiting for its month" : ""].filter(Boolean).join(" · ") + "</small></div>";
   const secs = [];
   for (const x of st) {
@@ -458,6 +459,8 @@ export function refreshProjectEditor(force = false) {
   if (editing) redraw(force);
 }
 
+const wholeMin = (v) => Math.max(0, Math.round(Number(v) || 0));
+
 // 新建：固定星期几的至少要有一天有分钟数
 function createPlan(box) {
   readDraft(box);
@@ -466,7 +469,7 @@ function createPlan(box) {
   const auto = draft.place === "auto", r = draft.rule || {};
   const start = r.start || store.today(), end = R.clampEnd(start, r.end || "");
   const base = { deep: Boolean(r.deep), notes: String(draft.notes || "") };
-  const rule = auto ? { days: r.days || [0, 0, 0, 0, 0, 0, 0], start, end, ...base } : { perWeek: Math.max(0, Math.round(Number(r.perWeek) || 0)), min: 0, ...base };
+  const rule = auto ? { days: r.days || [0, 0, 0, 0, 0, 0, 0], start, end, ...base } : { perWeek: wholeMin(r.perWeek), min: wholeMin(r.min), ...base };
   if (auto && !rule.days.some((v) => v > 0)) { box.querySelector("[data-rday]")?.focus(); return; }
   editing = store.saveProject({ name, group: String(draft.group || "").trim(), color: draft.color, kind: "regular", place: auto ? "auto" : "pool", rule,
     start: auto ? "" : draft.start || "", deadline: auto ? "" : draft.deadline || "" });
@@ -480,7 +483,7 @@ function pasteGo(box) {
   const laterOf = (name) => Boolean(later[name]);
   if (!editing) {
     readDraft(box);
-    const res = store.pastePlan(paste.text, { group: String(draft?.group || "").trim(), name: String(draft?.name || "").trim(), laterOf });
+    const res = store.pastePlan(paste.text, { group: String(draft?.group || "").trim(), name: String(draft?.name || "").trim(), laterOf, min: wholeMin(draft?.rule?.min) });
     if (!res) return;
     editing = res.planId;
     draft = null;
@@ -602,7 +605,7 @@ export function initProjects(rerender) {
     refreshProjectEditor();
   });
 
-  // 规则：星期几的分钟数、开始 / 结束、about N a week（空 = 不定）
+  // 规则：星期几的分钟数、开始 / 结束、默认分钟、about N a week（空 = 不定）
   on(document, "change", ".project-editor [data-rf], .project-editor [data-rday]", (e, el) => {
     const pid = el.closest("[data-pid]").dataset.pid;
     const p = pid && store.get("projects", pid);
@@ -611,7 +614,7 @@ export function initProjects(rerender) {
     if (el.dataset.rday !== undefined) rule.days = readDays(el.closest(".project-editor"));
     else {
       const f = el.dataset.rf;
-      rule[f] = f === "perWeek" ? Math.max(0, Math.round(Number(el.value) || 0)) : el.value;
+      rule[f] = f === "perWeek" || f === "min" ? wholeMin(el.value) : el.value;
       rule.end = R.clampEnd(rule.start || store.today(), rule.end || "");
     }
     store.saveProject({ id: pid, rule });

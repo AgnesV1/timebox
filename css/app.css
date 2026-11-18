@@ -500,8 +500,8 @@ body.side-min .sync-pill span { display: none; }
 .ls-step { font-size: 13px; }
 .ls-cb { position: relative; flex: none; width: 15px; height: 15px; display: grid; place-items: center; padding: 0; border: 1.5px solid var(--muted); border-radius: 4px; background: transparent; color: transparent; font-size: 10px; line-height: 1; }
 .ls-cb::after { content: ""; position: absolute; inset: -6px; }   /* 手指好点：点得到的地方比画出来的大一圈 */
-.ls-ln.done > .ls-cb, .ls-step.done > .ls-cb { border-color: var(--ink); background: var(--ink); color: var(--accent); }
-[data-theme="dark"] .ls-ln.done > .ls-cb, [data-theme="dark"] .ls-step.done > .ls-cb { border-color: var(--accent); background: var(--accent); color: var(--bg); }
+.ls-ln.done > .ls-cb, .ls-step.done > .ls-cb, .greet-p.done > .ls-cb { border-color: var(--ink); background: var(--ink); color: var(--accent); }
+[data-theme="dark"] .ls-ln.done > .ls-cb, [data-theme="dark"] .ls-step.done > .ls-cb, [data-theme="dark"] .greet-p.done > .ls-cb { border-color: var(--accent); background: var(--accent); color: var(--bg); }
 .ls-ln .ls-tx { flex: 1; min-width: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
 .ls-step .ls-tx { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .ls-ln .ls-tx small { margin-left: 4px; font-size: 11.5px; color: var(--muted); }
@@ -772,7 +772,9 @@ body.modal-open { overflow: hidden; }
 .field.small input { max-width: 120px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .field-row.three { grid-template-columns: 1fr 1fr 1fr; }
-@media (max-width: 560px) { .field-row, .field-row.three { grid-template-columns: 1fr; } }
+.field-row.four { grid-template-columns: .8fr .8fr 1fr 1fr; }
+@media (max-width: 720px) { .field-row.four { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .field-row, .field-row.three, .field-row.four { grid-template-columns: 1fr; } }
 .check { display: flex; align-items: center; gap: 9px; margin: 4px 0 14px; font-size: 14px; }
 .check input { width: 18px; height: 18px; accent-color: var(--ink); }
 [data-theme="dark"] .check input { accent-color: var(--accent); }
@@ -2272,6 +2274,20 @@ body.phone .wchip button { width: 22px; height: 22px; font-size: 17px; }
 @media (hover: hover) { .ochip:hover { background: var(--surface2); } }
 .ochip.done { background: var(--surface); color: var(--muted); text-decoration: line-through; }
 .ochip .og { font-weight: 500; color: var(--muted); }
+/* 问候清单：节的那一行和 Coming up 一样，底下一格一个人，方框和今天页勾项目的是同一个 */
+.oc-head .greet-n { font: 500 11.5px var(--num); color: var(--muted); }
+.greet-who { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 0 10px; align-items: start; padding-left: 56px; }
+.greet-p { display: flex; align-items: flex-start; gap: 6px; min-width: 0; padding: 3px 0; border: 0; background: none; font-size: 12.5px; line-height: 15px; text-align: left; }
+.greet-p span { min-width: 0; overflow-wrap: anywhere; }
+.greet-p.done span { color: var(--muted); text-decoration: line-through; }
+@media (hover: hover) { .greet-p:hover .ls-cb { border-color: var(--ink); } [data-theme="dark"] .greet-p:hover .ls-cb { border-color: var(--accent); } }
+.greet-edit { justify-self: start; padding: 3px 0; font-size: 12px; line-height: 15px; }
+.greet-q { width: 100%; max-width: 260px; margin-bottom: 10px; padding: 6px 11px; border: var(--b-ctl); border-radius: 999px; font-size: 13px; }
+.greet-all { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 2px 12px; max-height: 56vh; overflow-y: auto; }
+.greet-all .check { margin: 0; padding: 4px 2px; font-size: 13.5px; }
+.greet-all .check[hidden] { display: none; }
+.greet-all .check input { flex: none; }
+.greet-all .check span { min-width: 0; overflow-wrap: anywhere; }
 .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
 .fgrid textarea { min-height: 34px; resize: vertical; }
 @media (max-width: 560px) { .fgrid { grid-template-columns: 1fr; } }

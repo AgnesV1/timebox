@@ -1,4 +1,4 @@
-// 日历的 Year 视图：那天红不红（dayLoad）、一年每天的样子（yearDays）、中了哪几层、字用黑还是白
+// 日历的 Year 视图：那天红不红（dayLoad）、一年每天的样子（yearDays）、两种分档、长条怎么排、第二条画什么、字用黑还是白
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as Y from "../js/year.js";
@@ -60,10 +60,21 @@ test("yearDays: holiday means a public holiday or a day marked off; commute come
   assert.equal(day(c, "2026-03-04").commute, false);
 });
 
-test("yearDays: over is 2 past the box, 1 past 7 hours, and red stays off gold days", () => {
-  const tasks = [{ id: "a", date: "2026-03-04", actual: 601 }, { id: "b", date: "2026-03-05", actual: 421 }, { id: "c", date: "2026-03-06", actual: 420 }, { id: "d", date: "2026-03-09", actual: 700 }];
-  const c = ctx({ tasks, superRest: { days: { "2026-03-09": true } } });
-  assert.deepEqual(["2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09"].map((d) => day(c, d).over), [2, 1, 0, 0]);
+test("yearDays: minutes per group, and Build + Work + Chores added up for the first strip", () => {
+  const groups = [{ name: "Build", color: "#3E8E6E" }, ...GROUPS, { name: "Leisure", color: "#E07A2B" }];
+  const c = ctx({ groups, tasks: [
+    { id: "a", date: "2026-03-04", actual: 90, group: "Build" },
+    { id: "b", date: "2026-03-04", actual: 30, group: "Build" },
+    { id: "c", date: "2026-03-04", actual: 60, group: "Work" },
+    { id: "chore-2026-03-04", date: "2026-03-04", actual: 15, status: "done", group: "Chores" },
+    { id: "d", date: "2026-03-04", actual: 120, group: "Leisure" },
+    { id: "e", date: "2026-03-04", actual: 45, group: "Fitness" },
+    { id: "f", date: "2026-03-04", est: 300, group: "Work" }] });
+  const d = day(c, "2026-03-04");
+  assert.deepEqual(d.mins, { Build: 120, Work: 60, Chores: 15, Leisure: 120, Fitness: 45 }, "logged time only");
+  assert.equal(d.core, 195, "Leisure and Fitness stay out of the total");
+  assert.deepEqual([day(c, "2026-03-07").weekend, d.weekend], [true, false]);
+  assert.equal(day(ctx({ superRest: { days: { "2026-03-04": true } } }), "2026-03-04").gold, true);
 });
 
 test("yearDays: a group lights up only with logged time, through a plan or directly, and stays in its own year", () => {
@@ -77,33 +88,63 @@ test("yearDays: a group lights up only with logged time, through a plan or direc
   assert.deepEqual([...day(c, "2026-03-04").groups].sort(), ["Fitness", "Work"]);
   assert.equal(day(c, "2026-03-05").groups.size, 0, "planned but not done");
   assert.deepEqual([...day(c, "2026-03-06").groups], ["Chores"], "the Chore key counts as having done chores");
-  assert.equal(Y.yearCounts(Y.yearDays(c, 2026), GROUPS)["g:Work"], 1);
+  assert.equal(Y.yearDays(c, 2026).filter((d) => d.groups.has("Work")).length, 1);
 });
 
-test("hitsOf: only the open layers, in painting order; over 7 hours isn't filled", () => {
-  const d = { date: "2026-03-04", rest: true, holiday: "Day off", commute: true, over: 2, groups: new Set(["Fitness", "Work"]) };
-  assert.deepEqual(Y.hitsOf(d, new Set(["days", "over", "g:Work", "g:Fitness"]), GROUPS), ["over", "rest", "holiday", "commute", "g:Work", "g:Fitness"]);
-  assert.deepEqual(Y.hitsOf(d, new Set(["g:Fitness"]), GROUPS), ["g:Fitness"]);
-  assert.deepEqual(Y.hitsOf({ ...d, over: 1 }, new Set(["over"]), GROUPS), []);
-  assert.deepEqual(Y.hitsOf(d, new Set(), GROUPS), []);
+test("yearDays: Friends cuts across groups: a task done with someone lights it, whatever its group", () => {
+  const groups = [...GROUPS, { name: "Leisure", color: "#E07A2B", friends: true }, { name: "Friends", color: "#8B62AE", friends: true }];
+  const on = (id, date, x = {}) => ({ id, date, group: "Leisure", ...x });
+  const meets = ["a", "b", "c", "d", "e"].map((id) => ({ id: "mt:" + id, taskId: id, friends: ["ana"] }));
+  const tasks = [
+    on("a", "2026-03-02", { status: "done" }),
+    on("b", "2026-03-03", { actual: 90 }),
+    on("c", "2026-03-04"),
+    on("d", "2026-03-05", { actual: 30, status: "delay" }),
+    on("e", "2026-03-06", { status: "drop" }),
+    on("f", "2026-03-09", { actual: 60 })];
+  const c = ctx({ groups, tasks, meets: [...meets, { id: "mt:f", taskId: "f", friends: [] }, { id: "x", date: "2026-03-10", friends: ["ana"], taskId: "" }] });
+  const names = (d) => [...day(c, d).groups].sort();
+  assert.deepEqual(names("2026-03-02"), ["Friends"], "Done with someone, no time logged");
+  assert.deepEqual(names("2026-03-03"), ["Friends", "Leisure"], "time logged with someone: both");
+  assert.deepEqual(names("2026-03-04"), [], "planned, not done");
+  assert.deepEqual(names("2026-03-05"), ["Leisure"], "delayed: it didn't happen with them");
+  assert.deepEqual(names("2026-03-06"), [], "dropped");
+  assert.deepEqual(names("2026-03-09"), ["Leisure"], "nobody picked");
+  assert.deepEqual(names("2026-03-10"), [], "a catch-up noted on the Friends page isn't a task");
+  assert.equal(Y.yearDays(c, 2026).filter((d) => d.groups.has("Friends")).length, 2);
+  const renamed = ctx({ groups: [{ name: "Leisure", color: "#E07A2B" }, { name: "People", color: "#8B62AE", friends: true }], tasks, meets });
+  assert.deepEqual([...day(renamed, "2026-03-02").groups], ["People"], "a renamed Friends group is the one that can pick people");
+  assert.deepEqual([...day(ctx({ tasks, meets }), "2026-03-02").groups], [], "no such group: nothing to light");
 });
 
-test("rest and holiday are frames, commute, Work and Chores are dots, everything else fills the day", () => {
-  const shapes = (hits) => hits.map((h) => h + ":" + Y.shapeOf(h));
-  const d = { date: "2026-03-04", rest: true, holiday: "Day off", commute: true, over: 2, groups: new Set(["Work", "Chores", "Fitness", "Build"]) };
-  const hits = Y.hitsOf(d, new Set(["days", "over", "g:Work", "g:Chores", "g:Fitness"]), [...GROUPS, { name: "Build", color: "#3E8E6E" }]);
-  assert.deepEqual(shapes(hits), ["over:fill", "rest:frame", "holiday:frame", "commute:dot", "g:Work:dot", "g:Fitness:fill", "g:Chores:dot"]);
-  assert.equal(Y.shapeOf("g:Build"), "fill");
-  assert.deepEqual(Y.DOTS, ["g:Work", "g:Chores", "commute"], "fixed spots, top to bottom");
+test("coreLevel: five steps up to 7 hours, red only past them, and never on a gold day", () => {
+  assert.deepEqual([0, 1, 84, 85, 168, 336, 337, 420].map((m) => Y.coreLevel(m)), [0, 1, 1, 2, 2, 4, 5, 5]);
+  assert.equal(Y.coreLevel(421), Y.OVER_LEVEL, "just past 7 hours");
+  assert.equal(Y.coreLevel(421, true), 5, "a gold day stays at the brightest step");
+  assert.equal(Y.coreLevel(undefined), 0);
 });
 
-test("yearCounts: a day counts once per layer; over 7 hours counts as overworked", () => {
-  const days = [
-    { rest: true, holiday: "x", commute: true, over: 0, groups: new Set(["Work"]) },
-    { rest: false, holiday: "", commute: false, over: 1, groups: new Set(["Work", "Fitness"]) },
-    { rest: false, holiday: "", commute: false, over: 2, groups: new Set() },
-    { rest: false, holiday: "", commute: false, over: 0, groups: new Set() }];
-  assert.deepEqual(Y.yearCounts(days, GROUPS), { days: 1, over: 2, "g:Work": 2, "g:Fitness": 1, "g:Chores": 0 });
+test("heatLevel: one step an hour, topping out at 5 hours", () => {
+  assert.deepEqual([0, undefined, 1, 60, 61, 240, 241, 300, 999].map(Y.heatLevel), [0, 0, 1, 1, 2, 4, 5, 5, 5]);
+});
+
+test("stripLayout: one column a week, the year starting on its own weekday's row", () => {
+  const y = Y.stripLayout(2026);
+  assert.deepEqual([y.start, y.first, y.weeks], ["2025-12-29", 4, 53], "1 Jan 2026 is a Thursday");
+  assert.deepEqual([y.months[0], y.months[1], y.months[11]], [{ month: 0, date: "2026-01-01", col: 1 }, { month: 1, date: "2026-02-01", col: 5 }, { month: 11, date: "2026-12-01", col: 49 }]);
+  const sunday = Y.stripLayout(2026, "sunday");
+  assert.deepEqual([sunday.start, sunday.first], ["2025-12-28", 5]);
+  assert.equal(Y.stripLayout(2040).weeks, 54, "a leap year starting on a Sunday touches 54 weeks");
+});
+
+test("marksOf: Fitness and Chores are dots, every other group fills, in the groups' order", () => {
+  const groups = [{ name: "Build" }, { name: "Work" }, { name: "Friends" }, { name: "Leisure" }, { name: "Fitness" }, { name: "Chores" }, { name: "Garden" }];
+  const m = Y.marksOf({ groups: new Set(["Leisure", "Work", "Fitness", "Chores", "Garden"]), commute: true, rest: true, weekend: false, holiday: "" }, groups);
+  assert.deepEqual(m.fills.map((g) => g.name), ["Work", "Leisure", "Garden"]);
+  assert.deepEqual([m.fitness, m.chores, m.commute, m.rest, m.soft], [true, true, true, true, false]);
+  const quiet = (x) => Y.marksOf({ groups: new Set(), commute: false, rest: false, weekend: false, holiday: "", ...x }, groups);
+  assert.deepEqual([quiet({}).soft, quiet({ weekend: true }).soft, quiet({ holiday: "Canada Day" }).soft], [false, true, true], "weekends and holidays have pale digits");
+  assert.deepEqual([quiet({}).fills, quiet({}).fitness, quiet({}).chores, quiet({}).commute], [[], false, false, false]);
 });
 
 test("inkOn: black or white, whichever the hardest stripe can still carry", () => {

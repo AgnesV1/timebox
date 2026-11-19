@@ -505,6 +505,8 @@ export function buildGroup(ctx) {
   const list = ctx.groups || [];
   return (list.find((g) => g.name === "Build") || list.find((g) => GR.trackOf(g) === "progress"))?.name || "";
 }
+// Build + Work + Chores（大类清单里有的才算）：本月目标和日历 Year 的总量都看这几个，和 Stats 顶上那条同一个说法
+export const coreGroups = (ctx) => [...new Set([buildGroup(ctx), "Work", "Chores"])].filter((x) => x && (ctx.groups || []).some((g) => g.name === x));
 // 本月目标（Stats 顶上那条右边，她 2026-11-05 要的）：到昨天为止本该做到「目标 × 过了几天 ÷ 本月天数」，
 // 实际比它多就是正的、少就是负的；今天做的算超出，1 号是 0。都是分钟
 export function monthGap(goal, done, today) {

@@ -75,6 +75,15 @@ function applyTheme() {
 
 // ---------- 侧栏（电脑） ----------
 
+// 日历的周 / 月视图开着 Pool：地方不够，左栏自动收成一列图标（她 2026-11-18 要的）。她自己存的开关不动：关了 Pool、换到 Year、离开日历就回到原样。
+// 这时点 › = 这一次先展开着（sideKept），到上面那几种时候就忘掉
+let sideKept = false;
+const poolOpen = (view) => view === "calendar" && Boolean(store.local().pool) && store.local().calMode !== "year";
+function sideFolded(view) {
+  if (!poolOpen(view)) { sideKept = false; return Boolean(store.local().sideMin); }
+  return !sideKept;
+}
+
 function sidebarHTML(c, view) {
   const todayOpen = c.tasks.filter((t) => t.date === c.today && !t.status).length;
   const deals = Meal.toCheck(store.meals(), c.today).length;   // 这一轮还没看的打折
@@ -88,7 +97,7 @@ function sidebarHTML(c, view) {
   const link = ([v, t, n]) => '<a href="#' + v + '" class="' + (view === v ? "on" : "") + '" title="' + t + '">' + (view === v ? '<i class="snav-pill" aria-hidden="true"></i>' : "") + icon(v) + "<span>" + t + "</span>" + (n ? "<b>" + n + "</b>" : "") + "</a>";
   const st = sync.getStatus();
   // 收起来只剩一列图标（记在这台设备上）：名字放进 title，角标缩成一个点
-  const min = Boolean(store.local().sideMin);
+  const min = sideFolded(view);
   return '<div class="brand">' + ballHTML() + "<h1>苦昼短</h1>" +
     '<button type="button" class="icon-btn side-tog" data-act="side-toggle" aria-expanded="' + !min + '" aria-label="' + (min ? "Show" : "Hide") + ' the sidebar labels" title="' + (min ? "Expand" : "Collapse") + '">' + icon(min ? "right" : "left") + "</button></div>" +
     '<nav class="snav">' + blocks.map(([b, g, fallback, links]) => '<div class="sblock" data-b="' + b + '" style="--tint:' + esc(tint(g, fallback)) + '">' + links.map(link).join("") + "</div>").join("") + "</nav>" +
@@ -179,7 +188,7 @@ function draw() {
   const view = route();
   document.body.dataset.view = view;
   document.body.classList.toggle("phone", phone);
-  document.body.classList.toggle("side-min", !phone && Boolean(store.local().sideMin));
+  document.body.classList.toggle("side-min", !phone && sideFolded(view));
   const kept = captureKeep();
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
   if (!phone) spend.view(view === "spending");   // 电脑看着 Spending 时每次同步都带上记账（js/spend.js 的 due；手机上是拉下来那页自己说）
@@ -193,7 +202,7 @@ function draw() {
   reading.want(view === "reading");
   if (view === "reading" && lastView !== "reading" && sync.configured()) sync.sync();
   lastView = view;
-  const showPool = !phone && view === "calendar" && store.local().pool && store.local().calMode !== "year";   // Year 上不排东西，开关本身不动
+  const showPool = !phone && poolOpen(view);   // Year 上不排东西，开关本身不动
   pool.hidden = !showPool;
   pool.innerHTML = showPool ? poolHTML(c) : "";
   const hadDock = document.body.classList.contains("has-dock");
@@ -372,7 +381,10 @@ on(document, "click", "[data-act=theme-flip]", () => {
 // 点分段开关：这次重画算用户点的（选中的那块滑过去）；那个开关自己已经要了别的过渡的，不改它
 on(document, "click", "#main .seg > button", () => animateSoft());
 initEdgeGlow();
-on(document, "click", "[data-act=side-toggle]", () => store.setLocal({ sideMin: !store.local().sideMin }));
+on(document, "click", "[data-act=side-toggle]", () => {
+  if (poolOpen(route())) { sideKept = !sideKept; render(); }
+  else store.setLocal({ sideMin: !store.local().sideMin });
+});
 
 // 装到主屏后没网也能打开（只在 https 上，也就是 GitHub Pages）。网页本身用存着的那份秒开（sw.js）；
 // 新版装好、接管了（controllerchange）：打开以后还没碰过屏幕 / 键盘就直接刷新成新版，碰过了只弹一句、点 Reload 再刷（不打断正在做的）

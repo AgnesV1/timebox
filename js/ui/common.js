@@ -10,6 +10,35 @@ import { zebraFor } from "../patterns.js";
 
 export const STATUS = [["done", "Done"], ["delay", "Delay"], ["drop", "Drop"]];
 
+// 图表的读数小框（页面上一个 #ctip，Stats 建的；日历 Year 也用）：data = { title, rows: [[名字, 值, 小方块的 class, 颜色]] }，浮在 anchor 上面
+export function showChartTip(anchor, data) {
+  const tip = document.getElementById("ctip");
+  if (!tip) return;
+  tip.textContent = "";
+  const title = document.createElement("p");
+  title.className = "tt";
+  title.textContent = data.title;
+  tip.appendChild(title);
+  for (const [name, value, cls, color] of data.rows) {
+    const row = document.createElement("p");
+    const k = document.createElement("i");
+    k.className = "k " + cls;
+    if (color) k.style.background = color;
+    const v = document.createElement("b");
+    v.textContent = value;
+    row.append(k, v, " " + name);
+    tip.appendChild(row);
+  }
+  tip.hidden = false;
+  const b = anchor.getBoundingClientRect(), t = tip.getBoundingClientRect();
+  const x = Math.max(8, Math.min(innerWidth - t.width - 8, b.left + b.width / 2 - t.width / 2));
+  tip.style.transform = "translate(" + x + "px," + Math.max(8, b.top - t.height - 8) + "px)";
+}
+export function hideChartTip() {
+  const tip = document.getElementById("ctip");
+  if (tip) tip.hidden = true;
+}
+
 // 侧栏左上 / 手机顶栏的那颗日月：白天是太阳、夜里是月亮（颜色在 css 的 .ball），点一下换白天 / 夜里（js/main.js）。
 // 上面一层镜面球的细格：纬线不动，八条经线各自走到下一条的位置（--a → --b 是这一格起止的 sin 值），首尾相接，看着就是球绕着竖轴在转
 const RAD = Math.PI / 180;

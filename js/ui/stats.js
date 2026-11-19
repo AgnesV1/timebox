@@ -14,7 +14,7 @@ import * as S from "../stats.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
 import { fmtHours, fmtShort, fmtDay, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf } from "../dates.js";
-import { groupsOf } from "./common.js";
+import { groupsOf, showChartTip, hideChartTip } from "./common.js";
 import { hourLabel, REST_BLOCK, COMMUTE_BLOCKS } from "../day.js";
 import { neon } from "../groups.js";
 
@@ -111,7 +111,7 @@ function timeStrip(s, p, b, bp, name, w, goal = "") {
 function goalHTML(c) {
   const ym = c.today.slice(0, 7), saved = store.setting("month-goal", null);
   const hours = saved?.month === ym ? Number(saved.hours) || 0 : 0;
-  const names = [...new Set([S.buildGroup(c), "Work", "Chores"])].filter((x) => x && c.groups.some((g) => g.name === x));
+  const names = S.coreGroups(c);
   const done = names.reduce((a, x) => a + S.summarize(S.onlyGroup(c, x), ym + "-01", c.today).spent, 0);
   const { gap } = S.monthGap(hours * 60, done, c.today);
   return '<span class="ss-goal">' + MONTHS[Number(ym.slice(5)) - 1] + ' goal <input class="ss-goal-in num" type="text" inputmode="decimal" autocomplete="off" data-keep="st-goal" value="' + (hours || "") + '" aria-label="This month\'s goal in hours">h' +
@@ -598,35 +598,14 @@ export function statsHTML(c) {
 function showTip(col) {
   const chart = col.closest("[data-chart]")?.dataset.chart;
   const data = tips[chart]?.[Number(col.dataset.i)];
-  const tip = document.getElementById("ctip");
-  if (!data || !tip) return;
-  tip.textContent = "";
-  const title = document.createElement("p");
-  title.className = "tt";
-  title.textContent = data.title;
-  tip.appendChild(title);
-  for (const [name, value, cls, color] of data.rows) {
-    const row = document.createElement("p");
-    const k = document.createElement("i");
-    k.className = "k " + cls;
-    if (color) k.style.background = color;
-    const v = document.createElement("b");
-    v.textContent = value;
-    row.append(k, v, " " + name);
-    tip.appendChild(row);
-  }
-  tip.hidden = false;
-  const b = col.getBoundingClientRect(), t = tip.getBoundingClientRect();
-  let x = b.left + b.width / 2 - t.width / 2;
-  x = Math.max(8, Math.min(innerWidth - t.width - 8, x));
-  tip.style.transform = "translate(" + x + "px," + Math.max(8, b.top - t.height - 8) + "px)";
+  if (!data) return;
+  showChartTip(col, data);
   col.classList.add("hot");
 }
 
 function hideTip(col) {
   col?.classList.remove("hot");
-  const tip = document.getElementById("ctip");
-  if (tip) tip.hidden = true;
+  hideChartTip();
 }
 
 export function initStats(rerender) {

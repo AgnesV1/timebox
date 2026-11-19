@@ -51,7 +51,7 @@ function blank() {
     cursor: 0,     // 上次从表格拉到的时间点
     schema: SCHEMA,
     needFull: false,   // 下次同步整表重拉（本机刚升级过数据格式）
-    local: { url: "", secret: "", themeHold: null, fx: true, calMode: "week", yearLayers: ["days", "over"], pool: true, serverVersion: 0 }   // 只存在这台设备上
+    local: { url: "", secret: "", themeHold: null, fx: true, calMode: "week", yearHeat: "", pool: true, serverVersion: 0 }   // 只存在这台设备上
   };
 }
 
@@ -200,6 +200,7 @@ export function ctx() {
     projects: all("projects").sort(byOrder),
     items: all("items").sort(byOrder),
     tasks: all("tasks"),
+    meets: all("meets"),
     capacity: { default: Number(cap.default) || 0, weekly: Array.isArray(cap.weekly) ? cap.weekly : null, overrides },
     log,
     level: prefs().level !== false,

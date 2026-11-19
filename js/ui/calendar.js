@@ -115,9 +115,11 @@ const yrGroup = (c, name) => (c.groups || []).find((g) => g.name === name);
 // 第三条能切的两样（大类清单里有的），选了哪个记在这台设备上
 const heatNames = (c) => [...new Set([buildGroup(c), "Work"])].filter((n) => n && yrGroup(c, n));
 const heatName = (c) => { const list = heatNames(c), saved = store.local().yearHeat; return list.includes(saved) ? saved : list[0] || ""; };
+// Days 这一条隐藏了哪几样（记在这个浏览器里）：大类的名字，或 Y.COMMUTE、Y.REST
+const yrHidden = () => new Set(store.local().yearHide || []);
 
 // 读数小框写什么：{ title, rows: [[名字, 值, 小方块的样子, 颜色]] }
-function yearTip(kind, day, c) {
+function yearTip(kind, day, c, hidden = yrHidden()) {
   const row = (name, value = "", color = yrGroup(c, name)?.color || "") => [name, value, "dn", color];
   const time = (name) => (day.mins[name] > 0 ? fmtMin(day.mins[name]) : "");
   let rows;
@@ -128,7 +130,7 @@ function yearTip(kind, day, c) {
     const name = heatName(c);
     rows = [row(name, time(name) || "0m")];
   } else {
-    const m = Y.marksOf(day, c.groups);
+    const m = Y.marksOf(day, c.groups, hidden);
     rows = [...(day.holiday ? [row(day.holiday)] : []), ...m.fills.map((g) => row(g.name, time(g.name))),
       ...(m.fitness ? [row("Fitness", time("Fitness"))] : []), ...(m.chores ? [row("Chores", time("Chores"))] : []),
       ...(m.commute ? [row("Commute", "", "var(--ink)")] : []), ...(m.rest ? [row("Rest", "", "var(--yr-rest)")] : [])];
@@ -138,20 +140,20 @@ function yearTip(kind, day, c) {
 }
 
 // 一格。第一格用 grid-row-start 落到 1 月 1 号那一行，后面的顺着排
-function yearTile(kind, day, i, { c, shape, cursor }, cls = "", inner = "", style = "") {
-  const tip = yearTip(kind, day, c), label = tip.title + ": " + tip.rows.map(([n, v]) => (v ? v + " " : "") + n).join(", ");
+function yearTile(kind, day, i, { c, shape, cursor, hidden }, cls = "", inner = "", style = "") {
+  const tip = yearTip(kind, day, c, hidden), label = tip.title + ": " + tip.rows.map(([n, v]) => (v ? v + " " : "") + n).join(", ");
   const css = (i === 0 ? "grid-row-start:" + shape.first + ";" : "") + style;
   const classes = ["yr-d", cls, day.date > c.today ? "yr-ahead" : "", day.date === c.today ? "yr-today" : ""].filter(Boolean).join(" ");
   return '<button type="button" class="' + classes + '" data-act="open-day" data-date="' + day.date + '" tabindex="' + (day.date === cursor ? 0 : -1) + '" aria-label="' + esc(label) + '"' + (css ? ' style="' + esc(css) + '"' : "") + ">" + inner + "</button>";
 }
 
-// 第二条的一格：一样填色就是那个颜色，几样就斜着分几段；数字黑白看最难看清的那段
+// 第二条的一格：一样填色就是那个颜色，几样就斜着分几段；数字的颜色在 css 里，不跟底色变
 function detailTile(day, i, at) {
-  const m = Y.marksOf(day, at.c.groups), fills = m.fills.map((g) => g.color);
-  const ink = fills.length ? Y.inkOn(fills) : "", stop = (k) => Math.round((k * 100) / fills.length) + "%";
+  const m = Y.marksOf(day, at.c.groups, at.hidden), fills = m.fills.map((g) => g.color);
+  const stop = (k) => Math.round((k * 100) / fills.length) + "%";
   const bg = fills.length > 1 ? "linear-gradient(135deg," + fills.map((x, k) => x + " " + stop(k) + " " + stop(k + 1)).join(",") + ")" : fills[0] || "";
-  const style = fills.length ? "background:" + bg + ";--yr-ink:" + ink + ";" : "";
-  const cls = ["yr-num", fills.length ? "yr-fill" : "", m.rest ? "yr-rest" : "", m.soft ? "yr-soft" : ""].filter(Boolean).join(" ");
+  const style = bg ? "background:" + bg + ";" : "";
+  const cls = ["yr-num", m.rest ? "yr-rest" : "", m.soft ? "yr-soft" : ""].filter(Boolean).join(" ");
   const dots = m.fitness || m.chores || m.commute ? '<span class="yr-pips" aria-hidden="true">' + [["fit", m.fitness], ["cho", m.chores], ["com", m.commute]].map(([k, on]) => '<i class="yr-' + k + (on ? "" : " yr-pip-off") + '"></i>').join("") + "</span>" : "";
   return yearTile("days", day, i, at, cls, Number(day.date.slice(8)) + dots, style);
 }
@@ -166,15 +168,16 @@ function yearStrip(kind, head, key, tiles, shape, vars = "") {
 
 function yearHTML(c, y) {
   const days = Y.yearDays(c, y), shape = Y.stripLayout(y, weekStart()), inYear = (d) => d && Number(d.slice(0, 4)) === y;
-  const at = { c, shape, cursor: inYear(yrCursor) ? yrCursor : inYear(c.today) ? c.today : days[0].date };
+  const at = { c, shape, hidden: yrHidden(), cursor: inYear(yrCursor) ? yrCursor : inYear(c.today) ? c.today : days[0].date };
   const scale = (to) => "<span>0</span>" + [1, 2, 3, 4, 5].map((n) => '<i class="yr-l' + n + '"></i>').join("") + "<span>" + to + "</span>";
   const item = (mark, word) => '<span class="yr-kp">' + mark + word + "</span>";
   const total = yearStrip("total", "<h3>" + esc(coreGroups(c).join(" + ")) + "</h3>", scale("7h") + item('<i class="yr-l6"></i>', "Over 7h"),
     days.map((d, i) => yearTile("total", d, i, at, "yr-l" + Y.coreLevel(d.core, d.gold))).join(""), shape);
   const fit = yrGroup(c, "Fitness")?.color || "#E6DCC3", chores = yrGroup(c, "Chores")?.color || "#6A3A22";
-  const fills = (c.groups || []).filter((g) => g.name !== "Fitness" && g.name !== "Chores").map((g) => item('<i style="background:' + esc(g.color) + '"></i>', esc(g.name))).join("");
-  const detail = yearStrip("days", "<h3>Days</h3>", fills + item('<i class="yr-fit"></i>', "Fitness") + item('<i class="yr-cho"></i>', "Chores") + item('<i class="yr-com"></i>', "Commute") + item('<i class="yr-rk"></i>', "Rest"),
-    days.map((d, i) => detailTile(d, i, at)).join(""), shape, "--fit:" + fit + ";--fit-lit:" + (neon(fit) || fit) + ";--cho:" + chores + ";--cho-lit:" + (neon(chores) || chores));
+  const showHide = (key, mark, word) => '<button type="button" class="yr-kp yr-tog" data-act="yr-toggle" data-v="' + esc(key) + '" aria-pressed="' + !at.hidden.has(key) + '">' + mark + esc(word) + "</button>";
+  const fills = (c.groups || []).filter((g) => g.name !== "Fitness" && g.name !== "Chores").map((g) => showHide(g.name, '<i style="background:' + esc(g.color) + '"></i>', g.name)).join("");
+  const detail = yearStrip("days", "<h3>Days</h3>", fills + showHide("Fitness", '<i class="yr-kd"><b class="yr-fit"></b></i>', "Fitness") + showHide("Chores", '<i class="yr-kd"><b class="yr-cho"></b></i>', "Chores") + showHide(Y.COMMUTE, '<i class="yr-kd"><b class="yr-com"></b></i>', "Commute") + showHide(Y.REST, '<i class="yr-rk"></i>', "Rest"),
+    days.map((d, i) => detailTile(d, i, at)).join(""), shape, "--fit-lit:" + (neon(fit) || fit) + ";--cho:" + chores + ";--cho-lit:" + (neon(chores) || chores));
   const pick = heatName(c), color = yrGroup(c, pick)?.color;
   const seg = '<span class="seg">' + heatNames(c).map((n) => '<button type="button" data-act="yr-heat" data-v="' + esc(n) + '"' + (n === pick ? ' class="on"' : "") + ">" + esc(n) + "</button>").join("") + "</span>";
   const heat = pick ? yearStrip("heat", seg, scale("5h"), days.map((d, i) => yearTile("heat", d, i, at, "yr-l" + Y.heatLevel(d.mins[pick]))).join(""), shape, "--day:" + color + ";--lit:" + (neon(color) || color)) : "";
@@ -261,6 +264,7 @@ export function initCalendar(rerender) {
     else if (act === "cal-mode") store.setLocal({ calMode: el.dataset.mode });
     else if (act === "cal-month") { hideChartTip(); anchor = el.dataset.date; store.setLocal({ calMode: "month" }); }   // Year 上点月份名
     else if (act === "yr-heat") store.setLocal({ yearHeat: el.dataset.v });
+    else if (act === "yr-toggle") { const hidden = yrHidden(); if (!hidden.delete(el.dataset.v)) hidden.add(el.dataset.v); store.setLocal({ yearHide: [...hidden] }); }
     else if (act === "pool-toggle") store.setLocal({ pool: !store.local().pool });
     else if (act === "edit-task") openTaskEditor(el.dataset.id);
     else if (act === "open-ghost") { const id = store.materialize(el.dataset.key); if (id) openTaskEditor(id); }

@@ -1,4 +1,4 @@
-// 日历的 Year 视图：那天红不红（dayLoad）、一年每天的样子（yearDays）、两种分档、长条怎么排、第二条画什么、字用黑还是白
+// 日历的 Year 视图：那天红不红（dayLoad）、一年每天的样子（yearDays）、两种分档、长条怎么排、第二条画什么
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as Y from "../js/year.js";
@@ -147,11 +147,11 @@ test("marksOf: Fitness and Chores are dots, every other group fills, in the grou
   assert.deepEqual([quiet({}).fills, quiet({}).fitness, quiet({}).chores, quiet({}).commute], [[], false, false, false]);
 });
 
-test("inkOn: black or white, whichever the hardest stripe can still carry", () => {
-  assert.equal(Y.inkOn(["#3F62B5"]), "#FFFFFF", "ultramarine");
-  assert.equal(Y.inkOn(["#E6DCC3"]), "#0B0B0B", "ivory");
-  assert.equal(Y.inkOn(["#C6FF00"]), "#0B0B0B", "lime");
-  assert.equal(Y.inkOn(["#FFF"]), "#0B0B0B", "short hex");
-  assert.equal(Y.inkOn(["#0B0B0B", "#E6DCC3"]), Y.inkOn(["#E6DCC3", "#0B0B0B"]), "the order of the stripes doesn't matter");
-  assert.equal(Y.inkOn(["var(--muted)"]), "#0B0B0B", "a colour it can't read is treated as mid grey");
+test("marksOf: whatever was switched off in Days is left out; pale digits stay", () => {
+  const groups = [{ name: "Build" }, { name: "Work" }, { name: "Fitness" }, { name: "Chores" }];
+  const day = { groups: new Set(["Build", "Work", "Fitness", "Chores"]), commute: true, rest: true, weekend: true, holiday: "" };
+  const m = Y.marksOf(day, groups, new Set(["Work", "Fitness", Y.COMMUTE, Y.REST]));
+  assert.deepEqual(m.fills.map((g) => g.name), ["Build"]);
+  assert.deepEqual([m.fitness, m.chores, m.commute, m.rest, m.soft], [false, true, false, false, true]);
+  assert.deepEqual(Y.marksOf(day, groups).fills.map((g) => g.name), ["Build", "Work"], "nothing hidden by default");
 });

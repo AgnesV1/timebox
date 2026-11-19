@@ -51,7 +51,7 @@ function blank() {
     cursor: 0,     // 上次从表格拉到的时间点
     schema: SCHEMA,
     needFull: false,   // 下次同步整表重拉（本机刚升级过数据格式）
-    local: { url: "", secret: "", themeHold: null, fx: true, calMode: "week", yearHeat: "", pool: true, serverVersion: 0 }   // 只存在这台设备上
+    local: { url: "", secret: "", themeHold: null, fx: true, calMode: "week", yearHeat: "", yearHide: [], pool: true, serverVersion: 0 }   // 只存在这台设备上
   };
 }
 

@@ -83,31 +83,14 @@ export function stripLayout(y, weekStartsOn = "monday") {
 
 // 第二条（每天的细节）一天要画什么（她 2026-11-18 定的）：Fitness、Chores、通勤是右边三个点，别的大类填色（按大类清单的顺序），
 // 休息日金框，周末和假期字淡
+// hidden = 她在 Days 那一条关掉的几样（大类的名字，或 COMMUTE、REST），当没有；周末和假期的淡字不算一样
 const DOT_GROUPS = ["Fitness", "Chores"];
-export function marksOf(day, groups) {
+export const COMMUTE = ":commute", REST = ":rest";
+export function marksOf(day, groups, hidden = new Set()) {
+  const has = (name) => day.groups.has(name) && !hidden.has(name);
   return {
-    fills: (groups || []).filter((g) => day.groups.has(g.name) && !DOT_GROUPS.includes(g.name)),
-    fitness: day.groups.has("Fitness"), chores: day.groups.has("Chores"), commute: Boolean(day.commute),
-    rest: Boolean(day.rest), soft: Boolean(day.weekend || day.holiday)
+    fills: (groups || []).filter((g) => has(g.name) && !DOT_GROUPS.includes(g.name)),
+    fitness: has("Fitness"), chores: has("Chores"), commute: Boolean(day.commute) && !hidden.has(COMMUTE),
+    rest: Boolean(day.rest) && !hidden.has(REST), soft: Boolean(day.weekend || day.holiday)
   };
-}
-
-// 色块上的字用黑还是白：几段颜色里最难看清的那段，也要尽量看得清。认不出的颜色（比如 CSS 变量）当中间灰
-const INK = "#0B0B0B", PAPER = "#FFFFFF";
-function luminance(color) {
-  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(color || "").trim());
-  if (!m) return 0.5;
-  const hex = m[1].length === 3 ? [...m[1]].map((c) => c + c).join("") : m[1];
-  const [r, g, b] = [0, 2, 4].map((i) => {
-    const v = parseInt(hex.slice(i, i + 2), 16) / 255;
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-export function inkOn(colors) {
-  const worst = (ink) => Math.min(...colors.map((c) => {
-    const a = luminance(c), b = luminance(ink);
-    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-  }));
-  return worst(PAPER) > worst(INK) ? PAPER : INK;
 }

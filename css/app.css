@@ -20,6 +20,7 @@
   --yr-rest: #B8860B;   /* Year 休息日的金框：金条渐变里最深的那一截，白底上才看得清 */
   --yr-total: #3C7A94;   /* Year 第一条（Build + Work + Chores）白天的颜色：Build 绿和 Work 蓝混出来的青蓝，她 2026-11-18 挑的；荧光绿在浅底上分不出深浅，也和下面两条不是一个质感 */
   --yr-over: #B5413F;   /* 超过 7 小时：调色板里的茜红 */
+  --yr-tile: #9A9A94; --yr-off: #D6D6DC;   /* Year 第二条：没填色的格子、周末和假期的灰字 */
   --meter: linear-gradient(90deg, #C6FF00, #FF3EA5 70%, #2F5BFF);
   --b: 1.5px solid var(--edge); --b-soft: 1.5px solid #E2E2DC; --b-ctl: 1px solid #CDCDC6;
   --hard: 2px 2px 0 var(--edge); --hard-lg: 3px 3px 0 var(--edge); --glow: none;
@@ -49,6 +50,7 @@
   --yr-rest: #F5C542;
   --yr-total: #CCFF00;
   --yr-over: #FF5A36;   /* 偏暖的红，和荧光绿放一起不发粉 */
+  --yr-tile: #1B1B28; --yr-off: #B8B8C4;
   --meter: linear-gradient(90deg, #CCFF00, #00E5FF 60%, #FF2BD6);
   --b: 1px solid var(--edge); --b-soft: 1px solid #222232; --b-ctl: var(--b);
   --hard: 0 0 0 1px rgba(204, 255, 0, .05), 0 0 24px rgba(204, 255, 0, .06) inset; --hard-lg: 0 0 40px rgba(0, 229, 255, .06); --glow: 0 0 14px rgba(204, 255, 0, .5);
@@ -659,7 +661,12 @@ body.dragging .ev.blk .full { pointer-events: none; }
 .yr-key { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 3px; font-size: 11.5px; color: var(--muted); }
 .yr-key i { flex: none; width: 10px; height: 10px; border-radius: 2px; }
 .yr-kp { display: inline-flex; align-items: center; gap: 4px; margin-left: 9px; }
-.yr-key i.yr-fit, .yr-key i.yr-cho, .yr-key i.yr-com { width: 6px; height: 6px; border-radius: 50%; }
+/* Days 那一条的图例就是开关：点一下显示 / 隐藏，关掉的淡下去、划掉 */
+.yr-tog { padding: 2px 0; border: 0; background: none; font: inherit; color: inherit; }
+.yr-tog[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+@media (hover: hover) { .yr-tog:hover { color: var(--ink); } }
+.yr-key .yr-kd { display: grid; place-items: center; background: var(--yr-tile); }
+.yr-kd b { width: 4px; height: 4px; border-radius: 50%; }
 .yr-key i.yr-rk { box-shadow: inset 0 0 0 1.5px var(--yr-rest); }
 .yr-months, .yr-grid { display: grid; grid-template-columns: repeat(var(--w), minmax(0, 1fr)); gap: 2px; }
 .yr-months { margin: 0 0 3px 31px; }
@@ -668,7 +675,7 @@ body.dragging .ev.blk .full { pointer-events: none; }
 .yr-wd { display: grid; grid-template-rows: repeat(7, minmax(0, 1fr)); gap: 2px; font-size: 10.5px; color: var(--muted); }
 .yr-wd span { display: flex; align-items: center; }
 .yr-grid { grid-template-rows: repeat(7, auto); grid-auto-flow: column; }
-.yr-d { position: relative; display: grid; place-items: center; aspect-ratio: 1; min-width: 0; padding: 0; border: 0; border-radius: 3px; background: var(--track); font: 500 10px/1 var(--num); font-variant-numeric: tabular-nums; color: var(--yr-ink, var(--ink)); box-shadow: var(--yr-frame, 0 0 transparent), var(--yr-mark, 0 0 transparent); }
+.yr-d { position: relative; display: grid; place-items: center; aspect-ratio: 1; min-width: 0; padding: 0; border: 0; border-radius: 3px; background: var(--track); font: 500 10px/1 var(--num); font-variant-numeric: tabular-nums; box-shadow: var(--yr-frame, 0 0 transparent), var(--yr-mark, 0 0 transparent); }
 .yr-d.yr-ahead { background: color-mix(in srgb, var(--track) 40%, transparent); }
 .yr-d:focus-visible { outline-offset: 0; }
 @media (hover: hover) { .yr-d:hover { z-index: 2; outline: 1.5px solid var(--ink); } .yr-name:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; } }
@@ -683,25 +690,20 @@ body.dragging .ev.blk .full { pointer-events: none; }
 :is(.yr-d, .yr-key i).yr-l4 { background: color-mix(in srgb, var(--c) 84%, var(--track)); }
 :is(.yr-d, .yr-key i).yr-l5 { background: var(--c); }
 :is(.yr-d, .yr-key i).yr-l6 { background: var(--yr-over); }
-.yr-d.yr-num { padding-right: 5px; }
-.yr-num.yr-ahead { color: var(--muted); }
-.yr-num.yr-soft { color: color-mix(in srgb, var(--yr-ink, var(--ink)) 34%, transparent); }
-[data-theme="light"] .yr-num.yr-today:not(.yr-fill) { background: var(--accent); color: #0B0B0B; }
+/* 第二条的数字（她 2026-11-18 定的）：一律白字，周末和假期一律灰字，不跟底色变。白字和白色的 Fitness 点要看得见，所以白天没填色的格子也是中灰（--yr-tile） */
+.yr-d.yr-num { padding-right: 5px; background: var(--yr-tile); color: #FFFFFF; }
+.yr-d.yr-num.yr-soft { color: var(--yr-off); }
+.yr-d.yr-num.yr-ahead { background: color-mix(in srgb, var(--yr-tile) 72%, transparent); }
 .yr-d.yr-rest { --yr-frame: inset 0 0 0 1.5px var(--yr-rest); }
-.yr-num.yr-soft.yr-fill { color: color-mix(in srgb, var(--yr-ink) 62%, transparent); }
-/* 右边一竖排三个固定位置的点，从上到下 Fitness、Chores、通勤。Fitness 是白的：白天白点放在浅底上看不见，加一圈细墨线；夜里通勤换青柠，免得和白点混 */
+/* 右边一竖排三个固定位置的点，从上到下 Fitness、Chores、通勤，都不描边。Fitness 是白的；夜里通勤换青柠，免得和白点混 */
 .yr-pips { position: absolute; top: 50%; right: 2px; display: flex; flex-direction: column; gap: 1.5px; transform: translateY(-50%); pointer-events: none; }
 .yr-pips i { width: 4px; height: 4px; border-radius: 50%; }
 .yr-pips .yr-pip-off { visibility: hidden; }
-.yr-fit { background: var(--fit); box-shadow: inset 0 0 0 1px var(--ink); }
+.yr-fit { background: var(--fit-lit); }
 .yr-cho { background: var(--cho); }
 .yr-com { background: var(--ink); }
-[data-theme="dark"] .yr-fit { background: var(--fit-lit); box-shadow: none; }
 [data-theme="dark"] .yr-cho { background: var(--cho-lit); }
 [data-theme="dark"] .yr-com { background: var(--accent); }
-.yr-fill .yr-pips .yr-cho, .yr-fill .yr-pips .yr-com, [data-theme="dark"] .yr-fill .yr-pips .yr-fit { box-shadow: 0 0 0 1px var(--bg); }
-.yr-fill .yr-pips .yr-fit { box-shadow: inset 0 0 0 1px var(--ink), 0 0 0 1px var(--bg); }
-[data-theme="dark"] .yr-fill .yr-pips .yr-fit { box-shadow: 0 0 0 1px var(--bg); }
 .yr-note { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }
 [data-drag] { -webkit-user-select: none; user-select: none; }
 body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-select: none; user-select: none; }

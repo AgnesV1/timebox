@@ -137,21 +137,23 @@ test("stripLayout: one column a week, the year starting on its own weekday's row
   assert.equal(Y.stripLayout(2040).weeks, 54, "a leap year starting on a Sunday touches 54 weeks");
 });
 
-test("marksOf: Fitness and Chores are dots, every other group fills, in the groups' order", () => {
+test("marksOf: Leisure and Chores are dots, every other group fills (Fitness too), in the groups' order", () => {
   const groups = [{ name: "Build" }, { name: "Work" }, { name: "Friends" }, { name: "Leisure" }, { name: "Fitness" }, { name: "Chores" }, { name: "Garden" }];
   const m = Y.marksOf({ groups: new Set(["Leisure", "Work", "Fitness", "Chores", "Garden"]), commute: true, rest: true, weekend: false, holiday: "" }, groups);
-  assert.deepEqual(m.fills.map((g) => g.name), ["Work", "Leisure", "Garden"]);
-  assert.deepEqual([m.fitness, m.chores, m.commute, m.rest, m.soft], [true, true, true, true, false]);
+  assert.deepEqual(m.fills.map((g) => g.name), ["Work", "Fitness", "Garden"]);
+  assert.deepEqual([m.leisure, m.chores, m.commute, m.rest, m.dates, m.soft], [true, true, true, true, true, false]);
   const quiet = (x) => Y.marksOf({ groups: new Set(), commute: false, rest: false, weekend: false, holiday: "", ...x }, groups);
   assert.deepEqual([quiet({}).soft, quiet({ weekend: true }).soft, quiet({ holiday: "Canada Day" }).soft], [false, true, true], "weekends and holidays have pale digits");
-  assert.deepEqual([quiet({}).fills, quiet({}).fitness, quiet({}).chores, quiet({}).commute], [[], false, false, false]);
+  assert.deepEqual([quiet({}).fills, quiet({}).leisure, quiet({}).chores, quiet({}).commute], [[], false, false, false]);
 });
 
-test("marksOf: whatever was switched off in Days is left out; pale digits stay", () => {
-  const groups = [{ name: "Build" }, { name: "Work" }, { name: "Fitness" }, { name: "Chores" }];
-  const day = { groups: new Set(["Build", "Work", "Fitness", "Chores"]), commute: true, rest: true, weekend: true, holiday: "" };
-  const m = Y.marksOf(day, groups, new Set(["Work", "Fitness", Y.COMMUTE, Y.REST]));
+test("marksOf: whatever was switched off in Days is left out; hiding dates takes the pale digits with them", () => {
+  const groups = [{ name: "Build" }, { name: "Work" }, { name: "Leisure" }, { name: "Chores" }];
+  const day = { groups: new Set(["Build", "Work", "Leisure", "Chores"]), commute: true, rest: true, weekend: true, holiday: "" };
+  const m = Y.marksOf(day, groups, new Set(["Work", "Leisure", Y.COMMUTE, Y.REST]));
   assert.deepEqual(m.fills.map((g) => g.name), ["Build"]);
-  assert.deepEqual([m.fitness, m.chores, m.commute, m.rest, m.soft], [false, true, false, false, true]);
+  assert.deepEqual([m.leisure, m.chores, m.commute, m.rest, m.dates, m.soft], [false, true, false, false, true, true]);
   assert.deepEqual(Y.marksOf(day, groups).fills.map((g) => g.name), ["Build", "Work"], "nothing hidden by default");
+  const bare = Y.marksOf(day, groups, new Set([Y.DATES]));
+  assert.deepEqual([bare.dates, bare.soft, bare.chores], [false, false, true]);
 });

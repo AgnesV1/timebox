@@ -104,7 +104,7 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
 // ---------- Year ----------
 // 她 2026-11-18 定的：三条 GitHub 式的长横条，一列一周、一行星期几，三条上下对齐（算法在 js/year.js）。
 //   total  Build + Work + Chores 一共多久：白天青蓝、夜里青柠，越久越浓，超过 7 小时红，不写日期
-//   days   每天的细节，写日期：大类填色（几样就斜着分几段），Fitness、Chores、通勤是右边三个固定位置的点，休息日金框，周末和假期字淡
+//   days   每天的细节，写日期（能关）：大类填色（几样就斜着分几段，Fitness 也填色），Leisure、Chores、通勤是右边三个固定位置的点，休息日金框，周末和假期字淡
 //   heat   Build / Work 切着看，各用自己的颜色，不写日期
 // 鼠标或键盘停在格子上，读数在浮出来的小框里（和 Stats 的图共用一个）。点格子 = 到今天页的那天，点月份名 = 那个月。
 // 键盘：每条只占一个 Tab 站，左右一周、上下一天。
@@ -131,8 +131,8 @@ function yearTip(kind, day, c, hidden = yrHidden()) {
     rows = [row(name, time(name) || "0m")];
   } else {
     const m = Y.marksOf(day, c.groups, hidden);
-    rows = [...(day.holiday ? [row(day.holiday)] : []), ...m.fills.map((g) => row(g.name, time(g.name))),
-      ...(m.fitness ? [row("Fitness", time("Fitness"))] : []), ...(m.chores ? [row("Chores", time("Chores"))] : []),
+    rows = [...(day.holiday && m.dates ? [row(day.holiday)] : []), ...m.fills.map((g) => row(g.name, time(g.name))),
+      ...(m.leisure ? [row("Leisure", time("Leisure"))] : []), ...(m.chores ? [row("Chores", time("Chores"))] : []),
       ...(m.commute ? [row("Commute", "", "var(--ink)")] : []), ...(m.rest ? [row("Rest", "", "var(--yr-rest)")] : [])];
     if (!rows.length) rows = [row("Nothing marked")];
   }
@@ -153,9 +153,9 @@ function detailTile(day, i, at) {
   const stop = (k) => Math.round((k * 100) / fills.length) + "%";
   const bg = fills.length > 1 ? "linear-gradient(135deg," + fills.map((x, k) => x + " " + stop(k) + " " + stop(k + 1)).join(",") + ")" : fills[0] || "";
   const style = bg ? "background:" + bg + ";" : "";
-  const cls = ["yr-num", m.rest ? "yr-rest" : "", m.soft ? "yr-soft" : ""].filter(Boolean).join(" ");
-  const dots = m.fitness || m.chores || m.commute ? '<span class="yr-pips" aria-hidden="true">' + [["fit", m.fitness], ["cho", m.chores], ["com", m.commute]].map(([k, on]) => '<i class="yr-' + k + (on ? "" : " yr-pip-off") + '"></i>').join("") + "</span>" : "";
-  return yearTile("days", day, i, at, cls, Number(day.date.slice(8)) + dots, style);
+  const cls = ["yr-num", m.dates ? "" : "yr-bare", m.rest ? "yr-rest" : "", m.soft ? "yr-soft" : ""].filter(Boolean).join(" ");
+  const dots = m.leisure || m.chores || m.commute ? '<span class="yr-pips" aria-hidden="true">' + [["lei", m.leisure], ["cho", m.chores], ["com", m.commute]].map(([k, on]) => '<i class="yr-' + k + (on ? "" : " yr-pip-off") + '"></i>').join("") + "</span>" : "";
+  return yearTile("days", day, i, at, cls, (m.dates ? Number(day.date.slice(8)) : "") + dots, style);
 }
 
 function yearStrip(kind, head, key, tiles, shape, vars = "") {
@@ -173,11 +173,14 @@ function yearHTML(c, y) {
   const item = (mark, word) => '<span class="yr-kp">' + mark + word + "</span>";
   const total = yearStrip("total", "<h3>" + esc(coreGroups(c).join(" + ")) + "</h3>", scale("7h") + item('<i class="yr-l6"></i>', "Over 7h"),
     days.map((d, i) => yearTile("total", d, i, at, "yr-l" + Y.coreLevel(d.core, d.gold))).join(""), shape);
-  const fit = yrGroup(c, "Fitness")?.color || "#E6DCC3", chores = yrGroup(c, "Chores")?.color || "#6A3A22";
+  // 右边三个点：Leisure 用自己的颜色（夜里霓虹版）；Chores 白天就是大类的深棕，夜里深棕在黑格子上看不见，默认的棕换成焦糖棕（她 2026-11-18 从试样挑的）
+  const leisure = yrGroup(c, "Leisure")?.color || "#E07A2B", chores = yrGroup(c, "Chores")?.color || "#6A3A22";
+  const choNight = chores.toUpperCase() === "#6A3A22" ? "#C99A6B" : neon(chores) || chores;
   const showHide = (key, mark, word) => '<button type="button" class="yr-kp yr-tog" data-act="yr-toggle" data-v="' + esc(key) + '" aria-pressed="' + !at.hidden.has(key) + '">' + mark + esc(word) + "</button>";
-  const fills = (c.groups || []).filter((g) => g.name !== "Fitness" && g.name !== "Chores").map((g) => showHide(g.name, '<i style="background:' + esc(g.color) + '"></i>', g.name)).join("");
-  const detail = yearStrip("days", "<h3>Days</h3>", fills + showHide("Fitness", '<i class="yr-kd"><b class="yr-fit"></b></i>', "Fitness") + showHide("Chores", '<i class="yr-kd"><b class="yr-cho"></b></i>', "Chores") + showHide(Y.COMMUTE, '<i class="yr-kd"><b class="yr-com"></b></i>', "Commute") + showHide(Y.REST, '<i class="yr-rk"></i>', "Rest"),
-    days.map((d, i) => detailTile(d, i, at)).join(""), shape, "--fit-lit:" + (neon(fit) || fit) + ";--cho:" + chores + ";--cho-lit:" + (neon(chores) || chores));
+  const fills = (c.groups || []).filter((g) => g.name !== "Leisure" && g.name !== "Chores").map((g) => showHide(g.name, '<i style="background:' + esc(g.color) + '"></i>', g.name)).join("");
+  const dot = (k, key, word) => showHide(key, '<i class="yr-kd"><b class="yr-' + k + '"></b></i>', word);
+  const detail = yearStrip("days", "<h3>Days</h3>", fills + dot("lei", "Leisure", "Leisure") + dot("cho", "Chores", "Chores") + dot("com", Y.COMMUTE, "Commute") + showHide(Y.REST, '<i class="yr-rk"></i>', "Rest") + showHide(Y.DATES, "", "Dates"),
+    days.map((d, i) => detailTile(d, i, at)).join(""), shape, "--lei:" + leisure + ";--lei-lit:" + (neon(leisure) || leisure) + ";--cho:" + chores + ";--cho-lit:" + choNight);
   const pick = heatName(c), color = yrGroup(c, pick)?.color;
   const seg = '<span class="seg">' + heatNames(c).map((n) => '<button type="button" data-act="yr-heat" data-v="' + esc(n) + '"' + (n === pick ? ' class="on"' : "") + ">" + esc(n) + "</button>").join("") + "</span>";
   const heat = pick ? yearStrip("heat", seg, scale("5h"), days.map((d, i) => yearTile("heat", d, i, at, "yr-l" + Y.heatLevel(d.mins[pick]))).join(""), shape, "--day:" + color + ";--lit:" + (neon(color) || color)) : "";

@@ -20,7 +20,7 @@
   --yr-rest: #B8860B;   /* Year 休息日的金框：金条渐变里最深的那一截，白底上才看得清 */
   --yr-total: #3C7A94;   /* Year 第一条（Build + Work + Chores）白天的颜色：Build 绿和 Work 蓝混出来的青蓝，她 2026-11-18 挑的；荧光绿在浅底上分不出深浅，也和下面两条不是一个质感 */
   --yr-over: #B5413F;   /* 超过 7 小时：调色板里的茜红 */
-  --yr-tile: #9A9A94; --yr-off: #D6D6DC;   /* Year 第二条：没填色的格子、周末和假期的灰字 */
+  --yr-tile: #EDEDE7; --yr-off: #D6D6DC;   /* Year 第二条：没填色的格子（她 2026-11-18 晚要回原来的浅色，白字在上面看不清，她知道，可以关掉数字）、周末和假期的灰字 */
   --meter: linear-gradient(90deg, #C6FF00, #FF3EA5 70%, #2F5BFF);
   --b: 1.5px solid var(--edge); --b-soft: 1.5px solid #E2E2DC; --b-ctl: 1px solid #CDCDC6;
   --hard: 2px 2px 0 var(--edge); --hard-lg: 3px 3px 0 var(--edge); --glow: none;
@@ -695,13 +695,15 @@ body.dragging .ev.blk .full { pointer-events: none; }
 .yr-d.yr-num.yr-soft { color: var(--yr-off); }
 .yr-d.yr-num.yr-ahead { background: color-mix(in srgb, var(--yr-tile) 72%, transparent); }
 .yr-d.yr-rest { --yr-frame: inset 0 0 0 1.5px var(--yr-rest); }
-/* 右边一竖排三个固定位置的点，从上到下 Fitness、Chores、通勤，都不描边。Fitness 是白的；夜里通勤换青柠，免得和白点混 */
+/* 右边一竖排三个固定位置的点，从上到下 Leisure、Chores、通勤，都不描边。夜里 Leisure 用霓虹橘、Chores 用焦糖棕、通勤用青柠（她 2026-11-18 晚定的） */
 .yr-pips { position: absolute; top: 50%; right: 2px; display: flex; flex-direction: column; gap: 1.5px; transform: translateY(-50%); pointer-events: none; }
 .yr-pips i { width: 4px; height: 4px; border-radius: 50%; }
 .yr-pips .yr-pip-off { visibility: hidden; }
-.yr-fit { background: var(--fit-lit); }
+.yr-d.yr-num.yr-bare { padding-right: 0; }
+.yr-lei { background: var(--lei); }
 .yr-cho { background: var(--cho); }
 .yr-com { background: var(--ink); }
+[data-theme="dark"] .yr-lei { background: var(--lei-lit); }
 [data-theme="dark"] .yr-cho { background: var(--cho-lit); }
 [data-theme="dark"] .yr-com { background: var(--accent); }
 .yr-note { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }

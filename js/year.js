@@ -81,16 +81,17 @@ export function stripLayout(y, weekStartsOn = "monday") {
   return { start, first: diffDays(start, jan1) + 1, weeks: col(isoOf(y, 12, 31)), months };
 }
 
-// 第二条（每天的细节）一天要画什么（她 2026-11-18 定的）：Fitness、Chores、通勤是右边三个点，别的大类填色（按大类清单的顺序），
-// 休息日金框，周末和假期字淡
-// hidden = 她在 Days 那一条关掉的几样（大类的名字，或 COMMUTE、REST），当没有；周末和假期的淡字不算一样
-const DOT_GROUPS = ["Fitness", "Chores"];
-export const COMMUTE = ":commute", REST = ":rest";
+// 第二条（每天的细节）一天要画什么（她 2026-11-18 晚定的）：Leisure、Chores、通勤是右边三个点（从上到下），
+// 别的大类填色（按大类清单的顺序，Fitness 也是填色），休息日金框，周末和假期字淡
+// hidden = 她在 Days 那一条关掉的几样（大类的名字，或 COMMUTE、REST、DATES），当没有。关了 DATES = 不写数字，周末和假期的淡字也就没了
+const DOT_GROUPS = ["Leisure", "Chores"];
+export const COMMUTE = ":commute", REST = ":rest", DATES = ":dates";
 export function marksOf(day, groups, hidden = new Set()) {
   const has = (name) => day.groups.has(name) && !hidden.has(name);
+  const dates = !hidden.has(DATES);
   return {
     fills: (groups || []).filter((g) => has(g.name) && !DOT_GROUPS.includes(g.name)),
-    fitness: has("Fitness"), chores: has("Chores"), commute: Boolean(day.commute) && !hidden.has(COMMUTE),
-    rest: Boolean(day.rest) && !hidden.has(REST), soft: Boolean(day.weekend || day.holiday)
+    leisure: has("Leisure"), chores: has("Chores"), commute: Boolean(day.commute) && !hidden.has(COMMUTE),
+    rest: Boolean(day.rest) && !hidden.has(REST), dates, soft: dates && Boolean(day.weekend || day.holiday)
   };
 }

@@ -2,6 +2,7 @@
 //   Groceries（#meals/groceries）：常买的东西：哪个超市、一次买多少钱、够吃几天、热量低中高、几周一轮打折、这一轮看过没有
 //   Boxes（#meals/boxes）：一个 Box = 一顿 = 几样东西（用量随便写），低中高自动定（也能手动），一天份大概多少钱；
 //     左边一排架子按类别摆着常买的东西，拖到 Box 上就加进去；每类最前面的「Any meat」= 随便哪种，买的时候再挑
+//     Box 里的一样能拖到别的 Box（搬过去，用量跟着走）或拖回架子（拿掉）；Plan 里某天的一个 Box 能拖到别的天（换天）或拖回顶上那排（拿掉）——她 2026-11-21 要的
 //   Plan（#meals）：最上面是「下次采购」的单子；然后是这一轮还没看的打折、这周和下周按天放 Box、之后四周四个框粗排
 //     （到了周五，这周就不再显示，从下周看起）
 //     Boxes 页底下一块 To try = 在外面吃过、想自己做的菜（菜名 + 备注），分 For meal prep / Try once 两种：
@@ -154,7 +155,7 @@ function planHTML(D, c) {
   const pr = store.mealPrefs(), w0 = planWeek(c.today), w1 = addDays(w0, 7);
   const boxes = Object.values(D.box).sort(bySlot);
   const palette = boxes.length
-    ? '<div class="mpalette"><span class="msub">Drag a box onto a day, or click it</span>' + boxes.map((b) =>
+    ? '<div class="mpalette" data-drop="mpal"><span class="msub">Drag a box onto a day, or click it · drag one back here to take it off its day</span>' + boxes.map((b) =>
       '<span class="mpk" data-drag="box:' + esc(b.id) + '" role="button" tabindex="0" aria-haspopup="listbox" title="' + esc((b.parts || []).map((p) => M.partIng(D, p)?.name).filter(Boolean).join(" · ")) + '">' +
       dot(M.boxLevel(D, b)) + "<b>" + esc(b.name || "Untitled") + "</b><small>" + slotName(b.slot) + "</small></span>").join("") + "</div>"
     : '<p class="mpalette msub">No boxes yet — <a href="#meals/boxes">make a few</a>, then drag them onto the days.</p>';
@@ -217,7 +218,7 @@ function dayHTML(D, c, d) {
   return '<div class="' + cls + '" data-drop="mday:' + d.date + '" data-act="edit-day" data-date="' + d.date + '"' + (n ? ' data-drag="mcopy:' + d.date + '"' : "") + ' role="button" tabindex="0">' +
     '<div class="mday-head"><span>' + WEEKDAYS[weekday(d.date)] + "</span><b>" + Number(d.date.slice(8)) + "</b></div>" +
     (off ? '<p class="moff">Not cooking</p>'
-      : n ? '<ul class="mbl">' + d.boxes.map((id) => '<li class="lv-' + M.boxLevel(D, D.box[id]) + '">' + esc(D.box[id].name || "Untitled") + "</li>").join("") + "</ul>" +
+      : n ? '<ul class="mbl">' + d.boxes.map((id, i) => '<li class="lv-' + M.boxLevel(D, D.box[id]) + '" data-drag="mslot:' + d.date + "|" + i + '">' + esc(D.box[id].name || "Untitled") + "</li>").join("") + "</ul>" +
         '<div class="mday-foot"><span>≈ ' + money(d.cost) + "</span>" + (d.levels.high ? '<span class="hi">' + d.levels.high + " high</span>" : "") + "</div>"
       : '<p class="mempty">+ Add</p>') + "</div>";
 }
@@ -246,7 +247,7 @@ function roughHTML(D, start, pr, boxes) {
 function shelfHTML(D) {
   const catOf = (i) => (M.CATS.some(([k]) => k === i.cat) ? i.cat : "");
   const chip = (drag, lv, name, any) => '<span class="mpk' + (any ? " any" : "") + '" data-drag="' + drag + '" role="button" tabindex="0" aria-haspopup="listbox">' + dot(lv) + "<b>" + name + "</b></span>";
-  return '<aside class="mshelf"><p class="msub">Drag onto a box, or click</p>' + [...M.CATS, ["", "Other"]].map(([k, l]) => {
+  return '<aside class="mshelf" data-drop="mshelf"><p class="msub">Drag onto a box, or click · drag one out of a box back here to take it out</p>' + [...M.CATS, ["", "Other"]].map(([k, l]) => {
     const list = Object.values(D.ing).filter((i) => catOf(i) === k).sort(M.byName);
     if (!list.length && !M.ANY[k]) return "";
     return "<section><h4>" + l + '</h4><div class="mbin">' + (M.ANY[k] ? chip("any:" + k, M.ANY[k], "Any " + l.toLowerCase(), true) : "") +
@@ -261,7 +262,7 @@ function boxesHTML(D, c) {
     const lv = M.boxLevel(D, b);
     return '<article class="mbox lv-' + lv + '" data-drop="mbox:' + esc(b.id) + '" data-act="edit-box" data-id="' + esc(b.id) + '" role="button" tabindex="0">' +
       "<header><b>" + esc(b.name || "Untitled") + '</b><span class="slot">' + slotName(b.slot) + "</span></header><ul>" +
-      (b.parts || []).map((p) => [p, M.partIng(D, p, c.today)]).filter(([, i]) => i).map(([p, i]) => "<li" + (p.any ? ' class="any"' : "") + ">" + dot(M.levelOf(i)) + "<span>" + esc(i.name) + '</span><span class="q">' + esc(p.amt || "") + "</span></li>").join("") +
+      (b.parts || []).map((p, k) => [p, M.partIng(D, p, c.today), k]).filter(([, i]) => i).map(([p, i, k]) => "<li" + (p.any ? ' class="any"' : "") + ' data-drag="mpart:' + esc(b.id) + "|" + k + '">' + dot(M.levelOf(i)) + "<span>" + esc(i.name) + '</span><span class="q">' + esc(p.amt || "") + "</span></li>").join("") +
       '</ul><footer><span class="lvtag lv-' + lv + '">' + M.levelName(lv) + (b.level ? "" : " · auto") + "</span><span>≈ " + money(M.boxCost(D, b, c.today)) + "</span></footer></article>";
   };
   return '<header class="msec-head"><h3 class="msec">Boxes <small>one meal each — drag them onto the days in Plan</small></h3><button type="button" class="btn cta" data-act="new-box">' + icon("plus") + " Box</button></header>" +
@@ -310,19 +311,23 @@ function groceriesHTML(D, c) {
   if (!ings.length) return tools + introHTML(true);
   const groups = new Map();
   for (const i of ings) { const k = String(i.store || "").trim(); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); }
+  // 她 2026-11-21 挑的试样 A：超市名顶格当小标题（旁边一行小结），东西往右缩一截，热量圆点放在名字前；没有的格子空着，不写「—」
   const row = (i) => {
     const st = M.dealState(i, c.today), r = M.roundOf(i, c.today), lv = M.levelOf(i);
-    const stText = st === "sale" ? "On sale till " + fmtShort(i.sale.until) : st === "checked" ? "Checked " + fmtShort(i.checked) : st === "check" ? "To check (" + fmtShort(r.start) + "–" + fmtShort(r.end) + ")" : "";
-    return '<tr data-act="edit-ing" data-id="' + esc(i.id) + '" tabindex="0"><td><b>' + esc(i.name || "Untitled") + "</b>" + (i.keep ? ' <span class="stag">always</span>' : i.staple ? ' <span class="stag">staple</span>' : "") + "</td>" +
-      "<td>" + (i.cat ? M.catName(i.cat) : '<span class="msub">—</span>') + "</td>" +
+    const stText = st === "sale" ? "On sale till " + fmtShort(i.sale.until) : st === "checked" ? "Checked " + fmtShort(i.checked) : st === "check" ? "To check · " + fmtShort(r.start) + "–" + fmtShort(r.end) : "";
+    return '<tr data-act="edit-ing" data-id="' + esc(i.id) + '" tabindex="0"><td class="mg-name">' + dot(lv) + "<b>" + esc(i.name || "Untitled") + "</b>" + (i.keep ? ' <span class="stag">always</span>' : i.staple ? ' <span class="stag">staple</span>' : "") + "</td>" +
+      '<td class="mg-soft">' + (i.cat ? M.catName(i.cat) : "") + "</td>" +
       '<td class="r num">' + (st === "sale" ? "<s>" + money(i.price) + "</s> " + money(i.sale.price) : money(i.price)) + "</td>" +
-      '<td class="num">' + M.lastsOf(i) + (Number(i.lasts) ? "" : '<small> (default)</small>') + " days</td>" +
-      "<td>" + dot(lv) + " " + M.levelName(lv) + "</td>" +
-      "<td>" + (Number(i.every) ? (Number(i.every) === 1 ? "Weekly" : "Every " + i.every + " wks") : '<span class="msub">—</span>') + "</td>" +
-      '<td><span class="dstate d-' + st + '">' + esc(stText) + "</span></td></tr>";
+      '<td class="num mg-soft">' + M.lastsOf(i) + " days" + (Number(i.lasts) ? "" : " <small>(default)</small>") + "</td>" +
+      '<td class="mg-soft">' + (Number(i.every) ? (Number(i.every) === 1 ? "Weekly" : "Every " + i.every + " wks") : "") + "</td>" +
+      "<td>" + (stText ? '<span class="dstate d-' + st + '">' + esc(stText) + "</span>" : "") + "</td></tr>";
   };
-  return tools + '<table class="mtable"><thead><tr><th>Item</th><th>Type</th><th class="r">Price</th><th>One buy lasts</th><th>Level</th><th>Deals</th><th>This round</th></tr></thead>' +
-    [...groups.entries()].map(([s, list]) => '<tbody><tr class="mstore-row"><th colspan="7">' + esc(s || "Anywhere") + " <small>" + list.length + "</small></th></tr>" + list.map(row).join("") + "</tbody>").join("") + "</table>";
+  const sum = (list) => {
+    const n = (s) => list.filter((i) => M.dealState(i, c.today) === s).length, sale = n("sale"), check = n("check");
+    return [list.length + (list.length === 1 ? " item" : " items"), sale ? sale + " on sale" : "", check ? check + " to check" : ""].filter(Boolean).join(" · ");
+  };
+  return tools + '<table class="mtable mg"><thead><tr><th>Item</th><th>Type</th><th class="r">Price</th><th>One buy lasts</th><th>Deals</th><th>This round</th></tr></thead>' +
+    [...groups.entries()].map(([s, list]) => '<tbody><tr class="mstore-row"><th colspan="6">' + esc(s || "Anywhere") + " <small>" + sum(list) + "</small></th></tr>" + list.map(row).join("") + "</tbody>").join("") + "</table>";
 }
 
 // ---------- Restock：规律要换 / 要补的东西 ----------
@@ -643,8 +648,27 @@ function update(patch, label) {
 
 export function mealDrop(payload, target) {
   const i = payload.indexOf(":"), kind = payload.slice(0, i), id = payload.slice(i + 1);
-  const j = target.indexOf(":"), tk = target.slice(0, j), tid = target.slice(j + 1);
+  const j = target.indexOf(":"), tk = j < 0 ? target : target.slice(0, j), tid = j < 0 ? "" : target.slice(j + 1);   // mshelf、mpal 不带冒号
   const D = store.meals();
+  // Box 里的一样：搬到别的 Box，或拖回架子 = 拿掉（一次撤销两边都回来）
+  if (kind === "mpart") {
+    const [boxId, k] = id.split("|"), b = D.box[boxId], part = b?.parts?.[Number(k)], what = M.partIng(D, part);
+    if (!part) return;
+    if (tk === "mshelf") { store.saveMeal("box", { ...b, parts: b.parts.filter((_, n) => n !== Number(k)) }, "Took " + (what?.name || "it") + " out of " + (b.name || "Untitled")); return; }
+    const m = M.movePart(D, boxId, Number(k), tid);
+    if (m.error) { toast(m.error); return; }
+    if (m.from) store.change(() => { store.saveMeal("box", m.from); store.saveMeal("box", m.to); }, "Moved " + (m.what?.name || "it") + " to " + (m.to.name || "Untitled"));
+    return;
+  }
+  // 某天的一个 Box：换到别的天，或拖回顶上那排 = 从那天拿掉
+  if (kind === "mslot") {
+    const [date, k] = id.split("|"), ids = M.boxesOfDay(D, D.days[date]), name = D.box[ids[Number(k)]]?.name || "Untitled";
+    if (!ids[Number(k)]) return;
+    if (tk === "mpal") { const left = ids.filter((_, n) => n !== Number(k)); store.setMealDay(weekOf(date), date, left.length ? { boxes: left } : null, "Took " + name + " off " + fmtDay(date)); return; }
+    const m = M.moveDayBox(D, date, Number(k), tid);
+    if (m) store.change(() => { store.setMealDay(weekOf(date), date, m.from); store.setMealDay(weekOf(tid), tid, m.to); }, "Moved " + name + " to " + fmtDay(tid));
+    return;
+  }
   if (tk === "mday") {
     if (kind === "box" && D.box[id]) store.setMealDay(weekOf(tid), tid, { boxes: [...M.boxesOfDay(D, D.days[tid]), id] });
     if (kind === "mcopy" && id !== tid && D.days[id]) { store.setMealDay(weekOf(tid), tid, { ...D.days[id] }); toast("Copied to " + fmtDay(tid)); }
@@ -656,12 +680,9 @@ export function mealDrop(payload, target) {
     if (tid === "new") { openEditor({ kind: "box", id: "", draft: { name: "", slot: "", level: "", parts: [part], note: "" } }); return; }
     const b = D.box[tid];
     if (!b) return;
-    const parts = b.parts || [], name = b.name || "Untitled";
-    if (parts.some((p) => (part.any ? p.any === part.any : p.ing === part.ing))) { toast("Already in " + name); return; }
-    // 拖进来一样具体的肉，Box 里正好有「Any meat」：就是挑定了，顶掉那格（用量留着）
-    const slot = part.ing ? parts.findIndex((p) => p.any && p.any === what.cat) : -1;
-    if (slot >= 0) store.saveMeal("box", { ...b, parts: parts.map((p, i) => (i === slot ? { ing: part.ing, amt: p.amt || "" } : p)) }, name + ": " + what.name + " instead of any " + M.catName(what.cat).toLowerCase());
-    else store.saveMeal("box", { ...b, parts: [...parts, part] }, "Added " + what.name + " to " + name);
+    const name = b.name || "Untitled", put = M.addPart(D, b.parts || [], part);   // 拖进来一样具体的肉、Box 里正好有「Any meat」：顶掉那格（用量留着）
+    if (!put) { toast("Already in " + name); return; }
+    store.saveMeal("box", { ...b, parts: put.parts }, put.replaced ? name + ": " + what.name + " instead of any " + M.catName(what.cat).toLowerCase() : "Added " + what.name + " to " + name);
   }
 }
 

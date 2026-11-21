@@ -4,6 +4,8 @@
 // 能放的地方带 data-drop="day:<日期>" 或 "pool"。
 // 备餐页：data-drag="box:<Box id>" 或 "mcopy:<日期>"（复制那天），放到 "mday:<日期>"；Box 也能放到之后某周 "mweek:<周一>"（粗排 +1）。
 // Boxes 页：data-drag="ing:<食材 id>" 或 "any:<类别>"（随便哪种），放到 "mbox:<Box id>"（"mbox:new" = 新开一个 Box）。
+// 拖回去（2026-11-21）：Box 卡片里的一样 "mpart:<Box id>|<第几样>" → 别的 Box（搬过去）或架子 "mshelf"（拿掉）；
+//   某天格子里的一个 Box "mslot:<日期>|<第几个>" → 别的天（换天）或 Plan 顶上那排 "mpal"（拿掉）。这两种都在有自己编辑框的卡片里，单击照旧开编辑框。
 // Projects 右栏：目标那一行左边的小把手 data-drag="goal:<id>"，放到另一段 "gcol:<段>" = 改成那一段的默认期限。
 // 把手只是一小块：拖起来的影子画它外面带 data-drag-show 的那一整行。
 // 鼠标按下移动 5px 才算开始拖，所以单击还是单击。拖到窗口上下边缘会自动滚动。
@@ -58,6 +60,11 @@ function move(e) {
 function accepts(payload, target) {
   if (payload.startsWith("goal:") || target.startsWith("gcol:")) return payload.startsWith("goal:") && target.startsWith("gcol:");
   if (target === "pool") return payload.startsWith("task:") || payload.startsWith("blk:");
+  // Box 里的一样（mpart:Box|第几样）→ 别的 Box（搬过去）或架子（拿掉）；某天的一个 Box（mslot:日期|第几个）→ 别的天或顶上那排（拿掉）
+  const home = payload.slice(payload.indexOf(":") + 1).split("|")[0];
+  if (payload.startsWith("mpart:")) return target === "mshelf" || (target.startsWith("mbox:") && target !== "mbox:new" && target.slice(5) !== home);
+  if (payload.startsWith("mslot:")) return target === "mpal" || (target.startsWith("mday:") && target.slice(5) !== home);
+  if (target === "mshelf" || target === "mpal") return false;
   const part = payload.startsWith("ing:") || payload.startsWith("any:");
   const meal = part || payload.startsWith("box:") || payload.startsWith("mcopy:");
   if (target.startsWith("mbox:")) return part;

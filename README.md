@@ -123,7 +123,7 @@ The code is public, but no data is in it; the Apps Script URL and secret are sto
   Dragging the whole sticky moves that day's unticked items; back to the Pool puts them back; clicking it opens the day on Today. The month view draws only the weeks the month touches.
   Two warnings on that bar: past the box it turns a steady red (no pulse); past 7 hours but still within the box it pulses every 5 seconds, rose by day and red at night (for now).
   A gold super rest day never turns red — a day that went mostly to Leisure can be marked gold instead.
-  While the Pool is open in Week or Month, the left sidebar folds to its icons to make room; its › opens it for the moment, and it goes back to how you left it when the Pool closes, in Year, or on any other page.
+  While the Pool is open in Week or Month, and always in Year, the left sidebar folds to its icons to make room; its › opens it for the moment, and it goes back to how you left it when the Pool closes or on any other page.
   The Pool is on the right, by project and plan: drag an item onto a day (or click it, or Tab to it and press Enter, for a "Put on…" menu) and it joins that plan's row there; drag a plan's name for just its row. Either arrives with its time filled in: the item's own, otherwise the plan's Default minutes (a fixed-day plan uses its weekday minutes).
   The box at the top adds lines to a plan's pool. Other calendar tasks can be dragged to other days, or back to the Pool to unschedule them. In the faint previews of future days, a fixed-day plan's occurrence can be dragged away or opened.
   The number at the top right of a cell is that day's usable time; click it to change
@@ -212,18 +212,19 @@ the row asks **Finished it?** — tap 🥰 / 🎉 / 💢 (or ✓ for no rating),
 Offline, entries wait on the device and go out once you're back online.
 
 **Meals**: in the spirit of meal kits like HelloFresh — no grams, no calorie numbers. Three tabs on the computer:
-- `Groceries`: things you buy often — which store (Longo's / Farm Boy / Dodo / T&T / Eataly / Loblaws by default, or type your own), the price per purchase,
+- `Groceries`: things you buy often, listed under each store (items indented beneath the store's name, with how many there are and how many are on sale or to check) — which store (Longo's / Farm Boy / Dodo / T&T / Eataly / Loblaws by default, or type your own), the price per purchase,
   **how many days one purchase lasts** (7 if empty), **energy level** (Low vegetables and fruit / Mid normal / High fried, fatty or sweet), and deals.
   Staples (oil, salt) stay off the shopping list. Deals run in rounds: weekly flyers are Every week, something on sale about monthly is Every 4 weeks,
   plus the date one round starts; rounds you haven't checked yet show on the Plan tab (the number next to Meals in the sidebar), and No deal or On sale… (sale price and end date) marks them as checked.
 - `Boxes`: a Box = one meal = a few things, with amounts in words ("1 cup", "a handful"). A box's level is set automatically:
   its heaviest item, one level lower if more than half is Low (staples don't count); or pick it by hand. Next to it, roughly what a day's worth costs (each item's price ÷ days it lasts, added up).
   Drag a grocery from the shelf onto a box to add it, or click the grocery for an "Add to…" menu of boxes.
+  Drag an item inside a box onto another box to move it there (its amount goes with it), or back onto the shelf to take it out of that box.
 - `Plan`: at the top, the **next shopping list** by store: what this week's days need ÷ how many days a purchase lasts = how many times to buy, at the sale price if the shop day is during a deal;
   tick what you bought, Have it for what's still at home (no cost), and add anything else by hand; Mark shopped counts everything unticked as bought. Ticks are remembered —
   a bag of rice that lasts 30 days won't show up again for the next few weeks. Below: this round's unchecked deals and the Boxes to drag;
   this week and next by day (from Friday, this week disappears and planning starts from next week). Drag a Box onto a day, click a Box chip for a "Put on…" menu, or click a day to choose;
-  drag a planned day onto another day to copy it (or open the day: Same as another day); mark a day Not cooking.
+  drag a planned day onto another day to copy it (or open the day: Same as another day), or drag a single Box on a day to another day to move it, or back up to the row of Boxes to take it off; mark a day Not cooking.
   Each week has a small Low / Mid / High bar, red when High goes over the limit. The four weeks after that are four boxes holding only "which Box × how many"; when one becomes next week, Fill empty days spreads them over breakfast, lunch and dinner on the empty days.
   The gear at the top right: shop day (like a cutoff: the last one on or before the week starts), most High boxes per week, weekly budget (blank = no comparison).
   At the bottom, **To try**: dishes you had out and want to make yourself (name + note), as For meal prep (to become a Box) or Try once.

@@ -1817,8 +1817,12 @@ body.phone .rpick { padding: 8px 6px; }
 .mbox li.any span:first-of-type { font-style: italic; }
 .mnew { display: grid; place-content: center; justify-items: center; gap: 2px; min-height: 96px; border: 2px dashed var(--line); border-radius: 14px; color: var(--muted); font-size: 13px; cursor: pointer; }
 .mnew small { font-size: 11.5px; }
-.mbox.drop-on, .mnew.drop-on { background: #F4FFD6; box-shadow: inset 0 0 0 2px var(--edge); }
-[data-theme="dark"] .mbox.drop-on, [data-theme="dark"] .mnew.drop-on { background: rgba(204, 255, 0, .08); box-shadow: inset 0 0 0 1px var(--accent); }
+.mbox.drop-on, .mnew.drop-on, .mshelf.drop-on, .mpalette.drop-on { background: #F4FFD6; box-shadow: inset 0 0 0 2px var(--edge); }
+[data-theme="dark"] .mbox.drop-on, [data-theme="dark"] .mnew.drop-on, [data-theme="dark"] .mshelf.drop-on, [data-theme="dark"] .mpalette.drop-on { background: rgba(204, 255, 0, .08); box-shadow: inset 0 0 0 1px var(--accent); }
+/* 拖回去（2026-11-21）：Box 里的一样、某天的一个 Box 都能拿起来 */
+.mbox li[data-drag], .mbl li[data-drag] { cursor: grab; }
+@media (hover: hover) { .mbox li[data-drag]:hover, .mbl li[data-drag]:hover { background: var(--tonal); } }
+.mbox li[data-drag] { margin: 0 -4px; padding: 1px 4px; border-radius: 6px; }
 [data-theme="dark"] .mshelf { background: var(--surface); }
 .mimport { width: 100%; box-sizing: border-box; padding: 8px 10px; border: var(--b); border-radius: 10px; background: var(--bg); color: inherit; font: 12px/1.4 var(--num); resize: vertical; }
 .mimport-msg:empty { display: none; }
@@ -1849,6 +1853,19 @@ body.phone .rpick { padding: 8px 6px; }
 .d-sale { color: var(--ok); }
 .d-check { color: var(--c-Chore); }
 .d-checked { color: var(--muted); }
+/* Groceries 那张（她 2026-11-21 挑的试样 A）：超市名顶格当小标题、上面多空一段，东西往右缩 32px，一眼看出归哪个超市；
+   热量圆点在名字前；类别、够吃几天、打折节奏变淡；这一轮的状态有事才出小签（打折绿、要看橙） */
+.mtable.mg .mstore-row th { padding: 26px 10px 6px; background: none; font: 700 15px var(--display); border-bottom: 1px solid var(--line); }
+.mtable.mg tbody:first-of-type .mstore-row th { padding-top: 14px; }
+.mtable.mg .mstore-row th small { margin-left: 8px; font: 500 12px var(--body); }
+.mtable.mg tbody tr[data-act] td:first-child, .mtable.mg thead th:first-child { padding-left: 42px; }
+.mtable.mg tbody tr[data-act]:first-of-type, .mtable.mg .mstore-row + tr { border-top: 0; }
+.mg-name .lvdot { margin-right: 8px; }
+.mg-soft { color: var(--muted); }
+.mtable.mg .dstate { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; }
+.mtable.mg .d-sale { background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.mtable.mg .d-check { background: color-mix(in srgb, var(--c-Chore) 14%, transparent); }
+.mtable.mg .d-checked { padding: 0; }
 
 /* 编辑框 */
 .meal-editor .check { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; }

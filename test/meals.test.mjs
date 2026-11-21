@@ -414,3 +414,31 @@ test("big buys live in Settings rows like the rest of Meals", () => {
   assert.ok(store.get("settings", "meal-gear:g1"));
   assert.equal(store.meals().gear.g1.name, "Sony A7M4");
 });
+
+test("addPart: already there → nothing, a specific meat takes the place of Any meat, anything else goes last", () => {
+  const D = { ing: { chk: { id: "chk", name: "Chicken", cat: "meat" }, rice: { id: "rice", name: "Rice", cat: "carb" } }, box: {} };
+  const parts = [{ any: "meat", amt: "150g" }, { ing: "rice", amt: "1 cup" }];
+  assert.equal(M.addPart(D, parts, { ing: "rice", amt: "" }), null);
+  assert.deepEqual(M.addPart(D, parts, { ing: "chk", amt: "" }), { parts: [{ ing: "chk", amt: "150g" }, { ing: "rice", amt: "1 cup" }], replaced: true });
+  assert.deepEqual(M.addPart(D, [{ ing: "rice", amt: "" }], { any: "veg", amt: "" }).parts, [{ ing: "rice", amt: "" }, { any: "veg", amt: "" }]);
+});
+
+test("movePart: a grocery moves from one box to another with its amount", () => {
+  const D = { ing: { a: { id: "a", name: "Broccoli", cat: "veg" }, b: { id: "b", name: "Rice", cat: "carb" } },
+    box: { x: { id: "x", name: "Stir-fry", parts: [{ ing: "a", amt: "1 head" }, { ing: "b", amt: "" }] }, y: { id: "y", name: "Bowl", parts: [{ ing: "b", amt: "" }] } } };
+  const m = M.movePart(D, "x", 0, "y");
+  assert.deepEqual(m.from.parts, [{ ing: "b", amt: "" }]);
+  assert.deepEqual(m.to.parts, [{ ing: "b", amt: "" }, { ing: "a", amt: "1 head" }]);
+  assert.equal(m.what.name, "Broccoli");
+  assert.deepEqual(M.movePart(D, "x", 1, "y"), { error: "Already in Bowl" });
+  assert.equal(M.movePart(D, "x", 0, "x").error, "");
+  assert.equal(M.movePart(D, "x", 5, "y").error, "");
+});
+
+test("moveDayBox: one box moves to another day; an emptied day is cleared", () => {
+  const D = { box: { p: { id: "p" }, q: { id: "q" } }, days: { "2026-11-23": { boxes: ["p", "q"] }, "2026-11-24": { off: true } } };
+  const m = M.moveDayBox(D, "2026-11-23", 1, "2026-11-24");
+  assert.deepEqual(m, { from: { boxes: ["p"] }, to: { boxes: ["q"] }, id: "q" });
+  assert.equal(M.moveDayBox(D, "2026-11-23", 0, "2026-11-23"), null);
+  assert.equal(M.moveDayBox({ ...D, days: { "2026-11-23": { boxes: ["p"] } } }, "2026-11-23", 0, "2026-11-25").from, null);
+});

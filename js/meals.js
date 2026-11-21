@@ -83,6 +83,36 @@ export function boxesOfDay(D, entry) {
   return (entry.boxes || []).filter((id) => D.box[id]);
 }
 
+// ---------- 拖来拖去（她 2026-11-21 要的）----------
+
+const samePart = (a, b) => (a.any ? a.any === b.any : Boolean(a.ing) && a.ing === b.ing);
+// 一样东西放进 Box 的 parts：已经有了 → null；拖来具体的肉、Box 里正好有「Any meat」→ 顶掉那格（用量留着）；不然接在最后
+export function addPart(D, parts, part) {
+  if ((parts || []).some((p) => samePart(p, part))) return null;
+  const what = partIng(D, part);
+  const slot = part.ing && what ? parts.findIndex((p) => p.any && p.any === what.cat) : -1;
+  if (slot >= 0) return { parts: parts.map((p, i) => (i === slot ? { ing: part.ing, amt: part.amt || p.amt || "" } : p)), replaced: true };
+  return { parts: [...(parts || []), part], replaced: false };
+}
+
+// Box 里第 i 样搬到另一个 Box（用量跟着走）→ { from, to: 两个新的 Box, what } 或 { error }
+export function movePart(D, fromId, i, toId) {
+  const a = D.box[fromId], b = D.box[toId], part = a?.parts?.[i];
+  if (!a || !b || !part || fromId === toId) return { error: "" };
+  const what = partIng(D, part);
+  const put = addPart(D, b.parts || [], part);
+  if (!put) return { error: "Already in " + (b.name || "Untitled") };
+  return { from: { ...a, parts: a.parts.filter((_, k) => k !== i) }, to: { ...b, parts: put.parts }, what };
+}
+
+// 某天的第 i 个 Box 搬到另一天（接在那天最后；那天标了不做饭就改回做饭）→ { from, to: 两天的新 entry（from 空了 = null）, id } 或 null
+export function moveDayBox(D, from, i, to) {
+  const src = D.days[from], ids = boxesOfDay(D, src), id = ids[i];
+  if (!id || from === to) return null;
+  const left = ids.filter((_, k) => k !== i);
+  return { from: left.length ? { boxes: left } : null, to: { boxes: [...boxesOfDay(D, D.days[to]), id] }, id };
+}
+
 // ---------- 打折一轮一轮来 ----------
 
 // 每 every 周一轮，from = 某一轮开始的那天。date 落在哪一轮

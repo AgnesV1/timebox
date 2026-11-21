@@ -76,11 +76,13 @@ function applyTheme() {
 // ---------- 侧栏（电脑） ----------
 
 // 日历的周 / 月视图开着 Pool：地方不够，左栏自动收成一列图标（她 2026-11-18 要的）。她自己存的开关不动：关了 Pool、换到 Year、离开日历就回到原样。
+// 日历的 Year 也一样自动收起（她 2026-11-21 要的：三条长横条要宽），切到别的视图或别的页就回原样。
 // 这时点 › = 这一次先展开着（sideKept），到上面那几种时候就忘掉
 let sideKept = false;
 const poolOpen = (view) => view === "calendar" && Boolean(store.local().pool) && store.local().calMode !== "year";
+const autoFold = (view) => poolOpen(view) || (view === "calendar" && store.local().calMode === "year");
 function sideFolded(view) {
-  if (!poolOpen(view)) { sideKept = false; return Boolean(store.local().sideMin); }
+  if (!autoFold(view)) { sideKept = false; return Boolean(store.local().sideMin); }
   return !sideKept;
 }
 
@@ -382,7 +384,7 @@ on(document, "click", "[data-act=theme-flip]", () => {
 on(document, "click", "#main .seg > button", () => animateSoft());
 initEdgeGlow();
 on(document, "click", "[data-act=side-toggle]", () => {
-  if (poolOpen(route())) { sideKept = !sideKept; render(); }
+  if (autoFold(route())) { sideKept = !sideKept; render(); }
   else store.setLocal({ sideMin: !store.local().sideMin });
 });
 

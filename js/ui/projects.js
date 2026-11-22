@@ -5,12 +5,12 @@
 // 临时的重复在日历 Pool 里拖计划名旁边的 ↻ 设（带结束日，见 js/ui/repeat.js），不写在卡片上。
 // Pool 是一项项具体的 todo（算的在 js/lists.js、存的在 js/store/lists.js）：做几次、大概多久、每周、备注、分区、Later、月份。
 // 某天 = 这个计划一行（整块计时），拖进来的项是它下面的便条。
-// 循环小事（加任务时选 Repeat 建的、Pool 里没东西的）不在这一页：在日历 Pool 底下的 Repeats 清单里。
+// 循环小事（加任务时选 Repeat 建的、Pool 里没东西的）和以前固定星期几的计划也是一张卡片（她 2026-11-22 晚要回来的），不写 ↻、只写这周打卡几次；日历 Pool 底下的 Repeats 清单里也有它们。
 // 每张卡头上有 Archive（停上去才出现）：归档的折进区头右边的「3 archived」，点开在这个区里展开，卡上是 Restore。
 // 每个大类看什么不一样（groups.js 的 trackOf，Settings 里能改）：
 //   看钟点 / Relax / 联系的（Fitness / Leisure / Friends）：区头一句话（最近 7 天多少、多久没联系），不达标是红的，加最近 14 天的方块；
 //   别的（Build / Work / Chores）：只列计划。进度条在每张卡片上（2026-11-22 起，区头不再有总进度条）。
-// 卡片（她 2026-11-22 要的，照视觉层级理顺）：名字（每周大概几次写在右边）→ 一共多久、这个月做过几天 → 这周的打卡方块 → 进度条（只有写了 Due 的才有）→ 淡字的 Pool 还剩多少。
+// 卡片（她 2026-11-22 要的，照视觉层级理顺；夜里又改矮）：名字（截止日在右上）→ 一共多久、这个月做过几天 → 每周几次的打卡方块 → 进度条（只有写了 Due 的才有）→ 一行：做完几次 · Pool 还有几次。
 // 编辑框：它是谁（名字、项目）和进度 → Pool（主角，按分区列，点一项展开改）→ Notes → 小字的设置 → Serves → 状态；右上角 Copy as text / Paste text。
 
 import * as store from "../store.js";
@@ -54,34 +54,44 @@ const weekSquares = (w) => '<div class="pweek" title="This week">' + Array.from(
 const pct = (v) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 10;
 
 // 两个数：一共记了多久、这个月做过几天（勾了 Done 或记了时间，同一天算一次；以前试样写成「4×」，她看不懂）
-const numsHTML = (k) => '<p class="pc-nums"><b class="num">' + fmtHours(k.spent) + "</b><span>total</span><b class=\"num\">" + k.monthDays + "</b><span>" + (k.monthDays === 1 ? "time" : "times") + " this month</span></p>";
+// 一个数和它的字是一组，窄的时候整组换行（她 2026-11-22 晚报的：「14」留在上一行、「times this month」掉到下一行）
+const numsHTML = (k) => '<p class="pc-nums"><span class="pc-n"><b class="num">' + fmtHours(k.spent) + '</b> total</span><span class="pc-n"><b class="num">' + k.monthDays + "</b> " + (k.monthDays === 1 ? "time" : "times") + " this month</span></p>";
+
+// 卡片右上角：截止日（她 2026-11-22 夜要的：挪到右上角，卡片才矮得下来）；过了写 was due
+const dueHTML = (k, today) => (k.due ? '<span class="pc-due' + (today > k.due ? " late" : "") + '">' + (today > k.due ? "was due " : "due ") + fmtShort(k.due) + "</span>" : "");
 
 // 进度条只给有截止日（Due）的计划（她 2026-11-22 晚说的：没有截止日的不用条）：有总量 = 做完几次 / 一共几次（计划色）+ 一道竖线 = 按日子今天该到哪；
-// 没总量 = 日子过了多少（淡）。没有截止日的，做了几次看 Pool 那一行
-function barHTML(k, today) {
+// 没总量 = 日子过了多少（淡）
+function barHTML(k) {
   if (!k.due) return "";
-  const due = (today > k.due ? "was due " : "due ") + fmtShort(k.due);
   const tick = !(k.pace > 0) ? "" : '<u style="left:' + pct(k.pace) + '%" title="Where an even pace would be today"></u>';   // 第一天就不画（贴在最左边像个毛刺）
-  if (k.total) return '<div class="pc-bar"><i style="width:' + pct(k.done / k.total) + '%"></i>' + tick + '</div><p class="pc-bl"><span>' + k.done + " of " + k.total + " done</span><span>" + due + "</span></p>";
-  if (k.pace !== null) return '<div class="pc-bar days"><i style="width:' + pct(k.pace) + '%"></i></div><p class="pc-bl"><span>' + (today < k.start ? "starts " + fmtShort(k.start) : "day " + k.dayN + " of " + k.dayM) + "</span><span>" + due + "</span></p>";
-  return '<p class="pc-bl"><span></span><span>' + due + "</span></p>";
+  if (k.total) return '<div class="pc-bar"><i style="width:' + pct(k.done / k.total) + '%"></i>' + tick + "</div>";
+  return k.pace !== null ? '<div class="pc-bar days"><i style="width:' + pct(k.pace) + '%"></i></div>' : "";
 }
 
-// Pool 还剩多少（等月份的也算在 left 里，括号里说几项在等）；Pool 空着不写
-function poolLine(k) {
-  if (!k.items) return "";
-  const wait = k.waiting ? " (" + k.waiting + " waiting for " + (k.waiting > 1 ? "their" : "its") + " month)" : "";
-  const main = k.left ? "<b>" + k.left + "</b> left" + wait + (k.pick ? " · " + k.pick + " any" : "") : k.pick ? "<b>" + k.pick + "</b> to pick from" + wait : k.waiting ? k.waiting + " waiting for " + (k.waiting > 1 ? "their" : "its") + " month" : "all done";
-  return '<p class="ls-l pc-pool">Pool ' + main + (k.later ? " · " + k.later + " later" : "") + "</p>";
+// 最底下一行：左边做完几次（没总量、有截止日的写第几天），右边 Pool 里还有几次（等月份的只写个数，全文在停上去的小字里）。Pool 空着、也没截止日就不写
+function footHTML(k, today) {
+  const left = k.total ? k.done + " of " + k.total + " done" : k.due && k.pace !== null ? (today < k.start ? "starts " + fmtShort(k.start) : "day " + k.dayN + " of " + k.dayM) : "";
+  const wait = k.waiting ? " · " + k.waiting + " waiting" : "";
+  const right = !k.items ? "" : k.left ? "<b>" + k.left + "</b> in pool" + wait : k.pick ? "<b>" + k.pick + "</b> to pick" + wait : k.waiting ? k.waiting + " waiting" : "pool done";
+  if (!left && !right) return "";
+  const tip = [k.waiting ? k.waiting + " waiting for " + (k.waiting > 1 ? "their" : "its") + " month" : "", k.later ? k.later + " put away for later" : ""].filter(Boolean).join(" · ");
+  return '<p class="ls-l pc-foot"' + (tip ? ' title="' + esc(tip) + '"' : "") + "><span>" + left + "</span><span>" + right + "</span></p>";
 }
+
+// 一周大概几次：写了 About … a week 就是它；以前按固定星期几的（循环小事）按那几天有几天算。
+// 她 2026-11-22 夜说的：力量训练、游泳这种是「不用细分、一直做下去」的事，每周几次、哪天不固定，卡片上不写 ↻、不写星期几，只看这周打卡几次
+const weekly = (p) => {
+  const r = R.ruleOf(p);
+  if (Number(r.perWeek) > 0) return true;
+  return E.isAuto(p) && !p.rule?.plan && (!r.end || r.end >= store.today()) && r.days.some((v) => Number(v) > 0);
+};
 
 function cardHTML(c, p) {
-  const k = L.planCard(c, p), per = Number(R.ruleOf(p).perWeek) || 0;
-  const w = per ? E.regularWeek(c, p) : null;
+  const k = L.planCard(c, p), w = weekly(p) ? E.regularWeek(c, p) : null;
   return '<article class="pcard" data-project="' + p.id + '" style="--pc:' + esc(p.color) + '">' +
-    '<header><button type="button" class="pname" data-act="edit-project"><i></i><span>' + esc(p.name || "Untitled") + "</span></button>" +
-    (per ? '<span class="pc-per">about ' + per + " a week</span>" : "") + archBtn(p) + "</header>" +
-    numsHTML(k) + (w && w.target ? weekSquares(w) : "") + barHTML(k, c.today) + poolLine(k) + "</article>";
+    '<header><button type="button" class="pname" data-act="edit-project"><i></i><span>' + esc(p.name || "Untitled") + "</span></button>" + dueHTML(k, c.today) + archBtn(p) + "</header>" +
+    numsHTML(k) + (w && w.target ? weekSquares(w) : "") + barHTML(k) + footHTML(k, c.today) + "</article>";
 }
 
 // 大类看的是什么（没存过的名字、哪都没归的计划照旧看进度）
@@ -150,8 +160,6 @@ function groupHead(c, name, n, empty, track, last, more = {}) {
     (track === "progress" ? "" : groupHealthHTML(c, name, last) + groupDaysHTML(c, name, track));
 }
 
-// 循环小事 = 固定星期几、Pool 里又没东西、也不是日历 Pool 拖 ↻ 设的（那种还是一张计划）：不在这一页
-const isLoose = (c, p) => E.isRepeat(p) && !p.rule?.plan && !L.itemsOf(c, p.id).length;
 
 // 页头：标题和「+ New plan」；下面单独一条 North star（横跨两栏，js/ui/goals.js 的 northHTML）。再下面两栏：左边是各个项目（.pj-plans），
 // 右边一栏是 Goals | Ideas（js/ui/goals.js），滚的时候贴着顶
@@ -165,14 +173,12 @@ export function projectsHTML(c) {
     (c.projects.length ? "" : '<p class="hint pintro">A project is an area of your life. Tasks can sit right on it, or under a plan inside it: a plan is one row on a day, timed as a whole, with a pool of things you drag in when you like.</p>') +
     columns(groups.map((g) => {
       const track = trackFor(g.name);
-      const subs = g.subs.filter((p) => !isLoose(c, p));
-      const live = subs.filter(E.isActive), old = subs.filter((p) => !E.isActive(p));
-      if (!g.name && !subs.length) return null;   // 没归大类的只有循环小事：这一页不列
+      const live = g.subs.filter(E.isActive), old = g.subs.filter((p) => !E.isActive(p));
       const shown = openArchived.has(g.name) && old.length > 0;
       return { name: g.name, html: '<section class="pgroup" data-group="' + esc(g.name) + '">' + groupHead(c, g.name, live.length, !g.subs.length, track, last, { gone: old.length, shown }) +
         (live.length ? '<div class="pgrid">' + live.map((p) => cardHTML(c, p)).join("") + "</div>" : "") +
         (shown ? '<div class="pgrid closed">' + old.map((p) => cardHTML(c, p)).join("") + "</div>" : "") + "</section>" };
-    }).filter(Boolean)) + "</div>" + goalsHTML(c) + "</div></div>";
+    })) + "</div>" + goalsHTML(c) + "</div></div>";
 }
 
 // 项目那一块再分两栏（之前定的）：左边宽的是 Build、Work（GR.ORDER 的前两个），右边窄的是别的（一句话 + 14 天方块的那种）。
@@ -379,8 +385,8 @@ function editorHTML(p) {
     '<label class="pe-grp"><span>in</span><input data-pf="group" list="groups" value="' + esc(p.group || "") + '" placeholder="Build, Fitness…" aria-label="Project"></label>' +
     '<datalist id="groups">' + groups.map((g) => '<option value="' + esc(g) + '">').join("") + "</datalist></div>";
   if (isNew) return h + settingsHTML(p) + notesHTML(p) + '<div class="sheet-foot"><span></span><button type="button" class="btn cta" data-act="create-project">Create</button></div></div>';
-  const k = L.planCard(c, p), per = Number(R.ruleOf(p).perWeek) || 0, w = per ? E.regularWeek(c, p) : null;
-  h += '<div class="pe-prog">' + numsHTML(k) + (w && w.target ? weekSquares(w) : "") + barHTML(k, c.today) + "</div>" +
+  const k = L.planCard(c, p), w = weekly(p) ? E.regularWeek(c, p) : null;
+  h += '<div class="pe-prog"><div class="pe-pt">' + numsHTML(k) + dueHTML(k, c.today) + "</div>" + (w && w.target ? weekSquares(w) : "") + barHTML(k) + footHTML(k, c.today) + "</div>" +
     '<section class="pe-pool">' + poolEditHTML(c, p) + addLinesHTML(c, p) + "</section>" + notesHTML(p) + settingsHTML(p) + servesHTML(p) +
     '<div class="sheet-foot"><button type="button" class="btn danger" data-act="del-project">' + icon("trash") + ' Delete plan</button><span class="pe-foot"><span class="seg">' +
     [["active", "Active"], ["done", "Done"], ["dropped", "Dropped"]].map(([v, l]) => '<button type="button" data-act="pstatus" data-v="' + v + '"' + ((p.status || "active") === v ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + ">" + l + "</button>").join("") +

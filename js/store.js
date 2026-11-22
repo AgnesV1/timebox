@@ -810,7 +810,7 @@ export const { ideas, ideaOf, ideaOfTask, saveIdea, addIdeas, deleteIdea, pickId
 const { ideaTaskDropped, moveIdea } = idea;
 
 const series = seriesStore({ ...core, timer, setTimer: tm.setTimer, moveMeet, moveIdea });
-export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setSeriesGroup, stopRepeat, isPlanLike } = series;
+export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setSeriesGroup, stopRepeat, isPlanLike, adoptWeekly } = series;
 // 日历 Pool 拖 ↻ 设重复、闹钟那个开关：设好 / 打开以后今天该有的那一次马上排进来
 export function setPlanRepeat(pid, spec) { const ok = series.setPlanRepeat(pid, spec); if (ok) autoToday(); return ok; }
 export function toggleRepeat(pid, on) { series.toggleRepeat(pid, on); if (on) autoToday(); }

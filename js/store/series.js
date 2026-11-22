@@ -12,7 +12,8 @@ export default function (core) {
   const { all, get, put, drop, change, newId, today, byOrder, groupFor, colorFor, nextPlanOrder, nextOrder, started, dropTask, deleteTask, updateTask, timer, setTimer, moveMeet, moveIdea } = core;
 
   const routines = () => all("projects").filter(E.isRegular).sort(byOrder);
-  const routineOf = (taskId) => { const x = R.parseRoutineTaskId(taskId); const p = x ? get("projects", x.rid) : null; return p && E.isRegular(p) ? p : null; };
+  // 还在按星期几重复的才算（2026-11-22 起以前固定星期几的都改成每周几次了，它们以前那几次的 rt: 任务就是普通的那一行，不再当重复）
+  const routineOf = (taskId) => { const x = R.parseRoutineTaskId(taskId); const p = x ? get("projects", x.rid) : null; return p && E.isRegular(p) && E.isAuto(p) ? p : null; };
   const seriesTasks = (rid) => all("tasks").filter((x) => x.id.startsWith("rt:" + rid + ":")).sort((a, b) => a.date.localeCompare(b.date));
   const origDate = (id) => R.parseRoutineTaskId(id)?.date || "";
 
@@ -24,7 +25,7 @@ export default function (core) {
   function newRegular(name, projectId, rule, direct = "") {
     const group = groupFor(projectId) || direct;
     return { id: newId(), name, group, kind: "regular", place: "auto", status: "active", deadline: "", start: "", early: 0, calib: null,
-      rule: { days: [0, 0, 0, 0, 0, 0, 0], skip: [], ...rule }, color: get("projects", projectId)?.color || colorFor(group), order: nextPlanOrder() };
+      rule: { days: [0, 0, 0, 0, 0, 0, 0], skip: [], set: true, ...rule }, color: get("projects", projectId)?.color || colorFor(group), order: nextPlanOrder() };
   }
 
   const repeatLabel = (end) => (end ? "Repeats until " + fmtShort(end) : "Repeats from now on");
@@ -37,6 +38,23 @@ export default function (core) {
   // 从今天起已经落成、还没开始的那几次（规则变了以后不该出现的那些从这里挑）
   const ahead = (pid) => seriesTasks(pid).filter((x) => !started(x) && origDate(x.id) >= today());
   const daysText = (on) => [1, 2, 3, 4, 5, 6, 0].filter((d) => on.includes(d)).map((d) => WEEKDAYS[d]).join(" · ");
+
+  // 以前按固定星期几自己出现的（Gym 这种，她 2026-11-22 夜说的：「很少能固定周几去，周末安排不确定，也会拖延」）改成每周大概几次、自己拖：
+  // 每周几次 = 原来一周有几天，默认分钟 = 原来那几天的分钟；已经写了的照旧。过了最后一天的（早就不重复了）顺手归档。
+  // 只改以前建的：日历 Pool 拖 ↻ 临时设的（rule.plan）、之后加任务时选 Repeat 新建的（rule.set）都不动。今天已经排上的那一行留着
+  function adoptWeekly() {
+    const list = all("projects").filter((p) => E.isAuto(p) && !p.rule?.plan && !p.rule?.set);
+    if (!list.length) return false;
+    change(() => {
+      for (const p of list) {
+        const r = R.ruleOf(p), on = r.days.map(Number).filter((v) => v > 0), ended = Boolean(r.end) && r.end < today();
+        const { days: _d, start: _s, end: _e, skip: _k, off: _o, ...rest } = p.rule || {};
+        put("projects", { ...p, place: "pool", ...(ended && E.isActive(p) ? { status: "done" } : {}),
+          rule: { ...rest, perWeek: Number(rest.perWeek) > 0 ? Number(rest.perWeek) : ended ? 0 : on.length, min: Number(rest.min) > 0 ? Number(rest.min) : on[0] || 0 } });
+      }
+    }, "", { quiet: true });
+    return true;
+  }
 
   // 日历 Pool 里拖 ↻ 设的重复（她 2026-11-22 要的，像闹钟）：每周哪几天 on（0 = 周日 … 6 = 周六），从 start 到 end（她自己挑，必填）。
   // 存法沿用固定星期几（place auto + rule.days / start / end）。原来是拖着用的计划就记 rule.plan：它还是一张计划卡片，停掉以后变回拖着用的。
@@ -186,5 +204,5 @@ export default function (core) {
     change(() => put("projects", { ...p, group: to, color: colorFor(to) }), to ? "Moved to " + to : "Taken out of its project");
   }
 
-  return { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setRule, setSeriesGroup, setPlanRepeat, toggleRepeat, stopRepeat, isPlanLike };
+  return { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setRule, setSeriesGroup, setPlanRepeat, toggleRepeat, stopRepeat, isPlanLike, adoptWeekly };
 }

@@ -245,3 +245,29 @@ test("store: dragging ↻ makes a plan repeat for a while; switch it off and on;
   assert.ok(store.get("projects", pid), "deleting the whole repeat never deletes the plan");
   assert.equal(store.get("projects", pid).place, "pool");
 });
+
+test("store: old fixed-weekday plans become about N a week, once; new repeats and ↻ repeats stay", async () => {
+  const store = await import("../js/store.js?weekly");
+  const t = store.today();
+  const gym = store.saveProject({ name: "Gym", group: "Fitness", kind: "regular", place: "auto", rule: { days: [0, 40, 0, 40, 0, 40, 0], start: addDays(t, -60), end: "" } });
+  const old = store.saveProject({ name: "Nap", kind: "regular", place: "auto", rule: { days: [20, 20, 20, 20, 20, 20, 20], start: addDays(t, -30), end: addDays(t, -10) } });
+  const swim = store.saveProject({ name: "Swim", kind: "regular", place: "auto", rule: { days: [0, 0, 30, 0, 0, 0, 0], perWeek: 2, min: 50, start: addDays(t, -9) } });
+  const fresh = store.addRepeating({ date: t, title: "Stretch", est: 10 }, R.daysFor("daily", t, 10), "");
+  const ielts = store.saveProject({ name: "IELTS", kind: "regular", place: "pool", rule: { min: 45 } });
+  store.setPlanRepeat(ielts, { on: [weekday(t)], start: t, end: addDays(t, 14) });
+
+  assert.equal(store.adoptWeekly(), true);
+  const g = store.get("projects", gym);
+  assert.equal(g.place, "pool");
+  assert.equal(g.rule.perWeek, 3, "three weekdays → about 3 a week");
+  assert.equal(g.rule.min, 40, "their minutes become the default");
+  assert.equal(g.rule.days, undefined);
+  assert.equal(store.get("projects", swim).rule.perWeek, 2, "a weekly number already written stays");
+  assert.equal(store.get("projects", swim).rule.min, 50);
+  assert.equal(store.get("projects", old).status, "done", "one that had already ended is put away");
+  assert.equal(store.get("projects", R.parseRoutineTaskId(fresh).rid).place, "auto", "a repeat made from now on keeps its days");
+  assert.equal(store.get("projects", ielts).place, "auto", "a ↻ repeat from the calendar stays");
+  assert.equal(E.ghostsOn(store.ctx(), addDays(t, 7)).some((x) => x.plan.id === gym), false, "Gym no longer shows up by itself");
+  assert.equal(store.routineOf(R.routineTaskId(gym, t)), null, "its old rows are plain rows now, not a repeat");
+  assert.equal(store.adoptWeekly(), false, "runs once");
+});

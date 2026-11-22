@@ -1,6 +1,7 @@
 // 日历（电脑）：周视图 / 月视图，右边是 Pool；Year 视图是三条长横条（计算在 js/year.js），不放任务，也不开 Pool。
 // 把 Pool 里的一项拖到某天 = 那天这个计划下面多一条；计划名本身拖过去 = 那天这个计划空的一行（Swimming 这种）。
-// 一个计划那天是一张便利贴：Pool 关着只写计划名，鼠标停上去展开成一行一项；Pool 开着（排计划的时候）直接一行一项、右边写分钟，日期后面写那天排了几小时
+// 一个计划那天是一张便利贴：周视图（2026-11-22 晚起）不管 Pool 开没开都直接一行一项、右边写分钟；月视图 Pool 关着只写计划名，鼠标停上去展开成一行一项（不透明、压在下面的便利贴上）；
+// Pool 开着（排计划的时候）今天和以后直接一行一项、右边写分钟，日期后面写那天排了几小时
 //   （她 2026-10-27 挑的甲；每一项能单独拖到别的天）；
 // 整张拖到别的天 = 那天还没勾的几项一起挪，拖回 Pool = 回去；点它 = 到今天页的那一天。别的任务照旧一张一张，拖到别的天就挪过去，拖回 Pool 就撤回。
 // 固定星期几的计划在以后的日子里画成淡色预览：可以拖走 / 点开（这时才变成真任务）。停上去写着每周哪几天、到哪天，最后一次后面写 last。
@@ -94,7 +95,8 @@ function blockHTML(b, d, pool) {
 // 顶上那条（她 2026-10-28 定的）：以前的日子 = 实际记下的总时间，今天和以后 = 排了的（就是日期后面那个数，含固定星期几的预览）——都算所有大类。
 // 分母是那天的 box（右上角的数，她是 10h）。超过 box = 整条静止的红（强制，不闪）；没超 box、超过 7 小时（js/year.js 的 LONG_DAY）= 闪。
 // 金条那天都不红（Leisure 占得多的那天她自己改成金条）。大类的 Counts as progress 和这里无关（那是给季度表的）。这条规则在 js/year.js 的 dayLoad，Year 视图也用它
-function cellHTML(c, d, { month = false, outside = false, scores = null, still = false, pool = false } = {}) {
+// list = 计划那张一行一项、带分钟（她 2026-11-22 晚要的：周视图地方够，不管 Pool 开没开、以前还是以后，都直接展开所有小项和时间）
+function cellHTML(c, d, { month = false, outside = false, scores = null, still = false, pool = false, list = false } = {}) {
   // Chore 键记下的那条不上日历（她 2026-11-02 说的：没排，只是按了键，总会有一些事突然要做）：不画，也不算进「排了的」。
   // 以前的日子顶上那条是实际记下的总时间，这段时间照算；Chores 大类下自己排的任务照常显示
   const tasks = store.tasksOn(d).filter((t) => !store.isChore(t));
@@ -106,7 +108,7 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
   const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d), ahead = pool && d >= c.today;
   const past = d < c.today, { val, planned, over, long } = Y.dayLoad(c, d, gold);
   const cls =["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", over ? "over" : "", ahead ? "cal-plan" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
-  const all = [...blocks.map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d, ahead))), ...ghosts.map(ghostHTML)];
+  const all = [...blocks.map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d, ahead || list))), ...ghosts.map(ghostHTML)];
   const loadPct = over ? 100 : sum.cap ? Math.min(100, (val / sum.cap) * 100) : 0;
   let h ='<div class="' + cls + '" data-drop="day:' + d + '">' +
     '<div class="cell-head"><span class="dn-w"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"' + (unscored ? ' title="Not scored yet"' : "") + "><span>" + (month ? "" : WEEKDAYS[wd]) + "</span><b>" + Number(d.slice(8)) + "</b>" + (isPayday(d) ? '<span class="payday" title="Payday">$</span>' : "") + (unscored ? '<i class="dsc-dot" aria-label="Not scored yet"></i>' : "") + "</button>" +
@@ -227,7 +229,7 @@ export function calendarHTML(c) {
     const s = startOfWeek(anchor, weekStart());
     const e = addDays(s, 6);
     title = fmtShort(s) + " – " + (s.slice(5, 7) === e.slice(5, 7) ? Number(e.slice(8)) : fmtShort(e));
-    body = '<div class="cal-scroll"><div class="week">' + range(s, e).map((d) => cellHTML(c, d, { scores, still, pool })).join("") + "</div></div>";
+    body = '<div class="cal-scroll"><div class="week">' + range(s, e).map((d) => cellHTML(c, d, { scores, still, pool, list: true })).join("") + "</div></div>";
   } else {
     const m0 = startOfMonth(anchor);
     const s = startOfWeek(m0, weekStart());

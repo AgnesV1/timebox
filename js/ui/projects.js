@@ -359,8 +359,8 @@ function servesHTML(p) {
   if (!goals.length) return "";
   const ref = G.planRef(p.id), cols = G.board(goals, store.today()).cols;
   const linked = (g) => Array.isArray(g.by) && g.by.includes(ref);
-  const list = cols.flatMap((col) => col.items.filter((x) => (!x.done && (!col.far || serveMore)) || linked(x.goal)).map((x) => x.goal));
-  const more = cols.some((col) => col.far && col.items.some((x) => !x.done && !linked(x.goal)));
+  const list = cols.flatMap((col) => col.items.filter((x) => (!x.done && !x.miss && (!col.far || serveMore)) || linked(x.goal)).map((x) => x.goal));
+  const more = cols.some((col) => col.far && col.items.some((x) => !x.done && !x.miss && !linked(x.goal)));
   const own = goals.some(linked), heir = !own && p.group ? G.servedBy(goals, G.groupRef(p.group)) : [];
   return '<div class="field serves"><span>Serves</span><div class="chips schips">' +
     list.map((g) => '<button type="button" class="chip' + (linked(g) ? " on" : "") + '" data-act="serve" data-goal="' + esc(g.id) + '" aria-pressed="' + linked(g) + '" title="' + esc(g.text) + '">' + (g.span === "north" ? "✦ " : "") + esc(g.text) + "</button>").join("") +

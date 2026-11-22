@@ -2071,6 +2071,7 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .ns-text.empty { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .ns-g { display: inline; margin: 0 1px; padding: 1px 4px; border: 1.5px solid var(--ink); border-radius: 5px; font-weight: 600; -webkit-box-decoration-break: clone; box-decoration-break: clone; cursor: pointer; transition: background-color .15s; }
 .ns-g.done { color: var(--muted); text-decoration: line-through; }
+.ns-g.miss { color: var(--muted); }   /* 没实现：淡下去，不划掉（和做到了分开） */
 .ns-g.ghost { border-style: dashed; border-color: var(--muted); cursor: text; }
 @media (hover: hover) { .ns-g:hover { background: color-mix(in srgb, var(--accent) 40%, transparent); } }
 [data-theme="dark"] .ns-g { border-color: color-mix(in srgb, var(--accent) 75%, transparent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -2109,6 +2110,9 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .gt-in { flex: 1 1 calc(100% - 20px); min-width: 0; padding: 2px 6px; border: var(--b-ctl); border-radius: 6px; font-size: 12.5px; }
 .gl.done .gt { color: var(--muted); text-decoration: line-through; }
 .gl.ahead .gt { color: var(--muted); }
+/* 没实现（2026-11-22 夜）：字淡下去、不划掉，右边「– Nov」；点开这一行才有 Didn't happen 那个签 */
+.gl.miss .gt { color: var(--muted); }
+.gl.editing .gmiss { padding: 1px 8px; font-size: 11px; }
 .gmeta { display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; margin-left: auto; }
 .gl.editing .gmeta { flex: 1 1 100%; flex-wrap: wrap; row-gap: 4px; padding-left: 18px; }
 /* 改字时的「Part of」：选上级 */
@@ -2154,6 +2158,7 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 [data-theme="dark"] .gh input[type="checkbox"] { accent-color: var(--accent); }
 .gh-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gh.done .gh-t { text-decoration: line-through; }
+.gh.miss .gh-t { opacity: .7; }
 .gh-w { flex-shrink: 0; font: 600 11px var(--num); }
 .gh:hover .ggrip, .gh .ggrip:focus-visible, .gh .ggrip.open { opacity: 1; }
 @media (hover: hover) { .gmore:hover { color: var(--ink); text-decoration: underline; } }

@@ -1,5 +1,6 @@
 // 目标板的纯计算（Projects 页最上面）。一条目标：
-//   { id, text, tag, span: "month" | "quarter" | "year" | "north", due: "YYYY-MM"（打算哪个月做到）, done: "YYYY-MM"（实际哪个月做到，空 = 还没）, order,
+//   { id, text, tag, span: "month" | "quarter" | "year" | "north", due: "YYYY-MM"（打算哪个月做到）, done: "YYYY-MM"（实际哪个月做到，空 = 还没）,
+//     miss: "YYYY-MM"（没实现，哪个月定下的；她 2026-11-22 夜要的：只要一种、不分失败 / 放弃 / 改了范围，「到底为什么没实现再说」；和 done 只会有一个）, order,
 //     up: 上级目标的 id（一条只有一个上级，可以一层层往上串）, by: ["g:项目名", "p:计划 id"]（哪些项目 / 计划为它服务，多对多） }
 // 栏目按「今天」现算（她 2026-11-05 晚重排的），每栏管一段月份：This month、Next month；This quarter 只在本季第一个月出现，管第三个月；
 //   This year 只在今年还剩月份时出现，管前面几栏之后到 12 月；再加明年（Next year）和之后三年，最后一栏 North star（没有日期）。
@@ -49,29 +50,34 @@ export function whenText(when, colYear) {
 
 // 一条目标算在哪个月：勾了的算做完的那个月，没勾的算截止月——就是那一行右边写的那个月（「✓ Oct」「Dec」）。
 // 她 2026-11-06 说的：设了 Oct 的还没折叠、Nov 的在 Next month——那几条都勾了，显示的是做完的月份，以前却按截止月放
-export const monthOfGoal = (g) => (g?.done || g?.due || "");
+export const monthOfGoal = (g) => (g?.done || g?.miss || g?.due || "");
+// 已经有结果了：做到了，或者没实现（都不算还在进行，排在没结果的后面）
+export const closed = (g) => Boolean(g?.done || g?.miss);
+// 标「做到了 / 没实现」时记哪个月：这个月；已经过期的（往期里补标）记它原定的那个月
+export const settleMonth = (g, today) => (isOld({ ...g, done: "", miss: "" }, today) ? String(g.due).slice(0, 7) : String(today).slice(0, 7));
 
 // 过期了没有：它那个月已经过去了（月、季、年目标都一样）。North star、没写期限的永远不过期
 export function isOld(g, today) {
   return spanOf(g) !== "north" && Boolean(monthOfGoal(g)) && monthOf(monthOfGoal(g)) < monthOf(today);
 }
 
-// → { cols: [{...column, items: [{ goal, done, ahead, when }]}], old: 过期了、收进往期的有几条 }
+// → { cols: [{...column, items: [{ goal, done, miss, ahead, when }]}], old: 过期了、收进往期的有几条 }
 // 每一栏里：没做完的在前；再按标签排——rank(tag) 给的先后（项目的顺序：Build、Work、Friends…，没标签的最后）；同一个标签里早到期的在前
 export function board(goals, today, { rank = () => 0 } = {}) {
   const cols = columns(today).map((c) => ({ ...c, items: [] }));
   const timed = cols.filter((c) => c.span !== "north"), last = timed[timed.length - 1];
   let old = 0;
   for (const g of goals) {
-    if (spanOf(g) === "north") { cols[cols.length - 1].items.push({ goal: g, done: Boolean(g.done), ahead: false, when: g.done ? whenText(g.done, 0) : "" }); continue; }
+    if (spanOf(g) === "north") { cols[cols.length - 1].items.push({ goal: g, done: Boolean(g.done), miss: !g.done && Boolean(g.miss), ahead: false, when: g.done || g.miss ? whenText(g.done || g.miss, 0) : "" }); continue; }
     if (isOld(g, today)) { old++; continue; }
-    const at = monthOf(monthOfGoal(g) || today), done = Boolean(g.done);
+    const at = monthOf(monthOfGoal(g) || today), done = Boolean(g.done), miss = !done && Boolean(g.miss);
     let col = timed.find((c) => at >= c.from && at <= c.to), ahead = false;
     if (!col) { col = last; ahead = true; }
-    col.items.push({ goal: g, done, ahead, when: whenText(done ? g.done : g.due, col.y) });
+    col.items.push({ goal: g, done, miss, ahead, when: whenText(done ? g.done : miss ? g.miss : g.due, col.y) });
   }
-  const when = (x) => (x.done ? x.goal.done : x.goal.due) || "";
-  for (const c of cols) c.items.sort((a, b) => a.done - b.done || rank(a.goal.tag) - rank(b.goal.tag) || when(a).localeCompare(when(b)) || (Number(a.goal.order) || 0) - (Number(b.goal.order) || 0));
+  const when = (x) => (x.done ? x.goal.done : x.miss ? x.goal.miss : x.goal.due) || "";
+  const shut = (x) => (x.done || x.miss ? 1 : 0);
+  for (const c of cols) c.items.sort((a, b) => shut(a) - shut(b) || rank(a.goal.tag) - rank(b.goal.tag) || when(a).localeCompare(when(b)) || (Number(a.goal.order) || 0) - (Number(b.goal.order) || 0));
   return { cols, old };
 }
 

@@ -423,7 +423,7 @@ function focusNorth(root, ids) {
   }
   place(ov);
   // 框里的词和原来那段一个样子（.ns-g），只是不接鼠标、带的是 data-fgoal（不算能悬停、能连的那种）
-  const word = (i) => { const g = byId.get(at[i]); return (g ? '<span class="ns-g' + (g.done ? " done" : "") + '" data-fgoal="' + esc(g.id) + '">' : '<span class="ns-g ghost">') + esc(phrases[i].text) + "</span>"; };
+  const word = (i) => { const g = byId.get(at[i]); return (g ? '<span class="ns-g' + (g.done ? " done" : g.miss ? " miss" : "") + '" data-fgoal="' + esc(g.id) + '">' : '<span class="ns-g ghost">') + esc(phrases[i].text) + "</span>"; };
   const html = (parts) => parts.map((x) => (x.gap ? '<span class="ns-gap">…</span>' : x.sep ? '<span class="ns-sep">·</span>' : x.i !== undefined ? word(x.i) : esc(x.text))).join("");
   for (const [level, pad] of keep.length > 1 ? [["word"]] : [["sentence"], ["clause", 1], ["clause"], ["word"]]) {
     ov.innerHTML = html(G.northFocus(text, phrases, keep, level, pad));

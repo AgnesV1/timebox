@@ -46,10 +46,10 @@ function tagList(c, goals) {
 }
 
 function whenEditHTML(g, T) {
-  const cur = g.done || g.due || T.slice(0, 7), y = Number(cur.slice(0, 4)), m = Number(cur.slice(5, 7)), y0 = Number(T.slice(0, 4));
+  const cur = g.done || g.miss || g.due || T.slice(0, 7), y = Number(cur.slice(0, 4)), m = Number(cur.slice(5, 7)), y0 = Number(T.slice(0, 4));
   const years = [];
   for (let k = Math.min(y, y0 - 1); k <= Math.max(y, y0 + 8); k++) years.push(k);
-  const what = g.done ? "finished" : "due";
+  const what = g.done ? "finished" : g.miss ? "it didn't happen" : "due";
   return '<span class="gwhen"><select data-g="m" aria-label="Month ' + what + '">' + MONTHS.map((name, i) => '<option value="' + (i + 1) + '"' + (i + 1 === m ? " selected" : "") + ">" + name + "</option>").join("") +
     '</select><select data-g="y" aria-label="Year ' + what + '">' + years.map((k) => '<option value="' + k + '"' + (k === y ? " selected" : "") + ">" + k + "</option>").join("") + "</select></span>";
 }
@@ -78,12 +78,14 @@ function rowHTML(x, k, dflt, fold = false) {
   const tagSel = '<select class="gtag' + (tag ? (hue ? " dot" : "") : " none") + '" data-g="tag" aria-label="' + esc(tag ? "Tag: " + tag : "Tag") + '" title="' + esc(tag || "Add a tag") + '" style="--pc:' + esc(hue || "var(--c-None)") + '"><option value="">' + (tag ? "No tag" : "+ tag") + "</option>" +
     opts.map((t) => '<option value="' + esc(t) + '"' + (low(t) === low(tag) ? " selected" : "") + (k.colors[low(t)] ? ' data-color="' + esc(k.colors[low(t)]) + '"' : "") + ">" + esc(t) + "</option>").join("") + "</select>";
   const when = field === "when" ? whenEditHTML(g, k.T)
-    : '<button type="button" class="gdue' + (dflt ? " dflt" : "") + '" data-act="g-when" title="' + (x.done ? "Finished — click to change" : "Due — click to change") + '">' + (x.done ? "✓ " : "") + esc(x.when) + "</button>";
+    : '<button type="button" class="gdue' + (dflt ? " dflt" : "") + '" data-act="g-when" title="' + (x.done ? "Finished — click to change" : x.miss ? "Didn't happen — click to change the month" : "Due — click to change") + '">' + (x.done ? "✓ " : x.miss ? "– " : "") + esc(x.when) + "</button>";
+  // 点开这一行（改字的时候）多一个「Didn't happen」：没实现，不分为什么（她 2026-11-22 夜要的）；再点一下取消
+  const miss = field === "text" ? '<button type="button" class="chip gmiss' + (x.miss ? " on" : "") + '" data-act="g-miss" aria-pressed="' + Boolean(x.miss) + '">Didn\'t happen</button>' : "";
   // 左边的小把手：拖到别的一段 = 改成那一段的默认期限；点一下 / 回车 = 挑一段（js/ui/dnd.js）。拖目标本身是连线（js/ui/links.js），两个不打架
   const grip = field ? "" : '<span class="ggrip" data-drag="goal:' + id + '" role="button" tabindex="0" aria-haspopup="listbox" aria-label="Move to another time" title="Drag to another time, or click"></span>';
-  return '<li class="gl' + (x.done ? " done" : "") + (x.ahead ? " ahead" : "") + (fold ? " fold" : "") + (field === "text" ? " editing" : "") + '" data-goal="' + id + '" data-drag-show>' + grip +
+  return '<li class="gl' + (x.done ? " done" : "") + (x.miss ? " miss" : "") + (x.ahead ? " ahead" : "") + (fold ? " fold" : "") + (field === "text" ? " editing" : "") + '" data-goal="' + id + '" data-drag-show>' + grip +
     '<input type="checkbox" data-g="done"' + (x.done ? " checked" : "") + ' aria-label="Done">' + text +
-    '<span class="gmeta">' + (field === "text" ? upHTML(g, k) : "") + tagSel + when + '<button type="button" class="gx" data-act="g-del" aria-label="Delete goal">×</button></span></li>';
+    '<span class="gmeta">' + (field === "text" ? upHTML(g, k) : "") + miss + tagSel + when + '<button type="button" class="gx" data-act="g-del" aria-label="Delete goal">×</button></span></li>';
 }
 
 function colHTML(col, k, first) {
@@ -91,7 +93,7 @@ function colHTML(col, k, first) {
   const all = openCols.has(col.key) || col.items.slice(limit).some((x) => x.goal.id === edit?.id);
   const shown = all ? col.items : col.items.slice(0, limit), more = col.items.length - shown.length;
   // 折起来的那几条也画出来、带 .fold（平时藏着；拖连线时 css 让它们露出来，才放得上去）
-  const rows = col.items.map((x, i) => rowHTML(x, k, !x.done && !x.ahead && x.goal.due === col.due, !all && i >= limit));
+  const rows = col.items.map((x, i) => rowHTML(x, k, !x.done && !x.miss && !x.ahead && x.goal.due === col.due, !all && i >= limit));
   const add = adding === col.key || (k.empty && col.key === "month");
   const title = esc(col.title);
   return '<section class="gcol' + (shown.length || add ? "" : " empty") + (first ? " far1" : "") + '" data-col="' + col.key + '" data-drop="gcol:' + col.key + '" data-name="' + esc(col.title + (col.sub ? " · " + col.sub : "")) + '"><h4>' + title + (col.sub ? " <small>" + col.sub + "</small>" : "") +
@@ -122,7 +124,7 @@ export function northHTML() {
     h += esc(text.slice(from, p.start));
     const g = at.get(ids[i]);
     // 用行内的 span（不是 button）：长的词跟着字一行行折下去，每一截都有框；Tab 能停、回车 / 空格能点（见下面的 keydown）
-    h += g ? '<span class="ns-g' + (g.done ? " done" : "") + '" role="button" tabindex="0" data-goal="' + esc(g.id) + '" data-act="ns-edit" data-i="' + i + '">' + esc(p.text) + "</span>"
+    h += g ? '<span class="ns-g' + (g.done ? " done" : g.miss ? " miss" : "") + '" role="button" tabindex="0" data-goal="' + esc(g.id) + '" data-act="ns-edit" data-i="' + i + '">' + esc(p.text) + "</span>"
       : '<span class="ns-g ghost">' + esc(p.text) + "</span>";
     from = p.end;
   });
@@ -143,16 +145,16 @@ function pastHTML(goals, T) {
   const list = G.past(goals, T);
   if (!list.length) return "";
   const cur = list.find((x) => x.key === pastKey) || list[0];
-  const own = [...cur.year, ...cur.quarters.flatMap((x) => x.items), ...cur.months.flatMap((x) => x.items)], done = own.filter((g) => g.done).length;
-  const row = (g) => '<li class="gh' + (g.done ? " done" : "") + '" data-goal="' + esc(g.id) + '" data-drag-show>' +
+  const own = [...cur.year, ...cur.quarters.flatMap((x) => x.items), ...cur.months.flatMap((x) => x.items)], done = own.filter((g) => g.done).length, missed = own.filter((g) => !g.done && g.miss).length;
+  const row = (g) => '<li class="gh' + (g.done ? " done" : g.miss ? " miss" : "") + '" data-goal="' + esc(g.id) + '" data-drag-show>' +
     (g.done ? "" : '<span class="ggrip" data-drag="goal:' + esc(g.id) + '" role="button" tabindex="0" aria-haspopup="listbox" aria-label="Move back to a current section" title="Drag to a current section, or click"></span>') +
     '<input type="checkbox" data-g="done"' + (g.done ? " checked" : "") + ' aria-label="Done"><span class="gh-t" title="' + esc(g.text) + '">' + esc(g.text) + "</span>" +
-    '<span class="gh-w">' + esc(g.done ? "✓ " + G.whenText(g.done, cur.y) : G.whenText(g.due, cur.y)) + "</span></li>";
+    '<span class="gh-w"' + (g.miss && !g.done ? ' title="Didn\'t happen"' : "") + ">" + esc(g.done ? "✓ " + G.whenText(g.done, cur.y) : g.miss ? "– " + G.whenText(g.miss, cur.y) : G.whenText(g.due, cur.y)) + "</span></li>";
   const group = (title, items) => (items.length ? "<h5>" + esc(title) + "</h5><ul>" + items.map(row).join("") + "</ul>" : "");
   return '<section class="gpast' + (pastOpen ? " open" : "") + '" aria-label="Past goals">' +
     '<div class="gpast-h"><button type="button" class="gpast-t" data-act="past-toggle" aria-expanded="' + pastOpen + '">Past</button>' +
     '<select data-g="pastq" aria-label="Which year">' + list.map((x) => '<option value="' + x.key + '"' + (x === cur ? " selected" : "") + ">" + esc(x.label) + "</option>").join("") + "</select>" +
-    (own.length ? '<small class="msub">' + done + " of " + own.length + " done</small>" : "") + "</div>" +
+    (own.length ? '<small class="msub">' + done + " of " + own.length + " done" + (missed ? " · " + missed + " didn't happen" : "") + "</small>" : "") + "</div>" +
     (pastOpen ? '<div class="gpast-b">' + group("Year", cur.year) + cur.quarters.map((x) => group(x.label, x.items)).join("") + cur.months.map((x) => group(x.label, x.items)).join("") + "</div>" : "") + "</section>";
 }
 
@@ -173,7 +175,7 @@ function listHTML(c) {
 
 export function goalsHTML(c) {
   const tab = sideTab();
-  const open = store.goals().filter((g) => g.span !== "north" && !g.done && !G.isOld(g, c.today)).length;
+  const open = store.goals().filter((g) => g.span !== "north" && !G.closed(g) && !G.isOld(g, c.today)).length;
   const seg = '<span class="seg">' + [["goals", "Goals"], ["ideas", "Ideas"]].map(([v, l]) => '<button type="button" data-act="rail-tab" data-v="' + v + '"' + (v === tab ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
   return '<aside class="goals pj-rail" aria-label="Goals and ideas">' +
     '<div class="rail-tabs">' + seg + (tab === "goals" && open ? '<span class="msub">' + open + " open</span>" : "") + "</div>" +
@@ -202,7 +204,8 @@ export function goalDrop(payload, target) {
   edit = null;
   openCols.add(key);   // 落到折起来的那几条里也看得到
   const { dated: _d, ...rest } = g;   // 11-05 那一版留下的字段，现在用不上了，顺手去掉
-  store.saveGoal({ ...rest, span: col.span, due: col.due }, "Moved to " + col.title + (col.sub ? " (" + col.sub + ")" : ""));
+  // 没实现的拖回现在的某一段 = 重新来过，「没实现」去掉
+  store.saveGoal({ ...rest, span: col.span, due: col.due, miss: "" }, "Moved to " + col.title + (col.sub ? " (" + col.sub + ")" : ""));
 }
 
 export function initGoals(rerender) {
@@ -214,6 +217,8 @@ export function initGoals(rerender) {
     const act = el.dataset.act, id = rowOf(el), col = el.closest("[data-col]")?.dataset.col || "";
     if (act === "rail-tab") { edit = null; adding = ""; store.setLocal({ projSide: el.dataset.v === "ideas" ? "ideas" : "goals" }); return; }
     if (act === "g-del") { edit = null; store.deleteGoal(id); return; }
+    // 没实现：记这个月（往期里补标的记它原定的那个月），和 Done 只能有一个；再点一下取消
+    if (act === "g-miss") { const g = goal(id); if (g) store.saveGoal({ ...g, miss: g.miss ? "" : G.settleMonth(g, store.today()), done: "" }, g.miss ? "Back to open" : "Marked as didn't happen"); return; }
     if (act === "past-toggle") pastOpen = !pastOpen;
     else if (act === "g-add") {
       adding = adding === col ? "" : col;
@@ -324,13 +329,13 @@ export function initGoals(rerender) {
     const f = el.dataset.g, g = goal(rowOf(el));
     if (!g) return;
     // 往期里补勾：记成它原定的那个月（那时候做完的），不是今天
-    if (f === "done") store.saveGoal({ ...g, done: el.checked ? (G.isOld(g, store.today()) ? String(g.due).slice(0, 7) : store.today().slice(0, 7)) : "" });
+    if (f === "done") store.saveGoal({ ...g, done: el.checked ? G.settleMonth(g, store.today()) : "", miss: "" });
     else if (f === "tag") store.saveGoal({ ...g, tag: el.value });
     else if (f === "up") store.setParent(g.id, el.value);
     else if (f === "m" || f === "y") {
       const box = el.closest(".gwhen");
       const when = G.ymOf(Number(box.querySelector("[data-g=y]").value), Number(box.querySelector("[data-g=m]").value));
-      store.saveGoal({ ...g, [g.done ? "done" : "due"]: when });
+      store.saveGoal({ ...g, [g.done ? "done" : g.miss ? "miss" : "due"]: when });
     }
   });
 

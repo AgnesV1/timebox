@@ -195,3 +195,16 @@ test("store: link, parent, rename, delete, and the old far year moves to North s
   store.deleteGoal(near);
   assert.equal(get(soon).up, "", "a goal whose parent is gone has no parent");
 });
+
+test("a goal that didn't happen is closed like a done one: after the open ones, at the month it was called, then into the past", () => {
+  const T = "2026-11-10";
+  const b = G.board([g("open", "month", "2026-11"), g("missed", "month", "2026-11", { miss: "2026-11", order: 0 }), g("dec", "month", "2026-12", { miss: "2026-11" })], T);
+  const month = b.cols.find((c) => c.key === "month").items;
+  assert.deepEqual(month.map((x) => x.goal.id + (x.miss ? "–" : "")), ["open", "missed–", "dec–"], "open first; a December goal called off in November sits in November");
+  assert.equal(month[1].when, "Nov");
+  assert.equal(G.closed({ miss: "2026-11" }), true);
+  assert.equal(G.closed({ done: "", miss: "" }), false);
+  assert.equal(G.settleMonth(g("x", "month", "2026-11"), T), "2026-11", "called this month");
+  assert.equal(G.settleMonth(g("y", "month", "2026-09"), T), "2026-09", "called off in the past: the month it was due");
+  assert.equal(G.isOld(g("z", "month", "2026-12", { miss: "2026-10" }), T), true, "goes into the past with the month it was called");
+});

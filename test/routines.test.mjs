@@ -264,10 +264,39 @@ test("store: old fixed-weekday plans become about N a week, once; new repeats an
   assert.equal(g.rule.days, undefined);
   assert.equal(store.get("projects", swim).rule.perWeek, 2, "a weekly number already written stays");
   assert.equal(store.get("projects", swim).rule.min, 50);
-  assert.equal(store.get("projects", old).status, "done", "one that had already ended is put away");
+  assert.equal(store.get("projects", old).status, "active", "one past its last day stays where it was (it may still be dragged)");
+  assert.equal(store.get("projects", old).rule.perWeek, 7);
   assert.equal(store.get("projects", R.parseRoutineTaskId(fresh).rid).place, "auto", "a repeat made from now on keeps its days");
   assert.equal(store.get("projects", ielts).place, "auto", "a ↻ repeat from the calendar stays");
   assert.equal(E.ghostsOn(store.ctx(), addDays(t, 7)).some((x) => x.plan.id === gym), false, "Gym no longer shows up by itself");
   assert.equal(store.routineOf(R.routineTaskId(gym, t)), null, "its old rows are plain rows now, not a repeat");
   assert.equal(store.adoptWeekly(), false, "runs once");
+});
+
+test("store: plans the first version of that change put away come back, once, with an undo", async () => {
+  const store = await import("../js/store.js?weekly-fix");
+  const t = store.today();
+  let label = "", undo = null;
+  store.onUndo((l, before) => { label = l; undo = before; });
+  // 上一版转完的样子：拖着用、没有星期几、被标成 done（先照现在的转一遍，再归档）
+  const train = store.saveProject({ name: "Training", group: "Fitness", kind: "regular", place: "auto", rule: { days: [0, 60, 0, 60, 0, 0, 0], start: addDays(t, -40), end: addDays(t, -20) } });
+  store.materialize(R.routineTaskId(train, addDays(t, -21)));
+  const ielts = store.saveProject({ name: "IELTS", kind: "regular", place: "auto", rule: { days: [0, 0, 0, 0, 0, 45, 0], start: addDays(t, -400), end: addDays(t, -300) } });
+  store.addPoolLines(ielts, "", "Mock test · ×3");
+  const dusty = store.saveProject({ name: "Old nap", kind: "regular", place: "auto", rule: { days: [20, 0, 0, 0, 0, 0, 0], start: addDays(t, -400), end: addDays(t, -300) } });
+  const mine = store.saveProject({ name: "Q4", kind: "regular", place: "pool", rule: { min: 30 } });
+  store.adoptWeekly();
+  [train, ielts, dusty, mine].forEach((id) => store.archiveProject(id));
+  undo = null;
+
+  assert.equal(store.repairWeekly(false, [0, Infinity]), 2);
+  assert.equal(store.get("projects", train).status, "active");
+  assert.equal(store.get("projects", train).rule.perWeek, 2, "about 2 a week, from its two weekdays");
+  assert.equal(store.get("projects", ielts).status, "active", "a plan with a pool comes back");
+  assert.equal(store.get("projects", dusty).status, "done", "an old one with nothing recent stays put away");
+  assert.equal(store.get("projects", mine).status, "done", "not one that change touched");
+  assert.match(label, /Brought back Training, IELTS/);
+  assert.equal(store.repairWeekly(false, [0, Infinity]), 0, "only once");
+  store.undo(undo);
+  assert.equal(store.get("projects", train).status, "done", "undo puts it back as it was");
 });

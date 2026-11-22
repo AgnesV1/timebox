@@ -321,7 +321,7 @@ initFriends(render);
 initSun();
 
 store.subscribe((meta) => {
-  if (meta.pulled) { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); store.adoptQuads(); store.adoptLists(); store.adoptSteps(); store.adoptWeekly(); store.settleLists(); }
+  if (meta.pulled) { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); store.adoptQuads(); store.adoptLists(); store.adoptSteps(); store.adoptWeekly(); store.repairWeekly(true); store.settleLists(); }
   if (meta.local) setFx(store.local().fx !== false);
   if (!meta.quiet) render();
   else paintSync();
@@ -433,5 +433,5 @@ setInterval(autoReload, 60000);
 render();
 // 今天该自己出现的、过了那天回 Pool 的，要等表格里的数据拉下来再看；连不上就 6 秒后用本机的
 if (sync.configured()) await Promise.race([syncThenLog(), new Promise((r) => setTimeout(r, 6000))]);
-else { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); store.adoptQuads(); store.adoptLists(); store.adoptSteps(); store.adoptWeekly(); store.settleLists(); }
+else { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); store.adoptQuads(); store.adoptLists(); store.adoptSteps(); store.adoptWeekly(); store.repairWeekly(); store.settleLists(); }
 store.ensureToday();

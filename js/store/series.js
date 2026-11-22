@@ -40,17 +40,17 @@ export default function (core) {
   const daysText = (on) => [1, 2, 3, 4, 5, 6, 0].filter((d) => on.includes(d)).map((d) => WEEKDAYS[d]).join(" · ");
 
   // 以前按固定星期几自己出现的（Gym 这种，她 2026-11-22 夜说的：「很少能固定周几去，周末安排不确定，也会拖延」）改成每周大概几次、自己拖：
-  // 每周几次 = 原来一周有几天，默认分钟 = 原来那几天的分钟；已经写了的照旧。过了最后一天的（早就不重复了）顺手归档。
+  // 每周几次 = 原来一周有几天，默认分钟 = 原来那几天的分钟；已经写了的照旧。状态（在用 / 归档）一律不动——
+  // 上一版把「过了最后一天」的顺手归档了，可她那几个计划设过结束日、之后一直在 Pool 里拖着用，归档以后卡片和 Pool 里都没了（她 11-22 夜报的，放回来见 store.js 的 repairWeekly）。
   // 只改以前建的：日历 Pool 拖 ↻ 临时设的（rule.plan）、之后加任务时选 Repeat 新建的（rule.set）都不动。今天已经排上的那一行留着
   function adoptWeekly() {
     const list = all("projects").filter((p) => E.isAuto(p) && !p.rule?.plan && !p.rule?.set);
     if (!list.length) return false;
     change(() => {
       for (const p of list) {
-        const r = R.ruleOf(p), on = r.days.map(Number).filter((v) => v > 0), ended = Boolean(r.end) && r.end < today();
+        const on = R.ruleOf(p).days.map(Number).filter((v) => v > 0);
         const { days: _d, start: _s, end: _e, skip: _k, off: _o, ...rest } = p.rule || {};
-        put("projects", { ...p, place: "pool", ...(ended && E.isActive(p) ? { status: "done" } : {}),
-          rule: { ...rest, perWeek: Number(rest.perWeek) > 0 ? Number(rest.perWeek) : ended ? 0 : on.length, min: Number(rest.min) > 0 ? Number(rest.min) : on[0] || 0 } });
+        put("projects", { ...p, place: "pool", rule: { ...rest, perWeek: Number(rest.perWeek) > 0 ? Number(rest.perWeek) : on.length, min: Number(rest.min) > 0 ? Number(rest.min) : on[0] || 0 } });
       }
     }, "", { quiet: true });
     return true;

@@ -3,7 +3,7 @@
 // 数据和读写都在这个文件里；几块各管一摊的（重复、计时、Friends、目标、备餐、灵感池、每天的打分）写在 js/store/ 下面，
 // 最底下把它们接回来——对外还是 store.xxx，名字不变。
 
-import { todayIso, addDays, fmtShort } from "./dates.js";
+import { todayIso, addDays, fmtShort, weekday } from "./dates.js";
 import * as E from "./engine.js";
 import * as R from "./routines.js";
 import * as GR from "./groups.js";
@@ -810,6 +810,30 @@ export const { ideas, ideaOf, ideaOfTask, saveIdea, addIdeas, deleteIdea, pickId
 const { ideaTaskDropped, moveIdea } = idea;
 
 const series = seriesStore({ ...core, timer, setTimer: tm.setTimer, moveMeet, moveIdea });
+// 放回上一版 adoptWeekly 误归档的计划（她 2026-11-22 夜报的：「原本设计的几个 sub-project 直接消失了，在 pool 也不见了」）。
+// 上一版把「过了最后一天」的固定星期几计划顺手标成了 done；它们设过结束日，可她一直在 Pool 里拖着用。
+// 挑的：那次转换（部署后 7 天里）动过、现在是 done、拖着用、没有星期几的计划里，最近 120 天用过的或者 Pool 里有东西的
+// （她自己很早以前归档、早就不用的旧重复不动）。每周几次是 0 的，照它以前那几次（rt: 任务）落在星期几算。
+// 带 label 的一次改动：会弹「Brought back …」和撤销。只跑一次（Settings weekly-fix）；fresh = 刚拉完表格（没东西可放也记下跑过了）
+const WEEKLY_AT = Date.UTC(2026, 10, 22, 22, 40), WEEKLY_TILL = WEEKLY_AT + 7 * 864e5;
+export function repairWeekly(fresh = false, [at, till] = [WEEKLY_AT, WEEKLY_TILL]) {   // [at, till] 只给测试换
+  if (setting("weekly-fix", null)) return 0;
+  const t = today(), from = addDays(t, -120), tasks = all("tasks"), items = all("items");
+  const list = all("projects").filter((p) => p.status === "done" && p.place === "pool" && E.isRegular(p) && !("days" in (p.rule || {})) &&
+    Number(p.updated) >= at && Number(p.updated) <= till &&
+    (items.some((i) => i.projectId === p.id) || tasks.some((x) => x.projectId === p.id && x.date >= from)));
+  const mark = () => put("settings", { id: "weekly-fix", key: "weekly-fix", value: t });
+  if (!list.length) { if (fresh) change(mark, "", { quiet: true }); return 0; }
+  change(() => {
+    mark();
+    for (const p of list) {
+      const days = new Set(tasks.filter((x) => x.id.startsWith("rt:" + p.id + ":")).map((x) => weekday(R.parseRoutineTaskId(x.id)?.date || x.date)));
+      put("projects", { ...p, status: "active", rule: { ...(p.rule || {}), perWeek: Number(p.rule?.perWeek) > 0 ? Number(p.rule.perWeek) : days.size } });
+    }
+  }, "Brought back " + list.map((p) => p.name || "a plan").join(", ") + " — put away by mistake");
+  return list.length;
+}
+
 export const { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setSeriesGroup, stopRepeat, isPlanLike, adoptWeekly } = series;
 // 日历 Pool 拖 ↻ 设重复、闹钟那个开关：设好 / 打开以后今天该有的那一次马上排进来
 export function setPlanRepeat(pid, spec) { const ok = series.setPlanRepeat(pid, spec); if (ok) autoToday(); return ok; }

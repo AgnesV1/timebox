@@ -3,7 +3,9 @@
 // 一个计划那天是一张便利贴：Pool 关着只写计划名，鼠标停上去展开成一行一项；Pool 开着（排计划的时候）直接一行一项、右边写分钟，日期后面写那天排了几小时
 //   （她 2026-10-27 挑的甲；每一项能单独拖到别的天）；
 // 整张拖到别的天 = 那天还没勾的几项一起挪，拖回 Pool = 回去；点它 = 到今天页的那一天。别的任务照旧一张一张，拖到别的天就挪过去，拖回 Pool 就撤回。
-// 固定星期几的计划在以后的日子里画成淡色预览：可以拖走 / 点开（这时才变成真任务）。
+// 固定星期几的计划在以后的日子里画成淡色预览：可以拖走 / 点开（这时才变成真任务）。停上去写着每周哪几天、到哪天，最后一次后面写 last。
+// 重复（她 2026-11-22 要的）：Pool 里计划名右边的 ↻ 拖到某天 = 弹出小框（js/ui/repeat.js，像闹钟）选每周哪几天、最后一天；
+// Pool 底下 Repeats 清单列着正在重复的（含以前加任务时选 Repeat 建的循环小事）：哪几天、到哪天、还剩几次，右边开关；点一行打开同一个小框。
 // 格子里的日程永远全部显示（不折叠）；月视图只画这个月占到的那几周，便利贴排得紧一点，尽量一屏看完。格子有最小宽度，放不下就左右滑。格子顶上的小开关标「通勤日」。
 // 上班那一层（js/offdays.js）：发薪日日期后面一个小 $；请假、公众假日日期旁边一个很小的 💤（工作日鼠标移上来能点）；
 // 点顶上那条进度条 = 超级休息日，整条变金色。都只是标记，不改可用时间、不影响排计划。
@@ -12,6 +14,7 @@
 import * as store from "../store.js";
 import * as E from "../engine.js";
 import * as L from "../lists.js";
+import * as R from "../routines.js";
 import { esc, on, icon } from "../dom.js";
 import { addDays, addMonths, diffDays, startOfWeek, startOfMonth, daysInMonth, range, fmtShort, fmtHours, fmtMin, WEEKDAYS, MONTHS, MONTHS_LONG, weekday } from "../dates.js";
 import * as Y from "../year.js";
@@ -23,6 +26,7 @@ import { colorOf, badgeOf, projectOptions, groupsOf, toast, showChartTip, hideCh
 import { ideasPoolHTML } from "./ideas.js";
 import { showDate } from "./today.js";
 import { openTaskEditor } from "./editor.js";
+import { openRepeat } from "./repeat.js";
 
 let anchor = "";
 let adding = "";      // 正在哪一天的格子里加任务
@@ -37,9 +41,31 @@ function chipHTML(t) {
     '<span class="t">' + (E.isRoutine(t) ? '<i class="rt">↻</i>' : "") + esc(t.title) + "</span>" + (Number(t.est) > 0 ? '<span class="m num">' + Number(t.est) + "</span>" : "") + "</div>";
 }
 
+// 每周哪几天（按一周从哪天开始排）
+const dayOrder = () => (weekStart() === "sunday" ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0]);
+const repDays = (r) => dayOrder().filter((d) => Number(r.days?.[d]) > 0).map((d) => WEEKDAYS[d]).join(" · ");
+// 「every Tue · Thu until Feb 24」；d 是不是最后一次
+const repText = (p) => { const r = R.ruleOf(p); return "every " + repDays(r) + (r.end ? " until " + fmtShort(r.end) : ""); };
+const lastOne = (p, d) => { const r = R.ruleOf(p); return Boolean(r.end) && !R.occurrences(r, addDays(d, 1), r.end).length; };
+
 function ghostHTML(g) {
-  return '<div class="ev ghost" role="button" tabindex="0" data-drag="ghost:' + esc(g.key) + '" data-act="open-ghost" data-key="' + esc(g.key) + '" style="--c:' + esc(g.plan.color) + '" title="' + esc(g.title + " · repeats") + '">' +
-    '<span class="t"><i class="rt">↻</i>' + esc(g.title) + "</span>" + (Number(g.est) > 0 ? '<span class="m num">' + Number(g.est) + "</span>" : "") + "</div>";
+  const last = lastOne(g.plan, g.date);
+  return '<div class="ev ghost" role="button" tabindex="0" data-drag="ghost:' + esc(g.key) + '" data-act="open-ghost" data-key="' + esc(g.key) + '" style="--c:' + esc(g.plan.color) + '" title="' + esc(g.title + " · " + repText(g.plan) + (last ? " · the last one" : "")) + '">' +
+    '<span class="t"><i class="rt">↻</i>' + esc(g.title) + (last ? '<i class="rt-last">last</i>' : "") + "</span>" + (Number(g.est) > 0 ? '<span class="m num">' + Number(g.est) + "</span>" : "") + "</div>";
+}
+
+// Pool 底下的 Repeats（像闹钟的清单）：正在重复、还没过最后一天的，每条 名字 / 哪几天 · 到哪天 · 还剩几次 / 开关；关着的淡下去
+function repeatsHTML(c) {
+  const list = c.projects.filter((p) => E.isActive(p) && E.isAuto(p)).map((p) => ({ p, r: R.ruleOf(p) }))
+    .filter(({ r }) => r.days.some((v) => Number(v) > 0) && (!r.end || r.end >= c.today));
+  if (!list.length) return "";
+  return '<div class="pool-reps"><div class="pg-group">Repeats</div>' + list.map(({ p, r }) => {
+    const on = !r.off, left = r.end ? R.occurrences({ ...r, off: false }, c.today, r.end).length : 0;
+    return '<div class="rp-row' + (on ? "" : " off") + '" data-rep="' + esc(p.id) + '" style="--pc:' + esc(p.color || "var(--c-None)") + '">' +
+      '<button type="button" class="rp-open" data-act="rep-open"><b>' + esc(p.name || "Untitled") + "</b><small>Every " + esc(repDays(r)) +
+      (r.end ? " · until " + fmtShort(r.end) + " · " + left + " left" : " · no last day") + (on ? "" : " · paused") + "</small></button>" +
+      '<button type="button" class="rp-sw" role="switch" aria-checked="' + on + '" data-act="rep-toggle" aria-label="' + esc((p.name || "Repeat") + " on") + '"></button></div>';
+  }).join("") + "</div>";
 }
 
 // 一个计划那天的那一张（她 2026-10-27 改的）：Pool 关着只写名字（那一行的名字，没有那一行才写计划名），停上去展开成一行一项；
@@ -239,7 +265,9 @@ export function poolHTML(c) {
     const { items } = groups.find((g) => g.plan === p);
     if (pg.name !== lastGroup) { lastGroup = pg.name; if (pg.name) h += '<div class="pg-group">' + esc(pg.name) + "</div>"; }
     const min = items.reduce((a, x) => a + L.estOf(x.item, p) * (Number.isFinite(x.count.left) ? x.count.left : 0), 0);
-    h += '<section class="pg"><div class="pg-head pg-plan" data-drag="plan:' + esc(p.id) + '" role="button" tabindex="0" aria-haspopup="listbox" title="Drag onto a day: ' + esc(p.name) + ' that day" style="--pc:' + esc(p.color) + '"><i></i><span>' + esc(p.name) + "</span><em>" + (items.length ? (min ? fmtHours(min) : items.length + " left") : L.sizeOf(L.planMin(p)) || "any day") + "</em></div>";
+    // 计划名能拖（那天一行）；右边的 ↻ 拖到某天 = 从那天起每周重复一阵子（弹出小框挑哪几天、最后一天）
+    h += '<section class="pg"><div class="pg-hrow" data-drag-show style="--pc:' + esc(p.color) + '"><div class="pg-head pg-plan" data-drag="plan:' + esc(p.id) + '" role="button" tabindex="0" aria-haspopup="listbox" title="Drag onto a day: ' + esc(p.name) + ' that day"><i></i><span>' + esc(p.name) + "</span><em>" + (items.length ? (min ? fmtHours(min) : items.length + " left") : L.sizeOf(L.planMin(p)) || "any day") + "</em></div>" +
+      '<span class="pg-rep" data-drag="rep:' + esc(p.id) + '" role="button" tabindex="0" aria-haspopup="listbox" aria-label="Repeat ' + esc(p.name) + ' every week for a while" title="Drag onto a day to repeat it every week for a while">↻</span></div>';
     let mod = null;
     for (const x of items) {
       if ((x.item.module || "") !== mod) { mod = x.item.module || ""; if (mod) h += '<div class="pg-mod">' + esc(mod) + "</div>"; }
@@ -252,7 +280,7 @@ export function poolHTML(c) {
     }
     h += "</section>";
   }));
-  return h + ideasPoolHTML(c) + '<p class="pool-hint">Drag an item onto a day, or click it to pick the day; it joins that plan\'s row there. Drag a plan\'s name for just its row. Drag something back here to put it back.</p></div>';
+  return h + repeatsHTML(c) + ideasPoolHTML(c) + '<p class="pool-hint">Drag an item onto a day, or click it to pick the day; it joins that plan\'s row there. Drag a plan\'s name for just its row, or its ↻ to repeat it every week for a while. Drag something back here to put it back.</p></div>';
 }
 
 // ---------- 交互 ----------
@@ -269,6 +297,8 @@ export function initCalendar(rerender) {
     else if (act === "yr-heat") store.setLocal({ yearHeat: el.dataset.v });
     else if (act === "yr-toggle") { const hidden = yrHidden(); if (!hidden.delete(el.dataset.v)) hidden.add(el.dataset.v); store.setLocal({ yearHide: [...hidden] }); }
     else if (act === "pool-toggle") store.setLocal({ pool: !store.local().pool });
+    else if (act === "rep-open") openRepeat(el.closest("[data-rep]").dataset.rep);
+    else if (act === "rep-toggle") store.toggleRepeat(el.closest("[data-rep]").dataset.rep, el.getAttribute("aria-checked") !== "true");
     else if (act === "edit-task") openTaskEditor(el.dataset.id);
     else if (act === "open-ghost") { const id = store.materialize(el.dataset.key); if (id) openTaskEditor(id); }
     else if (act === "commute") store.toggleCommute(el.dataset.date);
@@ -370,5 +400,6 @@ export function handleDrop(payload, target) {
   else if (kind === "blk") store.moveBlock(planId, from, date);
   else if (kind === "item") { if (!store.placeItem(id, date)) toast("Nothing of that left in the pool"); }
   else if (kind === "plan" || kind === "regular") store.ensureRow(id, date);
+  else if (kind === "rep") openRepeat(id, { date });
   else if (kind === "ghost") { const tid = store.materialize(id); if (tid) store.moveTask(tid, date); }
 }

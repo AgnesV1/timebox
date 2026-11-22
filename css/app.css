@@ -276,16 +276,19 @@ body.side-min .sync-pill span { display: none; }
 @keyframes ball-lon { to { transform: scaleX(var(--b)); } }
 
 /* ---------- 今天 ---------- */
-.today-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 18px 40px; align-items: start; }
+.today-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 24px 48px; align-items: start; }   /* 间距她 2026-11-22 从试样挑的「再松一点」：组和组之间拉开 */
 @media (max-width: 1100px) { .today-grid { grid-template-columns: minmax(0, 1fr); } .today-side { order: -1; } }
-.today-main { padding: 12px 14px 14px; border: var(--b); border-radius: 16px; background: var(--bg); box-shadow: var(--hard); }
-.today-main .strip { margin-top: 2px; }
-.today-side { display: grid; gap: 10px; }
+.today-main { padding: 18px 20px 20px; border: var(--b); border-radius: 16px; background: var(--bg); box-shadow: var(--hard); }
+.today-main .strip { margin-top: 12px; }
+.today-main .chore { margin: 8px 0 12px; }
+.today-main .row { padding: 12px 0; }
+.today-main .add { margin-top: 14px; padding-top: 16px; }
+.today-side { display: grid; gap: 24px; }
 .today-side .overdue, .today-side .bill { margin-top: 0; }
 /* 每天的打分（js/ui/scores.js）：电脑上排在右栏、汇总那块下面；窄了（右栏挪到最上面）就排到清单后面。不套框，靠留白分组：
    一块 = 上面名字、意思、只有下划线的数字格（灰字是平常的范围），下面几档（只有字，选中的铺青柠）；底下一格 note */
 .today-grid { grid-template-rows: auto 1fr; }
-.today-col { grid-column: 1; grid-row: 1 / span 2; display: grid; gap: 18px; align-content: start; min-width: 0; }
+.today-col { grid-column: 1; grid-row: 1 / span 2; display: grid; gap: 24px; align-content: start; min-width: 0; }
 .today-side { grid-column: 2; grid-row: 1; }
 .dsc { grid-column: 2; grid-row: 2; display: grid; gap: 1px; align-content: start; }
 @media (max-width: 1100px) { .today-grid { grid-template-rows: none; } .today-col, .today-side, .dsc { grid-column: auto; grid-row: auto; } }
@@ -325,6 +328,14 @@ body.side-min .sync-pill span { display: none; }
 .qd { --qd-line: rgba(11, 11, 11, .12); display: grid; grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(104px, 1fr) minmax(104px, 1fr);
   padding: 10px 10px 10px 4px; border-radius: var(--r); background: var(--card); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); }
 [data-theme="dark"] .qd { --qd-line: var(--edge); }
+/* 四格都空着：收成一行（2026-11-22），淡淡的虚线，点开才是四格 */
+.qd.qd-fold { display: block; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.qd-open { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 14px; border: 1px dashed var(--line); border-radius: var(--r); background: none; font-size: 12.5px; color: var(--muted); text-align: left; }
+[data-theme="light"] .qd-open { border-color: #D6D6CF; }
+.qd-open b { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.qd-open span { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.qd-open .ic { width: 13px; height: 13px; }
+@media (hover: hover) { .qd-open:hover { color: var(--ink); border-color: var(--edge); } }
 .qd-ax { padding: 0 0 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; text-align: center; white-space: nowrap; color: var(--muted); }
 .qd-v { padding: 0 0 0 6px; writing-mode: vertical-rl; rotate: 180deg; }
 .qd-q { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); align-content: start; gap: 5px; min-width: 0; padding: 8px 8px 32px; }
@@ -459,6 +470,14 @@ body.side-min .sync-pill span { display: none; }
 .strip i { flex-basis: 0; min-width: 0; border-radius: 999px; border: 1.5px solid var(--edge); }
 [data-theme="dark"] .strip i { border: 0; }
 .stripmeta { display: flex; justify-content: space-between; font: 500 12px var(--num); color: var(--muted); }
+/* 电脑今天页任务卡片的头：「做了多少」是整页最大的字（2026-11-22），后面淡字排了多少、盒子 */
+.tday-hd { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 2px 0 2px; font: 500 13px var(--num); color: var(--muted); }
+.tday-big { font: 800 28px/1 var(--display); letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+[data-theme="dark"] .tday-big { font-family: var(--num); color: var(--accent); text-shadow: 0 0 14px rgba(204, 255, 0, .4); }
+.tday-hd.over span { color: var(--warn-text); }
+/* 右栏的那个数退成次要的：小、墨色（以前 34px 粉色，和左边抢） */
+.today-side .hero .big { font: 800 18px/1 var(--num); color: var(--ink); text-shadow: none; }
+.today-side .hero .of { font-size: 13px; }
 .stripmeta.over { color: var(--warn-text); }
 
 /* 账单、过期 */
@@ -468,7 +487,7 @@ body.side-min .sync-pill span { display: none; }
 [data-theme="dark"] .bill.ahead { background: rgba(204, 255, 0, .07); }
 .overdue { margin-top: 14px; padding: 2px 0; font-size: 13.5px; }
 .od-head { display: flex; align-items: baseline; gap: 8px; }
-.od-head b { color: var(--c-Chore); }
+.od-head b { color: var(--ink); }   /* 以前橙色（2026-11-22 改墨色：一页只留青柠一个强调色） */
 .od-head span { color: var(--muted); flex: 1; }
 .overdue ul { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; }
 .overdue li { display: flex; align-items: center; gap: 8px; }
@@ -573,7 +592,7 @@ body.phone .ls-cb { width: 19px; height: 19px; font-size: 12px; }
 /* ---------- 日历 ---------- */
 /* 格子不挤扁：有最小宽度，窗口 + 任务池放不下时日历区左右滑 */
 .cal-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px 6px; }
-.week { display: grid; grid-template-columns: repeat(7, minmax(104px, 1fr)); gap: 5px; }
+.week { display: grid; grid-template-columns: repeat(7, minmax(104px, 1fr)); gap: 8px; min-height: calc(100vh - 92px); }   /* 七天的格子撑到窗口底（2026-11-22）：整列都是这一天，往下面拖也接得住 */
 .cell { position: relative; display: flex; flex-direction: column; gap: 5px; min-height: 160px; padding: 6px 6px 26px; border: 1.5px solid transparent; border-radius: 12px; background: var(--bg); transition: background-color .15s, box-shadow .15s; }
 .cell.past { background: color-mix(in srgb, var(--bg) 60%, var(--page)); }
 .cell.rest { background: repeating-linear-gradient(-45deg, transparent 0 7px, var(--surface) 7px 8px), var(--bg); }
@@ -751,6 +770,34 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
 .idea-due li:hover button, .idea-due button:focus-visible { opacity: 1; }
 @media (hover: hover) { .idea-due button:hover { background: var(--accent); color: var(--accent-ink); } }
 .pool-hint { margin-top: 18px; font-size: 12px; color: var(--muted); }
+/* 计划名右边的 ↻（她 2026-11-22 要的）：拖到某天 = 每周重复一阵子。平时淡，停在这一行上才实 */
+.pg-hrow { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
+.pg-hrow .pg-head.pg-plan { flex: 1; min-width: 0; margin-bottom: 0; }
+.pg-rep { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: var(--tonal); color: var(--muted); font-size: 13px; cursor: grab; opacity: .55; transition: opacity .15s; }
+.pg-hrow:hover .pg-rep, .pg-rep:focus-visible { opacity: 1; }
+@media (hover: hover) { .pg-rep:hover { color: var(--ink); } }
+/* Pool 底下的 Repeats：像闹钟的清单，一行 名字 / 哪几天 · 到哪天 · 还剩几次 / 开关 */
+.pool-reps { margin-top: 18px; }
+.pool-reps .pg-group { margin: 0 0 4px; }
+.rp-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
+.rp-open { flex: 1; min-width: 0; padding: 0; border: 0; background: none; text-align: left; }
+.rp-open b { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.rp-open b::before { content: ""; width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--pc); }
+.rp-open small { display: block; margin-top: 1px; font-size: 11.5px; color: var(--muted); }
+.rp-row.off .rp-open { opacity: .5; }
+.rp-sw { position: relative; flex: none; width: 34px; height: 20px; padding: 0; border: 0; border-radius: 999px; background: var(--accent); transition: background-color .2s; }
+.rp-sw::after { content: ""; position: absolute; top: 2px; left: 16px; width: 16px; height: 16px; border-radius: 50%; background: #FFF; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: left .2s var(--ease); }
+.rp-sw[aria-checked="false"] { background: var(--surface2); }
+.rp-sw[aria-checked="false"]::after { left: 2px; }
+.ev .rt-last { margin-left: 4px; font-style: normal; font-size: .85em; color: var(--muted); }
+/* 重复的小框（js/ui/repeat.js） */
+.rep-sheet .hint { margin: -6px 0 12px; }
+.rp-days { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-days .chip { min-width: 44px; padding: 5px 9px; }
+.rp-end input { max-width: 200px; }
+.rep-sheet .rp-msg { margin: 6px 0 0; min-height: 1.4em; }
+.rp-err { color: var(--warn-text); font-weight: 600; }
+.rp-go { display: flex; gap: 8px; }
 .forecast { margin-top: 22px; }
 .forecast h4 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .fc { display: flex; gap: 3px; height: 74px; align-items: flex-end; }
@@ -762,18 +809,32 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
 .fc-col span { position: absolute; bottom: -14px; font-size: 9px; color: var(--muted); }
 
 /* ---------- 项目 ---------- */
-.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+/* 计划卡片（她 2026-11-22 要的：每个计划一张小卡片，照视觉层级理顺）：细边、不要硬投影（粗边 + 硬投影留给每页的主卡片）。
+   名字 → 两个数（一共多久、这个月几天）→ 这周的方块 → 进度条 → 淡字的 Pool */
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 8px; }
 .pgrid.closed { margin-top: 12px; opacity: .7; }
-.pcard { padding: 11px 12px 10px; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); }
-.pcard header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.pname { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0; border: 0; background: none; font: 700 14.5px/1.25 var(--display); text-align: left; letter-spacing: -.01em; }
-.pname i { width: 12px; height: 12px; flex-shrink: 0; border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 1.5px var(--edge); }
+.pcard { padding: 8px 11px 9px; border: 1px solid #E2E2DC; border-radius: 11px; background: var(--bg); }
+[data-theme="dark"] .pcard { border-color: var(--edge); }
+.pcard header { display: flex; align-items: center; gap: 8px; }
+.pname { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 0; border: 0; background: none; font: 700 13.5px/1.25 var(--display); text-align: left; letter-spacing: -.01em; }
+.pname span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pname i { width: 9px; height: 9px; flex-shrink: 0; border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 1.5px var(--edge); }
 [data-theme="dark"] .pname i { box-shadow: 0 0 10px var(--pc); }
-/* 卡片上的几行（2026-10-25 她挑的样子）：怎么出现 · 起止 · 花了多少 / 这周每项几次 / Pool 还剩几次 */
-.pcard .ls-l { margin: 3px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
-.pcard header + .ls-l { margin-top: 6px; }
-.pcard .ls-l b { font: 600 12.5px var(--num); color: var(--ink); }
-.pcard .pweek { margin-top: 8px; }
+.pc-per { margin-left: auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.pcard header .p-arch { margin-left: auto; }
+.pcard .pc-per + .p-arch { margin-left: 4px; }
+.pc-nums { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 4px; margin: 5px 0 0; font-size: 11.5px; color: var(--muted); }
+.pc-nums b { font: 600 14px var(--num); color: var(--ink); }
+.pc-nums span { margin-right: 8px; }
+.pc-bar { position: relative; height: 4px; margin: 8px 0 0; border-radius: 999px; background: var(--track); }
+.pc-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--pc); }
+[data-theme="light"] .pc-bar i { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .16); }   /* Fitness 是象牙白，不描一圈在浅轨道上看不见 */
+.pc-bar.days i { opacity: .4; }
+.pc-bar u { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); }
+.pc-bl { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0 0; font-size: 11px; color: var(--muted); }
+.pcard .ls-l { margin: 4px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+.pcard .ls-l b { font: 600 11.5px var(--num); color: var(--ink); }
+.pcard .pweek { margin-top: 6px; }
 .health { flex-shrink: 0; padding: 3px 9px; border-radius: 999px; background: var(--surface); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
 .h-safe { color: var(--ok); }
 .h-danger { color: var(--warn-text); }
@@ -816,6 +877,37 @@ body.modal-open { overflow: hidden; }
 .ls-hd .sheet-title { margin: 0 auto 0 0; }
 .ls-hd .btn { padding: 5px 11px; font-size: 12.5px; }
 .ls-hd .btn.on { background: var(--accent); color: var(--accent-ink); }
+/* 计划编辑框的层级（她 2026-11-22 要的）：名字最大 → 进度 → Pool（主角）→ Notes → 小字的设置 → Serves → 底部状态 */
+.project-editor .pe-kick { font: 600 12px var(--body); letter-spacing: .02em; color: var(--muted); }
+.ls-hd .btn.ghosty { padding: 5px 9px; }
+.pe-id { display: flex; align-items: center; gap: 8px; margin: -2px 0 2px; }
+.pe-dot { flex: none; width: 13px; height: 13px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 1.5px var(--edge); }
+[data-theme="dark"] .pe-dot { box-shadow: 0 0 10px var(--pc); }
+.pe-name { flex: 1; min-width: 0; margin-left: -4px; padding: 3px 6px; border-color: transparent; background: transparent; font: 700 22px/1.2 var(--display); letter-spacing: -.015em; }
+@media (hover: hover) { .pe-name:hover { border-color: var(--line); } }
+.pe-grp { display: flex; align-items: center; gap: 6px; flex: none; font-size: 12.5px; color: var(--muted); }
+.pe-grp input { width: 130px; padding: 4px 8px; border-color: transparent; background: var(--tonal); font-size: 13px; font-weight: 600; }
+.pe-prog { margin: 6px 0 4px; }
+.pe-prog .pc-nums { margin-top: 0; }
+.pe-prog .pc-bar { max-width: 420px; }
+.pe-prog .pc-bl { max-width: 420px; }
+.pe-pool .ls-ph { margin-top: 18px; font-size: 16px; }
+.project-editor .ls-notes { margin: 12px 0 0; }
+.pe-set { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pe-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.pe-set .field { margin-bottom: 8px; font-size: 13px; }
+.pe-set .field > span { font-size: 10.5px; }
+.pe-set input:not([type="checkbox"], [type="radio"]) { padding: 5px 8px; font-size: 13px; }
+.pe-checks { display: flex; flex-wrap: wrap; gap: 0 22px; }
+.pe-checks .check { margin: 2px 0 10px; font-size: 13px; }
+.pe-checks .check input { width: 16px; height: 16px; }
+.pe-color .swatches i { width: 18px; height: 18px; }
+.pe-rep { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 0; font-size: 13px; }
+.pe-rep > span:first-child { margin-right: auto; }
+p.pe-rep { display: block; font-size: 12px; }
+.project-editor .serves { margin-top: 14px; }
+.pe-foot { display: flex; align-items: center; gap: 10px; }
+.pe-foot .seg button { padding: 5px 10px; font-size: 12.5px; }
 .ls-notes { display: block; width: 100%; margin: 2px 0 12px; padding: 7px 10px; border: 0; border-radius: 10px; background: var(--tonal); font-size: 12.5px; color: var(--muted); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ls-ph { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 2px; font: 700 14px var(--display); }
 .ls-ph small { font: 500 12px var(--num); color: var(--muted); }
@@ -870,19 +962,22 @@ body.phone .settings .page-head { margin-top: 4px; }
 .projects { container-type: inline-size; }
 .pj-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 20px; }
 @container (min-width: 740px) { .pj-cols { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; } .pj-side .pgrid { grid-template-columns: minmax(0, 1fr); } }
-.pg-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.pg-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }   /* 不折行（2026-11-22）：窄栏里 Rename / + Plan 以前会掉到下一行，名字太长就省略 */
+.pg-top:not(.editing) h3 { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pg-top .pg-meta { flex: 0 100 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }   /* 挤的时候先缩「1 plan」，名字最后才缩 */
+.pg-top .pg-actions { flex: none; }
 .pg-top h3 { margin: 0; font: 700 15.5px var(--display); letter-spacing: -.01em; }
 .pg-top .rename { width: 260px; padding: 6px 10px; font: 700 16px var(--display); border: var(--b-ctl); }
 .pg-meta { font-size: 12.5px; color: var(--muted); }
 .dot-only { padding: 0; background: none; font-size: 12px; }
 .pg-actions { display: flex; gap: 6px; margin-left: auto; }
 .pg-actions .btn { padding: 6px 12px; font-size: 12.5px; }
+.pj-side .pg-actions { gap: 0; }
+.pj-side .pg-actions .btn { padding: 6px 7px; }   /* 右边窄栏：省出地方，「No plans yet」「1 plan」不被省略 */
 /* 每个分组标题行都有的 Rename / + Plan：成排重复，做成字（第三级按钮），停上去才出淡底 */
 .pg-actions .btn:not(.cta, .primary) { background: transparent; }
 @media (hover: hover) { .pg-actions .btn:not(.cta, .primary):hover { background: var(--tonal); } }
 .btn.ghosty { border-color: transparent; background: transparent; color: var(--muted); }
-.gbar { height: 5px; margin: 0 0 10px; border-radius: 999px; background: var(--track); overflow: hidden; }
-.gbar i { display: block; height: 100%; border-radius: inherit; background: var(--meter); }
 .pg-group { margin: 18px 0 -4px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
 .rt { font-style: normal; font-size: .9em; color: var(--muted); }
 .ev .rt { margin-right: 3px; }
@@ -909,15 +1004,15 @@ body.phone .settings .page-head { margin-top: 4px; }
 /* ---------- 统计 ---------- */
 /* 图上的颜色用 --k-*（校验过的同色系），文字一律用正文颜色；柱子 ≤24px、顶端 4px 圆角、相邻留 2px 缝 */
 /* 每张图一块半透明的软板：不描边、不投影（和 Settings 一样）——全去掉的话一页的图连成一片，分不清哪块是哪块 */
-.stats .card { margin-bottom: 14px; padding: 14px 16px 12px; border-radius: 14px; background: var(--bg); }
+.stats .card { margin-bottom: 20px; padding: 18px 20px 16px; border-radius: 14px; background: var(--bg); }   /* 间距她 2026-11-22 从试样挑的「松一点」 */
 .stats h3 { margin: 0; font: 700 15px var(--display); letter-spacing: -.01em; }
-.stats figure { margin: 0 0 16px; }
+.stats figure { margin: 0 0 20px; }
 /* 排版照 web-interface-guidelines（.claude/skills，Vercel 那份）：超宽屏不铺满——整页最宽 1480px、居中，读数不用隔着半个屏幕找；
    说明文字避开最后一行只剩一两个词（text-wrap: pretty） */
 .stats { max-width: 1480px; margin: 0 auto; }
-.stats .lede { margin: 4px 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--muted); text-wrap: pretty; }
+.stats .lede { margin: 6px 0 16px; font-size: 12.5px; line-height: 1.5; color: var(--muted); text-wrap: pretty; }
 .stats .empty { padding: 14px 0 4px; font-size: 13.5px; }
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 16px; }
 .tile { padding: 4px 0; }
 .tl { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
 .tv { margin: 4px 0 2px; font: 700 24px/1.1 var(--body); letter-spacing: -.02em; }
@@ -941,8 +1036,22 @@ body.phone .settings .page-head { margin-top: 4px; }
 .ss-goal-in:focus-visible { outline: none; border-bottom-color: var(--ink); }
 [data-theme="dark"] .ss-goal-in:focus-visible { border-bottom-color: var(--accent); box-shadow: 0 7px 8px -7px rgba(204, 255, 0, .7); }
 .st-strip .ss-gap.neg { color: var(--warn-text); }
-.chart figcaption { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-.chart figcaption p { margin: 4px 0 0; font-size: 13px; color: var(--muted); text-wrap: pretty; }
+/* Build 这一段一共多久做这一页的主数字（她 2026-11-22 要的视觉层级） */
+.st-strip.st-hero { margin-bottom: 22px; }
+.st-strip .ss-hero { font-size: 14px; font-weight: 600; color: var(--ink); }
+.st-strip .ss-big { font: 800 28px/1 var(--display); letter-spacing: -.02em; }
+[data-theme="dark"] .st-strip .ss-big { font-family: var(--num); text-shadow: 0 0 14px rgba(204, 255, 0, .35); }
+/* 本月目标的细条：做了多少 / 目标，竖线 = 按日子今天该到哪 */
+.ss-gbar { position: relative; display: inline-block; width: 90px; height: 5px; margin: 0 2px 0 10px; border-radius: 999px; background: var(--track); vertical-align: middle; }
+.ss-gbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--blue); }
+[data-theme="dark"] .ss-gbar i { background: var(--accent); }
+.ss-gbar u { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); }
+/* 卡片标题旁的「?」：长说明停上去或 Tab 到才出来 */
+.st-q { position: relative; display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 6px; border-radius: 50%; background: var(--tonal); font: 700 10.5px var(--body); color: var(--muted); vertical-align: 2px; cursor: help; }
+.st-q:hover::after, .st-q:focus-visible::after { content: attr(data-tip); position: absolute; left: 50%; transform: translateX(-50%); top: calc(100% + 6px); z-index: 30; width: max-content; max-width: 320px; padding: 8px 11px; border-radius: 10px; background: var(--ink); color: var(--bg); font: 500 12px/1.5 var(--body); letter-spacing: 0; text-transform: none; text-align: left; white-space: normal; pointer-events: none; }
+.st-q:focus-visible { outline: 2px solid var(--edge); outline-offset: 2px; }
+.chart figcaption { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.chart figcaption p { margin: 6px 0 0; font-size: 13px; color: var(--muted); text-wrap: pretty; }
 .chart figcaption > div:first-child { flex: 1 1 220px; min-width: 0; }   /* 那句话长了自己折行，图例留在右边 */
 .chart figcaption b { color: var(--ink); font-weight: 600; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
@@ -1028,8 +1137,8 @@ body.phone .settings .page-head { margin-top: 4px; }
 .st-bar .dk-deep { min-height: 30px; padding: 4px 11px; }
 .st-range { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .st-range input { padding: 4px 8px; border: var(--b-ctl); border-radius: 999px; font-size: 12.5px; }
-.st-two { display: grid; grid-template-columns: minmax(0, 5fr) minmax(400px, 4fr); gap: 0 14px; align-items: stretch; }   /* 饼图那张要放得下图例的名字（1280 宽时原来只剩 40px，Untracked 都被截） */
-.st-two > * { margin-bottom: 10px; }
+.st-two { display: grid; grid-template-columns: minmax(0, 5fr) minmax(400px, 4fr); gap: 0 20px; align-items: stretch; }   /* 饼图那张要放得下图例的名字（1280 宽时原来只剩 40px，Untracked 都被截） */
+.st-two > * { margin-bottom: 20px; }
 @media (max-width: 1100px) { .st-two { grid-template-columns: minmax(0, 1fr); } }
 /* 花了多久 / 深度那两个数字竖着叠成窄窄一列，挨着 Weekly rhythm；窄了就回到上面并排两块 */
 /* 深度（.tide；别叫 .dp，那是任务名后面「◆ Deep」小字的类，带 margin，会把这一段挤偏）：柱子还是那一根青柠。
@@ -1414,13 +1523,9 @@ body.phone .logtime input, body.phone .add input, body.phone .add select, body.p
 .g-days i:nth-child(8) { margin-left: 7px; }
 [data-theme="light"] .g-days i.d { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .22); }
 [data-theme="light"] .g-days i.s { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .28), inset 0 0 0 2.5px var(--pc); }
-/* 循环小事：不单独一张卡，大类头下面一行小字，点开是它的编辑框 */
-.g-reps { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: -2px 0 10px; }
-.g-rep { padding: 0; border: 0; background: none; font-size: 12.5px; font-weight: 600; text-align: left; }
-.g-rep small { margin-left: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
-@media (hover: hover) { .g-rep:hover { text-decoration: underline; text-underline-offset: 3px; } }
-/* 计划卡头上的 Archive / Restore：淡的小字，鼠标移上来才实 */
+/* 计划卡头上的 Archive / Restore：淡的小字，停在卡片上（或 Tab 到卡片里）才出现，归档展开的那几张一直在 */
 .p-arch { flex-shrink: 0; margin-left: 2px; padding: 3px 0; border: 0; background: none; font-size: 11.5px; font-weight: 600; color: var(--muted); opacity: .75; }
+.pgrid:not(.closed) .pcard:not(:hover, :focus-within) .p-arch { opacity: 0; }
 .p-arch:focus-visible { opacity: 1; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 @media (hover: hover) { .p-arch:hover { opacity: 1; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; } }
 .seg button[disabled] { opacity: .35; cursor: not-allowed; }
@@ -1430,7 +1535,8 @@ body.phone .logtime input, body.phone .add input, body.phone .add select, body.p
 /* 电脑：左边原来那一栏，最右边「Rest of 今年」——今年接下来想读的（js/ui/reading.js 的 planHTML），滚的时候贴着顶。样子学备餐页的 Big buys */
 .read-cols { display: grid; grid-template-columns: minmax(0, 640px) minmax(260px, 320px); justify-content: space-between; gap: 0 40px; align-items: start; }
 @media (max-width: 1100px) { .read-cols { grid-template-columns: minmax(0, 640px); } .yl { position: static; margin-top: 8px; } }
-.yl { position: sticky; top: 16px; padding: 14px 14px 12px; border-radius: 16px; background: var(--surface); }
+.yl { position: sticky; top: 16px; padding: 14px 14px 12px; border: 1px solid #E2E2DC; border-radius: 12px; background: var(--card); }   /* 2026-11-22：和 Projects 的计划卡片同一种细边卡（以前是全站唯一的灰底卡） */
+[data-theme="dark"] .yl { border-color: var(--edge); }
 .yl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .yl-head h3 { margin: 0; font: 700 14px var(--display); }
 .yl-list { margin: 0 0 10px; padding: 0; list-style: none; }
@@ -1440,7 +1546,7 @@ body.phone .logtime input, body.phone .add input, body.phone .add select, body.p
 .yl-grip { display: grid; place-content: center; gap: 2px; flex: none; width: 18px; height: 26px; cursor: grab; touch-action: none; opacity: .3; transition: opacity .15s; }
 .yl-grip i { display: block; width: 10px; height: 2px; border-radius: 1px; background: currentColor; }
 .yl-row:is(:hover, :focus-visible) .yl-grip { opacity: .8; }
-.yl-t { flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.35; overflow-wrap: anywhere; font-weight: 600; }   /* 书名放得下两行：一般长的写全，特别长的第二行末尾才省略 */
+.yl-t { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; line-height: 1.35; font-weight: 600; }   /* 书名一行（2026-11-22：两行的把清单撑乱），长的省略，停上去看全名（title） */
 .yl-tab { flex: none; padding: 1px 7px; border-radius: 999px; background: var(--tonal); font-size: 11px; font-weight: 600; color: var(--muted); }
 .yl-done, .yl-from { flex: none; font: 600 11px var(--num); color: var(--muted); }
 .yl-done { color: var(--ok); }
@@ -1599,6 +1705,9 @@ body[data-view="today"] #main, body.phone.has-dock[data-view="today"] #main { pa
    日期后面那天排了几小时（💤 跟在它后面），别的任务右边也写分钟；以前的日子不写时长（她说不需要知道），停上去展开的那几项也不写。
    周视图的格子这时窄（Pool 占了右边，1440 宽时一格里面只有 116px）：通勤的小开关先藏起来（关掉 Pool 就回来，她说可以），box 收紧；再窄放不下就先收起 box */
 .cal-hrs { margin-left: 5px; font-size: 11px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+/* 周视图的格子（她 2026-11-22 从试样挑的「松一点」）：格子里留白、便利贴之间都松一点；月视图照旧紧 */
+.week .cell { gap: 7px; padding: 8px 8px 28px; }
+.week .ev { padding: 7px 7px 5px; }
 .week .cell.cal-plan { container-type: inline-size; }
 .week .cell.cal-plan .cm-t { display: none; }
 .cell.cal-plan .cap { padding: 1px 4px; }
@@ -2128,7 +2237,7 @@ html.fx-off .lk-dot { animation: none; }
 .projects.lk-dim .pj-north :is(.ns-text, .ns-focus) { color: var(--muted); }
 .projects.lk-dim .pj-north .ns-text.more { -webkit-mask-image: none; mask-image: none; }
 .lk-can { outline: 1.5px dashed color-mix(in srgb, var(--ink) 45%, transparent); outline-offset: 2px; border-radius: 6px; }
-.pcard.lk-can { outline-offset: 4px; border-radius: 14px; }
+.pcard.lk-can { outline-offset: 4px; border-radius: 12px; }
 .lk-snap { outline: 2px solid var(--ink); }
 .gl.lk-snap, .g-rep.lk-snap, .ns-g.lk-snap { background-color: color-mix(in srgb, var(--accent) 22%, transparent); }
 .ns-g.lk-can { border-radius: 5px; }
@@ -2183,7 +2292,7 @@ body.phone .chain { font-size: 13px; }
 .ghealth { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -2px 0 8px; font-size: 12px; color: var(--muted); }
 .pintro { margin: 0 0 14px; max-width: 640px; }
 .pgroup:has(.pgrid) { margin-bottom: 18px; }
-.pgroup:not(:has(.pgrid)) { margin-bottom: 6px; }
+.pgroup:not(:has(.pgrid)) { margin-bottom: 14px; }
 .pgroup:not(:has(.pgrid)) .pg-top { margin-bottom: 4px; }
 
 /* ---------- 提醒（今天页右边）：上周的时间、存储 ---------- */

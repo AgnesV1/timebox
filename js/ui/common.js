@@ -143,16 +143,19 @@ export function heroHTML(c, d) {
   const pct = (v) => Math.min(100, (v / scale) * 100).toFixed(1) + "%";
   return '<section class="hero free">' +
     '<div class="hero-k">' + (d === c.today ? "Today" : "This day") + "</div>" +
-    '<div class="nums"><span class="big" data-roll="hero-' + d + '">' + hoursOf(day.done) + '</span><span class="of">/ ' + fmtHours(day.planned) + " picked</span>" +
+    '<div class="nums"><span class="big">' + hoursOf(day.done) + '</span><span class="of">/ ' + fmtHours(day.planned) + " picked</span>" +
     '<span class="state quiet">' + (day.rest ? "Rest day" : day.cap ? "box " + fmtHours(day.cap) + (over ? " · over" : "") : "") + "</span></div>" +
     '<div class="meter"><div class="fill" style="width:' + pct(day.done) + '"></div>' + (day.cap && day.cap < scale ? '<i class="tick" style="left:' + pct(day.cap) + '"></i>' : "") + "</div></section>";
 }
 
+// 电脑今天页任务卡片的头（她 2026-11-22 要的视觉层级）：「做了多少」是整页最大的数字，后面一行字说排了多少、盒子多大；下面是那条轴。
+// 右栏的 heroHTML 跟着变小、墨色（以前右栏那个粉色大数字和这里抢）
 export function stripHTML(c, d, tasks) {
   const day = E.daySummary(c, d);
   const over = day.cap > 0 && day.planned > day.cap;
-  return '<div class="strip">' + tasks.map(segHTML).join("") + "</div>" +
-    '<div class="stripmeta' + (over ? " over" : "") + '"><span>' + hoursOf(day.planned) + " / " + (day.cap ? fmtHours(day.cap) : "—") + " planned" + (over ? " · over" : "") + "</span><span>" + fmtHours(day.done) + " done</span></div>";
+  return '<div class="tday-hd' + (over ? " over" : "") + '"><b class="tday-big num"><span data-roll="done-' + d + '">' + hoursOf(day.done) + "</span>h</b><span>done of " + fmtHours(day.planned) + " planned" +
+    (day.rest ? " · rest day" : day.cap ? " · box " + fmtHours(day.cap) : "") + (over ? " · over the box" : "") + "</span></div>" +
+    '<div class="strip">' + tasks.map(segHTML).join("") + "</div>";
 }
 
 

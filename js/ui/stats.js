@@ -13,7 +13,7 @@ import * as store from "../store.js";
 import * as S from "../stats.js";
 import * as E from "../engine.js";
 import { esc, on, icon } from "../dom.js";
-import { fmtHours, fmtShort, fmtDay, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf } from "../dates.js";
+import { fmtHours, fmtShort, fmtDay, WEEKDAYS, MONTHS, MONTHS_LONG, weekday, addDays, diffDays, quarterOf, daysInMonth } from "../dates.js";
 import { groupsOf, showChartTip, hideChartTip } from "./common.js";
 import { hourLabel, REST_BLOCK, COMMUTE_BLOCKS } from "../day.js";
 import { neon } from "../groups.js";
@@ -89,6 +89,9 @@ function delta(cur, prev, fmt, goodUp = true) {
   return '<span class="delta ' + (up === goodUp ? "good" : "bad") + '">' + (up ? "▲ " : "▼ ") + fmt(Math.abs(d)) + " vs " + PREV[kind] + "</span>";
 }
 
+// 卡片说明只留一行（她 2026-11-22 要的视觉层级）：长的放进标题旁边的「?」，停上去或 Tab 到才显示（css 的 .st-q）
+const qmark = (long) => ' <span class="st-q" tabindex="0" role="note" aria-label="' + esc(long) + '" data-tip="' + esc(long) + '">?</span>';
+
 function tile(label, value, sub, dlt = "") {
   return '<div class="tile"><p class="tl">' + label + '</p><p class="tv">' + value + "</p>" + (sub ? '<p class="ts">' + sub + "</p>" : "") + dlt + "</div>";
 }
@@ -100,7 +103,8 @@ function tile(label, value, sub, dlt = "") {
 function timeStrip(s, p, b, bp, name, w, goal = "") {
   const n = (v, cls = "") => '<b class="num' + (cls ? " " + cls : "") + '">' + fmtHours(v) + "</b>";
   if (!b) return '<div class="st-strip"><span>All ' + n(s.spent) + ' <span class="ss-m">· ◆ ' + fmtHours(s.deep) + (s.days ? " · ~" + fmtHours(s.avgSpent) + " a day" : "") + "</span></span>" + delta(s.spent, p.spent, fmtHours) + goal + "</div>";
-  return '<div class="st-strip"><span>' + esc(name) + " " + n(b.spent, "ss-b") + "</span><span>◆ deep " + n(b.deep) + "</span>" + delta(b.spent, bp.spent, fmtHours) +
+  // 她 2026-11-22 要的视觉层级：Build 这一段一共多久是这一页的主数字，deep 和环比在旁边小字
+  return '<div class="st-strip st-hero"><span class="ss-hero"><b class="num ss-b ss-big">' + fmtHours(b.spent) + "</b> " + esc(name) + "</span><span>◆ deep " + n(b.deep) + "</span>" + delta(b.spent, bp.spent, fmtHours) +
     (w && w.spent > 0 ? '<span class="ss-all">' + esc(name) + " + " + esc(w.name) + " " + n(b.spent + w.spent, "ss-b") + (b.days ? ' (deep <b class="num">~' + fmtHours((b.deep + w.deep) / b.days) + "/d</b>)" : "") + "</span>" : "") + goal + "</div>";
 }
 
@@ -114,7 +118,10 @@ function goalHTML(c) {
   const names = S.coreGroups(c);
   const done = names.reduce((a, x) => a + S.summarize(S.onlyGroup(c, x), ym + "-01", c.today).spent, 0);
   const { gap } = S.monthGap(hours * 60, done, c.today);
-  return '<span class="ss-goal">' + MONTHS[Number(ym.slice(5)) - 1] + ' goal <input class="ss-goal-in num" type="text" inputmode="decimal" autocomplete="off" data-keep="st-goal" value="' + (hours || "") + '" aria-label="This month\'s goal in hours">h' +
+  // 设了目标：一根细条 = 做了多少 / 目标，竖线 = 按日子今天该到哪（到昨天过了几天 ÷ 本月天数，和 gap 同一个算法）
+  const days = daysInMonth(ym + "-01"), dayN = Number(c.today.slice(8)) - 1;
+  const bar = hours ? '<span class="ss-gbar" title="' + fmtHours(done) + " of " + fmtHours(hours * 60) + '"><i style="width:' + Math.min(100, (done / (hours * 60)) * 100).toFixed(1) + '%"></i><u style="left:' + ((dayN / days) * 100).toFixed(1) + '%"></u></span>' : "";
+  return '<span class="ss-goal">' + MONTHS[Number(ym.slice(5)) - 1] + ' goal <input class="ss-goal-in num" type="text" inputmode="decimal" autocomplete="off" data-keep="st-goal" value="' + (hours || "") + '" aria-label="This month\'s goal in hours">h' + bar +
     (hours ? ' · gap <b class="num ss-gap' + (gap < 0 ? " neg" : "") + '">' + (gap < 0 ? "−" : "+") + fmtHours(Math.abs(gap)) + "</b>" : "") + "</span>";
 }
 
@@ -298,7 +305,7 @@ function heatHTML(c, s, by, seg = "") {
   const timed = heatGrid.reduce((a, x) => a + x.hours.reduce((b, v) => b + v, 0), 0);
   tips.wday = order.map((wd) => { const r = s.byWeekday[wd]; return { title: WEEKDAYS[wd] + " · " + r.days + " day" + (r.days === 1 ? "" : "s"),
     rows: [["a day on average", fmtHours(r.avg), "ln"], ...r.parts.map((x) => [x.name || "No project", fmtHours(x.avg), "sw", paint(x)])] }; });
-  return '<section class="card heatcard"><header class="heat-head"><h3>When you worked</h3>' + seg + '</header><p class="lede">Average minutes timed in each hour, from 6:00. The colour is what that hour mostly went to — a blend when it was shared. Only time with a start and end counts. Point at a weekday for its daily average.</p>' +
+  return '<section class="card heatcard"><header class="heat-head"><h3>When you worked' + qmark("Average minutes timed in each hour, from 6:00. The colour is what that hour mostly went to — a blend when it was shared. Only time with a start and end counts. Point at a weekday for its daily average.") + "</h3>" + seg + '</header><p class="lede">Minutes timed in each hour.</p>' +
     (timed ? heatRows("heat", order.map((wd, k) => ({ label: WEEKDAYS[wd], hours: byWd[wd].hours, parts: byWd[wd].parts, what: "average", wdI: k }))) : '<p class="empty">No timed sessions in this period.</p>') +
     (timed ? '<details class="heat-weeks"' + (weeksOpen ? " open" : "") + '><summary>Week by week</summary><div data-heat-weeks>' + (weeksOpen ? weeksHTML() : "") + "</div></details>" : "") + "</section>";
 }
@@ -316,7 +323,7 @@ function projectsHTML(c, s) {
   const rows = S.projectRows(c, s.from, s.last);
   if (!rows.length) return "";
   const times = (r) => (r.n ? r.done + " / " + r.n : r.done ? String(r.done) : "—");
-  return '<section class="card wide"><h3>Plans</h3><p class="lede">Done = times ticked off in each plan\'s pool (out of how many it holds); spent = the time logged on it, all of it and in this period.</p>' +
+  return '<section class="card wide"><h3>Plans' + qmark("Done = times ticked off in each plan's pool (out of how many it holds); spent = the time logged on it, all of it and in this period.") + '</h3><p class="lede">Times done and time spent on each plan.</p>' +
     '<div class="table-wrap"><table class="ptable"><thead><tr><th>Plan</th><th>Done</th><th>Spent</th><th>This period</th></tr></thead><tbody>' +
     groupsOf(rows.map((r) => r.p)).map((g) => {
       const rs = g.subs.map((p) => rows.find((r) => r.p === p));
@@ -418,7 +425,7 @@ function pieHTML(c, s, rest, haze = null, filtered = false) {
   const field = (k, label, unit, v) => "<label><span>" + label + '</span><input class="num" type="number" min="0" max="24" step="0.5" data-life="' + k + '" data-keep="life-' + k + '" value="' + (v ? Math.round(v / 6) / 10 : "") + '" placeholder="' + (k === "deepGoal" ? "none" : "0") + '"><em>' + unit + "</em></label>";
   // 上个月的 On the side 还没填（填 0 也算填了）：Adjust 旁边一个红点（她 10-23 要的）
   const sideDue = !store.sideFilled(S.sideMonths(c.today).slice(-2)[0]);
-  return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went</h3><p class="lede">Each 24-hour day. Sleep and meals count but aren\'t drawn.' +
+  return '<section class="card piecard"><header class="pie-head"><div><h3>Where the time went' + qmark("Each 24-hour day. Sleep and meals count but aren't drawn.") + '</h3><p class="lede">Each 24-hour day.' +
     ' <button type="button" class="link" data-act="life-adjust" aria-expanded="' + adjust + '">' + (adjust ? "Done" : "Adjust") + "</button>" +
     (sideDue ? '<i class="dsc-dot st-due" title="Last month\'s On the side isn\'t filled in" aria-label="Last month\'s On the side isn\'t filled in"></i>' : "") + "</p></div></header>" +
     // Adjust 一个月才开一次：几个默认值 + On the side 都收在这里面，平常不占地方
@@ -490,7 +497,7 @@ function typicalHalf(key, title, x) {
 
 function typicalHTML(c, s, by) {
   const t = S.typicalDays(c, s.from, s.to, { by, isOff: (d) => store.offDay(d).off });
-  return '<section class="card typ-card"><h3>A typical day</h3><p class="lede">An average work day (Monday to Friday, not days off) and weekend day in this period, from times with a start and end. Each bar is an hour; the grey arc is sleep and the commute.</p>' +
+  return '<section class="card typ-card"><h3>A typical day' + qmark("An average work day (Monday to Friday, not days off) and weekend day in this period, from times with a start and end. Each bar is an hour; the grey arc is sleep and the commute.") + '</h3><p class="lede">An average work day and weekend day, hour by hour.</p>' +
     '<div class="typ-two">' + typicalHalf("work", "Work day", t.work) + typicalHalf("weekend", "Weekend", t.weekend) + "</div></section>";
 }
 

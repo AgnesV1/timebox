@@ -189,3 +189,59 @@ test("store: a repeat sits right on its project; moving it takes the colour alon
   store.archiveProject(rid, false);
   assert.equal(E.isActive(store.get("projects", rid)), true);
 });
+
+test("a repeat that's switched off doesn't come up, and keeps its rule", () => {
+  const r = { days: [0, 30, 0, 0, 0, 0, 0], start: TODAY, end: "", skip: [] };
+  assert.equal(R.dueOn(r, TODAY), 30);
+  assert.equal(R.dueOn({ ...r, off: true }, TODAY), 0);
+});
+
+test("regularWeek: about N a week wins over set days; a day counts once however many things were done on it", () => {
+  const p = { id: "g", kind: "regular", place: "auto", status: "active", rule: { perWeek: 3, days: [0, 40, 0, 40, 0, 40, 0], start: TODAY } };
+  const t = (id, date, status = "done", itemId = "") => ({ id, date, title: "", est: 30, status, projectId: "g", itemId, actual: null });
+  const c = { today: TODAY, weekStartsOn: "monday", projects: [p], tasks: [t("a", TODAY), t("b", TODAY, "done", "i1"), t("c", addDays(TODAY, 2), "")] };
+  assert.deepEqual(E.regularWeek(c, p), { target: 3, placed: 2, done: 1, left: 1 });
+});
+
+test("store: dragging ↻ makes a plan repeat for a while; switch it off and on; stopping turns it back into a plan", async () => {
+  const store = await import("../js/store.js?plan-repeat");
+  const t = store.today(), wd = weekday(t);
+  let undo = null;
+  store.onUndo((label, before) => { undo = before; });
+  const pid = store.saveProject({ name: "IELTS", group: "Build", kind: "regular", place: "pool", rule: { perWeek: 2, min: 45 } });
+  store.addPoolLines(pid, "", "Mock test · ×3");
+  assert.equal(store.setPlanRepeat(pid, { on: [wd], start: t, end: "" }), false, "a last day is a must");
+  assert.equal(store.setPlanRepeat(pid, { on: [wd, (wd + 2) % 7], start: t, end: addDays(t, 20) }), true);
+  let p = store.get("projects", pid);
+  assert.equal(p.place, "auto");
+  assert.equal(p.rule.plan, true, "it stays a plan, not a loose repeat");
+  assert.equal(p.rule.days[wd], 45, "the plan's default minutes");
+  assert.equal(p.rule.perWeek, 2, "about N a week is left alone");
+  const today = R.routineTaskId(pid, t);
+  assert.equal(store.get("tasks", today)?.est, 45, "today's one is there straight away");
+
+  store.toggleRepeat(pid, false);
+  assert.equal(store.get("projects", pid).rule.off, true);
+  assert.equal(store.get("tasks", today), null, "today's one, not started yet, goes away");
+  assert.equal(E.ghostsOn(store.ctx(), addDays(t, 7)).length, 0, "no previews while it's off");
+  store.toggleRepeat(pid, true);
+  assert.equal(store.get("tasks", today)?.est, 45, "back on: today's one comes back");
+  assert.equal(E.ghostsOn(store.ctx(), addDays(t, 7)).length, 1);
+  assert.equal(E.ghostsOn(store.ctx(), addDays(t, 21)).length, 0, "nothing after the last day");
+
+  store.editSeries(today, { title: "IELTS speaking" }, "all");
+  assert.equal(store.get("projects", pid).name, "IELTS", "renaming the row doesn't rename the plan");
+
+  store.stopRepeat(pid);
+  p = store.get("projects", pid);
+  assert.equal(p.place, "pool");
+  assert.equal(p.rule.days, undefined);
+  assert.equal(p.rule.perWeek, 2);
+  assert.equal(store.all("items").filter((i) => i.projectId === pid).length, 1, "the pool is still there");
+  store.undo(undo);
+  assert.equal(store.get("projects", pid).place, "auto", "undo brings the repeat back");
+
+  store.deleteSeries(R.routineTaskId(pid, t), "all");
+  assert.ok(store.get("projects", pid), "deleting the whole repeat never deletes the plan");
+  assert.equal(store.get("projects", pid).place, "pool");
+});

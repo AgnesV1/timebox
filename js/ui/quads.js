@@ -6,6 +6,7 @@
 //   经过的那一格亮起来，空位挪到要落的地方，别的纸让开；松手：纸飞进空位、摆正，胶条按一下；拖到窗外松手 = 飞回原处。
 // 点一下便签 = 改字（回车存、Esc 不改），右边出现 ✓、挪到别的格（不用拖的做法：挑四格里的另一格）和删除；每格底下的 + 新写一张，回车接着写下一张，Esc 收起。
 // 整页重画的时候（同步拉下来之类）照这里记着的画回来：开着的「新写」框、正在改的那张、正拖着 / 正落下的那张（画成空位）。
+// 四格都空着时收成一行「Urgent / important · + Sort a task」（2026-11-22），点开才是四格。
 
 import * as store from "../store.js";
 import * as Q from "../quads.js";
@@ -56,8 +57,13 @@ function cellHTML(q, list) {
 
 const addHTML = (q) => '<form class="qd-addf" data-q="' + q + '" autocomplete="off"><input name="text" data-keep="qd-add-' + q + '" maxlength="' + Q.MAX + '" placeholder="New note" aria-label="New note"></form>';
 
+// 四格都空着：收成一行（她 2026-11-22 要的视觉层级，空的四格不占一大块地方），点开才是四格，先开左上那格的「新写」
+let unfolded = false;
 export function quadHTML() {
   const b = store.quadBoard();
+  if (!unfolded && !adding && !Object.values(b).some((l) => l.length)) {
+    return '<section class="qd qd-fold" aria-label="Urgent and important"><button type="button" class="qd-open" data-qd="open"><b>Urgent / important</b><span>' + icon("plus") + " Sort a task</span></button></section>";
+  }
   return '<section class="qd" aria-label="Urgent and important">' +
     '<span></span><span class="qd-ax">Urgent</span><span class="qd-ax">Not urgent</span>' +
     '<span class="qd-ax qd-v">Important</span>' + cellHTML("do", b.do) + cellHTML("plan", b.plan) +
@@ -369,7 +375,8 @@ export function initQuads(render) {
   });
   on(document, "click", ".qd [data-qd]", (e, b) => {
     const id = b.closest(".qd-note")?.dataset.id, k = b.dataset.qd;
-    if (k === "add") openAdd(b.closest(".qd-q").dataset.q);
+    if (k === "open") { unfolded = true; rerender(); requestAnimationFrame(() => openAdd("do")); }
+    else if (k === "add") openAdd(b.closest(".qd-q").dataset.q);
     else if (k === "done") toggleDone(id);
     else if (k === "move") moveMenu(b, id);
     else if (k === "del") remove(id);

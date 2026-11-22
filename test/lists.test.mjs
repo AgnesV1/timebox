@@ -354,3 +354,31 @@ test("Today's minutes: a bare number under an hour, hours and minutes from there
   assert.deepEqual([5, 30, 59, 60, 90, 193, 180, 0, null].map(L.estText), ["5", "30", "59", "1h", "1h30", "3h13", "3h", "", ""]);
   assert.equal(L.sizeOf(30), "30m", "the pool lists keep their m");
 });
+
+test("planCard: hours, days this month, pool left with the waiting ones, and an even-pace tick for a due date", () => {
+  const p = plan("B2", { m1: { n: 3 }, m2: { n: 2, month: "2027-02" }, any: { n: 0 }, old: { n: 1, later: true } }, { start: "2026-10-01", deadline: "2026-10-31", rule: { months: true, items: { m1: { n: 3 }, m2: { n: 2, month: "2027-02" }, any: { n: 0 }, old: { n: 1, later: true } } } });
+  const items = ["m1", "m2", "any", "old"].map((id, k) => ({ id, projectId: "B2", module: "", title: id, est: 30, order: k }));
+  const tasks = [
+    task({ id: "r1", date: "2026-10-05", projectId: "B2", actual: 60, status: "done" }),
+    task({ id: "l1", date: "2026-10-05", projectId: "B2", itemId: "m1", status: "done" }),
+    task({ id: "l2", date: "2026-10-12", projectId: "B2", itemId: "m1", status: "done" }),
+    task({ id: "r2", date: "2026-09-28", projectId: "B2", actual: 30 }),
+    task({ id: "x", date: "2026-10-06", projectId: "Other", actual: 90, status: "done" })
+  ];
+  const k = L.planCard(ctx({ projects: [p], items, tasks }), p);
+  assert.equal(k.spent, 90, "all the time logged on the plan, last month too");
+  assert.equal(k.monthDays, 2, "the 5th counts once, the 12th once; September doesn't");
+  assert.deepEqual([k.total, k.done, k.left, k.waiting, k.pick, k.later, k.items], [5, 2, 3, 1, 1, 1, 4], "the waiting item counts in total and left");
+  assert.equal(k.due, "2026-10-31");
+  assert.equal(k.pace, 28 / 30, "Oct 29 of Oct 1 → Oct 31");
+  assert.deepEqual([k.dayN, k.dayM], [29, 31]);
+});
+
+test("planCard: no start written = the first task's day; no due date = no tick", () => {
+  const p = plan("Q4", {}, { deadline: "2026-11-08" });
+  const k = L.planCard(ctx({ projects: [p], tasks: [task({ id: "a", date: "2026-10-20", projectId: "Q4" })] }), p);
+  assert.equal(k.start, "2026-10-20");
+  assert.equal(k.pace, 9 / 19);
+  assert.equal(L.planCard(ctx({ projects: [plan("X")] }), plan("X")).pace, null);
+  assert.equal(L.planCard(ctx({ projects: [plan("X")] }), plan("X")).items, 0, "an empty pool");
+});

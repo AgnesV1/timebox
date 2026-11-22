@@ -14,7 +14,7 @@
 // 这里剩下的：单个任务的分钟、索引、每天的可用时间、日历格子的汇总和预览、规律计划这一周。
 
 import { addDays, weekday, range, startOfWeek } from "./dates.js";
-import { ruleOf, dueOn, inRange } from "./routines.js";
+import { ruleOf, dueOn } from "./routines.js";
 
 
 const num = (v) => Number(v) || 0;
@@ -106,7 +106,10 @@ export function ghostsOn(ctx, d) {
 export function regularWeek(ctx, p, d = ctx.today) {
   const ws = startOfWeek(d, ctx.weekStartsOn || "monday"), we = addDays(ws, 6), r = ruleOf(p);
   const ts = tasksOfProject(ctx, p.id).filter((t) => t.date >= ws && t.date <= we);
-  const target = isAuto(p) ? range(ws, we).filter((x) => dueOn(r, x)).length : (inRange(r, we) || inRange(r, ws) ? num(r.perWeek) : 0);
-  const placed = ts.filter(isPlanned).length;
-  return { target, placed, done: ts.filter((t) => t.status === "done").length, left: Math.max(0, target - placed) };
+  // 写了 about N a week 就按它（2026-11-22 起：计划只写每周大概几次，日历上临时拖的重复不改这个数）；没写的固定星期几按那几天
+  const target = num(r.perWeek) > 0 ? num(r.perWeek) : isAuto(p) ? range(ws, we).filter((x) => dueOn(r, x)).length : 0;
+  // 按天数：那天这个计划的一行和拖进来的几项算一次打卡
+  const days = (f) => new Set(ts.filter(f).map((t) => t.date)).size;
+  const placed = days((t) => isPlanned(t));
+  return { target, placed, done: days((t) => t.status === "done"), left: Math.max(0, target - placed) };
 }

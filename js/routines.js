@@ -59,7 +59,8 @@ export function inRange(r, date) {
 
 // 那天该不该出现、做几分钟（Auto 规则）
 export function dueOn(r, date) {
-  if (!inRange(r, date) || (r.skip || []).includes(date)) return 0;
+  // off = 在日历 Pool 底下的 Repeats 清单里关掉了（她 2026-11-22 要的，像闹钟的开关）：先不出现，规则留着
+  if (r.off || !inRange(r, date) || (r.skip || []).includes(date)) return 0;
   return minutesOn(r, date);
 }
 

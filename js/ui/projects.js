@@ -1,17 +1,17 @@
 // 项目页。右边一栏是 North star 那段字和 Goals | Ideas（js/ui/goals.js；Ideas = 灵感池，见 js/ui/ideas.js），贴着顶；下面说的都是左边的计划。
 // 左边按「项目」分区（项目 = 大类 = 计划的 group），够宽时再分两栏（左 Build、Work，右别的），
 // 清单里的大类一直都在（空的也在）；区头 Rename 可以改名、换颜色、并进别的大类。
-// 计划只有一种（2026-10-25 起，取代 Total / Regular × Auto / Pool）：名字；固定星期几自己出现，或者拖到哪天（about N a week 只是参考数）；Notes；Pool。
-// Pool 是一项项具体的 todo（算的在 js/lists.js、存的在 js/store/lists.js）：做几次、大概多久、每周、步骤、备注、分区、Later。
+// 计划只有一种：名字；拖到哪天（about N a week 只是参考数）；Notes；Pool。2026-11-22 起编辑框里不再选「固定星期几」，
+// 临时的重复在日历 Pool 里拖计划名旁边的 ↻ 设（带结束日，见 js/ui/repeat.js），不写在卡片上。
+// Pool 是一项项具体的 todo（算的在 js/lists.js、存的在 js/store/lists.js）：做几次、大概多久、每周、备注、分区、Later、月份。
 // 某天 = 这个计划一行（整块计时），拖进来的项是它下面的便条。
-// 固定星期几、Pool 里又没东西的（循环小事）不单独给卡：区头下面一行小字，点开是它的编辑框。
-// 每张卡头上有 Archive：归档的折进区头右边的「3 archived」，点开在这个区里展开，卡上是 Restore。
+// 循环小事（加任务时选 Repeat 建的、Pool 里没东西的）不在这一页：在日历 Pool 底下的 Repeats 清单里。
+// 每张卡头上有 Archive（停上去才出现）：归档的折进区头右边的「3 archived」，点开在这个区里展开，卡上是 Restore。
 // 每个大类看什么不一样（groups.js 的 trackOf，Settings 里能改）：
-//   看进度的（Build）：区头一根条 = 各计划 Pool 里做了几次 / 一共几次；
 //   看钟点 / Relax / 联系的（Fitness / Leisure / Friends）：区头一句话（最近 7 天多少、多久没联系），不达标是红的，加最近 14 天的方块；
-//   不看的（Work / Chores）：只列计划。
-// 卡片（她 2026-10-25 挑的样子）：怎么出现 · 起止和第几天 · 花了多少；这周每项做了几次（有每周量的）；Pool 还剩几次 · 几项 Later。
-// 编辑框：项目、名字、怎么出现、颜色、Notes、Pool（按分区列，点一项展开改），右上角 Copy as text / Paste text（粘贴整份，先看认出了什么）。
+//   别的（Build / Work / Chores）：只列计划。进度条在每张卡片上（2026-11-22 起，区头不再有总进度条）。
+// 卡片（她 2026-11-22 要的，照视觉层级理顺）：名字（每周大概几次写在右边）→ 一共多久、这个月做过几天 → 这周的打卡方块 → 进度条（只有写了 Due 的才有）→ 淡字的 Pool 还剩多少。
+// 编辑框：它是谁（名字、项目）和进度 → Pool（主角，按分区列，点一项展开改）→ Notes → 小字的设置 → Serves → 状态；右上角 Copy as text / Paste text。
 
 import * as store from "../store.js";
 import * as E from "../engine.js";
@@ -22,10 +22,11 @@ import * as G from "../goals.js";
 import * as L from "../lists.js";
 import * as PT from "../plantext.js";
 import { esc, on, icon } from "../dom.js";
-import { diffDays, fmtShort, fmtHours, startOfMonth, WEEKDAYS, MONTHS } from "../dates.js";
+import { fmtShort, fmtHours, WEEKDAYS, MONTHS } from "../dates.js";
 import { groupsOf, chainHTML, toast } from "./common.js";
 import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
 import { goalsHTML, northHTML } from "./goals.js";
+import { openRepeat } from "./repeat.js";
 
 let editing = "";
 let draft = null;      // 新建时还没存的：{ group, name, place, color, rule, notes, start, deadline }
@@ -46,41 +47,41 @@ const shortOf = (title) => /^([A-Z]{1,3}\d{1,2})(?!\w)/.exec(title)?.[1] || (tit
 // 卡头最右边那个淡的小字：在用的是 Archive，归档里的是 Restore
 const archBtn = (p) => '<button type="button" class="p-arch" data-act="archive-plan">' + (E.isActive(p) ? "Archive" : "Restore") + "</button>";
 
-// 「Oct 26 – Dec 4 · day 4 of 40」：还没开始写哪天开始，过了写 ended
-function datesText(p, today) {
-  if (!p.start || !p.deadline || p.deadline < p.start) return "";
-  const n = diffDays(p.start, today) + 1, m = diffDays(p.start, p.deadline) + 1;
-  return fmtShort(p.start) + " – " + fmtShort(p.deadline) + " · " + (n < 1 ? "starts " + fmtShort(p.start) : n > m ? "ended" : "day " + n + " of " + m);
-}
-
-// 固定星期几、每周几次的计划这一周的方块（和区头 14 天方块同一种）
+// 写了每周大概几次的计划：这一周的打卡方块（和区头 14 天方块同一种）。一天算一次
 const weekSquares = (w) => '<div class="pweek" title="This week">' + Array.from({ length: w.target }, (_, k) => '<i class="' + (k < w.done ? "d" : k < w.placed ? "s" : "") + '"></i>').join("") +
   '<span class="num">' + w.done + "/" + w.target + " this week</span></div>";
 
-function cardHTML(c, p, track) {
-  const r = R.ruleOf(p), auto = E.isAuto(p);
-  const st = L.itemsOf(c, p.id).slice().sort(byOrder).map((i) => L.stateOf(c, i));
-  const ts = E.tasksOfProject(c, p.id);
-  const when = auto ? "↻ " + R.describe(r, weekStart()) + (r.end ? " until " + fmtShort(r.end) : "") : Number(r.perWeek) > 0 ? "About " + Number(r.perWeek) + " a week" : "Drag it when you like";
-  let lines;
-  if (st.length) {
-    const spent = ts.reduce((a, t) => a + E.spentMin(t), 0), tot = L.poolTotals(c, p);
-    const week = st.filter((x) => !x.cfg.later && x.cfg.perWeek > 0).map((x) => esc(shortOf(x.item.title)) + " <b>" + x.week.done + "/" + x.cfg.perWeek + "</b>");
-    lines = [
-      [when, datesText(p, c.today), spent ? "<b>" + fmtHours(spent) + "</b> so far" : ""].filter(Boolean).join(" · "),
-      week.length ? "This week · " + week.join(" · ") : "",
-      "Pool " + (tot.times ? "<b>" + tot.times + "</b> left" : tot.items ? "<b>" + tot.items + "</b> to pick from" : "all done") + (tot.later ? " · " + tot.later + " later" : "") + (tot.waiting ? " · " + tot.waiting + " waiting for its month" : "")
-    ];
-  } else {
-    const from = startOfMonth(c.today);
-    const month = ts.filter((t) => t.date >= from && t.date <= c.today && (E.spentMin(t) > 0 || t.status === "done"));
-    const days = new Set(month.map((t) => t.date)).size, hours = month.reduce((a, t) => a + E.spentMin(t), 0);
-    lines = [[when, datesText(p, c.today), days ? "<b>" + days + "</b> time" + (days > 1 ? "s" : "") + " this month" : "", hours ? "<b>" + fmtHours(hours) + "</b>" : ""].filter(Boolean).join(" · ")];   // Pool 空着就不提（她说没加就空着）
-  }
-  const w = !st.length && track !== "" ? E.regularWeek(c, p) : null;
+const pct = (v) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 10;
+
+// 两个数：一共记了多久、这个月做过几天（勾了 Done 或记了时间，同一天算一次；以前试样写成「4×」，她看不懂）
+const numsHTML = (k) => '<p class="pc-nums"><b class="num">' + fmtHours(k.spent) + "</b><span>total</span><b class=\"num\">" + k.monthDays + "</b><span>" + (k.monthDays === 1 ? "time" : "times") + " this month</span></p>";
+
+// 进度条只给有截止日（Due）的计划（她 2026-11-22 晚说的：没有截止日的不用条）：有总量 = 做完几次 / 一共几次（计划色）+ 一道竖线 = 按日子今天该到哪；
+// 没总量 = 日子过了多少（淡）。没有截止日的，做了几次看 Pool 那一行
+function barHTML(k, today) {
+  if (!k.due) return "";
+  const due = (today > k.due ? "was due " : "due ") + fmtShort(k.due);
+  const tick = !(k.pace > 0) ? "" : '<u style="left:' + pct(k.pace) + '%" title="Where an even pace would be today"></u>';   // 第一天就不画（贴在最左边像个毛刺）
+  if (k.total) return '<div class="pc-bar"><i style="width:' + pct(k.done / k.total) + '%"></i>' + tick + '</div><p class="pc-bl"><span>' + k.done + " of " + k.total + " done</span><span>" + due + "</span></p>";
+  if (k.pace !== null) return '<div class="pc-bar days"><i style="width:' + pct(k.pace) + '%"></i></div><p class="pc-bl"><span>' + (today < k.start ? "starts " + fmtShort(k.start) : "day " + k.dayN + " of " + k.dayM) + "</span><span>" + due + "</span></p>";
+  return '<p class="pc-bl"><span></span><span>' + due + "</span></p>";
+}
+
+// Pool 还剩多少（等月份的也算在 left 里，括号里说几项在等）；Pool 空着不写
+function poolLine(k) {
+  if (!k.items) return "";
+  const wait = k.waiting ? " (" + k.waiting + " waiting for " + (k.waiting > 1 ? "their" : "its") + " month)" : "";
+  const main = k.left ? "<b>" + k.left + "</b> left" + wait + (k.pick ? " · " + k.pick + " any" : "") : k.pick ? "<b>" + k.pick + "</b> to pick from" + wait : k.waiting ? k.waiting + " waiting for " + (k.waiting > 1 ? "their" : "its") + " month" : "all done";
+  return '<p class="ls-l pc-pool">Pool ' + main + (k.later ? " · " + k.later + " later" : "") + "</p>";
+}
+
+function cardHTML(c, p) {
+  const k = L.planCard(c, p), per = Number(R.ruleOf(p).perWeek) || 0;
+  const w = per ? E.regularWeek(c, p) : null;
   return '<article class="pcard" data-project="' + p.id + '" style="--pc:' + esc(p.color) + '">' +
-    '<header><button type="button" class="pname" data-act="edit-project"><i></i>' + esc(p.name || "Untitled") + "</button>" + archBtn(p) + "</header>" +
-    lines.filter(Boolean).map((l) => '<p class="ls-l">' + l + "</p>").join("") + (w && w.target ? weekSquares(w) : "") + "</article>";
+    '<header><button type="button" class="pname" data-act="edit-project"><i></i><span>' + esc(p.name || "Untitled") + "</span></button>" +
+    (per ? '<span class="pc-per">about ' + per + " a week</span>" : "") + archBtn(p) + "</header>" +
+    numsHTML(k) + (w && w.target ? weekSquares(w) : "") + barHTML(k, c.today) + poolLine(k) + "</article>";
 }
 
 // 大类看的是什么（没存过的名字、哪都没归的计划照旧看进度）
@@ -125,13 +126,6 @@ function groupDaysHTML(c, name, track) {
     "<span>last 14 days</span></div>";
 }
 
-// 循环小事那一行：名字 + 怎么重复，点开是计划的编辑框（停掉、改星期几都在那儿）
-function repsHTML(reps) {
-  if (!reps.length) return "";
-  return '<p class="g-reps">' + reps.map((p) => '<button type="button" class="g-rep" data-project="' + p.id + '" data-act="edit-project">↻ ' + esc(p.name || "Untitled") +
-    " <small>" + esc(R.describe(R.ruleOf(p), weekStart())) + "</small></button>").join("") + "</p>";
-}
-
 // 改名的那一排：名字、颜色、并进别的大类、（空的）拿掉
 function renameHTML(name, empty) {
   const g = store.groupByName(name);
@@ -142,33 +136,22 @@ function renameHTML(name, empty) {
     '<button type="button" class="btn" data-act="rename-done">Done</button>';
 }
 
-// 一个大类（一组计划）的头：几个计划；看进度的再加一根条 = 这些计划 Pool 里做了几次 / 一共几次（Later、Any 的不算）；别的见 groupHealthHTML。
-// subs = 在用的、有卡的那些；more = { reps 循环小事几条, gone 归档了几个, shown 归档展开着没有 }
-function groupHead(c, name, subs, empty, track, last, more = {}) {
-  const progress = track === "progress";
-  let n = 0, done = 0;
-  if (progress) {
-    for (const p of subs) for (const i of L.itemsOf(c, p.id)) {
-      const s = L.stateOf(c, i);
-      if (s.cfg.later || !(s.cfg.n > 0)) continue;
-      n += s.cfg.n;
-      done += Math.min(s.count.done, s.cfg.n);
-    }
-  }
-  const pct = n ? Math.round((done / n) * 100) : 0;
+// 一个大类（一组计划）的头：名字 · 几个计划，右边淡字的 archived / Rename / + Plan；看钟点 / 联系的再加一句话和 14 天方块（groupHealthHTML、groupDaysHTML）。
+// 进度条在各张卡片上（2026-11-22 起，区头不再有总进度条）。n = 在用的卡片几张；more = { gone 归档了几个, shown 归档展开着没有 }
+function groupHead(c, name, n, empty, track, last, more = {}) {
   const editingName = renaming === name && name;
   const color = store.groupByName(name)?.color;
   const title = editingName ? renameHTML(name, empty) : "<h3>" + (color ? '<i class="gdot" style="background:' + esc(color) + '"></i>' : "") + esc(name || "No project") + "</h3>";
-  const meta = [subs.length ? subs.length + " plan" + (subs.length > 1 ? "s" : "") : more.reps ? "" : "No plans yet", n ? pct + "% of the pool done" : ""].filter(Boolean).join(" · ");
+  const meta = n ? n + " plan" + (n > 1 ? "s" : "") : "No plans yet";
   return '<header class="pg-top' + (editingName ? " editing" : "") + '">' + title + (editingName ? "" : '<span class="pg-meta">' + esc(meta) + "</span>" +
     '<span class="pg-actions">' + (more.gone ? '<button type="button" class="btn ghosty" data-act="toggle-archived" aria-expanded="' + Boolean(more.shown) + '">' + more.gone + " archived</button>" : "") +
     (name ? '<button type="button" class="btn ghosty" data-act="rename-group">Rename</button>' : "") +
     '<button type="button" class="btn" data-act="new-sub">' + icon("plus") + " Plan</button></span>") + "</header>" +
-    (progress ? (n ? '<div class="gbar"><i style="width:' + pct + '%"></i></div>' : "") : groupHealthHTML(c, name, last) + groupDaysHTML(c, name, track));
+    (track === "progress" ? "" : groupHealthHTML(c, name, last) + groupDaysHTML(c, name, track));
 }
 
-// 循环小事 = 固定星期几、Pool 里又没东西的
-const isRep = (c, p) => E.isRepeat(p) && !L.itemsOf(c, p.id).length;
+// 循环小事 = 固定星期几、Pool 里又没东西、也不是日历 Pool 拖 ↻ 设的（那种还是一张计划）：不在这一页
+const isLoose = (c, p) => E.isRepeat(p) && !p.rule?.plan && !L.itemsOf(c, p.id).length;
 
 // 页头：标题和「+ New plan」；下面单独一条 North star（横跨两栏，js/ui/goals.js 的 northHTML）。再下面两栏：左边是各个项目（.pj-plans），
 // 右边一栏是 Goals | Ideas（js/ui/goals.js），滚的时候贴着顶
@@ -182,14 +165,14 @@ export function projectsHTML(c) {
     (c.projects.length ? "" : '<p class="hint pintro">A project is an area of your life. Tasks can sit right on it, or under a plan inside it: a plan is one row on a day, timed as a whole, with a pool of things you drag in when you like.</p>') +
     columns(groups.map((g) => {
       const track = trackFor(g.name);
-      const live = g.subs.filter(E.isActive), old = g.subs.filter((p) => !E.isActive(p));
-      const cards = live.filter((p) => !isRep(c, p)), reps = live.filter((p) => isRep(c, p));
+      const subs = g.subs.filter((p) => !isLoose(c, p));
+      const live = subs.filter(E.isActive), old = subs.filter((p) => !E.isActive(p));
+      if (!g.name && !subs.length) return null;   // 没归大类的只有循环小事：这一页不列
       const shown = openArchived.has(g.name) && old.length > 0;
-      return { name: g.name, html: '<section class="pgroup" data-group="' + esc(g.name) + '">' + groupHead(c, g.name, cards, !g.subs.length, track, last, { reps: reps.length, gone: old.length, shown }) +
-        repsHTML(reps) +
-        (cards.length ? '<div class="pgrid">' + cards.map((p) => cardHTML(c, p, track)).join("") + "</div>" : "") +
-        (shown ? '<div class="pgrid closed">' + old.map((p) => cardHTML(c, p, track)).join("") + "</div>" : "") + "</section>" };
-    })) + "</div>" + goalsHTML(c) + "</div></div>";
+      return { name: g.name, html: '<section class="pgroup" data-group="' + esc(g.name) + '">' + groupHead(c, g.name, live.length, !g.subs.length, track, last, { gone: old.length, shown }) +
+        (live.length ? '<div class="pgrid">' + live.map((p) => cardHTML(c, p)).join("") + "</div>" : "") +
+        (shown ? '<div class="pgrid closed">' + old.map((p) => cardHTML(c, p)).join("") + "</div>" : "") + "</section>" };
+    }).filter(Boolean)) + "</div>" + goalsHTML(c) + "</div></div>";
 }
 
 // 项目那一块再分两栏（之前定的）：左边宽的是 Build、Work（GR.ORDER 的前两个），右边窄的是别的（一句话 + 14 天方块的那种）。
@@ -205,28 +188,29 @@ function columns(list) {
 
 const weekOrder = () => (weekStart() === "sunday" ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0]);
 
-function seg(name, value, options) {
-  return '<span class="seg">' + options.map(([v, l]) => '<button type="button" data-act="' + name + '" data-v="' + v + '"' + (value === v ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span>";
-}
-
-// 固定星期几：一周七天各几分钟、开始 / 结束（= 以前的 Regular Auto，那天自己出现）
-function daysFields(p) {
+// 小字的设置区（她 2026-11-22：设置不和 Pool 抢眼）：默认分钟、每周大概几次、起止（To 改叫 Due）、项带月份、默认深度、颜色、重复那一行
+function settingsHTML(p) {
   const r = R.ruleOf(p);
-  return '<div class="field"><span>Minutes on each day — empty = not that day</span><div class="weekly">' + weekOrder().map((d) =>
-    "<label><b>" + WEEKDAYS[d] + '</b><input class="num" type="number" min="0" step="5" data-rday="' + d + '" value="' + (Number(r.days[d]) > 0 ? Number(r.days[d]) : "") + '"></label>').join("") + "</div></div>" +
-    '<div class="field-row"><label class="field"><span>Starts</span><input type="date" data-rf="start" value="' + esc(r.start || "") + '"></label>' +
-    '<label class="field"><span>Ends (empty = keeps going)</span><input type="date" data-rf="end" value="' + esc(r.end || "") + '"></label></div>';
-}
-
-// 拖到哪天的：默认分钟（计划和没写时间的项拖过去就是这么久）、about N a week（只是参考数，卡片和 Pool 里显示这周几次）、起止（卡片上写第几天）
-function dragFields(p) {
-  const r = R.ruleOf(p);
-  return '<div class="field-row four"><label class="field" title="What this plan, and any item without its own time, gets when you drag it onto a day"><span>Default minutes</span><input class="num" type="number" min="0" step="5" data-rf="min" value="' + (Number(r.min) > 0 ? Number(r.min) : "") + '" placeholder="—"></label>' +
+  return '<div class="pe-set"><div class="pe-grid">' +
+    '<label class="field" title="What this plan, and any item without its own time, gets when you drag it onto a day"><span>Default minutes</span><input class="num" type="number" min="0" step="5" data-rf="min" value="' + (Number(r.min) > 0 ? Number(r.min) : "") + '" placeholder="—"></label>' +
     '<label class="field"><span>About … a week</span><input class="num" type="number" min="0" max="21" data-rf="perWeek" value="' + (Number(r.perWeek) > 0 ? Number(r.perWeek) : "") + '" placeholder="—"></label>' +
-    '<label class="field"><span>From (optional)</span><input type="date" data-pf="start" value="' + esc(p.start || "") + '"></label>' +
-    '<label class="field"><span>To (optional)</span><input type="date" data-pf="deadline" value="' + esc(p.deadline || "") + '"></label></div>' +
-    // 小项目带月份（她 2026-11-05 晚要的）：只有 When I drag it 的计划有；开了以后点开一项能挑月份，那个月的前一个月起才进 Pool
-    '<label class="check"><input type="checkbox" data-pmonths' + (p.rule?.months ? " checked" : "") + '> Items have a month <span class="msub">— each shows in the Pool from the month before</span></label>';
+    '<label class="field"><span>From</span><input type="date" data-pf="start" value="' + esc(p.start || "") + '"></label>' +
+    '<label class="field"><span>Due</span><input type="date" data-pf="deadline" value="' + esc(p.deadline || "") + '"></label></div>' +
+    // 小项目带月份（她 2026-11-05 晚要的）：开了以后点开一项能挑月份，那个月的前一个月起才进 Pool
+    '<div class="pe-checks"><label class="check"><input type="checkbox" data-pmonths' + (p.rule?.months ? " checked" : "") + '> Items have a month <span class="msub">— each shows in the Pool from the month before</span></label>' + deepHTML(p, !p.id) + "</div>" +
+    '<div class="field pe-color"><span>Color</span><div class="swatches">' + store.PROJECT_COLORS.map((col) => '<label><input type="radio" name="pcolor" data-pf="color" value="' + col + '"' + (p.color === col ? " checked" : "") + '><i style="background:' + col + '"></i></label>').join("") + "</div></div>" +
+    repeatLineHTML(p) + "</div>";
+}
+
+// 正在重复的（日历 Pool 拖 ↻ 设的，或者以前固定星期几的）：哪几天 · 到哪天 · Change / Stop；不在重复就一行淡字说怎么设
+function repeatLineHTML(p) {
+  if (!p.id) return "";
+  const r = R.ruleOf(p), on = E.isAuto(p) && r.days.some((v) => Number(v) > 0) && (!r.end || r.end >= store.today());
+  if (!on) return '<p class="hint pe-rep">To repeat it every week for a while, drag the ↻ next to its name in the Calendar pool.</p>';
+  const days = weekOrder().filter((d) => Number(r.days[d]) > 0).map((d) => WEEKDAYS[d]).join(" · ");
+  return '<div class="pe-rep"><span><span class="rt">↻</span> Every <b>' + esc(days) + "</b>" + (r.end ? " · until " + fmtShort(r.end) : "") + (r.off ? " · paused" : "") + "</span>" +
+    (r.off ? '<button type="button" class="link" data-act="rep-on">Turn on</button>' : "") +
+    '<button type="button" class="link" data-act="rep-change">Change</button><button type="button" class="link" data-act="rep-stop">Stop</button></div>';
 }
 
 // 一项的月份写成「Dec」，不是今年的带上年份「Jan 2027」
@@ -382,24 +366,25 @@ function servesHTML(p) {
 const deepHTML = (p, isNew) => '<label class="check deepdef"><input type="checkbox" data-pdeep' + (p.rule?.deep ? " checked" : "") + "> <span>◆ Deep work by default <small>" +
   (isNew ? "Tasks from this plan start out marked Deep." : "Marks every task of this plan, earlier ones too. Single tasks can still be changed.") + "</small></span></label>";
 
+// 她 2026-11-22 要的顺序（视觉层级）：它是谁（名字大、项目小）和进度 → Pool（主角）→ Notes → 小字的设置 → Serves → 底部状态。
+// 2026-11-22 起没有「Shows up」：计划都是拖着用的，临时的重复在日历 Pool 拖 ↻ 设
 function editorHTML(p) {
-  const c = store.ctx(), isNew = !p.id, auto = E.isAuto(p);
+  const c = store.ctx(), isNew = !p.id;
   const groups = store.groups().map((g) => g.name);
-  let h = '<div class="project-editor" data-pid="' + (p.id || "") + '"><div class="ls-hd"><h2 class="sheet-title">' + (isNew ? "New plan" : "Edit plan") + "</h2>" +
-    (isNew ? "" : '<button type="button" class="btn" data-act="plan-copy">Copy as text</button>') +
-    '<button type="button" class="btn' + (paste ? " on" : "") + '" data-act="paste-open" aria-pressed="' + Boolean(paste) + '">Paste text</button></div>';
+  let h = '<div class="project-editor" data-pid="' + (p.id || "") + '" style="--pc:' + esc(p.color || "var(--c-None)") + '"><div class="ls-hd"><h2 class="sheet-title pe-kick">' + (isNew ? "New plan" : "Edit plan") + "</h2>" +
+    (isNew ? "" : '<button type="button" class="btn ghosty" data-act="plan-copy">Copy as text</button>') +
+    '<button type="button" class="btn ghosty' + (paste ? " on" : "") + '" data-act="paste-open" aria-pressed="' + Boolean(paste) + '">Paste text</button></div>';
   if (paste) return h + pasteHTML(c, p) + "</div>";
-  h += '<div class="field-row"><label class="field"><span>Project</span><input data-pf="group" list="groups" value="' + esc(p.group || "") + '" placeholder="Build, Fitness…"><datalist id="groups">' + groups.map((g) => '<option value="' + esc(g) + '">').join("") + "</datalist></label>" +
-    '<label class="field"><span>Plan</span><input data-pf="name" value="' + esc(p.name || "") + '" placeholder="IELTS, Swimming…"></label></div>' +
-    '<div class="field"><span>Shows up</span>' + seg("pplace", auto ? "auto" : "pool", [["pool", "When I drag it"], ["auto", "On set days"]]) + "</div>" +
-    (auto ? daysFields(p) : dragFields(p)) +
-    '<div class="field"><span>Color</span><div class="swatches">' + store.PROJECT_COLORS.map((col) => '<label><input type="radio" name="pcolor" data-pf="color" value="' + col + '"' + (p.color === col ? " checked" : "") + '><i style="background:' + col + '"></i></label>').join("") + "</div></div>" +
-    notesHTML(p);
-  if (isNew) return h + deepHTML(p, true) + '<div class="sheet-foot"><span></span><button type="button" class="btn cta" data-act="create-project">Create</button></div></div>';
-  h += poolEditHTML(c, p) + addLinesHTML(c, p) + servesHTML(p) +
-    '<div class="field"><span>Status</span><div class="seg">' + [["active", "Active"], ["done", "Done"], ["dropped", "Dropped"]].map(([v, l]) => '<button type="button" data-act="pstatus" data-v="' + v + '"' + ((p.status || "active") === v ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</div></div>" +
-    deepHTML(p, false) +
-    '<div class="sheet-foot"><button type="button" class="btn danger" data-act="del-project">' + icon("trash") + ' Delete plan</button><button type="button" class="btn primary" data-modal-close>Done</button></div>';
+  h += '<div class="pe-id"><i class="pe-dot"></i><input class="pe-name" data-pf="name" value="' + esc(p.name || "") + '" placeholder="IELTS, Swimming…" aria-label="Plan name">' +
+    '<label class="pe-grp"><span>in</span><input data-pf="group" list="groups" value="' + esc(p.group || "") + '" placeholder="Build, Fitness…" aria-label="Project"></label>' +
+    '<datalist id="groups">' + groups.map((g) => '<option value="' + esc(g) + '">').join("") + "</datalist></div>";
+  if (isNew) return h + settingsHTML(p) + notesHTML(p) + '<div class="sheet-foot"><span></span><button type="button" class="btn cta" data-act="create-project">Create</button></div></div>';
+  const k = L.planCard(c, p), per = Number(R.ruleOf(p).perWeek) || 0, w = per ? E.regularWeek(c, p) : null;
+  h += '<div class="pe-prog">' + numsHTML(k) + (w && w.target ? weekSquares(w) : "") + barHTML(k, c.today) + "</div>" +
+    '<section class="pe-pool">' + poolEditHTML(c, p) + addLinesHTML(c, p) + "</section>" + notesHTML(p) + settingsHTML(p) + servesHTML(p) +
+    '<div class="sheet-foot"><button type="button" class="btn danger" data-act="del-project">' + icon("trash") + ' Delete plan</button><span class="pe-foot"><span class="seg">' +
+    [["active", "Active"], ["done", "Done"], ["dropped", "Dropped"]].map(([v, l]) => '<button type="button" data-act="pstatus" data-v="' + v + '"' + ((p.status || "active") === v ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + ">" + l + "</button>").join("") +
+    '</span><button type="button" class="btn primary" data-modal-close>Done</button></span></div>';
   return h + "</div>";
 }
 
@@ -410,17 +395,11 @@ export function openProjectEditor(id, { group = "", focus = "" } = {}) {
   notesOpen = false;
   paste = null;
   gone = [];
-  draft = id ? null : { group, name: "", place: "pool", color: store.groupByName(group)?.color || store.PROJECT_COLORS[store.all("projects").length % store.PROJECT_COLORS.length], rule: { start: store.today() }, notes: "", start: "", deadline: "" };
+  draft = id ? null : { group, name: "", place: "pool", color: store.groupByName(group)?.color || store.PROJECT_COLORS[store.all("projects").length % store.PROJECT_COLORS.length], rule: {}, notes: "", start: "", deadline: "" };
   const p = id ? store.get("projects", id) : draft;
   const sheet = openModal(editorHTML(p), { wide: true, close: () => { editing = ""; draft = null; paste = null; gone = []; openItem = ""; } });
   if (!id) sheet.querySelector('[data-pf="' + (focus || (group ? "name" : "group")) + '"]')?.focus();
 }
-
-const readDays = (box) => {
-  const days = [0, 0, 0, 0, 0, 0, 0];
-  box.querySelectorAll("[data-rday]").forEach((el) => { days[Number(el.dataset.rday)] = Math.max(0, Math.round(Number(el.value) || 0)); });
-  return days;
-};
 
 // 新建框里已经填了的值收进 draft（换显示方式、开粘贴要重画时不丢）
 function readDraft(box) {
@@ -431,7 +410,6 @@ function readDraft(box) {
   });
   draft.rule = { ...(draft.rule || {}) };
   box.querySelectorAll("[data-rf]").forEach((el) => { draft.rule[el.dataset.rf] = el.value; });
-  if (box.querySelector("[data-rday]")) draft.rule.days = readDays(box);
   draft.rule.deep = Boolean(box.querySelector("[data-pdeep]")?.checked);
   if (box.querySelector("[data-pmonths]")) draft.rule.months = box.querySelector("[data-pmonths]").checked;
   const n = box.querySelector("[data-pnotes]");
@@ -461,18 +439,14 @@ export function refreshProjectEditor(force = false) {
 
 const wholeMin = (v) => Math.max(0, Math.round(Number(v) || 0));
 
-// 新建：固定星期几的至少要有一天有分钟数
+// 新建：都是拖着用的（2026-11-22 起编辑框里不再选固定星期几）
 function createPlan(box) {
   readDraft(box);
   const name = String(draft.name || "").trim();
   if (!name) { box.querySelector('[data-pf="name"]').focus(); return; }
-  const auto = draft.place === "auto", r = draft.rule || {};
-  const start = r.start || store.today(), end = R.clampEnd(start, r.end || "");
-  const base = { deep: Boolean(r.deep), notes: String(draft.notes || "") };
-  const rule = auto ? { days: r.days || [0, 0, 0, 0, 0, 0, 0], start, end, ...base } : { perWeek: wholeMin(r.perWeek), min: wholeMin(r.min), ...base };
-  if (auto && !rule.days.some((v) => v > 0)) { box.querySelector("[data-rday]")?.focus(); return; }
-  editing = store.saveProject({ name, group: String(draft.group || "").trim(), color: draft.color, kind: "regular", place: auto ? "auto" : "pool", rule,
-    start: auto ? "" : draft.start || "", deadline: auto ? "" : draft.deadline || "" });
+  const r = draft.rule || {};
+  const rule = { perWeek: wholeMin(r.perWeek), min: wholeMin(r.min), deep: Boolean(r.deep), notes: String(draft.notes || ""), ...(r.months ? { months: true } : {}) };
+  editing = store.saveProject({ name, group: String(draft.group || "").trim(), color: draft.color, kind: "regular", place: "pool", rule, start: draft.start || "", deadline: draft.deadline || "" });
   draft = null;
   redraw(true);
 }
@@ -529,10 +503,9 @@ export function initProjects(rerender) {
     else if (act === "rename-done") { renaming = null; rerender(); }
     else if (act === "remove-group") { renaming = null; store.removeGroup(group); }
     else if (act === "edit-project") openProjectEditor(pid);
-    else if (act === "pplace") {
-      if (!pid) { readDraft(box); draft.place = el.dataset.v; redraw(true); }
-      else store.saveProject({ id: pid, place: el.dataset.v });
-    }
+    else if (act === "rep-change") openRepeat(pid, { back: () => openProjectEditor(pid) });
+    else if (act === "rep-stop") store.stopRepeat(pid);
+    else if (act === "rep-on") store.toggleRepeat(pid, true);
     else if (act === "toggle-archived") { if (!openArchived.delete(group)) openArchived.add(group); rerender(); }
     else if (act === "archive-plan") { const p = store.get("projects", pid); if (p) store.archiveProject(pid, E.isActive(p)); }
     else if (act === "create-project") { if (!editing) createPlan(box); }   // editing 有值 = 已经建过了，别再建一个
@@ -598,6 +571,7 @@ export function initProjects(rerender) {
   // 已有计划：字段改了就存
   on(document, "change", ".project-editor [data-pf]", (e, el) => {
     const pid = el.closest("[data-pid]").dataset.pid;
+    if (el.dataset.pf === "color") el.closest(".project-editor").style.setProperty("--pc", el.value);   // 名字前那个点跟着换
     if (!pid) return;
     const f = el.dataset.pf, v = el.value;
     if (f === "name" && !v.trim()) return;
@@ -605,18 +579,12 @@ export function initProjects(rerender) {
     refreshProjectEditor();
   });
 
-  // 规则：星期几的分钟数、开始 / 结束、默认分钟、about N a week（空 = 不定）
-  on(document, "change", ".project-editor [data-rf], .project-editor [data-rday]", (e, el) => {
+  // 规则：默认分钟、about N a week（空 = 不定）
+  on(document, "change", ".project-editor [data-rf]", (e, el) => {
     const pid = el.closest("[data-pid]").dataset.pid;
     const p = pid && store.get("projects", pid);
     if (!p) return;
-    const rule = { ...(p.rule || {}) };
-    if (el.dataset.rday !== undefined) rule.days = readDays(el.closest(".project-editor"));
-    else {
-      const f = el.dataset.rf;
-      rule[f] = f === "perWeek" || f === "min" ? wholeMin(el.value) : el.value;
-      rule.end = R.clampEnd(rule.start || store.today(), rule.end || "");
-    }
+    const f = el.dataset.rf, rule = { ...(p.rule || {}), [f]: wholeMin(el.value) };
     store.saveProject({ id: pid, rule });
     refreshProjectEditor();
   });

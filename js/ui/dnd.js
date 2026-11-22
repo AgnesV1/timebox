@@ -1,5 +1,6 @@
 // 拖放：日历里的任务、任务池里的条目。
 // 可拖的元素带 data-drag="task:<id>"、"item:<id>"（Pool 里的一项）、"plan:<计划 id>"（Pool 里的计划自己 = 那天空的一行）、
+// "rep:<计划 id>"（Pool 里计划名右边的 ↻ = 从那天起每周重复一阵子，落下后弹出小框，见 js/ui/repeat.js）、
 // "blk:<计划 id>|<日期>"（日历里一个计划那天的那一张）或 "ghost:<rt id>"（以后某天的预览）；
 // 能放的地方带 data-drop="day:<日期>" 或 "pool"。
 // 备餐页：data-drag="box:<Box id>" 或 "mcopy:<日期>"（复制那天），放到 "mday:<日期>"；Box 也能放到之后某周 "mweek:<周一>"（粗排 +1）。
@@ -127,7 +128,7 @@ export function targetsFor(payload, zones, here = "") {
   }
   return out;
 }
-const TITLE = { item: "Put on…", plan: "Put on…", regular: "Put on…", box: "Put on…", ing: "Add to…", any: "Add to…", goal: "Move to…" };
+const TITLE = { item: "Put on…", plan: "Put on…", rep: "Repeat from…", regular: "Put on…", box: "Put on…", ing: "Add to…", any: "Add to…", goal: "Move to…" };
 function moveMenu(src) {
   const payload = src.dataset.drag, kind = payload.slice(0, payload.indexOf(":"));
   const here = src.closest("[data-drop]")?.dataset.drop || "";

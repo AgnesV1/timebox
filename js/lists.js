@@ -6,7 +6,7 @@
 // 拖进那天的项 = 挂着 itemId 的任务，只是便条（大概多久、不计时），Done = 这一次做了；有步骤的，步骤在它的 Description 里（`- [ ] 听力 · 35min`）。
 // 过了那天还没勾的回 Pool（settle）；勾了一半步骤的，勾了的留在那天（标 Delay），剩下的在 Pool 里接着做，算同一次。
 
-import { addDays, startOfWeek } from "./dates.js";
+import { addDays, startOfWeek, diffDays } from "./dates.js";
 import { parseDur, fmtDur } from "./plantext.js";
 
 export const DEFAULT = { n: 1, perWeek: 0, steps: [], note: "", later: false, month: "" };
@@ -138,6 +138,36 @@ export function poolTotals(ctx, plan) {
     if (Number.isFinite(s.count.left)) { times += s.count.left; min += estOf(i, plan) * s.count.left; }
   }
   return { items, times, min, later, waiting: waits };
+}
+
+// Projects 页一张计划卡片 / 编辑框头上的数（她 2026-11-22 要的）：
+//   spent 一共记了多久；monthDays 这个月做过几天（勾了 Done 或记了时间，同一天算一次）；
+//   Pool：total 一共几次（不算 Later、Any，等月份的也算）、done 做完几次、left 还要几次（含等月份的）、waiting 几项等月份、pick 几项 Any 还能挑、later 几项 Later、items 几项；
+//   due 截止日（计划的 deadline）、start 开始（计划的 start，没写用最早一条任务那天）、pace 按日子今天该到哪（0–1，有开始和截止才有）、dayN / dayM 第几天 / 一共几天
+export function planCard(ctx, plan) {
+  const today = ctx.today, ts = (ctx.tasks || []).filter((t) => t.projectId === plan.id);
+  const spent = ts.reduce((a, t) => a + num(t.actual), 0), m0 = String(today).slice(0, 8) + "01";
+  const monthDays = new Set(ts.filter((t) => t.date >= m0 && t.date <= today && (num(t.actual) > 0 || t.status === "done")).map((t) => t.date)).size;
+  let total = 0, done = 0, left = 0, waits = 0, pick = 0, later = 0, items = 0;
+  for (const i of itemsOf(ctx, plan.id)) {
+    items++;
+    const s = stateOf(ctx, i);
+    if (s.cfg.later) { later++; continue; }
+    const w = waiting(s.cfg, plan, today);
+    if (w) waits++;
+    if (s.cfg.n > 0) { total += s.cfg.n; done += Math.min(s.count.done, s.cfg.n); left += Math.max(0, s.count.left); }
+    else if (!w) pick++;
+  }
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(plan.deadline || "") ? plan.deadline : "";
+  const first = ts.map((t) => t.date).filter(Boolean).sort()[0] || "";
+  const start = /^\d{4}-\d{2}-\d{2}$/.test(plan.start || "") ? plan.start : first;
+  let pace = null, dayN = 0, dayM = 0;
+  if (due && start && due > start) {
+    dayM = diffDays(start, due) + 1;
+    dayN = Math.min(dayM, Math.max(0, diffDays(start, today) + 1));
+    pace = Math.min(1, Math.max(0, diffDays(start, today) / diffDays(start, due)));
+  }
+  return { spent, monthDays, total, done, left, waiting: waits, pick, later, items, due, start, pace, dayN, dayM };
 }
 
 // ---------- 每天那一行 ----------

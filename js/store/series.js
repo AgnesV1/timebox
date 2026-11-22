@@ -3,9 +3,10 @@
 // 加任务框的「重复」、任务编辑框里的「Repeat」都是新建一个 Regular + Auto 的计划。
 // 这里不存东西：数据在 js/store.js 手里，core 是它递进来的那几样（读、写、撤销）。
 
-import { addDays, fmtShort } from "../dates.js";
+import { addDays, fmtShort, WEEKDAYS } from "../dates.js";
 import * as E from "../engine.js";
 import * as R from "../routines.js";
+import * as L from "../lists.js";
 
 export default function (core) {
   const { all, get, put, drop, change, newId, today, byOrder, groupFor, colorFor, nextPlanOrder, nextOrder, started, dropTask, deleteTask, updateTask, timer, setTimer, moveMeet, moveIdea } = core;
@@ -27,6 +28,55 @@ export default function (core) {
   }
 
   const repeatLabel = (end) => (end ? "Repeats until " + fmtShort(end) : "Repeats from now on");
+
+  // 这个重复是不是一张计划（停掉以后还是拖着用的计划）：日历 Pool 拖 ↻ 设的（rule.plan），或者 Pool 里有东西的。
+  // 不是的就是循环小事（加任务时选 Repeat 建的），停掉就没了
+  const isPlanLike = (p) => Boolean(p?.rule?.plan) || all("items").some((i) => i.projectId === p?.id);
+  // 变回拖着用的计划：去掉星期几、起止、开关
+  const toPool = (p) => { const { days: _d, start: _s, end: _e, off: _o, skip: _k, ...rest } = p.rule || {}; return { ...p, place: "pool", rule: rest }; };
+  // 从今天起已经落成、还没开始的那几次（规则变了以后不该出现的那些从这里挑）
+  const ahead = (pid) => seriesTasks(pid).filter((x) => !started(x) && origDate(x.id) >= today());
+  const daysText = (on) => [1, 2, 3, 4, 5, 6, 0].filter((d) => on.includes(d)).map((d) => WEEKDAYS[d]).join(" · ");
+
+  // 日历 Pool 里拖 ↻ 设的重复（她 2026-11-22 要的，像闹钟）：每周哪几天 on（0 = 周日 … 6 = 周六），从 start 到 end（她自己挑，必填）。
+  // 存法沿用固定星期几（place auto + rule.days / start / end）。原来是拖着用的计划就记 rule.plan：它还是一张计划卡片，停掉以后变回拖着用的。
+  // 那几天各多久：已经在重复的照原来的分钟，不然用计划的默认分钟，都没有就 60。已经落成、还没开始、新规则里没有的那几次删掉
+  function setPlanRepeat(pid, { on, start, end }) {
+    const p = get("projects", pid);
+    if (!p || !Array.isArray(on) || !on.length || !start || !end) return false;
+    const min = L.planMin(p) || 60, plan = Boolean(p.rule?.plan) || !E.isAuto(p);
+    const rule = { ...(p.rule || {}), days: [0, 1, 2, 3, 4, 5, 6].map((d) => (on.includes(d) ? min : 0)), start, end: R.clampEnd(start, end), off: false, skip: p.rule?.skip || [], ...(plan ? { plan: true } : {}) };
+    const next = R.ruleOf({ ...p, rule });
+    change(() => {
+      put("projects", { ...p, place: "auto", rule });
+      ahead(pid).forEach((x) => { if (!R.dueOn(next, origDate(x.id))) dropTask(x.id); });
+    }, (p.name || "Plan") + " every " + daysText(on) + " until " + fmtShort(rule.end));
+    return true;
+  }
+
+  // 闹钟那个开关：关了先不出现（规则留着），已经落成、还没开始的那几次拿掉；开了从今天起照规则接着来
+  function toggleRepeat(pid, on) {
+    const p = get("projects", pid);
+    if (!p || !E.isAuto(p) || Boolean(p.rule?.off) === !on) return;
+    change(() => {
+      put("projects", { ...p, rule: { ...(p.rule || {}), off: !on } });
+      if (!on) ahead(pid).forEach((x) => dropTask(x.id));
+    }, on ? (p.name || "Repeat") + " is back on" : (p.name || "Repeat") + " paused");
+  }
+
+  // 不要这个重复了：从今天起还没开始的那几次拿掉。计划变回拖着用的；循环小事到昨天为止（一次都没有过的整个删掉，做过的标 Dropped）
+  function stopRepeat(pid) {
+    const p = get("projects", pid);
+    if (!p || !E.isAuto(p)) return;
+    change(() => {
+      ahead(pid).forEach((x) => dropTask(x.id));
+      if (isPlanLike(p)) return put("projects", toPool(p));
+      const end = addDays(today(), -1), r = R.ruleOf(p);
+      if (!r.start || end >= r.start) return setRule(p, { end });
+      if (all("tasks").some((x) => x.projectId === pid)) put("projects", { ...p, status: "dropped" });
+      else drop("projects", pid);
+    }, "Stopped repeating " + (p.name || ""));
+  }
 
   // 加任务时直接设重复：days 是一周七天的分钟数，end 是最后一天（空 = 一直）。返回第一次的 ID（那天要做的话）
   function addRepeating(fields, days, end) {
@@ -95,7 +145,8 @@ export default function (core) {
       if ("optional" in fields) rule.optional = Boolean(fields.optional);
       if ("deep" in fields) rule.deep = Boolean(fields.deep);
       if ("est" in fields) rule.days = (rule.days || []).map((v) => (Number(v) > 0 ? Number(fields.est) || 0 : 0));
-      put("projects", { ...plan, ...("title" in fields ? { name: fields.title } : {}), rule });
+      // 计划的重复（日历 Pool 拖 ↻ 设的）：改那一行的名字不改计划的名字
+      put("projects", { ...plan, ...("title" in fields && !isPlanLike(plan) ? { name: fields.title } : {}), rule });
     }, null, { quiet: patch.title !== undefined });
   }
 
@@ -120,6 +171,8 @@ export default function (core) {
       else if (scope === "earlier") setRule(p, { start: addDays(od, 1) });
       const r = R.ruleOf(get("projects", p.id));
       if (scope !== "all" && !(r.start && r.end && r.end < r.start)) return;
+      // 是一张计划的（Pool 里有东西、或者日历 Pool 拖 ↻ 设的）：不删计划，变回拖着用的
+      if (isPlanLike(p)) return put("projects", toPool(get("projects", p.id)));
       // 一次都不剩了：做过的还在就留着计划（标 Dropped），不然整个删掉
       if (all("tasks").some((x) => x.projectId === p.id)) put("projects", { ...get("projects", p.id), status: "dropped" });
       else drop("projects", p.id);
@@ -133,5 +186,5 @@ export default function (core) {
     change(() => put("projects", { ...p, group: to, color: colorFor(to) }), to ? "Moved to " + to : "Taken out of its project");
   }
 
-  return { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setRule, setSeriesGroup };
+  return { routines, routineOf, seriesTasks, addRepeating, repeatTask, replanSeries, editSeries, seriesScope, deleteSeries, setRule, setSeriesGroup, setPlanRepeat, toggleRepeat, stopRepeat, isPlanLike };
 }

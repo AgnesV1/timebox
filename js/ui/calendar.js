@@ -1,9 +1,10 @@
-// 日历（电脑）：周视图 / 月视图，右边是 Pool；Year 视图是三条长横条（计算在 js/year.js），不放任务，也不开 Pool。
+// 日历（电脑）：周视图（上四天、下三天，第八格是今天页那块四象限）/ 月视图，右边是 Pool；Year 视图是三条长横条（计算在 js/year.js），不放任务，也不开 Pool。
 // 把 Pool 里的一项拖到某天 = 那天这个计划下面多一条；计划名本身拖过去 = 那天这个计划空的一行（Swimming 这种）。
 // 一个计划那天是一张便利贴：周视图（2026-11-22 晚起）不管 Pool 开没开都直接一行一项、右边写分钟；月视图 Pool 关着只写计划名，鼠标停上去展开成一行一项（不透明、压在下面的便利贴上）；
 // Pool 开着（排计划的时候）今天和以后直接一行一项、右边写分钟，日期后面写那天排了几小时
 //   （她 2026-10-27 挑的甲；每一项能单独拖到别的天）；
 // 整张拖到别的天 = 那天还没勾的几项一起挪，拖回 Pool = 回去；点它 = 到今天页的那一天。别的任务照旧一张一张，拖到别的天就挪过去，拖回 Pool 就撤回。
+// 周视图里点一张便利贴（或计划下面的一项、计划名）= 就在它下面写备注（存在任务的 Details 里），More… 才打开编辑框；月视图照旧打开编辑框。
 // 固定星期几的计划在以后的日子里画成淡色预览：可以拖走 / 点开（这时才变成真任务）。停上去写着每周哪几天、到哪天，最后一次后面写 last。
 // 重复（她 2026-11-22 要的）：Pool 里计划名右边的 ↻ 拖到某天 = 弹出小框（js/ui/repeat.js，像闹钟）选每周哪几天、最后一天；
 // Pool 底下 Repeats 清单列着正在重复的（含以前加任务时选 Repeat 建的循环小事）：哪几天、到哪天、还剩几次，右边开关；点一行打开同一个小框。
@@ -26,6 +27,7 @@ import { isPayday } from "../offdays.js";
 import { colorOf, badgeOf, projectOptions, groupsOf, toast, showChartTip, hideChartTip } from "./common.js";
 import { ideasPoolHTML } from "./ideas.js";
 import { showDate } from "./today.js";
+import { quadHTML } from "./quads.js";
 import { openTaskEditor } from "./editor.js";
 import { openRepeat } from "./repeat.js";
 
@@ -36,10 +38,27 @@ let capEdit = "";     // 正在改哪一天的 box（可用时间）
 const mode = () => store.local().calMode || "week";
 const weekStart = () => store.prefs().weekStartsOn;
 
+// Details 和今天页同一个字段、同一种写法（她 2026-11-22 夜说的）：普通任务、计划那一行写整份 Details；
+// 计划下面的一项写的是步骤以外的字（步骤在今天页是一排勾，不在框里），今天页点开那一项也是这个框。有内容的名字后面一个「⋯」，和今天页一样
+const isItem = (t) => L.isLine(t);
+const detailsOf = (t) => (isItem(t) ? L.stepsOf(t?.desc).rest : String(t?.desc || ""));
+const pen = (t) => (detailsOf(t).trim() ? '<i class="ev-nt" title="Has details">⋯</i>' : "");
+
 function chipHTML(t) {
   const p = badgeOf(t);
-  return '<div class="ev st-' + (t.status || "open") + (t.optional ? " opt" : "") + '" role="button" tabindex="0" data-drag="task:' + t.id + '" data-act="edit-task" data-id="' + t.id + '" style="--c:' + colorOf(t) + '" title="' + esc(t.title + (p ? " · " + p.name : "")) + '">' +
-    '<span class="t">' + (E.isRoutine(t) ? '<i class="rt">↻</i>' : "") + esc(t.title) + "</span>" + (Number(t.est) > 0 ? '<span class="m num">' + Number(t.est) + "</span>" : "") + "</div>";
+  return '<div class="ev st-' + (t.status || "open") + (t.optional ? " opt" : "") + (noteOpen === t.id ? " noting" : "") + '" role="button" tabindex="0" data-drag="task:' + t.id + '" data-act="edit-task" data-id="' + t.id + '" style="--c:' + colorOf(t) + '" title="' + esc(t.title + (p ? " · " + p.name : "")) + '">' +
+    '<span class="t">' + (E.isRoutine(t) ? '<i class="rt">↻</i>' : "") + esc(t.title) + pen(t) + "</span>" + (Number(t.est) > 0 ? '<span class="m num">' + Number(t.est) + "</span>" : "") + "</div>";
+}
+
+// 周视图里点一张便利贴、计划下面的一项或计划名（她 2026-11-22 夜要的）：就在它下面写 Details，不弹编辑框；
+// 和今天页点开那一行的框一样（同一个字段、提示字一样、越写越高），打字时不重画页面。More… 打开完整的编辑框，Done / Esc 收起
+let noteOpen = "";
+function noteHTML(t) {
+  const text = detailsOf(t), rows = Math.min(12, Math.max(3, text.split("\n").length + 1));
+  const ph = isItem(t) || L.isRow(t) ? "Notes for this day" : "Details";   // 和今天页一样：计划那一行是 Notes for this day，普通任务是 Details
+  return '<div class="cal-note" data-note="' + esc(t.id) + '" style="--c:' + colorOf(t) + '">' + (L.isRow(t) || isItem(t) ? '<span class="cal-note-h">' + esc(t.title) + "</span>" : "") +
+    '<textarea class="desc" data-cal-note="' + esc(t.id) + '" data-keep="desc-' + esc(t.id) + '" rows="' + rows + '" placeholder="' + ph + '" aria-label="' + esc("Details for " + t.title) + '">' + esc(text) + "</textarea>" +
+    '<span class="cal-note-f"><button type="button" class="link" data-act="note-more" data-id="' + esc(t.id) + '">More…</button><button type="button" class="link" data-act="note-close">Done</button></span></div>';
 }
 
 // 每周哪几天（按一周从哪天开始排）
@@ -75,15 +94,16 @@ function repeatsHTML(c) {
 // 那一行没标、下面的项都勾了，也算做完
 function blockHTML(b, d, pool) {
   const plan = b.plan, lines = b.lines.slice().sort((x, y) => (Number(x.order) || 0) - (Number(y.order) || 0));
-  const li = (t) => '<span class="li' + (t.status === "done" || t.status === "delay" ? " dn" : t.status === "drop" ? " dp" : "") + '"' + (t.status ? "" : ' data-drag="task:' + t.id + '"') + "><span>" + esc(t.title) + "</span>" +
+  const li = (t) => '<span class="li' + (t.status === "done" || t.status === "delay" ? " dn" : t.status === "drop" ? " dp" : "") + (noteOpen === t.id ? " noting" : "") + '" data-note-id="' + esc(t.id) + '"' + (t.status ? "" : ' data-drag="task:' + t.id + '"') + "><span>" + esc(t.title) + pen(t) + "</span>" +
     (Number(t.est) > 0 ? '<i class="lm num">' + Number(t.est) + "</i>" : "") + "</span>";
   const spent = b.row ? E.spentMin(b.row) : 0;
   const st = b.row?.status || (lines.length && lines.every((t) => t.status === "done") ? "done" : "open");
   const name = b.row?.title || plan.name, list = lines.map(li).join("");
   // 排计划时只有那一行、下面没有项：分钟写在名字右边（拖进来带着默认时间，一眼看得到）
+  const rowId = b.row ? ' data-note-id="' + esc(b.row.id) + '"' : "";   // 点计划名 = 那天那一行的备注（周视图）
   const head = pool && !lines.length && Number(b.row?.est) > 0
-    ? '<span class="li"><span class="bt">' + esc(name) + '</span><i class="lm num">' + Number(b.row.est) + "</i></span>"
-    : '<span class="bt">' + esc(name) + "</span>";
+    ? '<span class="li"' + rowId + '><span class="bt">' + esc(name) + pen(b.row) + '</span><i class="lm num">' + Number(b.row.est) + "</i></span>"
+    : '<span class="bt"' + rowId + ">" + esc(name) + pen(b.row) + "</span>";
   return '<div class="ev blk' + (pool ? " blk-ls" : "") + " st-" + st + (b.row?.optional ? " opt" : "") + '" role="button" tabindex="0" data-drag="blk:' + esc(plan.id) + "|" + d + '" data-act="open-day" data-date="' + d + '" style="--c:' + esc(plan.color || "var(--c-None)") + '" title="' +
     esc(name + (name !== plan.name ? " · " + plan.name : "") + (lines.length ? " · " + lines.length + " thing" + (lines.length > 1 ? "s" : "") : "") + (spent ? " · " + fmtHours(spent) + " logged" : "")) + '">' +
     '<span class="t">' + head + (pool ? list : "") + "</span>" +
@@ -108,7 +128,9 @@ function cellHTML(c, d, { month = false, outside = false, scores = null, still =
   const commute = store.isCommuteDay(d), off = store.offDay(d), gold = store.isSuperRest(d), wd = weekday(d), ahead = pool && d >= c.today;
   const past = d < c.today, { val, planned, over, long } = Y.dayLoad(c, d, gold);
   const cls =["cell", d === c.today ? "today" : "", d < c.today ? "past" : "", sum.rest ? "rest" : "", outside ? "outside" : "", over ? "over" : "", ahead ? "cal-plan" : "", gold ? "superrest" : ""].filter(Boolean).join(" ");
-  const all = [...blocks.map((b) => (b.task ? chipHTML(b.task) : blockHTML(b, d, ahead || list))), ...ghosts.map(ghostHTML)];
+  // 周视图：点开写备注的那一张，备注框接在它下面
+  const noteFor = (ts) => { const t = list && noteOpen ? ts.find((x) => x?.id === noteOpen) : null; return t ? noteHTML(t) : ""; };
+  const all = [...blocks.map((b) => (b.task ? chipHTML(b.task) + noteFor([b.task]) : blockHTML(b, d, ahead || list) + noteFor([b.row, ...b.lines]))), ...ghosts.map(ghostHTML)];
   const loadPct = over ? 100 : sum.cap ? Math.min(100, (val / sum.cap) * 100) : 0;
   let h ='<div class="' + cls + '" data-drop="day:' + d + '">' +
     '<div class="cell-head"><span class="dn-w"><button type="button" class="dn" data-act="open-day" data-date="' + d + '"' + (unscored ? ' title="Not scored yet"' : "") + "><span>" + (month ? "" : WEEKDAYS[wd]) + "</span><b>" + Number(d.slice(8)) + "</b>" + (isPayday(d) ? '<span class="payday" title="Payday">$</span>' : "") + (unscored ? '<i class="dsc-dot" aria-label="Not scored yet"></i>' : "") + "</button>" +
@@ -229,7 +251,8 @@ export function calendarHTML(c) {
     const s = startOfWeek(anchor, weekStart());
     const e = addDays(s, 6);
     title = fmtShort(s) + " – " + (s.slice(5, 7) === e.slice(5, 7) ? Number(e.slice(8)) : fmtShort(e));
-    body = '<div class="cal-scroll"><div class="week">' + range(s, e).map((d) => cellHTML(c, d, { scores, still, pool, list: true })).join("") + "</div></div>";
+    // 上面四天、下面三天，第八格放今天页那块四象限（她 2026-11-22 夜要的：每天宽一倍，计划的每一项一行放得下）
+    body = '<div class="cal-scroll"><div class="week">' + range(s, e).map((d) => cellHTML(c, d, { scores, still, pool, list: true })).join("") + '<div class="week-qd">' + quadHTML({ fold: false }) + "</div></div></div>";
   } else {
     const m0 = startOfMonth(anchor);
     const s = startOfWeek(m0, weekStart());
@@ -301,12 +324,24 @@ export function initCalendar(rerender) {
     else if (act === "pool-toggle") store.setLocal({ pool: !store.local().pool });
     else if (act === "rep-open") openRepeat(el.closest("[data-rep]").dataset.rep);
     else if (act === "rep-toggle") store.toggleRepeat(el.closest("[data-rep]").dataset.rep, el.getAttribute("aria-checked") !== "true");
-    else if (act === "edit-task") openTaskEditor(el.dataset.id);
+    else if (act === "edit-task") { if (mode() === "week") toggleNote(el.dataset.id); else openTaskEditor(el.dataset.id); }
+    else if (act === "note-more") { const id = el.dataset.id; noteOpen = ""; rerender(); openTaskEditor(id); }
+    else if (act === "note-close") { noteOpen = ""; rerender(); }
     else if (act === "open-ghost") { const id = store.materialize(el.dataset.key); if (id) openTaskEditor(id); }
     else if (act === "commute") store.toggleCommute(el.dataset.date);
     else if (act === "off-day") store.toggleOffDay(el.dataset.date);
     else if (act === "super-rest") store.toggleSuperRest(el.dataset.date);
-    else if (act === "open-day") { hideChartTip(); showDate(el.dataset.date); location.hash = "today"; }   // 浏览器后退回到日历
+    else if (act === "open-day") {
+      // 周视图里点计划那张便利贴（她 2026-11-22 夜说的：点开每个 task 别再跳到今天页）：点其中一项 = 那一项的；点别处 = 那天这个计划那一行的
+      // Notes for this day（今天页同一个框；那天还没有那一行就先建一行，和今天页点那个头一样）。日期才去今天页
+      if (el.classList.contains("blk") && mode() === "week") {
+        const [planId, d] = el.dataset.drag.slice(4).split("|");
+        const tid = e.target.closest("[data-note-id]")?.dataset.noteId || store.ensureRow(planId, d);
+        if (tid) toggleNote(tid);
+        return;
+      }
+      hideChartTip(); showDate(el.dataset.date); location.hash = "today";   // 浏览器后退回到日历
+    }
     else if (act === "cell-add") {
       adding = el.dataset.date;
       rerender();
@@ -318,6 +353,26 @@ export function initCalendar(rerender) {
       input?.focus();
       input?.select();
     }
+  });
+
+  function toggleNote(id) {
+    noteOpen = noteOpen === id ? "" : id;
+    rerender();
+    if (noteOpen) requestAnimationFrame(() => { const ta = document.querySelector('[data-cal-note="' + CSS.escape(id) + '"]'); ta?.focus(); ta?.setSelectionRange(ta.value.length, ta.value.length); });
+  }
+  // Details：打一个字存一下（不重画），越写越高（和今天页一样）；计划下面的一项，步骤留着
+  on(document, "input", "[data-cal-note]", (e, el) => {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+    const t = store.get("tasks", el.dataset.calNote);
+    if (t) store.updateTask(t.id, { desc: isItem(t) ? L.withSteps(el.value, L.stepsOf(t.desc).steps) : el.value }, null, { quiet: true });
+  });
+  on(document, "keydown", "[data-cal-note]", (e, el) => {
+    if (e.key !== "Escape") return;
+    const id = el.dataset.calNote;
+    noteOpen = "";
+    rerender();
+    requestAnimationFrame(() => document.querySelector('.calendar [data-id="' + CSS.escape(id) + '"], .calendar [data-note-id="' + CSS.escape(id) + '"]')?.closest("[role=button]")?.focus());
   });
 
   // 便利贴是 div：Tab 走得到（见 chipHTML 们），回车 / 空格和点一下一样

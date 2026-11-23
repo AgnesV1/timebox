@@ -169,7 +169,7 @@ function lineHTML(t, phone) {
   const open = lineOpen.has(t.id), done = t.status === "done";
   const spent = store.timeTotal(t.id);   // 以前的整块计划留下来的、记过时间的那几条
   let h = '<div class="ls-ln' + (t.status ? " " + t.status : "") + '"><button type="button" class="ls-cb" data-act="ls-tick" data-line="' + t.id + '" aria-pressed="' + done + '" aria-label="' + esc((done ? "Not done: " : "Done: ") + t.title) + '">✓</button>' +
-    '<button type="button" class="ls-tx" data-act="ls-open" data-line="' + t.id + '" aria-expanded="' + open + '">' + esc(t.title) + (t.status === "delay" ? " <small>back to the pool</small>" : "") + "</button>" +
+    '<button type="button" class="ls-tx" data-act="ls-open" data-line="' + t.id + '" aria-expanded="' + open + '">' + esc(t.title) + (t.status === "delay" ? " <small>back to the pool</small>" : "") + (!phone && !open && L.stepsOf(t.desc).rest ? '<span class="more"> ⋯</span>' : "") + "</button>" +
     '<span class="ls-sz">' + [steps.length ? ticked + "/" + steps.length : "", spent ? fmtMin(spent) + " logged" : L.estText(t.est)].filter(Boolean).join(" · ") + "</span></div>";
   if (!open) return h;
   if (steps.length) {
@@ -178,7 +178,10 @@ function lineHTML(t, phone) {
   }
   const note = t.itemId ? store.itemCfg(t.itemId).note : "";
   const back = !phone && !t.status ? '<button type="button" class="link" data-act="ls-back" data-line="' + t.id + '">Back to the pool</button>' : "";
-  return h + (note || back ? '<p class="ls-more">' + (note ? "<span>" + esc(note) + "</span>" : "") + back + "</p>" : "");
+  // 这一次自己的 Details（电脑；和日历周视图里点开这一项写的是同一份，步骤以外的字）
+  const rest = L.stepsOf(t.desc).rest;
+  const details = phone ? "" : '<textarea class="desc ls-desc" data-act="ls-desc" data-line="' + t.id + '" data-keep="desc-' + t.id + '" rows="' + Math.min(12, Math.max(2, rest.split("\n").length + 1)) + '" placeholder="Notes for this day">' + esc(rest) + "</textarea>";
+  return h + details + (note || back ? '<p class="ls-more">' + (note ? "<span>" + esc(note) + "</span>" : "") + back + "</p>" : "");
 }
 
 // 计划那一行：整块计时（点了选中、底部浮条 Start，和别的任务一样），和别的任务一样有 Done / Delay / Drop（她 2026-10-26 要回来的：Work、IELTS 这种要能标完成）。
@@ -661,6 +664,12 @@ export function initToday(rerender) {
   on(document, "input", ".dayview [data-act]", (e, el) => {
     const act = el.dataset.act, id = rowId(el);
     if (act === "reason") store.updateTask(id, { reason: el.value }, null, { quiet: true });
+    else if (act === "ls-desc") {   // 计划下面一项的 Details：步骤留着
+      el.style.height = "auto";
+      el.style.height = el.scrollHeight + "px";
+      const t = store.get("tasks", el.dataset.line);
+      if (t) store.updateTask(t.id, { desc: L.withSteps(el.value, L.stepsOf(t.desc).steps) }, null, { quiet: true });
+    }
     else if (act === "desc-input") {
       el.style.height = "auto";
       el.style.height = el.scrollHeight + "px";

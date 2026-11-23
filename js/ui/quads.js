@@ -1,4 +1,5 @@
-// 今天页的四象限便签（电脑；画在左边任务卡片下面，只在看今天的时候；内容一直留着、过了一天也不变，见 js/ui/today.js）：
+// 今天页的四象限便签（电脑；画在左边任务卡片下面，只在看今天的时候；内容一直留着、过了一天也不变，见 js/ui/today.js）；
+// 日历周视图的第八格也是它（同一份便签，2026-11-22 夜起）：
 // 紧急 / 不紧急 × 重要 / 不重要，四格里贴几张便签，拖来拖去。样子和日历的便签一样（纸、顶上一道胶条），只用一种纸色；
 // 字跟着格子变（css 里按 data-q）：左上粗体、右上正常、左下细体、右下斜体。数据只存在这台电脑上（js/store/quads.js）。
 // 拖、写、打勾、删：这里先把页面挪好再存（存的时候不整页重画），动画才接得上——
@@ -58,10 +59,11 @@ function cellHTML(q, list) {
 const addHTML = (q) => '<form class="qd-addf" data-q="' + q + '" autocomplete="off"><input name="text" data-keep="qd-add-' + q + '" maxlength="' + Q.MAX + '" placeholder="New note" aria-label="New note"></form>';
 
 // 四格都空着：收成一行（她 2026-11-22 要的视觉层级，空的四格不占一大块地方），点开才是四格，先开左上那格的「新写」
+// fold = false：日历周视图的第八格（她 2026-11-22 夜要的），地方够，空着也画四格
 let unfolded = false;
-export function quadHTML() {
+export function quadHTML({ fold = true } = {}) {
   const b = store.quadBoard();
-  if (!unfolded && !adding && !Object.values(b).some((l) => l.length)) {
+  if (fold && !unfolded && !adding && !Object.values(b).some((l) => l.length)) {
     return '<section class="qd qd-fold" aria-label="Urgent and important"><button type="button" class="qd-open" data-qd="open"><b>Urgent / important</b><span>' + icon("plus") + " Sort a task</span></button></section>";
   }
   return '<section class="qd" aria-label="Urgent and important">' +

@@ -18,7 +18,8 @@ import * as store from "../store.js";
 import { esc, icon } from "../dom.js";
 import { toast } from "./common.js";
 import { openModal, modalSheet } from "./modal.js";
-import { IX, cents, roll, kfmt, paceNote, paceTip, periodTitle, chartView, shownEntries, budgetsShown, amtOf, convOf, setShowCur, setRate, fetchRates, RATES, rateNote, curLabel, findText, fx } from "./money.js";
+import { slideFrom } from "../motion.js";
+import { IX, cents, roll, kfmt, paceNote, paceTip, periodTitle, chartView, shownEntries, budgetsShown, amtOf, convOf, setShowCur, setRate, fetchRates, RATES, rateNote, curLabel, findText, fx, pillNow, springOf } from "./money.js";
 
 const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const today = () => store.today();
@@ -68,7 +69,7 @@ export function createSpending() {
     if (!s) return;
     const b = s.querySelector('[data-v="' + val + '"]'), pill = s.firstElementChild;
     s.querySelectorAll("button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
-    if (b && b.offsetWidth) { pill.style.left = b.offsetLeft + "px"; pill.style.width = b.offsetWidth + "px"; }
+    if (b && b.offsetWidth) { const [x0, w0] = pillNow(s, pill); pill.style.left = b.offsetLeft + "px"; pill.style.width = b.offsetWidth + "px"; if (!quiet()) slideFrom(pill, x0, w0, { duration: 280, easing: springOf(pill) }); }
   }
 
   // ---------- 页头 ----------
@@ -110,7 +111,7 @@ export function createSpending() {
       if (!at) { dot.hidden = true; small.textContent = note || (mode === "year" ? "No earlier years yet" : "No history yet"); return; }
       dot.hidden = false;
       dot.classList.toggle("over", blown);
-      dot.style.left = (at.pos * 100).toFixed(1) + "%";
+      dot.style.setProperty("--x", at.pos.toFixed(3));
       small.textContent = paceNote(cmp, key, at, fmt, note);
     };
     cell("out", "−" + M.money(g.out), { key: "expense" });
@@ -174,7 +175,7 @@ export function createSpending() {
   const amountHTML = (e) => (e.v > 0 ? "+" : "−") + cents(M.money(e.v, M.curOf(e))) + (convOf(e) ? '<small class="sp-conv">' + esc(convOf(e)) + "</small>" : "");
   const rowHTML = (e, dated) => '<tr class="sp-row' + (e.id === fresh ? " new" : "") + '" data-id="' + esc(e.id) + '" tabindex="0" aria-label="' + esc(e.c + " " + amtOf(e) + (e.n ? ", " + e.n : "") + ", " + M.fmtDate(e.d) + " — press Enter to edit") + '">' +
     (dated ? '<td class="d mn-num">' + M.MON[M.parts(e.d).m - 1] + " " + M.parts(e.d).d + (M.parts(e.d).y !== todayP().y ? ", " + M.parts(e.d).y : "") + "</td>" : "") +
-    '<td class="c">' + esc(e.c) + (e.d > today() ? ' <span class="sp-up" title="Dated ' + esc(M.fmtDate(e.d)) + ' — already counted">upcoming</span>' : "") + '</td><td class="n" title="' + esc(e.n || "") + '">' + esc(e.n || "") + "</td>" +
+    '<td class="c">' + esc(e.c) + (e.d > today() ? ' <span class="sp-up" title="Dated ' + esc(M.fmtDate(e.d)) + ' — already counted">Upcoming</span>' : "") + '</td><td class="n" title="' + esc(e.n || "") + '">' + esc(e.n || "") + "</td>" +
     '<td class="r mn-num' + (e.v > 0 ? " in" : "") + '">' + amountHTML(e) + "</td>" +
     '<td class="a"><button type="button" class="sp-ra" data-act="edit" tabindex="-1">Edit</button><button type="button" class="sp-ra x" data-act="del" tabindex="-1" aria-label="Delete" title="Delete">×</button></td></tr>';
 

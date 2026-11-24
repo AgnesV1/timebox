@@ -47,7 +47,7 @@
 
 /* 分段开关：选中的那块滑过去 */
 .mn .mn-seg { position: relative; flex: none; display: flex; padding: 3px; border-radius: 11px; background: var(--mn-fill); box-shadow: var(--mn-hair); }
-.mn .mn-seg > i { position: absolute; top: 3px; bottom: 3px; left: 3px; width: 0; border-radius: 9px; background: var(--mn-pri); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14); transition: left .28s var(--mn-spring), width .28s var(--mn-spring); }
+.mn .mn-seg > i { position: absolute; top: 3px; bottom: 3px; left: 3px; width: 0; border-radius: 9px; background: var(--mn-pri); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14); transform-origin: 0 50%; }   /* 滑过去是 js 里只动 transform（seg） */
 .mn .mn-seg > button { all: unset; position: relative; z-index: 1; flex: 1; padding: 6px 0; text-align: center; font-size: 13px; color: var(--mn-mute); cursor: pointer; transition: color .25s; }
 .mn .mn-seg > button.on { color: var(--mn-pri-ink); }
 
@@ -149,20 +149,19 @@
 .mn .mn-card.mn-card-hl .v { font-size: 19px; font-weight: 600; color: var(--mn-blue); }
 /* Budget Left 那个数后面的「· 69%」（剩下几成） */
 .mn .mn-kp::before { content: "·"; margin: 0 .3em; color: var(--mn-mute); }
-.mn .mn-up { margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--mn-fill2); font: 600 9px/1.6 var(--num); letter-spacing: .07em; text-transform: uppercase; }   /* 提前记的、日期还没到（已经算进合计） */
+.mn .mn-up { margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--mn-fill2); font: 600 11px/1.3 var(--num); }   /* 提前记的、日期还没到（已经算进合计） */
 .mn .mn-track { height: 4px; border-radius: 2px; background: var(--mn-trk); overflow: hidden; }
-.mn .mn-track > i { display: block; height: 100%; width: 0; background: var(--mn-blue); transition: width .52s var(--mn-enter); }
 .mn .mn-track > i.over { background: var(--mn-orange); }
 /* 快慢杠（Budget left、Spent）：两头 = 之前六个月到同一天最少 / 最多，正中间那条竖线 = 平时，点 = 这一期到今天为止（超了预算 = 橙）。
    没有可比的时候点藏起来，竖线也不画；小字不是平时的速度（.mn-pace）时用墨色，不加别的颜色 */
-.mn .mn-range { position: relative; overflow: visible; background: var(--mn-rng); }
+.mn .mn-range { position: relative; overflow: visible; container-type: inline-size; background: var(--mn-rng); }
 .mn .mn-range::before { content: ""; position: absolute; left: 50%; top: -3px; width: 2px; height: 10px; margin-left: -1px; border-radius: 1px; background: var(--mn-mute); }
 .mn .mn-range:has(> b[hidden])::before { display: none; }
 .mn :is(.mn-meta, .sp-ks).mn-pace { color: var(--mn-ink); }
 /* Income、Balance 合成最后一张（她 11-01 晚说的）：没有横杠，两行「名字 数」，数靠右、小数点对齐 */
 .mn .mn-card.mn-card-io { display: grid; grid-template-columns: auto auto; align-content: center; align-items: baseline; gap: 10px 14px; }
 .mn .mn-card-io .v { justify-self: end; }
-.mn .mn-range > b { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--mn-blue); box-shadow: 0 0 0 2px var(--mn-ring); transition: left .62s var(--spring-pop), background-color .3s; }   /* 换期时点弹着滑到新位置（只改 left，元素不重建） */
+.mn .mn-range > b { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--mn-blue); box-shadow: 0 0 0 2px var(--mn-ring); left: 0; transform: translateX(calc(var(--x, .5) * 100cqw)); transition: transform .62s var(--spring-pop), background-color .3s; }   /* 换期时点弹着滑到新位置（js 只改 --x = 0–1，元素不重建；100cqw = 横杠的宽，只动 transform） */
 .mn .mn-range > b.over { background: var(--mn-orange); }
 .mn .mn-sect { margin-top: 22px; font-size: 15px; font-weight: 500; }
 .mn .mn-bk { border-bottom: 1px solid var(--mn-line); }
@@ -337,12 +336,12 @@
 .spend .sp-tnav h2 { min-width: 0; padding: 0 2px; white-space: nowrap; }
 .spend .sp-tnav .sp-nb { padding: 2px 9px; font-size: 19px; line-height: 1.2; }
 .spend .sp-now[hidden] { display: none; }
-.spend .sp-up { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--sp-a08); font: 600 9.5px/1.5 var(--num); letter-spacing: .07em; text-transform: uppercase; color: var(--mn-mute); vertical-align: 1px; }
+.spend .sp-up { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--sp-a08); font: 600 11px/1.3 var(--num); color: var(--mn-mute); vertical-align: 1px; }
 .spend .sp-status { margin: 4px 0 0; font-size: 12px; color: var(--mn-mute); }
 .spend .sp-status.bad { color: var(--mn-orange); }
 .spend .sp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .spend .sp-seg { position: relative; display: inline-flex; padding: 2px; border-radius: 999px; background: var(--sp-a08); }
-.spend .sp-seg > i { position: absolute; top: 2px; bottom: 2px; left: 2px; width: 0; border-radius: 999px; background: var(--mn-pri); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16); transition: left .28s var(--mn-spring), width .28s var(--mn-spring); }
+.spend .sp-seg > i { position: absolute; top: 2px; bottom: 2px; left: 2px; width: 0; border-radius: 999px; background: var(--mn-pri); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16); transform-origin: 0 50%; }   /* 滑过去是 js 里只动 transform（segTo） */
 .spend .sp-seg > button { all: unset; position: relative; z-index: 1; padding: 4px 11px; border-radius: 999px; font: 600 12.5px/1.4 var(--body); color: var(--sp-soft); cursor: pointer; transition: color .2s; }
 .spend .sp-seg > button.on { color: var(--mn-pri-ink); }
 .spend .sp-nb { all: unset; padding: 4px 9px; border-radius: 999px; font: 600 13px/1.4 var(--body); color: var(--sp-softer); cursor: pointer; transition: background .15s, opacity .15s; }
@@ -375,7 +374,7 @@
 .spend .sp-kio .sp-kv { justify-self: end; font-size: 19px; font-weight: 500; white-space: nowrap; }
 .spend .sp-kpi + .sp-kpi { border-left: 1px solid var(--sp-line); }
 .spend .sp-kpi:first-child { padding-left: 0; }
-.spend .sp-kl { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--mn-mute); }
+.spend .sp-kl { font-size: 11px; font-weight: 600; color: var(--mn-mute); }
 .spend .sp-kvw { align-self: flex-start; display: flex; align-items: baseline; max-width: 100%; font-size: 24px; font-weight: 500; white-space: nowrap; }
 /* Budget left：剩下的钱 · 剩下几成（她 10-22 要的）。格子窄了字跟着缩：9.5cqi 差不多正好放下「$12,345.67 · 100%」这么长，最小 14px */
 .spend .sp-kpi[data-k="left"] .sp-kvw { font-size: clamp(14px, 9.5cqi, 24px); }
@@ -419,7 +418,7 @@
 .spend .sp-table th, .spend .sp-table td { padding: 8px 10px; text-align: left; vertical-align: middle; }
 .spend .sp-table :is(th, td):first-child { padding-left: 0; }
 .spend .sp-table :is(th, td):last-child { padding-right: 0; }
-.spend .sp-table thead th { padding-top: 6px; padding-bottom: 7px; font: 600 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--mn-mute); border-bottom: 1px solid var(--sp-line); }
+.spend .sp-table thead th { padding-top: 6px; padding-bottom: 7px; font: 600 11px var(--body); color: var(--mn-mute); border-bottom: 1px solid var(--sp-line); }
 .spend .sp-table .r { text-align: right; }
 .spend .sp-table .c, .spend .sp-table .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spend .sp-table td.n { color: var(--sp-soft); }
@@ -481,7 +480,7 @@
 .spend .sp-cv { font-size: 13px; text-align: right; }
 .spend .sp-cp { font-size: 11px; text-align: right; color: var(--mn-mute); }
 .spend .sp-cb { position: absolute; left: 8px; right: 8px; bottom: 5px; height: 2px; border-radius: 1px; background: var(--sp-a07); }
-.spend .sp-cb::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: var(--w); border-radius: inherit; background: var(--mn-blue); transition: width .52s var(--mn-enter); }
+.spend .sp-cb::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: var(--w); border-radius: inherit; background: var(--mn-blue); }
 .spend .sp-cb.in::after { background: var(--mn-green); }
 .spend .sp-cat.on { background: rgba(76, 114, 216, .2); box-shadow: inset 0 0 0 1px rgba(76, 114, 216, .55); }
 @media (hover: hover) { .spend .sp-cat:not(.on):hover { background: var(--sp-a05); } }

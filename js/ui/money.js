@@ -11,12 +11,20 @@ import * as SP from "../spend.js";
 import * as M from "../money.js";
 import * as store from "../store.js";
 import { esc, icon } from "../dom.js";
+import { slideFrom } from "../motion.js";
 
 // 小东西（按钮、开关、小签）用的弹簧：只冲过头 0.5%；面板、抽屉、图表页这种大块不冲过头（ENTER / EXIT，见 css/money.css 开头）
 const SPR = "linear(0, .029, .099, .192, .296, .399, .498, .588, .668, .737, .795, .844, .883, .915, .939, .959, .973, .984, .992, .997, 1.001, 1.003, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1)";
 // 进场：快出来、慢慢停稳（不冲过头）；出场：干脆一点，越走越快
 const ENTER = "cubic-bezier(.16, 1, .3, 1)", EXIT = "cubic-bezier(.4, 0, 1, 1)";
 const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+// 分段开关的滑块现在看得见的位置和宽度（正滑着也算），先停掉正在滑的那次，从这里接着滑
+export function pillNow(seg, pill) {
+  const r = pill.getBoundingClientRect(), s = seg.getBoundingClientRect();
+  pill.getAnimations().forEach((a) => a.cancel());
+  return [r.left - s.left - seg.clientLeft, r.width];
+}
+export const springOf = (el) => getComputedStyle(el).getPropertyValue("--mn-spring").trim() || "ease-out";
 const today = () => store.today();
 const todayP = () => M.parts(today());
 const CW = { day: 30, month: 40, year: 76 };
@@ -296,7 +304,7 @@ export function createView() {
     if (!s) return;
     const b = s.querySelector('[data-v="' + val + '"]'), pill = s.firstElementChild;
     s.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-    if (b && b.offsetWidth) { pill.style.left = b.offsetLeft + "px"; pill.style.width = b.offsetWidth + "px"; }
+    if (b && b.offsetWidth) { const [x0, w0] = pillNow(s, pill); pill.style.left = b.offsetLeft + "px"; pill.style.width = b.offsetWidth + "px"; if (!quiet()) slideFrom(pill, x0, w0, { duration: 280, easing: springOf(pill) }); }
   }
 
   // ---------- 时间轴 ----------
@@ -460,7 +468,7 @@ export function createView() {
     const chip = (c, p, isIn) => '<button type="button" class="mn-chip' + (isIn ? " mn-inc" : "") + (V.filt === c ? " on" : "") + '" data-chip="' + esc(c) + '"><span>' + esc(c) + '</span><span class="mn-num mn-pct">' + (p * 100).toFixed(1) + "%</span>" + pie(p) + "</button>";
     $(".mn-chips").innerHTML = [...out].sort((a, b) => b[1] - a[1]).map(([c, v]) => chip(c, v / (to || 1), false)).join("") + [...inc].sort((a, b) => b[1] - a[1]).map(([c, v]) => chip(c, v / (ti || 1), true)).join("");
   }
-  const rowHTML = (e) => '<div class="mn-rw2"><div class="mn-del">Delete</div><div class="mn-row' + (e.id === V.fresh ? " mn-new" : "") + '" data-id="' + esc(e.id) + '"><div style="min-width:0"><div class="mn-r1">' + esc(e.c) + (e.n ? '<span class="mn-nt">' + esc(e.n) + "</span>" : "") + '</div><div class="mn-meta" style="margin-top:3px">' + M.fmtDate(e.d) + (e.d > today() ? ' <span class="mn-up" title="Already counted">upcoming</span>' : "") + '</div></div><span class="mn-num mn-am' + (e.v > 0 ? " inc" : "") + '">' + amtOf(e) + (convOf(e) ? "<small>" + convOf(e) + "</small>" : "") + "</span></div></div>";
+  const rowHTML = (e) => '<div class="mn-rw2"><div class="mn-del">Delete</div><div class="mn-row' + (e.id === V.fresh ? " mn-new" : "") + '" data-id="' + esc(e.id) + '"><div style="min-width:0"><div class="mn-r1">' + esc(e.c) + (e.n ? '<span class="mn-nt">' + esc(e.n) + "</span>" : "") + '</div><div class="mn-meta" style="margin-top:3px">' + M.fmtDate(e.d) + (e.d > today() ? ' <span class="mn-up" title="Already counted">Upcoming</span>' : "") + '</div></div><span class="mn-num mn-am' + (e.v > 0 ? " inc" : "") + '">' + amtOf(e) + (convOf(e) ? "<small>" + convOf(e) + "</small>" : "") + "</span></div></div>";
   function renderList() {
     const rows = SP.entries().filter((e) => inView(e) && (!V.filt || e.c === V.filt)).sort(M.byNewest);
     list.innerHTML = rows.length ? rows.slice(0, 300).map(rowHTML).join("") + (rows.length > 300 ? '<div class="mn-empty">+' + (rows.length - 300) + " more — search finds them all</div>" : "") : '<div class="mn-empty">No transactions</div>';
@@ -733,7 +741,7 @@ export function createView() {
       if (!at) { dot.hidden = true; small.textContent = note || (mode === "year" ? "No earlier years" : "No history yet"); continue; }
       dot.hidden = false;
       dot.classList.toggle("over", blown);
-      dot.style.left = (at.pos * 100).toFixed(1) + "%";
+      dot.style.setProperty("--x", at.pos.toFixed(3));
       small.textContent = paceNote(cmp, key, at, fmt, note);
     }
     box.querySelector('[data-v="inc"]').innerHTML = cents("+" + M.money(g.inc));

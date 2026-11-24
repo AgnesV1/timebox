@@ -72,8 +72,16 @@ export function glidePills(before, kind) {
   document.querySelectorAll("#main .seg").forEach((s, i) => {
     const p = s.querySelector(":scope > .seg-pill"), o = before.get("seg" + i);
     if (!p || !o || (o[0] === p.offsetLeft && o[1] === p.offsetWidth)) return;
-    p.animate([{ left: o[0] + "px", width: o[1] + "px" }, { left: p.offsetLeft + "px", width: p.offsetWidth + "px" }], opt);
+    slideFrom(p, o[0], o[1], opt);
   });
+}
+
+// 滑块从旧的位置、宽度滑到现在的：只动 transform（平移 + 横向缩放，transform-origin 在左边），不动 left / width，手机上不掉帧
+// （2026-11-23 照 hallmark 改的）。记账面板和 Spending 页的分段开关也用这个
+export function slideFrom(el, x0, w0, opt) {
+  const x1 = el.offsetLeft, w1 = el.offsetWidth;
+  if (!w1 || (x0 === x1 && w0 === w1)) return;
+  el.animate([{ transform: "translateX(" + (x0 - x1) + "px) scaleX(" + w0 / w1 + ")" }, { transform: "none" }], opt);
 }
 
 // ---------- 大数字一位一位滚过去 ----------

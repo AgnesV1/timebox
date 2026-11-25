@@ -340,7 +340,7 @@ body:not(.phone) .page-head { min-height: 34px; }
 @media (hover: hover) { .qd-open:hover { color: var(--ink); border-color: var(--edge); } }
 .qd-ax { padding: 0 0 6px; font-size: 12.5px; font-weight: 600; text-align: center; white-space: nowrap; color: var(--muted); }
 .qd-v { padding: 0 0 0 6px; writing-mode: vertical-rl; rotate: 180deg; }
-.qd-q { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); align-content: start; gap: 5px; min-width: 0; padding: 8px 8px 32px; }
+.qd-q { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(128px, 100%), 1fr)); align-content: start; gap: 5px; min-width: 0; padding: 8px 8px 32px; }
 .qd-q[data-q="do"], .qd-q[data-q="quick"] { border-right: 1px solid var(--qd-line); }
 .qd-q[data-q="do"], .qd-q[data-q="plan"] { border-bottom: 1px solid var(--qd-line); }
 /* 拖着经过的那一格亮起来（和日历格子接得住时一样：白天青柠淡底 + 黑边，夜里青柠淡底 + 霓虹边） */
@@ -598,6 +598,11 @@ body.phone .ls-cb { width: 19px; height: 19px; font-size: 12.5px; }
 .week { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8px; min-height: calc(100vh - 92px); }   /* 上四天、下三天 + 四象限（2026-11-22 夜），两行一起撑到窗口底 */
 .week-qd { display: flex; min-width: 0; }
 .week-qd .qd { flex: 1; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr); }   /* 七天的格子撑到窗口底（2026-11-22）：整列都是这一天，往下面拖也接得住 */
+/* 周视图这格窄（每个象限一百一十几 px），轴上的字小一号、更淡，左边竖条窄一点，地方让给便利贴（2026-11-24 她从试样挑的 B；今天页那块不动）。
+   便利贴不出格靠 .qd-q 的 min(128px, 100%)：格子比 128 窄时一张占满一行。 */
+.week-qd .qd { grid-template-columns: 14px minmax(0, 1fr) minmax(0, 1fr); padding: 8px 6px 8px 2px; }
+.week-qd .qd-ax { padding-bottom: 4px; font-size: 11px; font-weight: 400; color: color-mix(in srgb, var(--muted) 75%, transparent); }
+.week-qd .qd-v { padding: 0 0 0 2px; }
 .cell { position: relative; display: flex; flex-direction: column; gap: 5px; min-height: 160px; padding: 6px 6px 26px; border: 1.5px solid transparent; border-radius: 12px; background: var(--bg); transition: background-color .15s, box-shadow .15s; }
 .cell.past { background: color-mix(in srgb, var(--bg) 60%, var(--page)); }
 .cell.rest { background: repeating-linear-gradient(-45deg, transparent 0 7px, var(--surface) 7px 8px), var(--bg); }

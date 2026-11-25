@@ -226,6 +226,26 @@ test("old data (day packs, grams) reads as boxes and free-text amounts", () => {
   assert.deepEqual(D2.week["2030-01-07"].rough, [{ box: "old-a", n: 2 }]);
 });
 
+test("deleting a box keeps every other box on its meal", () => {
+  const row = (key, value) => ({ key, value, updated: 5 });
+  store.applyPull({ tables: { settings: [
+    row("meal-box:at-a", { name: "A", parts: [] }), row("meal-box:at-b", { name: "B", parts: [] }),
+    row("meal-week:2031-01-06", { days: { "2031-01-06": { boxes: ["at-a", "at-b", "at-a"], at: ["8:30", "12:00", "19:00"] } } })
+  ] } }, 10);
+  store.deleteMeal("box", "at-b");
+  assert.deepEqual(store.meals().days["2031-01-06"], { boxes: ["at-a", "at-a"], at: ["8:30", "19:00"] });
+});
+
+test("an import with only tags changes the boxes it names and keeps what's in them", () => {
+  const D = data();
+  const out = M.importRows(D, { box: [{ name: "chicken rice bowl", type: "main", portable: true }, { name: "Not a box I have", type: "base" }] }, () => "new");
+  assert.equal(out.box.length, 1, "a name that matches nothing is skipped, not made into an empty box");
+  assert.equal(out.box[0].id, "ex-bowl");
+  assert.equal(out.box[0].type, "main");
+  assert.equal(out.box[0].portable, true);
+  assert.deepEqual(out.box[0].parts, D.box["ex-bowl"].parts);
+});
+
 test("any meat: a box can hold 'whichever' of a type — its level and cost are the type's, and it lands on the list per day", () => {
   const D = data({ [NEXT]: { days: { "2026-10-12": { boxes: ["any"] }, "2026-10-13": { boxes: ["any"] } } } });
   D.ing["ex-chicken"].cat = "meat"; D.ing["ex-salmon"].cat = "meat";

@@ -636,7 +636,10 @@ export function importRows(D, payload, newId) {
   for (const r of payload?.box || []) {
     const name = String(r?.name || "").trim(), old = boxes.get(norm(name));
     if (!name) continue;
-    const parts = (r.parts || []).map((p) => (p?.any ? { any: p.any, amt: p.amt || "" } : { ing: names.get(norm(p?.ing))?.id || "", amt: p?.amt || "" })).filter((p) => (p.any ? ANY[p.any] : p.ing));
+    // 没写食材的（只改类型、便携这些）：只动已经有的 Box，食材照旧；名字对不上的跳过，不新建空 Box
+    if (!Array.isArray(r.parts) && !old) continue;
+    const parts = !Array.isArray(r.parts) ? old.parts || []
+      : r.parts.map((p) => (p?.any ? { any: p.any, amt: p.amt || "" } : { ing: names.get(norm(p?.ing))?.id || "", amt: p?.amt || "" })).filter((p) => (p.any ? ANY[p.any] : p.ing));
     const row = { type: "", portable: false, level: "", note: "", ...(old || {}), ...pick(r, BOX_FIELDS), name, parts, id: old?.id || newId() };
     boxes.set(norm(name), row);
     box.push(row);

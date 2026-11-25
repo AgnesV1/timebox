@@ -28,7 +28,7 @@ const money = (v) => "$" + (Number(v) || 0).toFixed(2);
 const money0 = (v) => "$" + Math.round(Number(v) || 0);
 const fmtDue = (d, T) => fmtShort(d) + (d.slice(0, 4) === T.slice(0, 4) ? "" : ", " + d.slice(0, 4));
 const dueText = (d, T) => { const n = diffDays(T, d); return n > 1 ? "in " + n + " days" : n === 1 ? "tomorrow" : n === 0 ? "today" : -n + (n === -1 ? " day late" : " days late"); };
-// Box 的类型（Base / Main / Main-lite / Bridge）和便携：贴在 Box 上的小标签（她 2026-11-24 要的）
+// Box 的类型（Base / Main / Bridge；11-25 取消了 Main-lite）和便携：贴在 Box 上的小标签（她 2026-11-24 要的）
 const typeLabel = (b) => M.typeName(M.typeOf(b)) || "No type";
 const goIcon = (b) => (b?.portable ? '<span class="mgo" title="Portable" aria-label="Portable">' + icon("go") + "</span>" : "");
 const weekOf = (date) => startOfWeek(date, store.prefs().weekStartsOn);

@@ -195,7 +195,8 @@ test("dropping a box on a day: the first empty meal of its type, else the first 
   const D = { box: { e: { id: "e", type: "base" }, m: { id: "m", type: "lite" }, x: { id: "x" } } };
   const home = M.FRAME.home;
   assert.equal(M.autoAt(D, null, home, "e"), "10:00");
-  assert.equal(M.autoAt(D, null, home, "m"), "14:30", "Main-lite goes in the Main meal");
+  assert.equal(M.autoAt(D, null, home, "m"), "14:30", "a box saved as Main-lite (since dropped) counts as Main");
+  assert.equal(M.typeOf(D.box.m), "main");
   assert.equal(M.autoAt(D, { boxes: ["e"], at: ["10:00"] }, home, "e"), "19:00");
   assert.equal(M.autoAt(D, { boxes: ["e"], at: ["10:00"] }, home, "x"), "14:30");
   assert.equal(M.autoAt(D, { boxes: ["e", "m", "e"], at: ["10:00", "14:30", "19:00"] }, home, "m"), "14:30");

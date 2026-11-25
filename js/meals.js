@@ -11,13 +11,14 @@
 import { addDays, addMonths, daysInMonth, diffDays, startOfMonth, startOfWeek, weekday, range, MONTHS } from "./dates.js";
 
 // Box 是哪一种（2026-11-24 她定的名字，取代以前的 Breakfast / Lunch / Dinner / Snack；旧的 slot 留在数据里不用了）：
-//   Base 底盘餐（高蛋白、蔬菜、低碳）/ Main 满配主餐 / Main-lite 清版主餐 / Bridge 两顿之间垫一下（隔夜燕麦这种）
-// 只是标签：哪个 Box 都能放进哪一顿；只有「Fill empty days」按它挑（Main 那一顿也收 Main-lite）
-export const TYPES = [["base", "Base"], ["main", "Main"], ["lite", "Main-lite"], ["bridge", "Bridge"]];
+//   Base 底盘餐（高蛋白、蔬菜、低碳，约 350 kcal）/ Main 主餐（约 500）/ Bridge 两顿之间垫一下（隔夜燕麦这种，约 300）
+//   11-25 她取消了 Main-lite（清版主餐），一律算 Main；已经存成 lite 的读出来就是 Main
+// 只是标签：哪个 Box 都能放进哪一顿；只有「Fill empty days」按它挑
+export const TYPES = [["base", "Base"], ["main", "Main"], ["bridge", "Bridge"]];
 const TYPE_KEYS = TYPES.map(([k]) => k);
-export const typeOf = (box) => (TYPE_KEYS.includes(box?.type) ? box.type : "");
+export const typeOf = (box) => (box?.type === "lite" ? "main" : TYPE_KEYS.includes(box?.type) ? box.type : "");
 export const typeName = (t) => (TYPES.find(([k]) => k === t) || ["", ""])[1];
-export const fits = (box, type) => Boolean(type) && (typeOf(box) === type || (type === "main" && typeOf(box) === "lite"));
+export const fits = (box, type) => Boolean(type) && typeOf(box) === type;
 export const LEVELS = [["low", "Low", "veg, fruit"], ["mid", "Mid", "normal: grains, lean meat, dairy"], ["high", "High", "fried, fatty, sweet"]];
 export const EVERY = [0, 1, 2, 3, 4, 6, 8];   // 打折几周一轮；0 = 不追
 export const STORES = ["Longo's", "Farm Boy", "Dodo", "T&T", "Eataly", "Loblaws", "Costco", "IKEA"];
@@ -392,7 +393,7 @@ export function roughLeft(D, start, w) {
   return queue;
 }
 
-// 粗排变细排：还空着的日子（from 之后、没标不做饭），照那天的框架一顿一顿放：先挑类型对得上的（Main 那一顿也收 Main-lite），
+// 粗排变细排：还空着的日子（from 之后、没标不做饭），照那天的框架一顿一顿放：先挑类型对得上的，
 // 没有就挑没贴类型的，再没有那一顿空着。frameFor(date) = 那天的框架（通勤日和非通勤日不一样）。返回 日期 → entry
 export function fillFromRough(D, start, w, from = start, frameFor = () => FRAME.home) {
   const queue = roughLeft(D, start, w), out = {};
@@ -684,7 +685,7 @@ export function examples(today, weekStart, D = { days: {}, week: {} }) {
     ["bowl", "Chicken rice bowl", "main", [part("chicken", "1 breast"), part("rice", "1 cup cooked"), part("broccoli", "1 cup")], true],
     ["salmon", "Salmon & bok choy", "base", [part("salmon", "1 fillet"), part("bokchoy", "2 heads"), part("rice", "1 cup cooked")]],
     ["dumplings", "Pan-fried dumplings", "main", [part("dumplings", "10"), part("bokchoy", "1 head"), part("oil", "1 tbsp")]],
-    ["pasta", "Pesto pasta", "lite", [part("pasta", "½ pack"), part("pesto", "2 tbsp"), part("spinach", "a handful")], true],
+    ["pasta", "Pesto pasta", "main", [part("pasta", "½ pack"), part("pesto", "2 tbsp"), part("spinach", "a handful")], true],
     ["banana", "Banana", "bridge", [part("banana", "1")], true]
   ].map(([id, name, type, parts, portable]) => ({ id: "ex-" + id, name, type, portable: Boolean(portable), level: "", parts, note: "" }));
   // 下周按天排上（空着的日子才放）；再下周粗排一下

@@ -218,17 +218,22 @@ Offline, entries wait on the device and go out once you're back online.
   **how many days one purchase lasts** (7 if empty), **energy level** (Low vegetables and fruit / Mid normal / High fried, fatty or sweet), and deals.
   Staples (oil, salt) stay off the shopping list. Deals run in rounds: weekly flyers are Every week, something on sale about monthly is Every 4 weeks,
   plus the date one round starts; rounds you haven't checked yet show on the Plan tab (the number next to Meals in the sidebar), and No deal or On sale… (sale price and end date) marks them as checked.
-- `Boxes`: a Box = one meal = a few things, with amounts in words ("1 cup", "a handful"). A box's level is set automatically:
+- `Boxes`: a Box = one meal = a few things, with amounts in words ("1 cup", "a handful"). Each Box can carry a type — Base (protein, veg, low-carb), Main, Main-lite (a lighter main) or Bridge
+  (something between meals, like overnight oats) — and a Portable tag (a small bag next to its name). Both are only labels: any Box can go in any meal. A box's level is set automatically:
   its heaviest item, one level lower if more than half is Low (staples don't count); or pick it by hand. Next to it, roughly what a day's worth costs (each item's price ÷ days it lasts, added up).
   Drag a grocery from the shelf onto a box to add it, or click the grocery for an "Add to…" menu of boxes.
   Drag an item inside a box onto another box to move it there (its amount goes with it), or back onto the shelf to take it out of that box.
 - `Plan`: at the top, the **next shopping list** by store: what this week's days need ÷ how many days a purchase lasts = how many times to buy, at the sale price if the shop day is during a deal;
   tick what you bought, Have it for what's still at home (no cost), and add anything else by hand; Mark shopped counts everything unticked as bought. Ticks are remembered —
   a bag of rice that lasts 30 days won't show up again for the next few weeks. Below: this round's unchecked deals and the Boxes to drag;
-  this week and next by day (from Friday, this week disappears and planning starts from next week). Drag a Box onto a day, click a Box chip for a "Put on…" menu, or click a day to choose;
-  drag a planned day onto another day to copy it (or open the day: Same as another day), or drag a single Box on a day to another day to move it, or back up to the row of Boxes to take it off; mark a day Not cooking.
-  Each week has a small Low / Mid / High bar, red when High goes over the limit. The four weeks after that are four boxes holding only "which Box × how many"; when one becomes next week, Fill empty days spreads them over breakfast, lunch and dinner on the empty days.
-  The gear at the top right: shop day (like a cutoff: the last one on or before the week starts), most High boxes per week, weekly budget (blank = no comparison).
+  this week and next by day (from Friday, this week disappears and planning starts from next week). Each day is one row per meal, from **your day** in the gear:
+  a commute day (the bus lit on that day in Calendar, or next to the date here) and a home day each have their own meals, every meal a time, a type and a few words on what it is
+  (by default a commute day is 8:30 Base, 12:00 Main, 15:30 Bridge, 19:00 Base, and a home day 10:00 Base, 14:30 Main, 19:00 Base). An empty meal shows its type; hover a row for the words.
+  Drag a Box onto a meal, or onto the date for the first empty meal that fits; click a Box chip for a "Put on…" menu of days, or click a day to choose meal by meal;
+  drag a planned day onto another day to copy it (or open the day: Same as another day), or drag a single Box to another meal or day to move it, or back up to the row of Boxes to take it off; mark a day Not cooking.
+  A Box planned at a time that isn't in that day's meals any more (the day became a commute day, or you changed a time) is shown in the meal that fits; it is saved there once you move it.
+  Each week has a small Low / Mid / High bar, red when High goes over the limit. The four weeks after that are four boxes holding only "which Box × how many"; when one becomes next week, Fill empty days puts them on the empty days meal by meal, a Box of the meal's type first (a Main meal also takes Main-lite), then one without a type.
+  The gear at the top right: shop day (like a cutoff: the last one on or before the week starts), most High boxes per week, weekly budget (blank = no comparison), and your day (the meals of a commute day and a home day).
   At the bottom, **To try**: dishes you had out and want to make yourself (name + note), as For meal prep (to become a Box) or Try once.
   Write them right there (paste several lines = several dishes; "dish — note" is split), or open a finished Leisure / Friends task on Today and add a few with `+ What I had`,
   which records where and when. `Make a box` = create a Box with the same name (the note goes into How to make it) and remove it from the list; for Try once, `Tried` when you've tried it. Computer only.

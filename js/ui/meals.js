@@ -28,7 +28,9 @@ const money = (v) => "$" + (Number(v) || 0).toFixed(2);
 const money0 = (v) => "$" + Math.round(Number(v) || 0);
 const fmtDue = (d, T) => fmtShort(d) + (d.slice(0, 4) === T.slice(0, 4) ? "" : ", " + d.slice(0, 4));
 const dueText = (d, T) => { const n = diffDays(T, d); return n > 1 ? "in " + n + " days" : n === 1 ? "tomorrow" : n === 0 ? "today" : -n + (n === -1 ? " day late" : " days late"); };
-const slotName = (s) => (M.SLOTS.find(([k]) => k === s) || ["", "Any"])[1];
+// Box 的类型（Base / Main / Main-lite / Bridge）和便携：贴在 Box 上的小标签（她 2026-11-24 要的）
+const typeLabel = (b) => M.typeName(M.typeOf(b)) || "No type";
+const goIcon = (b) => (b?.portable ? '<span class="mgo" title="Portable" aria-label="Portable">' + icon("go") + "</span>" : "");
 const weekOf = (date) => startOfWeek(date, store.prefs().weekStartsOn);
 // 排餐和采购从哪一周看起：到了周五就是下一周（见 M.planStart）
 const planWeek = (today) => M.planStart(today, store.prefs().weekStartsOn);
@@ -37,13 +39,15 @@ const weekName = (start, today) => ["This week", "Next week", "Week after"][diff
 const sel = (yes) => (yes ? " selected" : "");
 const afterRender = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));   // 重画排在下一帧
 const dot = (lv) => '<i class="lvdot lv-' + lv + '" title="' + M.levelName(lv) + '"></i>';
-const SLOT_ORDER = Object.fromEntries(M.SLOTS.map(([k], i) => [k, i]));
-const bySlot = (a, b) => (SLOT_ORDER[a.slot] ?? 9) - (SLOT_ORDER[b.slot] ?? 9) || M.byName(a, b);
+const TYPE_ORDER = Object.fromEntries(M.TYPES.map(([k], i) => [k, i]));
+const byType = (a, b) => (TYPE_ORDER[M.typeOf(a)] ?? 9) - (TYPE_ORDER[M.typeOf(b)] ?? 9) || M.byName(a, b);
+// 某天用哪一套框架：日历上点亮巴士的那天 = 通勤日
+const frameFor = (fr) => (date) => (store.isCommuteDay(date) ? fr.commute : fr.home);
 
 function boxOptions(D, selected, empty = "—") {
   const groups = new Map();
-  for (const b of Object.values(D.box).sort(bySlot)) {
-    const k = slotName(b.slot);
+  for (const b of Object.values(D.box).sort(byType)) {
+    const k = typeLabel(b);
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(b);
   }
@@ -73,7 +77,7 @@ export function mealsHTML(c) {
   const D = store.meals(), tab = tabOf();
   const head = '<header class="page-head"><div><h2>Meals</h2></div><div class="tools"><nav class="mtabs">' +
     TABS.map(([k, l, href]) => '<a class="nav' + (tab === k ? " on" : "") + '" href="' + href + '">' + l + "</a>").join("") + "</nav>" +
-    '<button type="button" class="icon-btn" data-act="meal-prefs" title="Shop day, budget, high boxes per week" aria-label="Meal settings">' + icon("settings") + "</button></div></header>";
+    '<button type="button" class="icon-btn" data-act="meal-prefs" title="Shop day, budget, your day" aria-label="Meal settings">' + icon("settings") + "</button></div></header>";
   const body = tab === "boxes" ? boxesHTML(D, c) : tab === "groceries" ? groceriesHTML(D, c) : tab === "restock" ? restockHTML(D, c) : planHTML(D, c);
   return '<div class="meals">' + head + body + "</div>";
 }
@@ -153,11 +157,11 @@ function memoHTML(D, start, phone) {
 function planHTML(D, c) {
   if (!Object.keys(D.box).length && !Object.keys(D.ing).length) return introHTML();
   const pr = store.mealPrefs(), w0 = planWeek(c.today), w1 = addDays(w0, 7);
-  const boxes = Object.values(D.box).sort(bySlot);
+  const boxes = Object.values(D.box).sort(byType);
   const palette = boxes.length
     ? '<div class="mpalette" data-drop="mpal"><span class="msub">Drag a box onto a day, or click it · drag one back here to take it off its day</span>' + boxes.map((b) =>
       '<span class="mpk" data-drag="box:' + esc(b.id) + '" role="button" tabindex="0" aria-haspopup="listbox" title="' + esc((b.parts || []).map((p) => M.partIng(D, p)?.name).filter(Boolean).join(" · ")) + '">' +
-      dot(M.boxLevel(D, b)) + "<b>" + esc(b.name || "Untitled") + "</b><small>" + slotName(b.slot) + "</small></span>").join("") + "</div>"
+      dot(M.boxLevel(D, b)) + "<b>" + esc(b.name || "Untitled") + "</b>" + (M.typeOf(b) ? "<small>" + typeLabel(b) + "</small>" : "") + goIcon(b) + "</span>").join("") + "</div>"
     : '<p class="mpalette msub">No boxes yet — <a href="#meals/boxes">make a few</a>, then drag them onto the days.</p>';
   return nextShopHTML(D, c, false) + dealsHTML(D, c.today) + palette +
     weekHTML(D, c, w0, weekName(w0, c.today), pr) + weekHTML(D, c, w1, weekName(w1, c.today), pr) +
@@ -209,17 +213,27 @@ function weekHTML(D, c, start, label, pr) {
     '<div class="tools"><button type="button" class="btn ghosty" data-act="skip-week" data-week="' + start + '">' + (w.skip ? "Unskip" : "Skip week") + "</button></div></header>" +
     ((carry && canFill) || w.note ? '<p class="carry">' + (carry && canFill ? "Planned earlier: " + carry + ' <button type="button" class="btn" data-act="fill-week" data-week="' + start + '">Fill empty days</button>' : "") +
       (w.note ? ' <span class="wnote">' + esc(w.note) + "</span>" : "") + "</p>" : "") +
-    '<div class="mdays">' + plan.days.map((d) => dayHTML(D, c, d)).join("") + "</div></section>";
+    '<div class="mdays">' + plan.days.map((d) => dayHTML(D, c, d, frameFor(M.frameOf(pr)))).join("") + "</div></section>";
 }
 
-function dayHTML(D, c, d) {
-  const off = d.entry?.off, n = d.boxes.length;
+// 一天一格（她 2026-11-24 从试样挑的 B：一顿一行）：日期旁边一个巴士，和日历是同一个通勤标记，点了切换 → 这天换成另一套框架；
+// 下面一顿一行：钟点 + 放进去的 Box（一顿放几个都行）；空着的那一顿淡淡写类型名（Base / Main…），鼠标停上去看这一顿吃什么。
+// 框架以外钟点的（改过框架、切过通勤日）照样一行；以前没放进哪一顿的排在最后，钟点写「·」
+function dayHTML(D, c, d, frameAt) {
+  const off = d.entry?.off, n = d.boxes.length, cm = store.isCommuteDay(d.date);
   const cls = ["mday", d.date === c.today && "today", d.date < c.today && "past", off && "off"].filter(Boolean).join(" ");
+  const rows = off ? [] : M.dayMeals(D, d.entry, frameAt(d.date));
+  const tip = (r) => [M.typeName(r.type), r.note].filter(Boolean).join(" · ");
+  const item = (p) => '<span class="mml-b lv-' + M.boxLevel(D, D.box[p.id]) + '" data-drag="mslot:' + d.date + "|" + p.i + '">' + esc(D.box[p.id].name || "Untitled") + "</span>";
+  const row = (r) => '<div class="mml' + (r.items.length ? "" : " empty") + '"' + (r.t ? ' data-drop="mmeal:' + d.date + "|" + r.t + '"' : "") + (tip(r) ? ' title="' + esc(tip(r)) + '"' : "") + ">" +
+    '<span class="mml-t">' + (r.t || "·") + "</span>" +
+    (r.items.length ? '<span class="mml-bs">' + r.items.map(item).join("") + "</span>" : '<span class="mml-e">' + esc(M.typeName(r.type) || "Meal") + "</span>") + "</div>";
   return '<div class="' + cls + '" data-drop="mday:' + d.date + '" data-act="edit-day" data-date="' + d.date + '"' + (n ? ' data-drag="mcopy:' + d.date + '"' : "") + ' role="button" tabindex="0">' +
-    '<div class="mday-head"><span>' + WEEKDAYS[weekday(d.date)] + "</span><b>" + Number(d.date.slice(8)) + "</b></div>" +
+    '<div class="mday-head"><span>' + WEEKDAYS[weekday(d.date)] + "</span><b>" + Number(d.date.slice(8)) + "</b>" +
+    '<button type="button" class="mday-cm' + (cm ? " on" : "") + '" data-act="meal-commute" data-date="' + d.date + '" aria-pressed="' + cm + '" title="' + (cm ? "Commute day — click to clear" : "Mark as a commute day") + '">' + icon("commute") + "</button></div>" +
     (off ? '<p class="moff">Not cooking</p>'
-      : n ? '<ul class="mbl">' + d.boxes.map((id, i) => '<li class="lv-' + M.boxLevel(D, D.box[id]) + '" data-drag="mslot:' + d.date + "|" + i + '">' + esc(D.box[id].name || "Untitled") + "</li>").join("") + "</ul>" +
-        '<div class="mday-foot"><span>≈ ' + money(d.cost) + "</span>" + (d.levels.high ? '<span class="hi">' + d.levels.high + " high</span>" : "") + "</div>"
+      : rows.length ? '<div class="mmls">' + rows.map(row).join("") + "</div>" +
+        (n ? '<div class="mday-foot"><span>≈ ' + money(d.cost) + "</span>" + (d.levels.high ? '<span class="hi">' + d.levels.high + " high</span>" : "") + "</div>" : "")
       : '<p class="mempty">+ Add</p>') + "</div>";
 }
 
@@ -256,12 +270,12 @@ function shelfHTML(D) {
 }
 
 function boxesHTML(D, c) {
-  const boxes = Object.values(D.box).sort(bySlot);
+  const boxes = Object.values(D.box).sort(byType);
   if (!boxes.length && !Object.keys(D.ing).length) return introHTML();
   const card = (b) => {
     const lv = M.boxLevel(D, b);
     return '<article class="mbox lv-' + lv + '" data-drop="mbox:' + esc(b.id) + '" data-act="edit-box" data-id="' + esc(b.id) + '" role="button" tabindex="0">' +
-      "<header><b>" + esc(b.name || "Untitled") + '</b><span class="slot">' + slotName(b.slot) + "</span></header><ul>" +
+      "<header><b>" + esc(b.name || "Untitled") + '</b><span class="slot">' + (M.typeOf(b) ? typeLabel(b) : "") + goIcon(b) + "</span></header><ul>" +
       (b.parts || []).map((p, k) => [p, M.partIng(D, p, c.today), k]).filter(([, i]) => i).map(([p, i, k]) => "<li" + (p.any ? ' class="any"' : "") + ' data-drag="mpart:' + esc(b.id) + "|" + k + '">' + dot(M.levelOf(i)) + "<span>" + esc(i.name) + '</span><span class="q">' + esc(p.amt || "") + "</span></li>").join("") +
       '</ul><footer><span class="lvtag lv-' + lv + '">' + M.levelName(lv) + (b.level ? "" : " · auto") + "</span><span>≈ " + money(M.boxCost(D, b, c.today)) + "</span></footer></article>";
   };
@@ -537,7 +551,8 @@ function boxEditor(D, row) {
   const parts = row.parts || [];
   return '<h3 class="sheet-title">' + (editing.id ? esc(row.name || "Untitled") : "New box") + ' <small><span class="lvtag lv-' + lv + '">' + M.levelName(lv) + "</span> ≈ " + money(M.boxCost(D, row, T)) + "</small></h3>" +
     '<div class="field-row"><label class="field"><span>Name</span><input data-f="name" data-k="name" value="' + esc(row.name || "") + '" placeholder="Chicken rice bowl" autocomplete="off"></label>' +
-    '<div class="field"><span>Meal</span>' + segHTML("box-slot", [...M.SLOTS, ["", "Any"]], row.slot || "") + "</div></div>" +
+    '<div class="field"><span>Type</span>' + segHTML("box-type", [...M.TYPES, ["", "None"]], M.typeOf(row)) + "</div></div>" +
+    '<div class="field"><span>Take it with you</span>' + segHTML("box-go", [["1", "Portable"], ["", "Not portable"]], row.portable ? "1" : "") + "</div>" +
     '<div class="field"><span>Calories</span>' + segHTML("box-level", [["", "Auto · " + M.levelName(auto)], ...M.LEVELS.map(([k, l]) => [k, l])], row.level || "") + "</div>" +
     '<p class="hint">Auto = as heavy as its heaviest grocery, one level lighter if at least half of it is Low. Staples don\'t count.</p>' +
     '<div class="field"><span>What goes in</span>' +
@@ -553,15 +568,17 @@ function boxEditor(D, row) {
     footHTML("box");
 }
 
+// 点开某一天：一顿一行（钟点 · 类型 · 这一顿吃什么），每顿下面放了的 Box 各一个下拉（选「— remove」拿掉），再一个「+ Add a box」
 function dayEditor(D) {
-  const date = editing.date, entry = D.days[date] || null;
-  const ids = M.boxesOfDay(D, entry);
-  const shown = ids.length < 6 ? [...ids, ""] : ids;
-  const t = M.sumBoxes(D, ids, date);
+  const date = editing.date, entry = D.days[date] || null, cm = store.isCommuteDay(date);
+  const ids = M.boxesOfDay(D, entry), t = M.sumBoxes(D, ids, date);
+  const rows = M.dayMeals(D, entry, frameFor(M.frameOf(store.mealPrefs()))(date));
+  const pick = (r, p) => '<select data-dbox data-i="' + (p ? p.i : -1) + '" data-at="' + r.t + '" data-k="dbox-' + r.t + "-" + (p ? p.i : "new") + '">' + boxOptions(D, p?.id || "", p ? "— remove" : "+ Add a box") + "</select>";
+  const meal = (r) => '<div class="dmeal"><span class="dm-t">' + (r.t || "·") + '</span><span class="dm-k">' + esc(M.typeName(r.type) || (r.t ? "" : "Not in a meal")) +
+    (r.note ? " <small>" + esc(r.note) + "</small>" : "") + '</span><div class="dm-picks">' + r.items.map((p) => pick(r, p)).join("") + (r.t ? pick(r, null) : "") + "</div></div>";
   return '<h3 class="sheet-title">' + fmtDay(date) + (ids.length ? " <small>≈ " + money(t.cost) + "</small>" : "") + "</h3>" +
-    (Object.keys(D.box).length ? '<div class="field"><span>Boxes</span>' + shown.map((id, i) => '<div class="pslot"><span class="num">' + (i + 1) + "</span>" +
-      '<select data-dbox data-i="' + i + '" data-k="dbox-' + i + '">' + boxOptions(D, id, i < ids.length ? "— remove" : "+ Add a box") + "</select>" +
-      "<span>" + (D.box[id] ? dot(M.boxLevel(D, D.box[id])) + " " + M.levelName(M.boxLevel(D, D.box[id])) : "") + "</span></div>").join("") + "</div>"
+    '<p class="hint dm-day">' + icon("commute") + " " + (cm ? "Commute day" : "Not a commute day") + ' · <button type="button" class="link" data-act="meal-commute" data-date="' + date + '">' + (cm ? "Make it a home day" : "Make it a commute day") + "</button></p>" +
+    (Object.keys(D.box).length ? (rows.length ? rows.map(meal).join("") : '<p class="hint">No meals in your day yet — add them in Meal settings.</p>')
       : '<p class="hint">No boxes yet — <a href="#meals/boxes" data-modal-close>make some</a> first.</p>') +
     copyFromHTML(D, date) +
     '<div class="sheet-foot"><span class="tools"><button type="button" class="btn' + (entry?.off ? " on" : "") + '" data-act="day-off">' + (entry?.off ? "Cooking after all" : "Not cooking") + "</button>" +
@@ -585,7 +602,26 @@ function prefsEditor() {
     '<label class="field"><span>Budget per week ($)</span><input data-pf="budget" data-k="budget" class="num" type="number" min="0" step="5" value="' + (Number(pr.budget) ? esc(pr.budget) : "") + '" placeholder="No budget"></label></div>' +
     '<p class="hint">Shop day works like a meal kit\'s cutoff: plan each week by its shop day — the last one on or before the week starts (a week starts on the day set in Settings). ' +
     "High boxes per week is your allowance for fried, fatty or sweet meals; the week bar turns red past it.</p>" +
+    frameHTML(pr) +
     '<div class="sheet-foot"><span></span><button type="button" class="btn primary" data-modal-close>Done</button></div>';
+}
+
+// 一天的框架：通勤日、非通勤日各几顿，每顿 钟点 · 类型 · 吃什么（她 2026-11-24 给的是默认）。改了钟点，已经放在旧钟点的 Box 不动，在那天单独一行
+const FRAME_SETS = [["commute", "Commute day"], ["home", "Home day"]];
+function frameHTML(pr) {
+  const fr = M.frameOf(pr);
+  const row = (k, m, i) => '<div class="mfr-row"><input data-fr="t" data-set="' + k + '" data-i="' + i + '" data-k="fr-' + k + "-t-" + i + '" value="' + esc(m.t) + '" placeholder="8:30" aria-label="Time" autocomplete="off">' +
+    '<select data-fr="type" data-set="' + k + '" data-i="' + i + '" data-k="fr-' + k + "-type-" + i + '" aria-label="Type">' + [["", "—"], ...M.TYPES].map(([v, l]) => '<option value="' + v + '"' + sel(m.type === v) + ">" + l + "</option>").join("") + "</select>" +
+    '<input data-fr="note" data-set="' + k + '" data-i="' + i + '" data-k="fr-' + k + "-note-" + i + '" value="' + esc(m.note) + '" placeholder="Protein, veg" aria-label="What it is" autocomplete="off">' +
+    '<button type="button" class="icon-btn" data-act="fr-del" data-set="' + k + '" data-i="' + i + '" aria-label="Remove this meal">' + icon("close") + "</button></div>";
+  return '<h4 class="msub-h">Your day</h4>' +
+    '<p class="hint">The meals in a day, by when you eat them. A commute day is one with the bus lit in Calendar, or on that day in Plan.</p>' +
+    '<div class="mfr-cols">' + FRAME_SETS.map(([k, l]) => '<div class="mfr"><h5>' + (k === "commute" ? icon("commute") + " " : "") + l + "</h5>" +
+      fr[k].map((m, i) => row(k, m, i)).join("") + '<button type="button" class="link" data-act="fr-add" data-set="' + k + '">+ A meal</button></div>').join("") + "</div>";
+}
+function saveFrame(k, fn) {
+  const pr = store.mealPrefs(), fr = M.frameOf(pr);
+  store.setSetting("meal-prefs", { ...pr, frame: { ...fr, [k]: fn(fr[k].map((m) => ({ ...m }))) } });
 }
 
 function importEditor() {
@@ -609,7 +645,7 @@ function editorHTML() {
 
 function openEditor(e) {
   editing = e;
-  openModal('<div class="meal-editor">' + editorHTML() + "</div>", { wide: e.kind === "ing" || e.kind === "box" || e.kind === "import" || e.kind === "gear-paste", close: () => { editing = null; } });
+  openModal('<div class="meal-editor">' + editorHTML() + "</div>", { wide: e.kind === "ing" || e.kind === "box" || e.kind === "import" || e.kind === "gear-paste" || e.kind === "prefs", close: () => { editing = null; } });
   modalSheet()?.querySelector("[data-k=name], [data-k=import]")?.focus();
 }
 
@@ -660,24 +696,28 @@ export function mealDrop(payload, target) {
     if (m.from) store.change(() => { store.saveMeal("box", m.from); store.saveMeal("box", m.to); }, "Moved " + (m.what?.name || "it") + " to " + (m.to.name || "Untitled"));
     return;
   }
-  // 某天的一个 Box：换到别的天，或拖回顶上那排 = 从那天拿掉
+  // 某天的一个 Box：换到别的天 / 别的一顿（mmeal:日期|钟点），或拖回顶上那排 = 从那天拿掉；拖到某天没对准哪一顿 = 那天第一顿空着的
+  const fr = frameFor(M.frameOf(store.mealPrefs()));
+  const [mdate, mat] = tk === "mmeal" ? tid.split("|") : [tid, ""];
   if (kind === "mslot") {
-    const [date, k] = id.split("|"), ids = M.boxesOfDay(D, D.days[date]), name = D.box[ids[Number(k)]]?.name || "Untitled";
-    if (!ids[Number(k)]) return;
-    if (tk === "mpal") { const left = ids.filter((_, n) => n !== Number(k)); store.setMealDay(weekOf(date), date, left.length ? { boxes: left } : null, "Took " + name + " off " + fmtDay(date)); return; }
-    const m = M.moveDayBox(D, date, Number(k), tid);
-    if (m) store.change(() => { store.setMealDay(weekOf(date), date, m.from); store.setMealDay(weekOf(tid), tid, m.to); }, "Moved " + name + " to " + fmtDay(tid));
+    const [date, k] = id.split("|"), list = M.placedOfDay(D, D.days[date]), p = list[Number(k)], name = D.box[p?.id]?.name || "Untitled";
+    if (!p) return;
+    if (tk === "mpal") { store.setMealDay(weekOf(date), date, M.entryOf(list.filter((_, n) => n !== Number(k))), "Took " + name + " off " + fmtDay(date)); return; }
+    if (tk !== "mday" && tk !== "mmeal") return;
+    const at = tk === "mmeal" ? mat : M.autoAt(D, D.days[mdate], fr(mdate), p.id);
+    const m = M.moveDayBox(D, date, Number(k), mdate, at);
+    if (m) store.change(() => { store.setMealDay(weekOf(date), date, m.from); store.setMealDay(weekOf(mdate), mdate, m.to); }, "Moved " + name + " to " + fmtDay(mdate) + (at ? ", " + at : ""));
     return;
   }
-  if (tk === "mday") {
-    if (kind === "box" && D.box[id]) store.setMealDay(weekOf(tid), tid, { boxes: [...M.boxesOfDay(D, D.days[tid]), id] });
-    if (kind === "mcopy" && id !== tid && D.days[id]) { store.setMealDay(weekOf(tid), tid, { ...D.days[id] }); toast("Copied to " + fmtDay(tid)); }
+  if ((tk === "mday" || tk === "mmeal") && kind === "box" && D.box[id]) {
+    store.setMealDay(weekOf(mdate), mdate, M.addToDay(D, D.days[mdate], id, tk === "mmeal" ? mat : M.autoAt(D, D.days[mdate], fr(mdate), id)));
   }
+  if (tk === "mday" && kind === "mcopy" && id !== tid && D.days[id]) { store.setMealDay(weekOf(tid), tid, { ...D.days[id] }); toast("Copied to " + fmtDay(tid)); }
   if (tk === "mweek" && kind === "box" && D.box[id]) roughAdd(tid, id);
   if (tk === "mbox" && (kind === "ing" || kind === "any")) {
     const part = kind === "any" ? { any: id, amt: "" } : { ing: id, amt: "" }, what = M.partIng(D, part);
     if (!what) return;
-    if (tid === "new") { openEditor({ kind: "box", id: "", draft: { name: "", slot: "", level: "", parts: [part], note: "" } }); return; }
+    if (tid === "new") { openEditor({ kind: "box", id: "", draft: { name: "", type: "", portable: false, level: "", parts: [part], note: "" } }); return; }
     const b = D.box[tid];
     if (!b) return;
     const name = b.name || "Untitled", put = M.addPart(D, b.parts || [], part);   // 拖进来一样具体的肉、Box 里正好有「Any meat」：顶掉那格（用量留着）
@@ -722,13 +762,14 @@ export function initMeals(rerender) {
     else if (act === "deal-sale") { saleFor = id; rerender(); afterRender(() => document.querySelector(".saleform [name=price]")?.select()); }
     else if (act === "sale-cancel") { saleFor = ""; rerender(); }
     else if (act === "edit-day") openEditor({ kind: "day", date: el.dataset.date });
+    else if (act === "meal-commute") store.toggleCommute(el.dataset.date);
     else if (act === "shopped") markShopped(start);
     else if (act === "unshop") store.saveWeek(start, { shopped: false });
     else if (act === "skip-week") store.saveWeek(start, (w) => ({ skip: !w.skip }), D.week[start]?.skip ? "" : "Week skipped");
     else if (act === "got-have") store.saveWeek(start, (w) => { const got = { ...(w.got || {}) }; if (got[id] === "have") delete got[id]; else got[id] = "have"; return { got }; });
     else if (act === "shop-unadd") store.saveWeek(start, (w) => { const extra = { ...(w.extra || {}) }; extra[id] = (Number(extra[id]) || 0) - 1; if (extra[id] <= 0) delete extra[id]; return { extra }; });
     else if (act === "fill-week") {
-      const days = M.fillFromRough(D, start, D.week[start], start < T ? T : start);
+      const days = M.fillFromRough(D, start, D.week[start], start < T ? T : start, frameFor(M.frameOf(store.mealPrefs())));
       const n = Object.keys(days).length;
       if (n) store.saveWeek(start, (w) => ({ days: { ...(w.days || {}), ...days } }), "Filled " + n + (n === 1 ? " day" : " days"));
     }
@@ -741,7 +782,7 @@ export function initMeals(rerender) {
         return { rough: rough.filter((r) => r.n > 0) };
       });
     }
-    else if (act === "new-box") openEditor({ kind: "box", id: "", draft: { name: "", slot: "", level: "", parts: [{ ing: "", amt: "" }], note: "" } });
+    else if (act === "new-box") openEditor({ kind: "box", id: "", draft: { name: "", type: "", portable: false, level: "", parts: [{ ing: "", amt: "" }], note: "" } });
     else if (act === "edit-box") openEditor({ kind: "box", id });
     else if (act === "new-ing") openEditor({ kind: "ing", id: "", draft: { name: "", store: "", price: "", lasts: "", level: "mid", cat: "", keep: false, staple: false, every: 0, from: "", checked: "", sale: null } });
     else if (act === "edit-ing") openEditor({ kind: "ing", id });
@@ -836,7 +877,8 @@ export function initMeals(rerender) {
       closeModal();
       store.importMeals({ gear: rows });
     }
-    else if (act === "box-slot") update({ slot: el.dataset.v });
+    else if (act === "box-type") update({ type: el.dataset.v });
+    else if (act === "box-go") update({ portable: el.dataset.v === "1" });
     else if (act === "box-level") update({ level: el.dataset.v });
     else if (act === "ing-level") update({ level: el.dataset.v });
     else if (act === "ing-cat") update({ cat: el.dataset.v });
@@ -855,6 +897,10 @@ export function initMeals(rerender) {
     else if (act === "ing-checked") update({ checked: store.today() });
     else if (act === "day-off") store.setMealDay(weekOf(editing.date), editing.date, D.days[editing.date]?.off ? null : { off: true });
     else if (act === "day-clear") store.setMealDay(weekOf(editing.date), editing.date, null);
+    else if (act === "meal-commute") store.toggleCommute(el.dataset.date);
+    // 框架加一顿：钟点先写最后一顿往后两个钟头（最晚 23:00），再自己改
+    else if (act === "fr-add") saveFrame(el.dataset.set, (list) => { const last = list.length ? M.toMin(list[list.length - 1].t) : 7 * 60; const m = Math.min(23 * 60, last + 120); return [...list, { t: Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0"), type: "", note: "" }]; });
+    else if (act === "fr-del") saveFrame(el.dataset.set, (list) => list.filter((_, i) => i !== Number(el.dataset.i)));
   });
   on(document, "change", ".meal-editor [data-f]", (e, el) => {
     const f = el.dataset.f, row = rowOf(store.meals());
@@ -888,11 +934,16 @@ export function initMeals(rerender) {
   });
   on(document, "change", ".meal-editor [data-dcopy]", (e, el) => { if (el.value) mealDrop("mcopy:" + el.value, "mday:" + editing.date); });
   on(document, "change", ".meal-editor [data-dbox]", (e, el) => {
-    const D = store.meals(), date = editing.date;
-    const boxes = [...M.boxesOfDay(D, D.days[date])];
-    boxes[Number(el.dataset.i)] = el.value;
-    const left = boxes.filter(Boolean);
-    store.setMealDay(weekOf(date), date, left.length ? { boxes: left } : null);
+    const D = store.meals(), date = editing.date, i = Number(el.dataset.i);
+    const list = M.placedOfDay(D, D.days[date]);
+    if (i >= 0 && list[i]) { if (el.value) list[i] = { ...list[i], id: el.value }; else list.splice(i, 1); }
+    else if (el.value) list.push({ id: el.value, at: el.dataset.at || "" });
+    store.setMealDay(weekOf(date), date, M.entryOf(list));
+  });
+  on(document, "change", ".meal-editor [data-fr]", (e, el) => {
+    const f = el.dataset.fr, i = Number(el.dataset.i);
+    if (f === "t" && !M.cleanTime(el.value)) { toast("Write the time like 8:30"); refreshMealEditor(); return; }
+    saveFrame(el.dataset.set, (list) => { if (list[i]) list[i][f] = f === "t" ? M.cleanTime(el.value) : el.value.trim(); return list; });
   });
   on(document, "change", ".meal-editor [data-pf]", (e, el) => {
     store.setSetting("meal-prefs", { ...store.mealPrefs(), [el.dataset.pf]: Math.max(0, Number(el.value) || 0) });

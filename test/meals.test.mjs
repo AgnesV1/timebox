@@ -131,7 +131,7 @@ test("next shop: the first of this week and next that isn't shopped or skipped",
   assert.equal(M.nextShop(data({ [NEXT]: { skip: true } }), TODAY, W0, 0), null);
 });
 
-test("rough weeks: totals, what's left to place, filling empty days breakfast–lunch–dinner", () => {
+test("rough weeks: totals, what's left to place, filling empty days meal by meal", () => {
   const D = data();
   const w = D.week[LATER];
   const t = M.roughTotals(D, w, TODAY);
@@ -139,11 +139,68 @@ test("rough weeks: totals, what's left to place, filling empty days breakfast–
   assert.deepEqual(t.levels, { low: 3, mid: 13, high: 1 });
   const D2 = { ...D, days: { ...D.days, "2026-10-20": { boxes: ["ex-eggs"] }, "2026-10-21": { off: true } } };
   assert.equal(M.roughLeft(D2, LATER, w).filter((b) => b === "ex-eggs").length, 2);
-  const filled = M.fillFromRough(D2, LATER, w);
+  // 10-19 是通勤日（四顿），别的天三顿；每顿挑类型对得上的，没有就空着
+  const frameFor = (d) => (d === "2026-10-19" ? M.FRAME.commute : M.FRAME.home);
+  const filled = M.fillFromRough(D2, LATER, w, LATER, frameFor);
   assert.deepEqual(Object.keys(filled), ["2026-10-19", "2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"]);
-  assert.deepEqual(filled["2026-10-19"].boxes, ["ex-oats", "ex-bowl", "ex-salmon"]);
-  assert.deepEqual(filled["2026-10-25"].boxes, ["ex-eggs", "ex-bowl", "ex-pasta"]);
-  assert.deepEqual(Object.keys(M.fillFromRough(D, LATER, w, "2026-10-24")), ["2026-10-24", "2026-10-25"]);
+  assert.deepEqual(filled["2026-10-19"], { boxes: ["ex-eggs", "ex-bowl", "ex-oats", "ex-eggs"], at: ["8:30", "12:00", "15:30", "19:00"] });
+  assert.deepEqual(filled["2026-10-22"], { boxes: ["ex-salmon", "ex-bowl", "ex-salmon"], at: ["10:00", "14:30", "19:00"] });
+  assert.deepEqual(filled["2026-10-23"], { boxes: ["ex-bowl"], at: ["14:30"] }, "no Base left, so those two meals stay empty");
+  assert.deepEqual(Object.keys(M.fillFromRough(D, LATER, w, "2026-10-24", frameFor)), ["2026-10-24", "2026-10-25"]);
+  // 没贴类型的 Box 哪一顿都能填
+  const D3 = { ...D, box: { ...D.box, plain: { id: "plain", name: "Leftovers", parts: [] } }, days: {} };
+  assert.deepEqual(M.fillFromRough(D3, LATER, { rough: [{ box: "plain", n: 2 }] }, LATER, frameFor)["2026-10-19"], { boxes: ["plain", "plain"], at: ["8:30", "12:00"] });
+});
+
+test("a day's frame: times are cleaned, the settings' frame wins, an emptied set stays empty", () => {
+  assert.equal(M.cleanTime("08:30"), "8:30");
+  assert.equal(M.cleanTime(" 19.00 "), "19:00");
+  assert.equal(M.cleanTime("25:00"), "");
+  assert.equal(M.cleanTime("noon"), "");
+  assert.deepEqual(M.frameOf({}), M.FRAME);
+  const fr = M.frameOf({ frame: { commute: [{ t: "19:00", type: "base" }, { t: "07:45", type: "x", note: " Oats " }, { t: "" }], home: [] } });
+  assert.deepEqual(fr.commute, [{ t: "7:45", type: "", note: "Oats" }, { t: "19:00", type: "base", note: "" }], "sorted by time; unknown types and bad times dropped");
+  assert.deepEqual(fr.home, []);
+});
+
+test("a day by meals: boxes hang on their meal, old boxes without a meal go last", () => {
+  const D = { box: { a: { id: "a", type: "base" }, b: { id: "b", type: "main" }, c: { id: "c" }, d: { id: "d" }, o: { id: "o", type: "bridge" } } };
+  const entry = { boxes: ["a", "b", "c", "gone", "a"], at: ["10:00", "14:30", "", "19:00", "10:00"] };
+  const show = (rows) => rows.map((r) => [r.t, r.type, r.items.map((p) => p.id + "@" + p.i), r.extra]);
+  assert.deepEqual(show(M.dayMeals(D, entry, M.FRAME.home)), [
+    ["10:00", "base", ["a@0", "a@3"], false],
+    ["14:30", "main", ["b@1"], false],
+    ["19:00", "base", [], false],
+    ["", "", ["c@2"], true]
+  ]);
+  // 排好以后才点亮巴士：非通勤日的钟点挪进通勤日对得上的那一顿（Main → 12:00、Bridge → 15:30），数据不动
+  const home = { boxes: ["a", "b", "o", "d"], at: ["10:00", "14:30", "16:00", "19:00"] };
+  assert.deepEqual(show(M.dayMeals(D, home, M.FRAME.commute)), [
+    ["8:30", "base", ["a@0"], false],
+    ["12:00", "main", ["b@1"], false],
+    ["15:30", "bridge", ["o@2"], false],
+    ["19:00", "base", ["d@3"], false]
+  ]);
+  // 没地方挪（一顿都没空、类型也对不上）：在它自己的钟点单独一行
+  const full = { boxes: ["a", "b", "a", "d"], at: ["10:00", "14:30", "19:00", "16:00"] };
+  assert.deepEqual(show(M.dayMeals(D, full, M.FRAME.home)).map((r) => r.slice(0, 1).concat(r.slice(3))), [["10:00", false], ["14:30", false], ["16:00", true], ["19:00", false]]);
+  assert.deepEqual(M.dayMeals(D, { boxes: [], off: true }, M.FRAME.home).map((r) => r.items.length), [0, 0, 0]);
+  // 存回去：没放进哪一顿的就不写 at
+  assert.deepEqual(M.entryOf([{ id: "a", at: "" }]), { boxes: ["a"] });
+  assert.equal(M.entryOf([]), null);
+  assert.deepEqual(M.placedOfDay(D, { boxes: ["a", "b"], at: ["08:30"] }), [{ id: "a", at: "8:30" }, { id: "b", at: "" }]);
+});
+
+test("dropping a box on a day: the first empty meal of its type, else the first empty one, else its type's meal", () => {
+  const D = { box: { e: { id: "e", type: "base" }, m: { id: "m", type: "lite" }, x: { id: "x" } } };
+  const home = M.FRAME.home;
+  assert.equal(M.autoAt(D, null, home, "e"), "10:00");
+  assert.equal(M.autoAt(D, null, home, "m"), "14:30", "Main-lite goes in the Main meal");
+  assert.equal(M.autoAt(D, { boxes: ["e"], at: ["10:00"] }, home, "e"), "19:00");
+  assert.equal(M.autoAt(D, { boxes: ["e"], at: ["10:00"] }, home, "x"), "14:30");
+  assert.equal(M.autoAt(D, { boxes: ["e", "m", "e"], at: ["10:00", "14:30", "19:00"] }, home, "m"), "14:30");
+  assert.equal(M.autoAt(D, null, [], "e"), "");
+  assert.deepEqual(M.addToDay(D, { off: true }, "e", "10:00"), { boxes: ["e"], at: ["10:00"] }, "a day marked not cooking is cooking again");
 });
 
 test("old data (day packs, grams) reads as boxes and free-text amounts", () => {
@@ -441,4 +498,10 @@ test("moveDayBox: one box moves to another day; an emptied day is cleared", () =
   assert.deepEqual(m, { from: { boxes: ["p"] }, to: { boxes: ["q"] }, id: "q" });
   assert.equal(M.moveDayBox(D, "2026-11-23", 0, "2026-11-23"), null);
   assert.equal(M.moveDayBox({ ...D, days: { "2026-11-23": { boxes: ["p"] } } }, "2026-11-23", 0, "2026-11-25").from, null);
+  // 带着哪一顿：搬到别的天的某一顿；同一天换一顿
+  const D2 = { ...D, days: { "2026-11-23": { boxes: ["p", "q"], at: ["8:30", "12:00"] } } };
+  assert.deepEqual(M.moveDayBox(D2, "2026-11-23", 1, "2026-11-24", "19:00"), { from: { boxes: ["p"], at: ["8:30"] }, to: { boxes: ["q"], at: ["19:00"] }, id: "q" });
+  const same = M.moveDayBox(D2, "2026-11-23", 0, "2026-11-23", "15:30");
+  assert.deepEqual(same.to, { boxes: ["p", "q"], at: ["15:30", "12:00"] });
+  assert.equal(M.moveDayBox(D2, "2026-11-23", 0, "2026-11-23", "08:30"), null, "already there");
 });

@@ -3,7 +3,7 @@
 // "rep:<计划 id>"（Pool 里计划名右边的 ↻ = 从那天起每周重复一阵子，落下后弹出小框，见 js/ui/repeat.js）、
 // "blk:<计划 id>|<日期>"（日历里一个计划那天的那一张）或 "ghost:<rt id>"（以后某天的预览）；
 // 能放的地方带 data-drop="day:<日期>" 或 "pool"。
-// 备餐页：data-drag="box:<Box id>" 或 "mcopy:<日期>"（复制那天），放到 "mday:<日期>"；Box 也能放到之后某周 "mweek:<周一>"（粗排 +1）。
+// 备餐页：data-drag="box:<Box id>" 或 "mcopy:<日期>"（复制那天），放到 "mday:<日期>"（Box 也能放进某一顿 "mmeal:<日期>|<钟点>"）；Box 也能放到之后某周 "mweek:<周一>"（粗排 +1）。
 // Boxes 页：data-drag="ing:<食材 id>" 或 "any:<类别>"（随便哪种），放到 "mbox:<Box id>"（"mbox:new" = 新开一个 Box）。
 // 拖回去（2026-11-21）：Box 卡片里的一样 "mpart:<Box id>|<第几样>" → 别的 Box（搬过去）或架子 "mshelf"（拿掉）；
 //   某天格子里的一个 Box "mslot:<日期>|<第几个>" → 别的天（换天）或 Plan 顶上那排 "mpal"（拿掉）。这两种都在有自己编辑框的卡片里，单击照旧开编辑框。
@@ -20,9 +20,11 @@ import { fmtDay, fmtShort } from "../dates.js";
 let drag = null;
 let onDropFn = () => {};
 
-function zoneAt(x, y) {
-  const el = document.elementFromPoint(x, y);
-  return el?.closest("[data-drop]") || null;
+// 鼠标底下能接住它的那一处：里面那层不收（拖一整天经过某一顿）就往外找（那一天）
+function zoneAt(x, y, payload) {
+  let z = document.elementFromPoint(x, y)?.closest("[data-drop]") || null;
+  while (z && payload && !accepts(payload, z.dataset.drop)) z = z.parentElement?.closest("[data-drop]") || null;
+  return z;
 }
 
 function begin(e) {
@@ -50,7 +52,7 @@ function move(e) {
     begin(e);
   }
   drag.ghost.style.transform = "translate(" + (e.clientX - drag.dx) + "px," + (e.clientY - drag.dy) + "px) rotate(-2deg)";
-  const z = zoneAt(e.clientX, e.clientY);
+  const z = zoneAt(e.clientX, e.clientY, drag.payload);
   if (z !== drag.zone) {
     drag.zone?.classList.remove("drop-on");
     drag.zone = z && accepts(drag.payload, z.dataset.drop) ? z : null;
@@ -64,12 +66,14 @@ function accepts(payload, target) {
   // Box 里的一样（mpart:Box|第几样）→ 别的 Box（搬过去）或架子（拿掉）；某天的一个 Box（mslot:日期|第几个）→ 别的天或顶上那排（拿掉）
   const home = payload.slice(payload.indexOf(":") + 1).split("|")[0];
   if (payload.startsWith("mpart:")) return target === "mshelf" || (target.startsWith("mbox:") && target !== "mbox:new" && target.slice(5) !== home);
-  if (payload.startsWith("mslot:")) return target === "mpal" || (target.startsWith("mday:") && target.slice(5) !== home);
+  // 一天里的一顿 "mmeal:<日期>|<钟点>"（2026-11-24）：Box 放进那一顿，某天的一个 Box 换过去（同一天换一顿也行）
+  if (payload.startsWith("mslot:")) return target === "mpal" || target.startsWith("mmeal:") || (target.startsWith("mday:") && target.slice(5) !== home);
   if (target === "mshelf" || target === "mpal") return false;
   const part = payload.startsWith("ing:") || payload.startsWith("any:");
   const meal = part || payload.startsWith("box:") || payload.startsWith("mcopy:");
   if (target.startsWith("mbox:")) return part;
   if (target.startsWith("mday:")) return meal && !part;
+  if (target.startsWith("mmeal:")) return payload.startsWith("box:");
   if (target.startsWith("mweek:")) return payload.startsWith("box:");
   return !meal && target.startsWith("day:");
 }
@@ -122,7 +126,7 @@ export function targetsFor(payload, zones, here = "") {
   const seen = new Set(), out = [];
   for (const z of zones) {
     const t = z.dataset.drop;
-    if (seen.has(t) || t === here || !accepts(payload, t)) continue;
+    if (seen.has(t) || t === here || t.startsWith("mmeal:") || !accepts(payload, t)) continue;   // 一顿一顿的不进菜单（太多），菜单里选哪天 = 那天第一顿空着的
     seen.add(t);
     out.push({ value: t, ...labelOf(t, z) });
   }

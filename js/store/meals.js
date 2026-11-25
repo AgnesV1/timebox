@@ -1,6 +1,6 @@
 // 备餐（Meals 页；手机上只有「下次采购」那张单子）
 // 都存在 Settings 页里，一样东西一行（不用改 Code.gs，一格也不会太长）：
-//   meal-ing:<id> 常买的东西 / meal-box:<id> 一顿 / meal-week:<这周第一天> 这周：days（日期 → {boxes} / {off}）、
+//   meal-ing:<id> 常买的东西 / meal-box:<id> 一顿 / meal-week:<这周第一天> 这周：days（日期 → {boxes, at} / {off}，at = 每个 Box 放在哪一顿的钟点）、
 //   粗排 rough（[{box, n}]）、买了没有 got、手动加的 extra、shopped、skip、note / meal-prefs 目标
 //   meal-sup:<id> 规律要换 / 要补的东西（Restock：价格、每隔多久、下次哪天）；这周的行里还有 notes（采购单上写的备注）
 //   meal-gear:<id> 贵重的东西（Restock 页右边）：类目、什么钱买的、价钱、哪天买的、哪天不用了
@@ -48,7 +48,7 @@ export default function (core) {
     return D;
   }
 
-  // high = 每周 High 的 Box 最多几个；budget = 每周预算（0 = 不比）；shopDay = 星期几去买
+  // high = 每周 High 的 Box 最多几个；budget = 每周预算（0 = 不比）；shopDay = 星期几去买；frame = 一天的框架（{commute, home}，没有就用 js/meals.js 的 FRAME）
   const mealPrefs = () => ({ high: 3, budget: 0, shopDay: 0, ...(setting("meal-prefs", {}) || {}) });
 
   function putMeal(kind, id, row) {
@@ -75,8 +75,8 @@ export default function (core) {
         for (const [d, e] of Object.entries(w.days)) {
           if (!e?.boxes?.includes(id)) { days[d] = e; continue; }
           touched = true;
-          const left = e.boxes.filter((x) => x !== id);
-          if (left.length) days[d] = { ...e, boxes: left };
+          const keep = e.boxes.map((x, k) => [x, e.at?.[k] || ""]).filter(([x]) => x !== id);   // at（哪一顿）和 boxes 一一对应，一起删
+          if (keep.length) days[d] = { ...e, boxes: keep.map(([x]) => x), ...(e.at ? { at: keep.map(([, t]) => t) } : {}) };
         }
         const rough = w.rough.filter((r) => r.box !== id);
         if (touched || rough.length !== w.rough.length) putMeal("week", w.id, { ...w, days, rough });
@@ -150,7 +150,7 @@ export default function (core) {
     if (!d) return "";
     const box = shortId();
     change(() => {
-      putMeal("box", box, { name: d.name, slot: "", level: "", parts: [{ ing: "", amt: "" }], note: [d.note, d.from ? "had at " + d.from : ""].filter(Boolean).join(" — ") });
+      putMeal("box", box, { name: d.name, type: "", portable: false, level: "", parts: [{ ing: "", amt: "" }], note: [d.note, d.from ? "had at " + d.from : ""].filter(Boolean).join(" — ") });
       drop("settings", mealKey("dish", id));
     }, "Made a box from " + (d.name || "it"));
     return box;

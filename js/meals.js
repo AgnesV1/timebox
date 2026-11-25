@@ -10,7 +10,14 @@
 
 import { addDays, addMonths, daysInMonth, diffDays, startOfMonth, startOfWeek, weekday, range, MONTHS } from "./dates.js";
 
-export const SLOTS = [["breakfast", "Breakfast"], ["lunch", "Lunch"], ["dinner", "Dinner"], ["snack", "Snack"]];
+// Box 是哪一种（2026-11-24 她定的名字，取代以前的 Breakfast / Lunch / Dinner / Snack；旧的 slot 留在数据里不用了）：
+//   Base 底盘餐（高蛋白、蔬菜、低碳）/ Main 满配主餐 / Main-lite 清版主餐 / Bridge 两顿之间垫一下（隔夜燕麦这种）
+// 只是标签：哪个 Box 都能放进哪一顿；只有「Fill empty days」按它挑（Main 那一顿也收 Main-lite）
+export const TYPES = [["base", "Base"], ["main", "Main"], ["lite", "Main-lite"], ["bridge", "Bridge"]];
+const TYPE_KEYS = TYPES.map(([k]) => k);
+export const typeOf = (box) => (TYPE_KEYS.includes(box?.type) ? box.type : "");
+export const typeName = (t) => (TYPES.find(([k]) => k === t) || ["", ""])[1];
+export const fits = (box, type) => Boolean(type) && (typeOf(box) === type || (type === "main" && typeOf(box) === "lite"));
 export const LEVELS = [["low", "Low", "veg, fruit"], ["mid", "Mid", "normal: grains, lean meat, dairy"], ["high", "High", "fried, fatty, sweet"]];
 export const EVERY = [0, 1, 2, 3, 4, 6, 8];   // 打折几周一轮；0 = 不追
 export const STORES = ["Longo's", "Farm Boy", "Dodo", "T&T", "Eataly", "Loblaws", "Costco", "IKEA"];
@@ -83,6 +90,82 @@ export function boxesOfDay(D, entry) {
   return (entry.boxes || []).filter((id) => D.box[id]);
 }
 
+// ---------- 一天的框架：几点吃哪一种（她 2026-11-24 给的）----------
+// 通勤日（日历上点亮巴士的那天）和非通勤日各一套；Meals 设置里能改（meal-prefs 的 frame），没改过用这里的
+// 一天的 entry：{ boxes: [Box id], at: [哪一顿的钟点] }，两个数组一一对应；以前的数据没有 at = 没放进哪一顿，排在最后
+export const FRAME = {
+  commute: [{ t: "8:30", type: "base", note: "Protein, veg" }, { t: "12:00", type: "main", note: "Main carbs" }, { t: "15:30", type: "bridge", note: "Overnight oats or similar" }, { t: "19:00", type: "base", note: "Low-carb, high-protein" }],
+  home: [{ t: "10:00", type: "base", note: "Protein, veg" }, { t: "14:30", type: "main", note: "Main meal" }, { t: "19:00", type: "base", note: "Protein, veg" }]
+};
+// "08:30" / "8.30" / " 8:30 " → "8:30"；不像钟点 → ""
+export function cleanTime(s) {
+  const m = /^\s*(\d{1,2})\s*[:.：]\s*(\d{2})\s*$/.exec(String(s ?? ""));
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return "";
+  return Number(m[1]) + ":" + m[2];
+}
+export const toMin = (t) => { const c = cleanTime(t); return c ? Number(c.split(":")[0]) * 60 + Number(c.split(":")[1]) : 24 * 60; };
+const byTime = (a, b) => toMin(a.t) - toMin(b.t);
+function cleanFrame(list) {
+  if (!Array.isArray(list)) return null;
+  return list.map((m) => ({ t: cleanTime(m?.t), type: TYPE_KEYS.includes(m?.type) ? m.type : "", note: String(m?.note || "").trim() })).filter((m) => m.t).sort(byTime);
+}
+// 设置里存的框架（一套删光了就是空的，不回到默认）
+export function frameOf(pr) {
+  return { commute: cleanFrame(pr?.frame?.commute) ?? FRAME.commute, home: cleanFrame(pr?.frame?.home) ?? FRAME.home };
+}
+
+// 某天放了什么：[{ id, at }]，顺序和 boxesOfDay 一样（删掉的 Box 不算）
+export function placedOfDay(D, entry) {
+  if (!entry || entry.off) return [];
+  const at = entry.at || [];
+  return (entry.boxes || []).map((id, i) => ({ id, at: cleanTime(at[i]) })).filter((p) => D.box[p.id]);
+}
+// 反过来：[{ id, at }] → 存的样子（空了 = null；一个都没放进哪一顿就不写 at）
+export function entryOf(list) {
+  if (!list.length) return null;
+  return { boxes: list.map((p) => p.id), ...(list.some((p) => p.at) ? { at: list.map((p) => p.at || "") } : {}) };
+}
+
+// 某天按顿排好：框架里的每一顿（放了的挂上去，一顿可以放几个）+ 没放进哪一顿的（以前的数据，t = ""，排最后）
+// 钟点不在这套框架里的（切过通勤日、改过钟点）：按钟点先后挪进对得上的那一顿——先空着、类型对得上的，再类型对得上的，再空着的；
+// 都不行才在它自己的钟点单独一行（extra）。只是这样摆，数据不改；拖一下、在编辑框里改一下才存成新的钟点
+// → [{ t, type, note, items: [{ id, at, i }], extra }]，i = 在 placedOfDay 里第几个（拖的时候用）
+export function dayMeals(D, entry, frame) {
+  const rows = frame.map((m) => ({ ...m, items: [], extra: false }));
+  const stray = [];
+  let loose = null;
+  placedOfDay(D, entry).forEach((p, i) => {
+    const item = { ...p, i };
+    if (!p.at) { (loose = loose || { t: "", type: "", note: "", items: [], extra: true }).items.push(item); return; }
+    const row = rows.find((r) => r.t === p.at);
+    if (row) row.items.push(item);
+    else stray.push(item);
+  });
+  const meals = rows.slice();
+  for (const p of stray.sort((a, b) => toMin(a.at) - toMin(b.at) || a.i - b.i)) {
+    const box = D.box[p.id], typed = Boolean(typeOf(box)), free = meals.filter((r) => !r.items.length);
+    let row = free.find((r) => fits(box, r.type)) || (typed && meals.find((r) => fits(box, r.type))) || free[0];
+    if (!row) {
+      row = rows.find((r) => r.extra && r.t === p.at);
+      if (!row) rows.push(row = { t: p.at, type: "", note: "", items: [], extra: true });
+    }
+    row.items.push(p);
+  }
+  for (const r of rows) r.items.sort((a, b) => a.i - b.i);   // 一顿里照放进去的先后
+  rows.sort(byTime);
+  return loose ? [...rows, loose] : rows;
+}
+
+// 拖到某天（没对准哪一顿）：放进第一顿空着、对得上类型的；没有就第一顿空着的；都满了放进同类型的那顿，再不然最后一顿
+export function autoAt(D, entry, frame, boxId) {
+  const rows = dayMeals(D, entry, frame).filter((r) => !r.extra);
+  if (!rows.length) return "";
+  const box = D.box[boxId], free = rows.filter((r) => !r.items.length);
+  return (free.find((r) => fits(box, r.type)) || free[0] || rows.find((r) => fits(box, r.type)) || rows[rows.length - 1]).t;
+}
+// 某天加一个 Box，放在 at 那一顿 → 新的 entry
+export const addToDay = (D, entry, id, at) => entryOf([...placedOfDay(D, entry), { id, at: cleanTime(at) }]);
+
 // ---------- 拖来拖去（她 2026-11-21 要的）----------
 
 const samePart = (a, b) => (a.any ? a.any === b.any : Boolean(a.ing) && a.ing === b.ing);
@@ -105,12 +188,13 @@ export function movePart(D, fromId, i, toId) {
   return { from: { ...a, parts: a.parts.filter((_, k) => k !== i) }, to: { ...b, parts: put.parts }, what };
 }
 
-// 某天的第 i 个 Box 搬到另一天（接在那天最后；那天标了不做饭就改回做饭）→ { from, to: 两天的新 entry（from 空了 = null）, id } 或 null
-export function moveDayBox(D, from, i, to) {
-  const src = D.days[from], ids = boxesOfDay(D, src), id = ids[i];
-  if (!id || from === to) return null;
-  const left = ids.filter((_, k) => k !== i);
-  return { from: left.length ? { boxes: left } : null, to: { boxes: [...boxesOfDay(D, D.days[to]), id] }, id };
+// 某天的第 i 个 Box 搬到另一天的 at 那一顿（接在那天最后；那天标了不做饭就改回做饭）；同一天换一顿也行
+// → { from, to: 两天的新 entry（from 空了 = null；同一天时两个一样）, id } 或 null
+export function moveDayBox(D, from, i, to, at = "") {
+  const src = placedOfDay(D, D.days[from]), p = src[i], t = cleanTime(at);
+  if (!p || (from === to && p.at === t)) return null;
+  if (from === to) { const same = entryOf(src.map((x, k) => (k === i ? { ...x, at: t } : x))); return { from: same, to: same, id: p.id }; }
+  return { from: entryOf(src.filter((_, k) => k !== i)), to: addToDay(D, D.days[to], p.id, t), id: p.id };
 }
 
 // ---------- 打折一轮一轮来 ----------
@@ -308,18 +392,20 @@ export function roughLeft(D, start, w) {
   return queue;
 }
 
-// 粗排变细排：还空着的日子（from 之后、没标不做饭），按早中晚各放一个；没标哪顿的补到一天 3 个。返回 日期 → {boxes}
-export function fillFromRough(D, start, w, from = start) {
-  const bySlot = {};
-  for (const id of roughLeft(D, start, w)) (bySlot[D.box[id].slot || ""] = bySlot[D.box[id].slot || ""] || []).push(id);
-  const out = {};
+// 粗排变细排：还空着的日子（from 之后、没标不做饭），照那天的框架一顿一顿放：先挑类型对得上的（Main 那一顿也收 Main-lite），
+// 没有就挑没贴类型的，再没有那一顿空着。frameFor(date) = 那天的框架（通勤日和非通勤日不一样）。返回 日期 → entry
+export function fillFromRough(D, start, w, from = start, frameFor = () => FRAME.home) {
+  const queue = roughLeft(D, start, w), out = {};
   for (const date of daysOf(start)) {
+    if (!queue.length) break;
     if (date < from || D.days[date]) continue;
-    const day = [];
-    for (const [s] of SLOTS) if (bySlot[s]?.length) day.push(bySlot[s].shift());
-    while (day.length < 3 && bySlot[""]?.length) day.push(bySlot[""].shift());
-    if (!day.length) break;
-    out[date] = { boxes: day };
+    const list = [];
+    for (const m of frameFor(date)) {
+      let k = queue.findIndex((id) => fits(D.box[id], m.type));
+      if (k < 0) k = queue.findIndex((id) => !typeOf(D.box[id]));
+      if (k >= 0) list.push({ id: queue.splice(k, 1)[0], at: m.t });
+    }
+    if (list.length) out[date] = entryOf(list);
   }
   return out;
 }
@@ -530,7 +616,7 @@ export function importGear(D, rows, newId) {
 // ---------- 导入一份清单（核对表里整理好的）：按名字对，已经有的更新、没有的新加；Box 里的东西也按名字找 ----------
 
 const ING_FIELDS = ["store", "price", "lasts", "level", "cat", "keep", "staple", "every", "from", "checked", "sale"];
-const BOX_FIELDS = ["slot", "level", "note"];
+const BOX_FIELDS = ["type", "portable", "level", "note"];
 const SUP_FIELDS = ["store", "price", "n", "unit", "next", "note", "tag"];
 const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
 const pick = (r, fields) => Object.fromEntries(fields.filter((f) => r[f] !== undefined).map((f) => [f, r[f]]));
@@ -551,7 +637,7 @@ export function importRows(D, payload, newId) {
     const name = String(r?.name || "").trim(), old = boxes.get(norm(name));
     if (!name) continue;
     const parts = (r.parts || []).map((p) => (p?.any ? { any: p.any, amt: p.amt || "" } : { ing: names.get(norm(p?.ing))?.id || "", amt: p?.amt || "" })).filter((p) => (p.any ? ANY[p.any] : p.ing));
-    const row = { slot: "", level: "", note: "", ...(old || {}), ...pick(r, BOX_FIELDS), name, parts, id: old?.id || newId() };
+    const row = { type: "", portable: false, level: "", note: "", ...(old || {}), ...pick(r, BOX_FIELDS), name, parts, id: old?.id || newId() };
     boxes.set(norm(name), row);
     box.push(row);
   }
@@ -590,19 +676,20 @@ export function examples(today, weekStart, D = { days: {}, week: {} }) {
   ].map(([id, name, store, price, lasts, level, more]) => ({ id: "ex-" + id, name, store, price, lasts, level, staple: false, every: 0, from: "", checked: "", sale: null, ...(more || {}) }));
   const part = (i, amt) => ({ ing: "ex-" + i, amt });
   const box = [
-    ["oats", "Oats & berries", "breakfast", [part("oats", "½ cup"), part("yogurt", "¾ cup"), part("berries", "a handful")]],
-    ["eggs", "Egg & spinach scramble", "breakfast", [part("eggs", "3"), part("spinach", "2 handfuls"), part("oil", "1 tsp")]],
-    ["bowl", "Chicken rice bowl", "lunch", [part("chicken", "1 breast"), part("rice", "1 cup cooked"), part("broccoli", "1 cup")]],
-    ["salmon", "Salmon & bok choy", "dinner", [part("salmon", "1 fillet"), part("bokchoy", "2 heads"), part("rice", "1 cup cooked")]],
-    ["dumplings", "Pan-fried dumplings", "dinner", [part("dumplings", "10"), part("bokchoy", "1 head"), part("oil", "1 tbsp")]],
-    ["pasta", "Pesto pasta", "dinner", [part("pasta", "½ pack"), part("pesto", "2 tbsp"), part("spinach", "a handful")]],
-    ["banana", "Banana", "snack", [part("banana", "1")]]
-  ].map(([id, name, slot, parts]) => ({ id: "ex-" + id, name, slot, level: "", parts, note: "" }));
+    ["oats", "Oats & berries", "bridge", [part("oats", "½ cup"), part("yogurt", "¾ cup"), part("berries", "a handful")], true],
+    ["eggs", "Egg & spinach scramble", "base", [part("eggs", "3"), part("spinach", "2 handfuls"), part("oil", "1 tsp")]],
+    ["bowl", "Chicken rice bowl", "main", [part("chicken", "1 breast"), part("rice", "1 cup cooked"), part("broccoli", "1 cup")], true],
+    ["salmon", "Salmon & bok choy", "base", [part("salmon", "1 fillet"), part("bokchoy", "2 heads"), part("rice", "1 cup cooked")]],
+    ["dumplings", "Pan-fried dumplings", "main", [part("dumplings", "10"), part("bokchoy", "1 head"), part("oil", "1 tbsp")]],
+    ["pasta", "Pesto pasta", "lite", [part("pasta", "½ pack"), part("pesto", "2 tbsp"), part("spinach", "a handful")], true],
+    ["banana", "Banana", "bridge", [part("banana", "1")], true]
+  ].map(([id, name, type, parts, portable]) => ({ id: "ex-" + id, name, type, portable: Boolean(portable), level: "", parts, note: "" }));
   // 下周按天排上（空着的日子才放）；再下周粗排一下
   const next = addDays(weekStart, 7), later = addDays(weekStart, 14);
   const plan = [["oats", "bowl", "salmon", "banana"], ["eggs", "bowl", "dumplings"], ["oats", "bowl", "salmon"], ["eggs", "bowl", "pasta"], ["oats", "bowl", "dumplings", "banana"], ["eggs", "pasta"], null];
   const days = {};
-  daysOf(next).forEach((d, i) => { if (!D.days[d]) days[d] = plan[i] ? { boxes: plan[i].map((b) => "ex-" + b) } : { off: true }; });
+  const at = ["10:00", "14:30", "19:00", "16:00"];   // 照非通勤日的框架放，第四个放在框架以外的钟点
+  daysOf(next).forEach((d, i) => { if (!D.days[d]) days[d] = plan[i] ? { boxes: plan[i].map((b) => "ex-" + b), at: plan[i].map((_, k) => at[k]) } : { off: true }; });
   const week = [];
   if (Object.keys(days).length) week.push({ ...(D.week[next] || {}), id: next, days: { ...(D.week[next]?.days || {}), ...days } });
   if (!D.week[later]?.rough?.length) {

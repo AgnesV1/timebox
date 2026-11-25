@@ -1915,8 +1915,26 @@ body.phone .rpick { padding: 8px 6px; }
 [data-theme="dark"] .mday.drop-on, [data-theme="dark"] .rweek.drop-on { background: rgba(204, 255, 0, .08); box-shadow: inset 0 0 0 1px var(--accent); }
 .mday-head { display: flex; align-items: baseline; gap: 5px; font-size: 11px; font-weight: 600; color: var(--muted); }
 .mday-head b { font: 700 16px var(--num); color: var(--ink); }
-.mbl { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
-.mbl li { padding: 2px 5px 2px 8px; border-radius: 7px; background: var(--surface); box-shadow: inset 3px 0 0 var(--lv); font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; }
+/* 一顿一行（2026-11-24 她从试样挑的 B）：钟点（等宽小字）+ 放进去的 Box（左边一道低中高的色）；空着的那一顿淡淡写类型名，鼠标停上去看这一顿吃什么。
+   每一行自己接得住拖来的 Box（亮起来），拖到日期那里 = 第一顿空着的 */
+.mmls { display: grid; gap: 2px; }
+.mml { display: grid; grid-template-columns: 33px minmax(0, 1fr); align-items: start; gap: 6px; min-height: 22px; padding: 1px 2px 1px 0; border-radius: 7px; transition: background-color .15s, box-shadow .15s; }
+.mml-t { padding-top: 3px; font: 600 11px var(--num); color: var(--muted); text-align: right; }
+.mml-bs { display: grid; gap: 2px; min-width: 0; }
+.mml-b { padding: 2px 5px 2px 8px; border-radius: 7px; background: var(--surface); box-shadow: inset 3px 0 0 var(--lv); font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; cursor: grab; }
+@media (hover: hover) { .mml-b:hover { background: var(--tonal); } }
+.mml-e { padding: 2px 0 2px 8px; font-size: 11px; line-height: 1.3; color: var(--muted); opacity: .6; }
+.mml.drop-on { background: #F4FFD6; box-shadow: inset 0 0 0 1.5px var(--edge); }
+[data-theme="dark"] .mml.drop-on { background: rgba(204, 255, 0, .08); box-shadow: inset 0 0 0 1px var(--accent); }
+/* 日期旁边的巴士：和日历的通勤开关一样，点亮 = 通勤日；没点亮的平时藏着，鼠标移到这天才出来 */
+.mday-cm { display: grid; place-items: center; align-self: center; width: 20px; height: 20px; margin-left: auto; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); opacity: 0; transition: opacity .15s; }
+.mday-cm .ic { width: 13px; height: 13px; }
+.mday:hover .mday-cm, .mday-cm:focus-visible, .mday-cm.on { opacity: 1; }
+.mday-cm.on { background: var(--ink); color: var(--bg); }
+[data-theme="dark"] .mday-cm.on { background: var(--surface2); color: var(--ink); }
+/* 便携的 Box：名字 / 类型后面一个小提袋 */
+.mgo { display: inline-grid; place-items: center; color: var(--muted); }
+.mgo .ic { width: 13px; height: 13px; }
 .mday-foot { display: flex; justify-content: space-between; margin-top: auto; font: 600 11px var(--num); color: var(--muted); }
 .mday-foot .hi { color: var(--warn-text); }
 .moff, .mempty { margin: auto 0; font-size: 12.5px; color: var(--muted); text-align: center; }
@@ -1966,8 +1984,8 @@ body.phone .rpick { padding: 8px 6px; }
 .mbox.drop-on, .mnew.drop-on, .mshelf.drop-on, .mpalette.drop-on { background: #F4FFD6; box-shadow: inset 0 0 0 2px var(--edge); }
 [data-theme="dark"] .mbox.drop-on, [data-theme="dark"] .mnew.drop-on, [data-theme="dark"] .mshelf.drop-on, [data-theme="dark"] .mpalette.drop-on { background: rgba(204, 255, 0, .08); box-shadow: inset 0 0 0 1px var(--accent); }
 /* 拖回去（2026-11-21）：Box 里的一样、某天的一个 Box 都能拿起来 */
-.mbox li[data-drag], .mbl li[data-drag] { cursor: grab; }
-@media (hover: hover) { .mbox li[data-drag]:hover, .mbl li[data-drag]:hover { background: var(--tonal); } }
+.mbox li[data-drag] { cursor: grab; }
+@media (hover: hover) { .mbox li[data-drag]:hover { background: var(--tonal); } }
 .mbox li[data-drag] { margin: 0 -4px; padding: 1px 4px; border-radius: 6px; }
 [data-theme="dark"] .mshelf { background: var(--surface); }
 .mimport { width: 100%; box-sizing: border-box; padding: 8px 10px; border: var(--b); border-radius: 10px; background: var(--bg); color: inherit; font: 12.5px/1.4 var(--num); resize: vertical; }
@@ -1975,7 +1993,7 @@ body.phone .rpick { padding: 8px 6px; }
 @media (max-width: 900px) { .mboxwrap { grid-template-columns: 1fr; } .mshelf { position: static; max-height: 36vh; } }
 .mbox header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .mbox header b { font: 700 14px/1.25 var(--display); letter-spacing: -.01em; }
-.mbox .slot { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.mbox .slot { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .mbox ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 12.5px; }
 .mbox li { display: flex; align-items: center; gap: 7px; }
 .mbox li span:first-of-type { flex: 1; min-width: 0; }
@@ -2027,6 +2045,21 @@ body.phone .rpick { padding: 8px 6px; }
 .pslot { display: grid; grid-template-columns: 18px minmax(0, 1fr) 70px; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12.5px; }
 .pslot > span:first-child { color: var(--muted); font-size: 12.5px; }
 .pslot select { width: 100%; }
+/* 点开某一天：一顿一行（钟点 · 类型和吃什么 · 放了的 Box 各一个下拉 + 一个「+ Add a box」） */
+.dm-day { display: flex; align-items: center; gap: 6px; }
+.dm-day .ic { width: 14px; height: 14px; }
+.dmeal { display: grid; grid-template-columns: 40px 150px minmax(0, 1fr); align-items: start; gap: 8px; margin-bottom: 8px; font-size: 12.5px; }
+.dm-t { padding-top: 7px; font: 600 12.5px var(--num); color: var(--muted); }
+.dm-k { padding-top: 7px; font-weight: 600; }
+.dm-k small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+.dm-picks { display: grid; gap: 4px; }
+.dm-picks select { width: 100%; }
+/* Meal settings 里的「Your day」：通勤日、非通勤日上下两块，每顿 钟点 · 类型 · 吃什么 · 删 */
+.mfr-cols { display: grid; gap: 16px; margin-bottom: 8px; }
+.mfr h5 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12.5px; font-weight: 600; }
+.mfr h5 .ic { width: 14px; height: 14px; }
+.mfr-row { display: grid; grid-template-columns: 64px 120px minmax(0, 1fr) 24px; align-items: center; gap: 6px; margin-bottom: 6px; }
+.mfr-row input, .mfr-row select { width: 100%; min-width: 0; font-size: 12.5px; }
 
 /* 手机：顶栏的 🛒 和 #shop 页 */
 .pshop { padding: 0 9px 0 8px; }

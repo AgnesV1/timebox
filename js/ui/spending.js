@@ -9,12 +9,15 @@
 //   右边（贴着顶）：By category，Expense / Income；每类一行：名字、金额、占比，底下一条按金额长的细线；点一类 = 流水只看这一类，再点取消
 //   齿轮：苦昼短自己的弹窗（Budget | Categories | Currency | Export | Import），功能和手机上的一样
 //   币种：每一笔是记的那种钱（金额那一格照原样写，换算过的小字在下面）；页头的 CAD ▾ = 总数换成哪种看（这台电脑自己的）；记一笔那一行金额后面能换币种，换了就一直用它
+// All years（她 2026-11-26 要的）：Month / Year 旁边第三个，整块换成跨年份的那张图——每年年底的余额、每年的收入和支出，按 CPI 和固定汇率折成基准年的钱，
+//   只写「基准年的几倍」；底色是住在哪；停在某一年看真实的数（当时的币种原样）。怎么算见 js/years.js；年底的余额、CPI、汇率、住在哪在齿轮的 Years 里填。
 // 颜色是记账那一套（奶白字、钴蓝、超了橙、收入青绿），控件的形状、大小照苦昼短的（药丸形的分段开关和按钮、32px 的图标按钮）。
 // 改了、删了都能在提示条上撤销（苦昼短的 toast）。这一页自己管自己：main.js 只在第一次进来时挂上，之后数据变了调 refresh。
 
 import * as SP from "../spend.js";
 import * as M from "../money.js";
 import * as store from "../store.js";
+import * as Y from "../years.js";
 import { esc, icon } from "../dom.js";
 import { toast } from "./common.js";
 import { openModal, modalSheet } from "./modal.js";
@@ -37,7 +40,7 @@ export function createSpending() {
     // 翻页的箭头夹着标题（一眼看到现在翻到哪）；不在当前这一期时，标题后面多一颗青柠小圆点 = 回到现在
     '<header class="sp-head"><div class="sp-title"><div class="sp-tnav"><button type="button" class="sp-nb" data-act="prev" aria-label="Earlier" title="Earlier">‹</button><h2 data-title></h2>' +
     '<button type="button" class="sp-nb" data-act="next" aria-label="Later" title="Later">›</button><button type="button" class="sp-nb sp-now" data-act="now" aria-label="Back to now" title="Back to now" hidden><i></i></button></div><p class="sp-status" data-status></p></div>' +
-    '<div class="sp-tools">' + seg("mode", [["month", "Month"], ["year", "Year"]]) +
+    '<div class="sp-tools">' + seg("mode", [["month", "Month"], ["year", "Year"], ["life", "All years"]]) +
     '<label class="sp-find">' + icon("search") + '<input type="search" data-q placeholder="Search" aria-label="Search notes, categories, amounts" autocomplete="off"><kbd>/</kbd></label>' +
     '<select class="sp-curs" data-show aria-label="Show totals in" title="Show totals in">' + M.CURS.map((c) => '<option value="' + c.k + '">' + c.code + "</option>").join("") + "</select>" +
     '<button type="button" class="sp-ic" data-act="set" aria-label="Spending settings" title="Settings">' + icon("settings") + "</button>" +
@@ -48,6 +51,7 @@ export function createSpending() {
       '<div class="sp-kpi" data-k="' + k + '"><span class="sp-kl">' + l + '</span><span class="sp-kvw"><span class="sp-kv mn-num mn-rn"></span><span class="sp-kp mn-num mn-rn"></span></span><div class="sp-kb"><div class="mn-track mn-range"><b hidden></b></div></div><span class="sp-ks mn-num"></span></div>').join("") +
       // Income、Balance 合成最后一格（她 11-01 晚说的）：两行「名字 数」，只有整期的数，没有横杠
       '<div class="sp-kpi sp-kio"><span class="sp-kl">Income</span><span class="sp-kv mn-num mn-rn" data-k="inc" style="color:var(--mn-green)"></span><span class="sp-kl">Balance</span><span class="sp-kv mn-num mn-rn" data-k="bal"></span></div></section>' +
+    '<section class="sp-life" data-life aria-label="All years"></section>' +
     '<div class="sp-body"><div class="sp-main">' +
     '<figure class="sp-chart"><figcaption><div><h3 data-ctitle></h3><p class="sp-lede" data-pace></p></div><div class="sp-legend" data-legend aria-hidden="true"></div></figcaption>' +
     '<svg class="mn-chart" data-chart role="img" aria-label="Spending against the budget"></svg></figure>' +
@@ -80,10 +84,12 @@ export function createSpending() {
     return [n ? n + " change" + (n === 1 ? "" : "s") + " waiting to sync" : "Synced with your spending Sheet", false];
   }
   function renderHead() {
-    $("[data-title]").textContent = periodTitle(V.cur, V.mode);
+    const life = V.mode === "life";
+    root.classList.toggle("life", life);
+    $("[data-title]").textContent = life ? "All years" : periodTitle(V.cur, V.mode);
     $("[data-show]").value = SP.show();
     segTo("mode", V.mode);
-    $('[data-act="now"]').hidden = M.samePeriod(V.cur, todayP(), V.mode);
+    $('[data-act="now"]').hidden = life || M.samePeriod(V.cur, todayP(), V.mode);
     const [st, bad] = statusText(), el = $("[data-status]");
     el.textContent = st;
     el.classList.toggle("bad", bad);
@@ -138,6 +144,150 @@ export function createSpending() {
     const base = SP.cats().filter((x) => x.role === "base").map((x) => x.name).join(", ") || "Base";
     $("[data-legend]").innerHTML = '<span><i class="ln"></i>Spent</span>' + (c.isCur ? '<span><i class="tr"></i>Trend</span>' : "") + (c.B ? '<span><i class="bd"></i>Budget</span>' : "") + (V.nohouse ? '<span class="sp-back">Click the chart to show everything</span>' : '<span><i class="hs"></i>' + esc(base) + "</span>");
     return c;
+  }
+
+
+  // ---------- All years：跨年份的那张图（js/years.js 算；她 2026-11-26 定的样子） ----------
+  //   上面一块：每年年底的余额（实线和点，填了才有）和账本推出来的余额（淡虚线），纵轴是「基准年的几倍」，基准那条 ×1 虚线；点上面小字是比上一年涨跌了几成。
+  //   下面一块：每年的收入（青绿）和支出（钴蓝）两根柱子，各自和基准年比；基准年以前的支出柱淡一点（那时候房租没记全）。
+  //   最底下两行：年份，和那一年按多少 CPI 折的（灰色小字）。底色一段段是住在哪，左上角写地名。
+  //   停在某一年（鼠标、或者 Tab 到图上用 ← →）：那一列亮一点，旁边浮出那一年的真实数字——当时的币种原样，再附上折成几倍、乘了多少 CPI。
+  const yearsCfg = () => store.setting("spend-years") || {};
+  function saveYears(patch, msg) {
+    store.setSetting("spend-years", { ...yearsCfg(), ...patch });
+    if (V.mode === "life") renderLife();
+    if (msg) toast(msg);
+  }
+  const LIFE = { i: -1, data: null };
+  const pctText = (c) => (c >= 0 ? "+" : "−") + Math.round(Math.abs(c) * 100) + "%";
+  function renderLife() {
+    const box = $("[data-life]");
+    if (!box) return;
+    const R = Y.build(SP.entries(), yearsCfg(), today()), cfg = R.cfg, ys = R.years;
+    LIFE.data = R;
+    if (!ys.length) { box.innerHTML = '<p class="sp-empty">Nothing recorded yet — the years show up as you add transactions, or year-end totals in <button type="button" class="sp-link" data-act="set-years">Settings → Years</button>.</p>'; return; }
+    const W = Math.max(560, Math.round(box.clientWidth || 900)), padL = 44, padR = 12;
+    // 上面那块随宽度高一点（200–300），下面柱子那块固定
+    const T0 = 30, T1 = T0 + Math.round(Math.min(300, Math.max(200, W * 0.24))), B0 = T1 + 28, B1 = B0 + 90, L0 = B1 + 20, L1 = L0 + 16, H = L1 + 10;
+    const n = ys.length, lo = ys[0].y, colW = (W - padL - padR) / n, cx = (i) => padL + colW * (i + 0.5);
+    const xAt = (y, m) => padL + colW * (y - lo + (m - 1) / 12), f1 = (v) => Math.round(v * 10) / 10;
+    let g = "";
+    // 住在哪：一段一块底色（隔一块深一点），交界一条虚线，左上角地名
+    const homes = cfg.homes;
+    homes.forEach((h, k) => {
+      const [hy, hm] = h.from.split("-").map(Number), next = homes[k + 1];
+      const a = Math.max(padL, k === 0 ? padL : xAt(hy, hm)), b = Math.min(W - padR, next ? xAt(...next.from.split("-").map(Number)) : W - padR);
+      if (b - a < 1) return;
+      g += '<rect class="sp-lband' + (k % 2 ? " alt" : "") + '" x="' + f1(a) + '" y="' + (T0 - 22) + '" width="' + f1(b - a) + '" height="' + (B1 - T0 + 22) + '"/>';
+      if (k > 0 && a > padL + 1) g += '<line class="sp-lsep" x1="' + f1(a) + '" x2="' + f1(a) + '" y1="' + (T0 - 22) + '" y2="' + B1 + '"/>';
+      if (b - a > 46) g += '<text class="sp-lplace" x="' + f1(a + 7) + '" y="' + (T0 - 8) + '">' + esc(h.place) + "</text>";
+    });
+    // 上面：余额
+    const vals = ys.flatMap((r) => [r.x.total, r.x.ledger]).filter((v) => v !== null && Number.isFinite(v));
+    const tk = Y.ticks(Math.max(1.2, ...vals), Math.min(0, ...vals)), t0 = tk[0], tN = tk[tk.length - 1];
+    const yv = (v) => T1 - (v - t0) / (tN - t0 || 1) * (T1 - T0);
+    for (const v of tk) g += '<line class="sp-lgrid' + (v === 1 ? " one" : "") + '" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + f1(yv(v)) + '" y2="' + f1(yv(v)) + '"/><text class="mn-ax sp-lax" x="' + (padL - 8) + '" y="' + f1(yv(v) + 4) + '">' + Y.times(v) + "</text>";
+    // ×1（基准年）那条虚线一定要有：刻度隔得大（×0、×2、×4）时单独补上
+    if (!tk.includes(1)) g += '<line class="sp-lgrid one" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + f1(yv(1)) + '" y2="' + f1(yv(1)) + '"/><text class="mn-ax sp-lax" x="' + (padL - 8) + '" y="' + f1(yv(1) + 4) + '">×1</text>';
+    const path = (key) => { let d = "", on = false; ys.forEach((r, i) => { const v = r.x[key]; if (v === null || !Number.isFinite(v)) { if (key === "ledger") on = false; return; } d += (on ? "L" : "M") + f1(cx(i)) + " " + f1(yv(v)); on = true; }); return d; };
+    const ld = path("ledger"), td = path("total");
+    if (ld) g += '<path class="sp-lledger" d="' + ld + '"/>';
+    if (td) g += '<path class="sp-lline" d="' + td + '"/>';
+    ys.forEach((r, i) => {
+      if (r.x.total === null) return;
+      const y = yv(r.x.total);
+      g += '<circle class="sp-ldot" cx="' + f1(cx(i)) + '" cy="' + f1(y) + '" r="4.5"/>';
+      if (r.change !== null) g += '<text class="sp-lchg ' + (r.change >= 0 ? "up" : "down") + '" x="' + f1(cx(i)) + '" y="' + f1(y - 11) + '">' + pctText(r.change) + "</text>";
+    });
+    // 下面：收入、支出两根柱子，各自和基准年比
+    const bars = ys.flatMap((r) => [r.x.inc, r.x.out]).filter((v) => v !== null && Number.isFinite(v));
+    const bmax = Math.max(1.2, ...bars), bh = (v) => Math.max(1, v / bmax * (B1 - B0)), bw = Math.max(4, Math.min(16, colW * 0.26));
+    g += '<line class="sp-lgrid one" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + f1(B1 - bh(1)) + '" y2="' + f1(B1 - bh(1)) + '"/><text class="mn-ax sp-lax" x="' + (padL - 8) + '" y="' + f1(B1 - bh(1) + 4) + '">×1</text>';
+    g += '<line class="sp-lbase" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + B1 + '" y2="' + B1 + '"/>';
+    ys.forEach((r, i) => {
+      if (r.x.inc !== null) g += '<rect class="sp-linc" x="' + f1(cx(i) - bw - 1.5) + '" y="' + f1(B1 - bh(r.x.inc)) + '" width="' + f1(bw) + '" height="' + f1(bh(r.x.inc)) + '" rx="2"/>';
+      if (r.x.out !== null) g += '<rect class="sp-lout' + (r.early ? " early" : "") + '" x="' + f1(cx(i) + 1.5) + '" y="' + f1(B1 - bh(r.x.out)) + '" width="' + f1(bw) + '" height="' + f1(bh(r.x.out)) + '" rx="2"/>';
+      g += '<text class="mn-ax sp-lyr' + (r.y === cfg.base ? " base" : "") + '" x="' + f1(cx(i)) + '" y="' + L0 + '">' + (colW < 34 ? "’" + String(r.y).slice(2) : r.y) + "</text>";
+      g += '<text class="mn-ax sp-lcpi" x="' + f1(cx(i)) + '" y="' + L1 + '">' + (r.y === cfg.base ? "base" : Y.rateIn(cfg, r.y) + "%") + "</text>";
+    });
+    g += '<rect class="sp-lcol" data-lcol x="0" y="' + (T0 - 22) + '" width="' + f1(colW) + '" height="' + (L1 - T0 + 30) + '" rx="6" visibility="hidden"/>';
+    ys.forEach((r, i) => { g += '<rect class="sp-lhit" data-i="' + i + '" x="' + f1(padL + colW * i) + '" y="0" width="' + f1(colW) + '" height="' + H + '"/>'; });
+    // 底下的说明（灰色小字）：基准年以前的支出为什么淡、×1 是哪一年、哪几年的余额没认出来
+    const notes = [];
+    if (ys.some((r) => r.early && r.x.out !== null)) notes.push("Before " + cfg.base + " rent wasn't in the ledger, so those spending bars are faded.");
+    if (!ys.some((r) => r.x.total !== null)) notes.push('No year-end totals yet: the dashed line is only what the ledger adds up to. <button type="button" class="sp-link" data-act="set-years">Add them in Settings → Years</button>');
+    else if (R.base.totalFrom && R.base.totalFrom !== cfg.base) notes.push("No year-end total for " + cfg.base + " — ×1 on the balance line is " + R.base.totalFrom + "’s.");
+    const bad = ys.filter((r) => r.bad.length);
+    if (bad.length) notes.push("Couldn't read part of " + bad.map((r) => r.y + " (“" + esc(r.bad.join(", ")) + "”)").join(", ") + ".");
+    box.innerHTML = '<figure class="sp-chart sp-lfig"><figcaption><div><h3>Year by year</h3><p class="sp-lede">In ' + cfg.base + " money (CPI " + cfg.cpi + "% a year unless set), at fixed rates, as a multiple of " + cfg.base +
+      ". Rest on a year for the real amounts.</p></div>" +
+      '<div class="sp-legend" aria-hidden="true"><span><i class="ln"></i>Year-end total</span><span><i class="lg"></i>From the ledger</span><span><i class="ic"></i>Income</span><span><i class="ou"></i>Spent</span>' +
+      '<button type="button" class="sp-link" data-act="set-years">Edit years</button></div></figcaption>' +
+      '<div class="sp-lwrap"><svg class="mn-chart sp-lchart" data-lchart viewBox="0 0 ' + W + " " + H + '" width="' + W + '" height="' + H + '" tabindex="0" role="img" aria-label="Year-end total, income and spending from ' + lo + " to " + ys[n - 1].y + ", as multiples of " + cfg.base + '. Use the left and right arrow keys to read each year.">' + g + "</svg>" +
+      '<div class="sp-ltip" data-ltip role="status" aria-live="polite" hidden></div></div>' +
+      (notes.length ? '<p class="sp-lnote">' + notes.join(" ") + "</p>" : "") + "</figure>";
+    if (LIFE.i >= n) LIFE.i = -1;
+    if (LIFE.i >= 0) lifeAt(LIFE.i);
+  }
+  // 停在第 i 年：那一列亮一点，旁边浮出真实的数
+  function lifeAt(i) {
+    const R = LIFE.data, svg = $("[data-lchart]"), tip = $("[data-ltip]");
+    if (!R || !svg || !tip) return;
+    const r = R.years[i];
+    if (!r) { tip.hidden = true; svg.querySelector("[data-lcol]")?.setAttribute("visibility", "hidden"); LIFE.i = -1; return; }
+    LIFE.i = i;
+    const hit = svg.querySelector('[data-i="' + i + '"]'), col = svg.querySelector("[data-lcol]");
+    col.setAttribute("x", hit.getAttribute("x"));
+    col.setAttribute("width", hit.getAttribute("width"));
+    col.setAttribute("visibility", "visible");
+    const cfg = R.cfg, row = (name, real, x, cls = "") => '<tr class="' + cls + '"><th>' + name + '</th><td class="mn-num">' + real + '</td><td class="mn-num sp-lx">' + Y.times(x) + "</td></tr>";
+    const where = r.homes.map((h) => esc(h.place)).join(" → ");
+    const net = Object.fromEntries(Object.entries(r.net).filter(([, v]) => v));
+    tip.innerHTML = '<p class="sp-lth"><b class="mn-num">' + r.y + "</b>" + (where ? "<span>" + where + "</span>" : "") + "</p><table>" +
+      row("Year-end total", r.total ? esc(Y.bagText(r.total)) : '<span class="sp-lmiss">not entered</span>', r.x.total) +
+      row("Income", esc(Y.bagText(r.inc)), r.x.inc, "in") + row("Spent", esc(Y.bagText(r.out)), r.x.out, "out") +
+      row("Saved (ledger)", Object.keys(net).length ? (Object.values(net).every((v) => v >= 0) ? "+" : "") + esc(Y.bagText(net)) : "—", r.x.ledger) + "</table>" +
+      '<p class="sp-lcp">' + (r.y === cfg.base ? "Base year: ×1" : "Inflation that year " + Y.rateIn(cfg, r.y) + "% · ×" + r.f.toFixed(3) + " to " + cfg.base + " money") + " · fixed rates" +
+      (r.change !== null ? " · total " + pctText(r.change) + " in real terms" : "") + (r.early ? " · rent not recorded yet" : "") + "</p>";
+    tip.hidden = false;
+    const wrap = tip.parentElement, x = Number(hit.getAttribute("x")) * (svg.clientWidth / (Number(svg.getAttribute("width")) || 1)), w = Number(hit.getAttribute("width")) * (svg.clientWidth / (Number(svg.getAttribute("width")) || 1));
+    const right = x + w + 10, tw = tip.offsetWidth;
+    tip.style.left = (right + tw > wrap.clientWidth ? Math.max(0, x - tw - 10) : right) + "px";
+  }
+  root.addEventListener("pointermove", (e) => { const h = e.target.closest?.(".sp-lchart [data-i]"); if (h && Number(h.dataset.i) !== LIFE.i) lifeAt(Number(h.dataset.i)); });
+  root.addEventListener("pointerout", (e) => { if (e.target.closest?.(".sp-lchart") && !e.relatedTarget?.closest?.(".sp-lchart") && document.activeElement !== $("[data-lchart]")) lifeAt(-1); });
+  root.addEventListener("focusin", (e) => { if (e.target.matches?.("[data-lchart]") && LIFE.i < 0 && LIFE.data) lifeAt(Math.max(0, LIFE.data.years.findIndex((r) => r.y === LIFE.data.cfg.base))); });
+  root.addEventListener("focusout", (e) => { if (e.target.matches?.("[data-lchart]")) lifeAt(-1); });
+  root.addEventListener("keydown", (e) => {
+    if (!e.target.matches?.("[data-lchart]") || !LIFE.data) return;
+    const n = LIFE.data.years.length;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); lifeAt(Math.min(n - 1, Math.max(0, (LIFE.i < 0 ? 0 : LIFE.i) + (e.key === "ArrowLeft" ? -1 : 1)))); }
+    else if (e.key === "Home" || e.key === "End") { e.preventDefault(); lifeAt(e.key === "Home" ? 0 : n - 1); }
+    else if (e.key === "Escape") lifeAt(-1);
+  });
+
+  // 齿轮里的 Years：基准年、默认 CPI；每年一行（住在哪、年底总余额、那一年的 CPI）；住在哪、固定汇率折起来
+  function yearsSetHTML() {
+    const raw = yearsCfg(), cfg = Y.settings(raw), t = todayP();
+    const first = SP.entries().reduce((m, e) => Math.min(m, Number(String(e.d).slice(0, 4)) || m), t.y);
+    const lo = Math.min(first, cfg.base, ...Object.keys(cfg.totals).map(Number)), years = [];
+    for (let y = t.y; y >= lo; y--) years.push(y);
+    const rowOf = (y) => {
+      const tot = cfg.totals[String(y)] || "", bad = tot ? Y.parseTotal(tot).bad : [], cp = String(y) in cfg.cpiBy ? cfg.cpiBy[String(y)] : "";
+      return '<tr' + (y === cfg.base ? ' class="sp-ybase"' : "") + '><td class="num">' + y + (y === cfg.base ? ' <span class="msub">×1</span>' : "") + '</td><td class="msub">' + esc(Y.homesIn(cfg.homes, y).map((h) => h.place).join(" → ")) + "</td>" +
+        '<td><input class="sp-yt' + (bad.length ? " bad" : "") + '" data-ytot="' + y + '" value="' + esc(tot) + '"' + (y === t.y ? ' placeholder="e.g. 52000 CAD + 30000 RMB"' : "") + ' aria-label="Year-end total ' + y + '"' + (bad.length ? ' title="Couldn\'t read: ' + esc(bad.join(", ")) + '"' : "") + "></td>" +
+        '<td class="r"><input class="num sp-bv sp-yn" data-ycpiy="' + y + '" value="' + esc(String(cp)) + '" placeholder="' + cfg.cpi + '" inputmode="decimal" aria-label="Inflation in ' + y + ' (%)"> %</td></tr>';
+    };
+    const rateCurs = M.CURS.filter((c) => c.k !== "cny");
+    return '<p class="msub">The <b>All years</b> chart puts every year in ' + cfg.base + " money: adjusted for inflation (CPI), converted at the fixed rates below, then drawn as a multiple of " + cfg.base + ". Resting on a year shows the real amounts in the currencies they were in.</p>" +
+      '<div class="sp-setrow"><label>Base year (×1) <select data-ybase>' + years.map((y) => "<option" + (y === cfg.base ? " selected" : "") + ">" + y + "</option>").join("") + "</select></label>" +
+      '<label>Inflation <input class="num sp-bv sp-yn" data-ycpi value="' + cfg.cpi + '" inputmode="decimal" aria-label="Inflation a year (%)"> % a year, unless a year says otherwise</label></div>' +
+      '<table class="mtable sp-ytab"><thead><tr><th>Year</th><th>Lived in</th><th>Year-end total <span class="msub">every account, any currencies</span></th><th class="r">Inflation</th></tr></thead><tbody>' + years.map(rowOf).join("") + "</tbody></table>" +
+      '<p class="msub">A total without a currency is in the money of the place you lived at the end of that year. “52k”, “3万 RMB”, “¥30,000 + A$2,000” all work.</p>' +
+      '<details class="sp-paste"><summary>Where you lived</summary><p class="msub">One line per move: when (year, or year.month), where, and its currency. It shades the chart and names the years above.</p>' +
+      '<textarea data-yhomes rows="5" spellcheck="false">' + esc(cfg.homesText) + '</textarea><div class="sp-setrow"><button type="button" class="btn" data-sact="yhomes">Save</button><button type="button" class="btn ghosty" data-sact="yhreset">Back to the default</button></div></details>' +
+      '<details class="sp-paste"><summary>Fixed rates for this chart</summary><p class="msub">Only for All years, so exchange-rate swings don\'t look like your money changing. Everything is in RMB.</p>' +
+      '<table class="mtable"><tbody>' + rateCurs.map((c) => "<tr><td>1 " + esc(c.code) + ' <span class="msub">' + esc(c.sym) + '</span> =</td><td class="r"><input class="num sp-bv" data-yrate="' + c.k + '" value="' + cfg.rates[c.k] + '" inputmode="decimal" aria-label="RMB for one ' + esc(c.code) + '"> RMB</td></tr>').join("") + "</tbody></table></details>";
   }
 
   // ---------- 右边：按类别 ----------
@@ -333,6 +483,7 @@ export function createSpending() {
 
   // ---------- 换期间 ----------
   function shift(k) {
+    if (V.mode === "life") return;
     let { y, m } = V.cur;
     if (V.mode === "month") ({ y, m } = M.addMonths(y, m, k)); else y += k;
     if (y < 2000 || y > todayP().y + 5) return;
@@ -344,6 +495,7 @@ export function createSpending() {
 
   function render(animate = false) {
     renderHead();
+    if (V.mode === "life") { renderLife(); renderAdd(); return; }
     const c = renderChart(animate);
     renderKpis(c);
     renderCats();
@@ -387,6 +539,7 @@ export function createSpending() {
     else if (act === "recent") { V.recent = !V.recent; V.all = false; V.edit = null; renderTable(); }
     else if (act === "add") startNew();
     else if (act === "set") openSettings();
+    else if (act === "set-years") { SET.tab = "years"; openSettings(); }
     else if (act === "edit" && rowId) startEdit(rowId);
     else if (act === "del" && rowId) del(rowId);
     else if (act === "sign") { readForm(); F.kind = F.kind === "out" ? "in" : "out"; F.cat = firstCat(F.kind); if (V.edit === "new") renderAdd(true); else renderTable(); focusAmount(); }
@@ -428,7 +581,7 @@ export function createSpending() {
   // ---------- 设定（苦昼短的弹窗） ----------
   const SET = { tab: "budget", catKind: "out", expM: null };
   function setHTML() {
-    const tabs = [["budget", "Budget"], ["cats", "Categories"], ["currency", "Currency"], ["export", "Export"], ["import", "Import"]];
+    const tabs = [["budget", "Budget"], ["cats", "Categories"], ["currency", "Currency"], ["years", "Years"], ["export", "Export"], ["import", "Import"]];
     const [st, bad] = statusText();
     return '<h3>Spending settings</h3><div class="sp-sett"><span class="seg">' + tabs.map(([k, l]) => '<button type="button" data-sact="tab" data-v="' + k + '"' + (SET.tab === k ? ' class="on"' : "") + ">" + l + "</button>").join("") + "</span></div>" +
       '<div class="sp-setb">' + setBody() + '</div><p class="msub sp-sets' + (bad ? " bad" : "") + '">' + esc(st) + " · Totals in " + esc(curLabel(SP.show())) + "</p>";
@@ -470,6 +623,7 @@ export function createSpending() {
           "<tr><td>" + esc(c.code) + ' <span class="msub">' + esc(c.sym) + '</span></td><td class="r"><input class="num sp-bv" data-rate="' + c.k + '" value="' + R[c.k] + '" inputmode="decimal" aria-label="' + esc(c.code) + ' for one Canadian dollar"></td><td class="msub">' + esc(rateNote(c.k)) + "</td></tr>").join("") + "</tbody></table>" +
         '<div class="sp-setrow"><button type="button" class="btn" data-sact="ecb">Use today\'s rates</button><span class="msub" data-ecbr>From the European Central Bank (frankfurter.dev), only when you click. “rough” = not set yet.</span></div>';
     }
+    if (SET.tab === "years") return yearsSetHTML();
     if (SET.tab === "export") {
       const e = SET.expM || (SET.expM = { y: V.cur.y, m: V.mode === "year" ? (V.cur.y === t.y ? t.m : 12) : V.cur.m });
       return '<div class="sp-setrow"><button type="button" class="btn ghosty" data-sact="exp" aria-label="Earlier month">‹</button><b class="sp-expm">' + M.MONTH[e.m - 1] + " " + e.y + '</b><button type="button" class="btn ghosty" data-sact="exn" aria-label="Later month">›</button>' +
@@ -532,6 +686,8 @@ export function createSpending() {
       else if (act === "hide") { SP.setCats(SP.cats().map((c) => (c.name === b.dataset.c ? { ...c, hidden: !c.hidden } : c))); renderSet(); }
       else if (act === "cdel") { const before = SP.cats(); SP.setCats(before.filter((c) => c.name !== b.dataset.c)); renderSet(); toast("Deleted " + b.dataset.c, () => { SP.setCats(before); renderSet(); }); }
       else if (act === "addcat") addCat(sheet.querySelector("[data-newcat]"));
+      else if (act === "yhomes") { saveYears({ homes: sheet.querySelector("[data-yhomes]").value }, "Saved where you lived"); }
+      else if (act === "yhreset") { saveYears({ homes: Y.DEFAULT_HOMES }, "Back to the default places"); renderSet(); }
       else if (act === "ecb") {
         const note = sheet.querySelector("[data-ecbr]");
         note.textContent = "Getting today's rates…";
@@ -574,12 +730,29 @@ export function createSpending() {
         toast(name + (role === "base" ? " is the base now" : role === "outside" ? " no longer counts against the budget" : " counts as usual"), () => { SP.setCats(before); renderSet(); });
       }
       else if (t.matches("[data-sin]")) { SP.setInCur(t.value); wantRate(t.value); }
+      else if (t.matches("[data-ybase]")) { saveYears({ base: Number(t.value) }, Number(t.value) + " is ×1 now"); renderSet(); }
+      else if (t.matches("[data-ycpi]")) { const v = parseFloat(String(t.value).replace(/[^\d.-]/g, "")); if (Number.isFinite(v)) saveYears({ cpi: v }, "Inflation " + v + "% a year"); else t.value = Y.settings(yearsCfg()).cpi; }
+      else if (t.matches("[data-ytot]")) {
+        const y = t.dataset.ytot, totals = { ...(yearsCfg().totals || {}) }, v = t.value.trim();
+        if (v) totals[y] = v; else delete totals[y];
+        saveYears({ totals }, v ? "Saved " + y : "Cleared " + y);
+        const bad = v ? Y.parseTotal(v).bad : [];
+        t.classList.toggle("bad", bad.length > 0);
+        t.title = bad.length ? "Couldn't read: " + bad.join(", ") : "";
+      } else if (t.matches("[data-ycpiy]")) {
+        const y = t.dataset.ycpiy, cpiBy = { ...(yearsCfg().cpiBy || {}) }, v = parseFloat(String(t.value).replace(/[^\d.-]/g, ""));
+        if (Number.isFinite(v)) cpiBy[y] = v; else { delete cpiBy[y]; t.value = ""; }
+        saveYears({ cpiBy }, Number.isFinite(v) ? "Inflation in " + y + ": " + v + "%" : "Inflation in " + y + " back to the default");
+      } else if (t.matches("[data-yrate]")) {
+        const v = parseFloat(String(t.value).replace(/[^\d.]/g, "")), k = t.dataset.yrate;
+        if (v > 0) saveYears({ rates: { ...(yearsCfg().rates || {}), [k]: v } }, "1 " + curLabel(k) + " = " + v + " RMB on the chart"); else t.value = Y.settings(yearsCfg()).rates[k];
+      }
     });
     sheet.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
       if (e.target.matches("[data-newcat]")) { e.preventDefault(); addCat(e.target); }
       else if (e.target.matches("[data-nbv]")) { e.preventDefault(); sheet.querySelector('[data-sact="nbs"]')?.click(); }
-      else if (e.target.matches("[data-bpv], [data-rn], [data-rate]")) { e.preventDefault(); e.target.blur(); }
+      else if (e.target.matches("[data-bpv], [data-rn], [data-rate], [data-ytot], [data-ycpi], [data-ycpiy], [data-yrate]")) { e.preventDefault(); e.target.blur(); }
     });
   }
 
@@ -589,7 +762,7 @@ export function createSpending() {
   if (typeof ResizeObserver === "function") new ResizeObserver(() => {
     if (!shown || !root.isConnected || root.clientWidth === lastW) return;
     lastW = root.clientWidth;
-    renderChart(false);
+    if (V.mode === "life") renderLife(); else renderChart(false);
     segTo("mode", V.mode);
     segTo("side", V.side);
   }).observe(root);
@@ -597,6 +770,12 @@ export function createSpending() {
   function refresh() {
     if (!shown) return;
     renderHead();
+    if (V.mode === "life") {
+      renderLife();
+      renderAdd();
+      if (modalSheet()?.querySelector(".sp-set") && !modalSheet().contains(document.activeElement?.closest?.("input, textarea") || null)) renderSet();
+      return;
+    }
     const c = renderChart(false);
     renderKpis(c);
     renderCats();

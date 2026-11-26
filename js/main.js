@@ -326,6 +326,7 @@ initMeals(render);
 initFriends(render);
 initSun();
 
+let yearsSeen = JSON.stringify(store.setting("spend-years") || null);
 store.subscribe((meta) => {
   if (meta.pulled) { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); store.adoptQuads(); store.adoptLists(); store.adoptSteps(); store.adoptWeekly(); store.repairWeekly(true); store.settleLists(); }
   if (meta.local) setFx(store.local().fx !== false);
@@ -334,6 +335,9 @@ store.subscribe((meta) => {
   if (meta.dirty) sync.queue();
   // 记账的汇率在 Settings 里（spend-fx）：改了（这台设备或同步过来的）记账那两块跟着换算
   if (fxChanged()) { if (desk && desk.el.isConnected) desk.refresh(); refreshIsland(); }
+  // All years 的设置（spend-years，在主表格的 Settings 里）：别的设备改了、同步过来，Spending 页跟着重画
+  const yk = JSON.stringify(store.setting("spend-years") || null);
+  if (yk !== yearsSeen) { yearsSeen = yk; if (desk && desk.el.isConnected) desk.refresh(); }
 });
 store.onUndo((label, before) => toast(label, () => store.undo(before)));
 reading.subscribe(() => { if (route() === "reading") render(); });

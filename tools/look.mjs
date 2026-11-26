@@ -211,6 +211,10 @@ const SHOTS = [
   { device: "desk", name: "spending-rest", hash: "spending", act: async (page) => { await page.waitForTimeout(400); await tapChartAbove(page, ".spend .mn-chart"); await page.mouse.move(5, 5); } },
   { device: "desk", name: "spending-year-rest", hash: "spending", act: async (page) => { await tap('.spend [data-seg="mode"] [data-v="year"]')(page); await page.waitForTimeout(900); await tapChartAbove(page, ".spend .mn-chart"); await page.mouse.move(5, 5); } },
   { device: "desk", name: "spending-set", hash: "spending", act: async (page) => { await tap('.spend [data-act="set"]')(page); await tap('#modal [data-sact="tab"][data-v="cats"]')(page); } },
+  // All years：2017 年起每月一笔收入、一笔支出（澳币、港币、人民币、加币），几年的年底余额；停在 2023 年（年中搬家）；齿轮的 Years
+  { device: "desk", name: "spending-life", hash: "spending", act: async (page) => { await seedYears(page); await tap('.spend [data-seg="mode"] [data-v="life"]')(page); await page.waitForTimeout(600); } },
+  { device: "desk", name: "spending-life-hover", hash: "spending", act: async (page) => { await seedYears(page); await tap('.spend [data-seg="mode"] [data-v="life"]')(page); await page.waitForTimeout(400); await page.locator('.spend .sp-lchart [data-i="6"]').hover({ force: true }); await page.waitForTimeout(300); } },
+  { device: "desk", name: "spending-life-set", hash: "spending", act: async (page) => { await seedYears(page); await tap('.spend [data-seg="mode"] [data-v="life"]')(page); await tap('.spend [data-act="set-years"]')(page); } },
   { device: "desk", name: "reading", hash: "reading", act: seedReading },
   { device: "desk", name: "reading-add", hash: "reading", act: async (page) => { await seedReading(page); await page.locator(".yl-in").click(); await page.waitForTimeout(300); } },
   { device: "desk", name: "settings", hash: "settings" },
@@ -222,6 +226,23 @@ const SHOTS = [
   { device: "small", name: "spending", hash: "spending" },
   { device: "small", name: "spending-add", hash: "spending", act: async (page) => { await page.keyboard.press("n"); await page.waitForTimeout(300); await page.keyboard.type("12.5"); } }
 ];
+// All years 用的几年账：每月一笔工资、一笔开销，用当时住的地方的钱；2021 年以前没记房租。只放一次（看 2017 年有没有账）
+async function seedYears(page) {
+  await page.evaluate(async () => {
+    const SP = await import("/js/spend.js"), store = await import("/js/store.js");
+    if (SP.entries().some((e) => e.d.startsWith("2017-"))) return;
+    const plan = { 2017: ["aud", 2500, 1800], 2018: ["hkd", 11000, 8200], 2019: ["hkd", 13000, 9600], 2020: ["cny", 9000, 5200], 2021: ["cny", 18000, 11000], 2022: ["cny", 21000, 12500], 2024: ["cad", 5200, 3900], 2025: ["cad", 5600, 4100] };
+    const rows = [];
+    for (let y = 2017; y <= 2025; y++) for (let m = 1; m <= 12; m++) {
+      const [cur, inc, out] = y === 2023 ? (m <= 8 ? ["cny", 22000, 13000] : ["cad", 4800, 3600]) : plan[y];
+      const d = y + "-" + String(m).padStart(2, "0") + "-";
+      rows.push({ d: d + "01", v: inc * 100, c: "Salary", n: "", cur }, { d: d + "15", v: -Math.round(out * (0.9 + ((y * 7 + m * 13) % 20) / 100)) * 100, c: "Food", n: "month", cur });
+    }
+    SP.addMany(rows);
+    store.setSetting("spend-years", { totals: { 2017: "8000 AUD", 2019: "60k HKD", 2020: "50000 RMB", 2021: "120000 RMB", 2022: "180000 RMB", 2023: "25000 CAD + 40000 RMB", 2024: "52000 CAD", 2025: "61000 CAD" }, cpiBy: { 2022: 2 } });
+  });
+  await page.waitForTimeout(400);
+}
 // 阅读页：连上假的阅读表格，右边「Rest of 今年」放四条（其中一条在假表格里已经记过看完，会被划掉；一条是去年加的）
 async function seedReading(page) {
   await page.evaluate(async () => {

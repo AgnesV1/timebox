@@ -149,7 +149,7 @@ export function createSpending() {
 
   // ---------- All years：跨年份的那张图（js/years.js 算；她 2026-11-26 定的样子，照 dataviz 那套规矩画） ----------
   //   一条中轴：轴上面是每年的收入（灰的柱子，白天深灰、夜里浅白，她挑的），轴下面是每年的支出（记账平常的钴蓝），都从中轴长出去：贴着轴那头是方的，另一头 4px 圆角，最宽 24px。
-  //   结余（收入 − 支出）是一条 2px 的平滑青绿线，穿过每一年，围着中轴上上下下；每年一个点（外面一圈底色），只在最后一年的点旁边写数。
+  //   结余（收入 − 支出）是一条铅笔画的平滑青绿线（粗一点、边上抖一点、有颗粒），穿过每一年，围着中轴上上下下；每年一个点（外面一圈底色），只在最后一年的点旁边写数。
   //   都用同一把尺子：×1 = 基准年一年的开销，按 CPI、固定汇率折过；轴两边的刻度只写倍数，网格是细实线。
   //   基准年以前（房租没记全）：柱子淡一点，那截线是虚的。最底下两行：年份，和那一年的 CPI（灰色小字）。底色一段段是住在哪。
   //   停在某一年（鼠标、或者 Tab 到图上用 ← →）：那一列亮一点，旁边浮出那一年的真实数字——当时的币种原样，再附上几倍、CPI 乘了多少。
@@ -211,11 +211,18 @@ export function createSpending() {
     ys.forEach((r, i) => { if (r.x.bal === null) { if (run.length) runs.push(run); run = []; } else run.push({ x: cx(i), y: AX - px(r.x.bal), r }); });
     if (run.length) runs.push(run);
     const bi = ys.findIndex((r) => r.y === cfg.base), xb = bi >= 0 ? cx(bi) : padL;
-    g += '<defs><clipPath id="sp-lcl-a"><rect x="0" y="0" width="' + f1(xb) + '" height="' + H + '"/></clipPath><clipPath id="sp-lcl-b"><rect x="' + f1(xb) + '" y="0" width="' + f1(W - xb) + '" height="' + H + '"/></clipPath></defs>';
+    // 铅笔的质感（她 2026-11-26 最后要的）：边上一点点抖（噪声推一推线），线里一粒粒的颗粒（噪声当透明度），再描一道细一点、错开半像素的，像铅笔来回描了两遍
+    g += '<defs><clipPath id="sp-lcl-a"><rect x="0" y="0" width="' + f1(xb) + '" height="' + H + '"/></clipPath><clipPath id="sp-lcl-b"><rect x="' + f1(xb) + '" y="0" width="' + f1(W - xb) + '" height="' + H + '"/></clipPath>' +
+      '<filter id="sp-pencil" x="-2%" y="-10%" width="104%" height="120%" color-interpolation-filters="sRGB">' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="4" result="wob"/><feDisplacementMap in="SourceGraphic" in2="wob" scale="2.4" xChannelSelector="R" yChannelSelector="G" result="rough"/>' +
+      '<feTurbulence type="fractalNoise" baseFrequency="1.7" numOctaves="1" seed="9" result="grain"/><feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  2.3 0 0 0 -0.42" result="tooth"/>' +
+      '<feComposite in="rough" in2="tooth" operator="in"/></filter></defs>';
     for (const pts of runs) {
-      const d = Y.smooth(pts);
-      g += '<path class="sp-bl early" clip-path="url(#sp-lcl-a)" d="' + d + '"/><path class="sp-bl" clip-path="url(#sp-lcl-b)" d="' + d + '"/>';
-      for (const p of pts) g += '<circle class="sp-bd" cx="' + f1(p.x) + '" cy="' + f1(p.y) + '" r="4"/>';
+      const d = Y.smooth(pts), d2 = Y.smooth(pts.map((p) => ({ x: p.x, y: p.y + 0.7 })));
+      g += '<g class="sp-pencil" filter="url(#sp-pencil)"><g clip-path="url(#sp-lcl-a)" class="early"><path class="sp-bl" d="' + d + '"/><path class="sp-bl2" d="' + d2 + '"/></g>' +
+        '<g clip-path="url(#sp-lcl-b)"><path class="sp-bl" d="' + d + '"/><path class="sp-bl2" d="' + d2 + '"/></g>';
+      for (const p of pts) g += '<circle class="sp-bd" cx="' + f1(p.x) + '" cy="' + f1(p.y) + '" r="4.5"/>';
+      g += "</g>";
     }
     // 只在最后一年的点旁边写数（其余的看刻度、停住看小卡）
     const last = runs.length ? runs[runs.length - 1].at(-1) : null;

@@ -548,7 +548,7 @@
 
 /* ---------- All years（Spending 页 Month / Year 旁边第三个，js/ui/spending.js 的 renderLife；她 2026-11-26 要的，照 dataviz 那套规矩）----------
    一条中轴：上面每年的收入是灰的柱子（她挑的：白天深灰、夜里浅白），下面每年的支出是记账平常的钴蓝。
-   柱子最宽 24px、贴轴那头方、另一头 4px 圆角，和轴之间各留 1px；结余是一条 2px 的青绿线（白天 #0A8F80、夜里 #2FB3A3，和钴蓝放一起色弱也分得开，跑过 dataviz 的检查），
+   柱子最宽 24px、贴轴那头方、另一头 4px 圆角，和轴之间各留 1px；结余是一条铅笔画的青绿线（3.6px，SVG 滤镜让边抖一点、带颗粒，再错开描一道细的）（白天 #0A8F80、夜里 #2FB3A3，和钴蓝放一起色弱也分得开，跑过 dataviz 的检查），
    点 r=4、外面一圈 2px 底色；只在最后一年旁边写数（字是墨色）。
    刻度只写倍数（×1 = 基准年一年的开销），网格是 1px 细实线、很淡，中轴深一点；字都是字的颜色，不用柱子的颜色。
    底色一段段是住在哪（隔一段深一点，左上角地名）；最底下年份，再下面一行灰色小字是那一年的 CPI。基准年以前（房租没记全）：柱子淡、那截线是虚的。
@@ -575,8 +575,10 @@
 .spend .sp-linc { fill: var(--life-inc); }
 .spend .sp-lout { fill: var(--mn-blue); }
 .spend :is(.sp-linc, .sp-lout).early { opacity: .4; }
-.spend .sp-bl { fill: none; stroke: var(--life-bal); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.spend .sp-bl.early { stroke-dasharray: 4 5; opacity: .7; }
+.spend .sp-bl { fill: none; stroke: var(--life-bal); stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; }
+.spend .sp-bl2 { fill: none; stroke: var(--life-bal); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+.spend .sp-pencil .early { opacity: .65; }
+.spend .sp-pencil .early :is(.sp-bl, .sp-bl2) { stroke-dasharray: 7 7; }
 .spend .sp-bd { fill: var(--life-bal); stroke: var(--mn-bg); stroke-width: 2; }
 .spend .mn-chart .sp-lend { fill: var(--mn-ink); font: 600 11px "JetBrains Mono", ui-monospace, monospace; }
 .spend .mn-chart .sp-lyr { text-anchor: middle; }

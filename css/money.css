@@ -546,49 +546,38 @@
 [data-theme="light"] .mn-phone .mn-veil { background: rgba(11, 11, 11, .12); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
 [data-theme="light"] .mn-phone .mn-hem { filter: drop-shadow(0 4px 7px rgba(11, 11, 11, .13)); }
 
-/* ---------- All years（Spending 页 Month / Year 旁边第三个，js/ui/spending.js 的 renderLife；她 2026-11-26 要的）----------
-   一条中轴：上面每年的收入是一摞卡通的平衡石（青绿的三种深浅，深一号的描边，左上一道白高光），下面每年的支出是往下滴的水（钴蓝，同样的描边和高光）；
-   结余是一条平滑的墨线，围着中轴上上下下，底下垫一道底色当描边，压在石头和水上也看得清；点在轴上面是青绿、下面是钴蓝（橙色只给超预算，这里不用）。
-   刻度只写倍数（×1 = 基准年一年的开销），×1 那两条虚线亮一点；底色一段段是住在哪（隔一段深一点，左上角地名）；最底下年份，再下面一行灰色小字是那一年的 CPI。
-   基准年以前（房租没记全）：石头、水滴淡一点，线是虚的。停在一年上：那一列铺一层淡光，旁边浮起磨砂的一张小卡，写真实的数。 */
+/* ---------- All years（Spending 页 Month / Year 旁边第三个，js/ui/spending.js 的 renderLife；她 2026-11-26 要的，照 dataviz 那套规矩）----------
+   一条中轴：上面每年的收入是棕色的柱子（她挑的；白天 #A65A28、夜里 #C08350，和钴蓝放一起色弱也分得开，跑过 dataviz 的检查），下面每年的支出是记账平常的钴蓝。
+   柱子最宽 24px、贴轴那头方、另一头 4px 圆角，和轴之间各留 1px；结余是一条 2px 的墨线，点 r=4、外面一圈 2px 底色；只在最后一年旁边写数。
+   刻度只写倍数（×1 = 基准年一年的开销），网格是 1px 细实线、很淡，中轴深一点；字都是字的颜色，不用柱子的颜色。
+   底色一段段是住在哪（隔一段深一点，左上角地名）；最底下年份，再下面一行灰色小字是那一年的 CPI。基准年以前（房租没记全）：柱子淡、那截线是虚的。
+   停在一年上：那一列铺一层淡光，旁边浮起磨砂的一张小卡，写真实的数。 */
+.spend { --life-inc: #C08350; }
+[data-theme="light"] .spend { --life-inc: #A65A28; }
 .spend .sp-life { display: none; margin-top: 18px; }
 .spend.life .sp-life { display: block; }
 .spend.life :is(.sp-kpis, .sp-body, .sp-find, .sp-nb[data-act="prev"], .sp-nb[data-act="next"]) { display: none; }
 .spend .sp-lfig figcaption { align-items: flex-start; }
-.spend .sp-legend .sp-mini { width: 18px; height: 13px; overflow: visible; }
+.spend .sp-legend .ic { background: var(--life-inc); }
+.spend .sp-legend .ou { background: var(--mn-blue); }
+.spend .sp-legend .bl { width: 16px; height: 2px; border-radius: 1px; background: var(--mn-ink); }
 .spend .sp-legend .sp-link { font-size: 11px; }
 .spend .sp-lwrap { position: relative; }
 .spend .sp-lchart { height: auto; cursor: default; outline-offset: 4px; }
 .spend .sp-lchart:focus-visible { outline: 1.5px solid var(--mn-blue); border-radius: 8px; }
 .spend .sp-lband { fill: transparent; }
 .spend .sp-lband.alt { fill: var(--mn-fill2); }
-.spend .sp-lsep { stroke: var(--mn-rng); stroke-dasharray: 3 4; }
 .spend .mn-chart .sp-lplace { fill: var(--mn-mute); font-weight: 600; }
-.spend .sp-lgrid { stroke: var(--mn-trk); }
-.spend .sp-lgrid.one { stroke: color-mix(in srgb, var(--mn-ink) 35%, transparent); stroke-dasharray: 4 4; }
+.spend .sp-lgrid { stroke: var(--mn-trk); stroke-width: 1; shape-rendering: crispEdges; }
 .spend .mn-chart .sp-lax { text-anchor: end; }
-.spend .mn-chart .sp-lpart { text-anchor: end; fill: var(--mn-mute); font-weight: 600; }
-.spend .sp-laxis { stroke: color-mix(in srgb, var(--mn-ink) 70%, transparent); stroke-width: 1.5; }
-/* 石头、水滴：颜色都从记账的青绿、钴蓝调出来，白天浅一点，夜里沉一点、描边亮一点 */
-.spend { --st-a: color-mix(in srgb, var(--mn-green) 62%, #FFFFFF); --st-b: color-mix(in srgb, var(--mn-green) 82%, #FFFFFF); --st-c: color-mix(in srgb, var(--mn-green) 45%, #FFFFFF);
-  --st-line: color-mix(in srgb, var(--mn-green) 55%, #000000); --dr-fill: color-mix(in srgb, var(--mn-blue) 62%, #FFFFFF); --dr-line: color-mix(in srgb, var(--mn-blue) 60%, #000000); }
-[data-theme="dark"] .spend { --st-a: color-mix(in srgb, var(--mn-green) 55%, #0B1414); --st-b: color-mix(in srgb, var(--mn-green) 75%, #0B1414); --st-c: color-mix(in srgb, var(--mn-green) 38%, #0B1414);
-  --st-line: color-mix(in srgb, var(--mn-green) 70%, #FFFFFF); --dr-fill: color-mix(in srgb, var(--mn-blue) 65%, #0A0E1C); --dr-line: color-mix(in srgb, var(--mn-blue) 60%, #FFFFFF); }
-.spend .sp-st { stroke: var(--st-line); stroke-width: 1.4; stroke-linejoin: round; }
-.spend .sp-st.t0 { fill: var(--st-a); }
-.spend .sp-st.t1 { fill: var(--st-b); }
-.spend .sp-st.t2 { fill: var(--st-c); }
-.spend .sp-sth, .spend .sp-drh { fill: none; stroke: #FFFFFF; stroke-opacity: .6; stroke-width: 1.6; stroke-linecap: round; }
-.spend .sp-dr { fill: var(--dr-fill); stroke: var(--dr-line); stroke-width: 1.3; stroke-linejoin: round; }
-.spend .sp-lyear.early { opacity: .45; }
-/* 结余的线 */
-.spend .sp-blh { fill: none; stroke: var(--mn-bg); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: .85; }
-.spend .sp-bl { fill: none; stroke: var(--mn-ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-.spend .sp-bl.early { stroke-dasharray: 5 5; opacity: .7; }
-.spend .sp-legend .sp-bl { stroke-width: 2; }
-.spend .sp-bd { stroke: var(--mn-bg); stroke-width: 2; }
-.spend .sp-bd.up { fill: var(--mn-green); }
-.spend .sp-bd.down { fill: var(--mn-blue); }
+.spend .sp-laxis { stroke: color-mix(in srgb, var(--mn-ink) 45%, transparent); stroke-width: 1; shape-rendering: crispEdges; }
+.spend .sp-linc { fill: var(--life-inc); }
+.spend .sp-lout { fill: var(--mn-blue); }
+.spend :is(.sp-linc, .sp-lout).early { opacity: .4; }
+.spend .sp-bl { fill: none; stroke: var(--mn-ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.spend .sp-bl.early { stroke-dasharray: 4 5; opacity: .7; }
+.spend .sp-bd { fill: var(--mn-ink); stroke: var(--mn-bg); stroke-width: 2; }
+.spend .mn-chart .sp-lend { fill: var(--mn-ink); font: 600 11px "JetBrains Mono", ui-monospace, monospace; }
 .spend .mn-chart .sp-lyr { text-anchor: middle; }
 .spend .mn-chart .sp-lyr.base { fill: var(--mn-ink); font-weight: 600; }
 .spend .mn-chart .sp-lcpi { text-anchor: middle; fill: var(--mn-faint); }
@@ -606,9 +595,11 @@
 .spend .sp-ltip th { padding: 3px 12px 3px 0; text-align: left; font-weight: 500; font-size: 11px; color: var(--mn-mute); white-space: nowrap; }
 .spend .sp-ltip td { padding: 3px 0; text-align: right; white-space: nowrap; }
 .spend .sp-ltip td.sp-lx { padding-left: 12px; color: var(--mn-mute); font-size: 11px; }
-.spend .sp-ltip tr.in td:not(.sp-lx) { color: var(--mn-green); }
-.spend .sp-ltip tr.out td:not(.sp-lx) { color: var(--mn-blue); }
 .spend .sp-ltip tr.bal th, .spend .sp-ltip tr.bal td:not(.sp-lx) { padding-top: 6px; border-top: 1px solid var(--mn-line2); color: var(--mn-ink); font-weight: 600; }
+.spend .sp-ltip .sw { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 2px; vertical-align: 0; }
+.spend .sp-ltip .sw.in { background: var(--life-inc); }
+.spend .sp-ltip .sw.out { background: var(--mn-blue); }
+.spend .sp-ltip .sw.bal { width: 10px; height: 2px; border-radius: 1px; vertical-align: 3px; background: var(--mn-ink); }
 .spend .sp-lmiss { color: var(--mn-mute); font-family: inherit; font-size: 11px; }
 .spend .sp-lcp { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: var(--mn-mute); }
 .sp-set .sp-ytab td { vertical-align: middle; }

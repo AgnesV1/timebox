@@ -181,63 +181,9 @@ export function recordsByHome(entries, homes) {
 }
 export const CUR_KEYS = CURS.map((c) => c.k);
 
-// ---------- 画法（她 2026-11-26 晚：结余是一条好看的线，围着中轴上上下下；收入在轴上面，画成卡通的平衡石；支出在轴下面，画成往下滴的水） ----------
-// 都是纯函数，给的是 SVG 路径的字；坐标以那一列的中线为 x = 0、中轴为 y = 0。同一年每次画出来都一样（按年份定的随机数）。
+// ---------- 画法 ----------
 
-// 按种子来的随机数（mulberry32）
-export function seeded(seed) {
-  let a = seed >>> 0;
-  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-}
 const r2 = (v) => Math.round(v * 100) / 100;
-
-// 平衡石：一摞石头从中轴往上垒到 H（像素），下面的大、上面的小，左右错开一点点、微微歪着（看着是搭稳了的）。
-// → [{ d（石头的轮廓）, hl（左上角一道高光）, tone: 0 | 1 | 2（深浅三种，相邻的不一样） }]，y 往上是负的
-export function cairn(H, maxW, seed) {
-  if (!(H >= 2)) return [];
-  const rnd = seeded(seed), n = Math.max(1, Math.min(6, Math.round(H / 22)));
-  const wts = Array.from({ length: n }, (_, k) => 1 - 0.13 * k), sum = wts.reduce((a, b) => a + b, 0);
-  const out = [];
-  let y = 0;
-  for (let k = 0; k < n; k++) {
-    const h = H * wts[k] / sum, w = Math.min(maxW, h * 2.3 + 8) * (1 - 0.07 * k) * (0.9 + 0.18 * rnd());
-    const cx = (k % 2 ? 1 : -1) * rnd() * w * 0.07, cy = -(y + h / 2), rx = w / 2, ry = h / 2 + 0.6;
-    const top = ry * (0.92 + 0.14 * rnd()), bot = ry * (0.82 + 0.1 * rnd()), lf = rx * (0.92 + 0.1 * rnd()), rt = rx * (0.92 + 0.1 * rnd());
-    const c = 0.56 + (rnd() - 0.5) * 0.12, tilt = (rnd() - 0.5) * rx * 0.16;   // tilt：顶上那一点往左 / 右偏一点，石头就像歪着放的
-    const R = [cx + rt, cy], T = [cx + tilt, cy - top], L = [cx - lf, cy], B = [cx - tilt * 0.5, cy + bot];
-    const d = "M" + r2(R[0]) + " " + r2(R[1]) +
-      "C" + r2(R[0]) + " " + r2(R[1] - top * c) + " " + r2(T[0] + rt * c) + " " + r2(T[1]) + " " + r2(T[0]) + " " + r2(T[1]) +
-      "C" + r2(T[0] - lf * c) + " " + r2(T[1]) + " " + r2(L[0]) + " " + r2(L[1] - top * c) + " " + r2(L[0]) + " " + r2(L[1]) +
-      "C" + r2(L[0]) + " " + r2(L[1] + bot * c) + " " + r2(B[0] - lf * c) + " " + r2(B[1]) + " " + r2(B[0]) + " " + r2(B[1]) +
-      "C" + r2(B[0] + rt * c) + " " + r2(B[1]) + " " + r2(R[0]) + " " + r2(R[1] + bot * c) + " " + r2(R[0]) + " " + r2(R[1]) + "Z";
-    const hl = h >= 7 ? "M" + r2(cx - rx * 0.55) + " " + r2(cy - ry * 0.05) + "Q" + r2(cx - rx * 0.45) + " " + r2(cy - top * 0.75) + " " + r2(cx - rx * 0.05) + " " + r2(cy - top * 0.72) : "";
-    out.push({ d, hl, tone: k % 3 });
-    y += h;
-  }
-  return out;
-}
-
-// 水滴：从中轴往下滴到 D（像素），一滴挨一滴、中间空一点，越往下越小；尖朝上（刚从轴上滴下来的样子）。
-// → [{ d, hl }]，y 往下是正的
-export function drips(D, maxW, seed) {
-  if (!(D >= 2)) return [];
-  const rnd = seeded(seed), n = Math.max(1, Math.min(6, Math.round(D / 24))), gap = n > 1 ? Math.min(3, D * 0.05) : 0;
-  const wts = Array.from({ length: n }, (_, k) => 1 - 0.1 * k), sum = wts.reduce((a, b) => a + b, 0), room = D - gap * (n - 1);
-  const out = [];
-  let y0 = 0;
-  for (let k = 0; k < n; k++) {
-    const h = room * wts[k] / sum, w = Math.min(maxW, h * 0.78 + 2), x = (rnd() - 0.5) * 2;
-    const d = "M" + r2(x) + " " + r2(y0) +
-      "C" + r2(x + w * 0.1) + " " + r2(y0 + h * 0.25) + " " + r2(x + w / 2) + " " + r2(y0 + h * 0.42) + " " + r2(x + w / 2) + " " + r2(y0 + h * 0.66) +
-      "C" + r2(x + w / 2) + " " + r2(y0 + h * 0.88) + " " + r2(x + w * 0.28) + " " + r2(y0 + h) + " " + r2(x) + " " + r2(y0 + h) +
-      "C" + r2(x - w * 0.28) + " " + r2(y0 + h) + " " + r2(x - w / 2) + " " + r2(y0 + h * 0.88) + " " + r2(x - w / 2) + " " + r2(y0 + h * 0.66) +
-      "C" + r2(x - w / 2) + " " + r2(y0 + h * 0.42) + " " + r2(x - w * 0.1) + " " + r2(y0 + h * 0.25) + " " + r2(x) + " " + r2(y0) + "Z";
-    const hl = h >= 9 ? "M" + r2(x - w * 0.28) + " " + r2(y0 + h * 0.58) + "Q" + r2(x - w * 0.3) + " " + r2(y0 + h * 0.8) + " " + r2(x - w * 0.08) + " " + r2(y0 + h * 0.86) : "";
-    out.push({ d, hl });
-    y0 += h + gap;
-  }
-  return out;
-}
 
 // 结余那条线：穿过每一点的平滑曲线，不会冲过头（单调三次插值，Fritsch–Carlson）——到了一年的高点 / 低点就平平地拐回来，
 // 不会在两点之间多鼓出一个假的山头、越过中轴。pts = [{ x, y }]（x 从小到大）→ SVG 路径的字

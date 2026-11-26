@@ -152,6 +152,7 @@ export function createSpending() {
   //   结余（收入 − 支出）是一条铅笔画的平滑青绿线（粗一点、边上抖一点、有颗粒），穿过每一年，围着中轴上上下下；每年一个点（外面一圈底色），只在最后一年的点旁边写数。
   //   都用同一把尺子：×1 = 基准年一年的开销，按 CPI、固定汇率折过；轴两边的刻度只写倍数，网格是细实线。
   //   基准年以前（房租没记全）：柱子淡一点，那截线是虚的。最底下两行：年份，和那一年的 CPI（灰色小字）。底色一段段是住在哪。
+  //   图上面一个数：从第一笔账起到今天一共结余多少（按页头选的那种钱、今天的汇率，不折 CPI）。新的一年第一笔账一记上，图就多一列、柱子跟着变窄，不用管。
   //   停在某一年（鼠标、或者 Tab 到图上用 ← →）：那一列亮一点，旁边浮出那一年的真实数字——当时的币种原样，再附上几倍、CPI 乘了多少。
   const yearsCfg = () => store.setting("spend-years") || {};
   function saveYears(patch, msg) {
@@ -235,7 +236,12 @@ export function createSpending() {
     if (R.unitYear !== cfg.base) notes.push("Nothing spent in " + cfg.base + " yet — ×1 is what " + R.unitYear + " cost.");
     const bad = ys.filter((r) => r.bad.length);
     if (bad.length) notes.push("Couldn't read part of the year-end total for " + bad.map((r) => r.y + " (“" + esc(r.bad.join(", ")) + "”)").join(", ") + ".");
-    box.innerHTML = '<figure class="sp-chart sp-lfig"><figcaption><div><h3>Balance, year by year</h3><p class="sp-lede">Income above the line, spending below, and the balance between them — in ' + cfg.base + " money (inflation " + cfg.cpi + "% a year unless set) at fixed rates. ×1 = what a year cost in " + R.unitYear +
+    // 最上面一个数：从第一笔账起到今天一共结余多少，换成页头选的那种钱（CAD ⌄），用今天的汇率（Settings → Currency）；不折 CPI，就是账上的钱
+    const show = SP.show(), RT = RATES(), tot = Y.totalSince(SP.entries(), today(), (v, cur) => M.convert(v, cur, show, RT));
+    const totalHTML = tot ? '<section class="sp-ltotal" aria-label="Balance since ' + tot.from + '"><span class="sp-kl">Balance since ' + tot.from + '</span>' +
+      '<span class="sp-ltv mn-num">' + (tot.net < 0 ? "−" : "+") + cents(M.money(Math.abs(tot.net))) + "</span>" +
+      '<span class="sp-lts">Income +' + esc(M.money(tot.inc)) + " · spent −" + esc(M.money(tot.out)) + " · " + tot.n.toLocaleString("en-US") + " records to today, all in " + esc(curLabel(show)) + " at today's rates</span></section>" : "";
+    box.innerHTML = totalHTML + '<figure class="sp-chart sp-lfig"><figcaption><div><h3>Balance, year by year</h3><p class="sp-lede">Income above the line, spending below, and the balance between them — in ' + cfg.base + " money (inflation " + cfg.cpi + "% a year unless set) at fixed rates. ×1 = what a year cost in " + R.unitYear +
       ". Rest on a year for the real amounts.</p></div>" +
       '<div class="sp-legend" aria-hidden="true"><span><i class="ic"></i>Income</span><span><i class="ou"></i>Spent</span><span><i class="bl"></i>Balance</span>' +
       '<button type="button" class="sp-link" data-act="set-years">Edit years</button></div></figcaption>' +
@@ -265,7 +271,7 @@ export function createSpending() {
       row("Balance", esc(Y.bagText(net, true)), Y.signedTimes(r.x.bal === null ? null : Math.round(r.x.bal * 100) / 100), "bal") +
       (r.total ? row("Year-end total", esc(Y.bagText(r.total)), Y.times(r.x.total)) : "") + "</table>" +
       '<p class="sp-lcp">' + (r.y === cfg.base ? "Base year" : "Inflation that year " + Y.rateIn(cfg, r.y) + "% · ×" + r.f.toFixed(3) + " to " + cfg.base + " money") + " · fixed rates · ×1 = " + R.unitYear + "’s spending" +
-      (r.early ? " · rent not recorded yet" : "") + "</p>";
+      (r.early ? " · rent not recorded yet" : "") + (r.y === todayP().y ? " · this year so far" : "") + "</p>";
     tip.hidden = false;
     const wrap = tip.parentElement, k = svg.clientWidth / (Number(svg.getAttribute("width")) || 1), x = Number(hit.getAttribute("x")) * k, w = Number(hit.getAttribute("width")) * k;
     const right = x + w + 10, tw = tip.offsetWidth;

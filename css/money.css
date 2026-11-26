@@ -558,6 +558,11 @@
 .spend .sp-life { display: none; margin-top: 18px; }
 .spend.life .sp-life { display: block; }
 .spend.life :is(.sp-kpis, .sp-body, .sp-find, .sp-nb[data-act="prev"], .sp-nb[data-act="next"]) { display: none; }
+/* 最上面那个数：从第一笔账起一共结余多少（和 Budget left 那一排的大数字一个样子），底下一行小字是收入、支出和换算的说明 */
+.spend .sp-ltotal { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 0 0 20px; padding: 14px 0 16px; border-top: 1px solid var(--sp-line); border-bottom: 1px solid var(--sp-line); }
+.spend .sp-ltotal .sp-kl { flex-basis: 100%; }
+.spend .sp-ltv { font-size: 24px; font-weight: 500; white-space: nowrap; }
+.spend .sp-lts { font-size: 11px; color: var(--mn-mute); }
 .spend .sp-lfig figcaption { align-items: flex-start; }
 .spend .sp-legend .ic { background: var(--life-inc); }
 .spend .sp-legend .ou { background: var(--mn-blue); }

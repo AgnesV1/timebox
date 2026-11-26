@@ -124,7 +124,8 @@ export function build(entries, raw, today) {
   }
   for (const y of Object.keys(cfg.totals)) row(Number(y));
   if (!by.size) return { cfg, years: [], unit: 0, unitYear: null };
-  const ys = [...by.keys()].filter((y) => y <= nowY + 1), lo = Math.min(...ys, cfg.base), hi = Math.max(...ys);
+  // 到今年为止：十二月提前记下的明年一月房租，等明年到了才多出一列（新的一年自己加进来，柱子跟着变窄）
+  const ys = [...by.keys()].filter((y) => y <= nowY), lo = Math.min(...ys, cfg.base), hi = Math.max(...ys);
   const years = [];
   for (let y = lo; y <= hi; y++) {
     const r = by.get(y) || { y, inc: {}, out: {}, net: {} }, homes = homesIn(cfg.homes, y), dflt = homes[homes.length - 1]?.cur || "cad";
@@ -178,6 +179,20 @@ export function recordsByHome(entries, homes) {
     }
     return { home: h, from: h.from, to: homes[k + 1]?.from || "", total, by };
   });
+}
+// 从第一笔账起到今天的总结余（她 2026-11-26：All years 上面写一个「2017 年以来一共结余多少」，按她现在看的那种钱）：
+// 到今天为止的每一笔（提前记的还没到的不算），conv(v, cur) 换成看的那种钱（js/ui/spending.js 用今天的汇率）。
+// → { from（第一笔那一年）, inc, out, net（都是换过的分）, n（几笔） }；一笔都没有 = null
+export function totalSince(entries, today, conv) {
+  let from = 0, inc = 0, out = 0, n = 0;
+  for (const e of entries || []) {
+    if (!e?.d || e.d > today || !Number(e.v)) continue;
+    const y = Number(String(e.d).slice(0, 4)), v = conv(Number(e.v), isCur(e.cur) ? e.cur : "cad");
+    if (!from || y < from) from = y;
+    if (v > 0) inc += v; else out -= v;
+    n++;
+  }
+  return n ? { from, inc, out, net: inc - out, n } : null;
 }
 export const CUR_KEYS = CURS.map((c) => c.k);
 

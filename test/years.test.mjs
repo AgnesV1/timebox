@@ -56,6 +56,15 @@ test("each year: balance, income and spending in base-year money, all against wh
   assert.equal(moved.unitYear, 2021);
 });
 
+test("a new year shows up once it begins; the total since the first record, up to today, in one currency", () => {
+  const entries = [{ d: "2017-03-01", v: 100000, cur: "aud" }, { d: "2026-02-01", v: -50000, cur: "cad" }, { d: "2026-12-30", v: -1000, cur: "cad" }, { d: "2027-01-01", v: -145000, cur: "cad" }];
+  assert.deepEqual(Y.build(entries, {}, "2026-11-26").years.map((r) => r.y).slice(-1), [2026], "next January's rent written down early doesn't add 2027 yet");
+  assert.equal(Y.build(entries, {}, "2027-01-02").years.at(-1).y, 2027);
+  const conv = (v, cur) => (cur === "aud" ? Math.round(v * 0.9) : v);
+  assert.deepEqual(Y.totalSince(entries, "2026-11-26", conv), { from: 2017, inc: 90000, out: 50000, net: 40000, n: 2 }, "records dated after today don't count yet");
+  assert.equal(Y.totalSince([], "2026-11-26", conv), null);
+});
+
 test("records in each place by currency: the Hong Kong years typed as another currency show up to be fixed", () => {
   const homes = Y.parseHomes(Y.DEFAULT_HOMES);
   const entries = [{ id: "a", d: "2017-05-01" , cur: "aud" }, { id: "b", d: "2018-03-01" }, { id: "c", d: "2019-12-31", cur: "hkd" }, { id: "d", d: "2019-07-01" }, { id: "e", d: "2023-09-02" }, { id: "f", d: "2023-08-30", cur: "cny" }];

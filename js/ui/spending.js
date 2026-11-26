@@ -147,10 +147,11 @@ export function createSpending() {
   }
 
 
-  // ---------- All years：跨年份的那张图（js/years.js 算；她 2026-11-26 定的样子） ----------
-  //   上面一块：每年的结余（收入 − 支出）围着中间那条轴上下——挣得比花得多往上（青绿），只花不挣、花得比挣得多往下（钴蓝；橙色只给超预算）。
-  //   下面一块：每年的收入（青绿）和支出（钴蓝）两根柱子。两块用同一把尺子：×1 = 基准年一年的开销，按 CPI、固定汇率折过。
-  //   基准年以前的柱子淡一点（那时候房租没记全：支出偏少、结余偏多）。最底下两行：年份，和那一年的 CPI（灰色小字）。底色一段段是住在哪。
+  // ---------- All years：跨年份的那张图（js/years.js 算、也给石头和水滴的形状；她 2026-11-26 定的样子） ----------
+  //   一条中轴：轴上面是每年的收入，画成一摞卡通的平衡石（挣下来的一块块垒上去）；轴下面是每年的支出，画成往下滴的水（流出去的）。
+  //   结余（收入 − 支出）是一条平滑的线，穿过每一年，围着中轴上上下下：在轴上面 = 那年攒下了，在轴下面 = 那年花得比挣得多。
+  //   都用同一把尺子：×1 = 基准年一年的开销，按 CPI、固定汇率折过；轴两边的刻度只写倍数。
+  //   基准年以前（房租没记全）：石头、水滴淡一点，线是虚的。最底下两行：年份，和那一年的 CPI（灰色小字）。底色一段段是住在哪。
   //   停在某一年（鼠标、或者 Tab 到图上用 ← →）：那一列亮一点，旁边浮出那一年的真实数字——当时的币种原样，再附上几倍、CPI 乘了多少。
   const yearsCfg = () => store.setting("spend-years") || {};
   function saveYears(patch, msg) {
@@ -159,17 +160,25 @@ export function createSpending() {
     if (msg) toast(msg);
   }
   const LIFE = { i: -1, data: null };
+  // 图例里的小样：一块石头、一滴水、一截线
+  const MINI = {
+    stone: '<svg class="sp-mini" viewBox="0 0 18 12" aria-hidden="true"><path class="sp-st t1" d="M16 7C16 3 12 1.5 9 1.5C5 1.5 2 3.5 2 7C2 9.5 5 10.5 9 10.5C13 10.5 16 9.5 16 7Z"/></svg>',
+    drop: '<svg class="sp-mini" viewBox="0 0 12 14" aria-hidden="true"><path class="sp-dr" d="M6 1C6.8 4 10 5.5 10 8.5C10 11 8.2 13 6 13C3.8 13 2 11 2 8.5C2 5.5 5.2 4 6 1Z"/></svg>',
+    line: '<svg class="sp-mini" viewBox="0 0 22 12" aria-hidden="true"><path class="sp-bl" d="M1 8C5 8 6 2 11 2S17 10 21 6"/></svg>'
+  };
   function renderLife() {
     const box = $("[data-life]");
     if (!box) return;
     const R = Y.build(SP.entries(), yearsCfg(), today()), cfg = R.cfg, ys = R.years;
     LIFE.data = R;
     if (!ys.length || !(R.unit > 0)) { box.innerHTML = '<p class="sp-empty">Nothing to compare yet — the years show up once there\'s spending in them.</p>'; return; }
-    const W = Math.max(560, Math.round(box.clientWidth || 900)), padL = 52, padR = 12;
-    // 上面那块随宽度高一点（180–260），下面柱子那块固定
-    const T0 = 30, T1 = T0 + Math.round(Math.min(260, Math.max(180, W * 0.2))), B0 = T1 + 30, B1 = B0 + 96, L0 = B1 + 20, L1 = L0 + 16, H = L1 + 10;
+    const W = Math.max(560, Math.round(box.clientWidth || 900)), padL = 46, padR = 12;
+    // 轴上、轴下各一半，随宽度高一点（130–190）
+    const half = Math.round(Math.min(190, Math.max(130, W * 0.14))), T0 = 32, AX = T0 + half, B1 = AX + half, L0 = B1 + 22, L1 = L0 + 16, H = L1 + 10;
     const n = ys.length, lo = ys[0].y, colW = (W - padL - padR) / n, cx = (i) => padL + colW * (i + 0.5);
     const xAt = (y, m) => padL + colW * (y - lo + (m - 1) / 12), f1 = (v) => Math.round(v * 10) / 10;
+    const vals = ys.flatMap((r) => [r.x.inc, r.x.out, r.x.bal === null ? null : Math.abs(r.x.bal)]).filter((v) => v !== null && Number.isFinite(v));
+    const top = Math.max(1.1, ...vals) * 1.06, px = (v) => v / top * half;
     let g = "";
     // 住在哪：一段一块底色（隔一块深一点），交界一条虚线，左上角地名
     const homes = cfg.homes;
@@ -177,48 +186,52 @@ export function createSpending() {
       const [hy, hm] = h.from.split("-").map(Number), next = homes[k + 1];
       const a = Math.max(padL, k === 0 ? padL : xAt(hy, hm)), b = Math.min(W - padR, next ? xAt(...next.from.split("-").map(Number)) : W - padR);
       if (b - a < 1) return;
-      g += '<rect class="sp-lband' + (k % 2 ? " alt" : "") + '" x="' + f1(a) + '" y="' + (T0 - 22) + '" width="' + f1(b - a) + '" height="' + (B1 - T0 + 22) + '"/>';
-      if (k > 0 && a > padL + 1) g += '<line class="sp-lsep" x1="' + f1(a) + '" x2="' + f1(a) + '" y1="' + (T0 - 22) + '" y2="' + B1 + '"/>';
-      if (b - a > 46) g += '<text class="sp-lplace" x="' + f1(a + 7) + '" y="' + (T0 - 8) + '">' + esc(h.place) + "</text>";
+      g += '<rect class="sp-lband' + (k % 2 ? " alt" : "") + '" x="' + f1(a) + '" y="' + (T0 - 24) + '" width="' + f1(b - a) + '" height="' + (B1 - T0 + 28) + '"/>';
+      if (k > 0 && a > padL + 1) g += '<line class="sp-lsep" x1="' + f1(a) + '" x2="' + f1(a) + '" y1="' + (T0 - 24) + '" y2="' + (B1 + 4) + '"/>';
+      if (b - a > 46) g += '<text class="sp-lplace" x="' + f1(a + 7) + '" y="' + (T0 - 10) + '">' + esc(h.place) + "</text>";
     });
-    const bw = Math.max(5, Math.min(30, colW * 0.42));
-    // 上面：结余，围着中轴（0）上下对称
-    const bals = ys.map((r) => r.x.bal).filter((v) => v !== null && Number.isFinite(v));
-    const tk = Y.ticksAround(Math.max(0, ...bals.map(Math.abs))), top = tk[tk.length - 1], mid = (T0 + T1) / 2;
-    const yb = (v) => mid - v / top * (T1 - T0) / 2;
-    for (const v of tk) g += '<line class="sp-lgrid' + (v === 0 ? " axis" : "") + '" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + f1(yb(v)) + '" y2="' + f1(yb(v)) + '"/><text class="mn-ax sp-lax" x="' + (padL - 8) + '" y="' + f1(yb(v) + 4) + '">' + Y.signedTimes(v) + "</text>";
+    // 刻度：轴上面是收入的倍数，下面是支出的倍数（一样的尺子），中轴是 0
+    for (const v of Y.ticks(top).filter((v) => v > 0 && v <= top)) {
+      for (const sgn of [-1, 1]) g += '<line class="sp-lgrid' + (v === 1 ? " one" : "") + '" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + f1(AX + sgn * px(v)) + '" y2="' + f1(AX + sgn * px(v)) + '"/><text class="mn-ax sp-lax" x="' + (padL - 8) + '" y="' + f1(AX + sgn * px(v) + 4) + '">' + Y.times(v) + "</text>";
+    }
+    g += '<text class="sp-lpart" x="' + (padL - 8) + '" y="' + (T0 + 4) + '">in</text><text class="sp-lpart" x="' + (padL - 8) + '" y="' + (B1 + 2) + '">out</text>';
+    // 中轴（石头坐在它上面、水从它下面滴出来，所以先画）
+    g += '<line class="sp-laxis" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + AX + '" y2="' + AX + '"/>';
+    // 平衡石、水滴
+    const sw = Math.min(colW * 0.62, 66), dw = Math.min(colW * 0.42, 34);
     ys.forEach((r, i) => {
-      const v = r.x.bal;
-      if (v === null) return;
-      const y = yb(v), h = Math.max(1.5, Math.abs(y - mid)), up = v >= 0;
-      g += '<rect class="sp-lbal ' + (up ? "up" : "down") + (r.early ? " early" : "") + '" x="' + f1(cx(i) - bw / 2) + '" y="' + f1(up ? mid - h : mid) + '" width="' + f1(bw) + '" height="' + f1(h) + '" rx="3"/>';
-      g += '<text class="sp-lval ' + (up ? "up" : "down") + '" x="' + f1(cx(i)) + '" y="' + f1(up ? mid - h - 6 : mid + h + 14) + '">' + Y.signedTimes(Math.round(v * 100) / 100) + "</text>";
-    });
-    // 下面：收入、支出两根柱子，同一把尺子（×1 = 基准年一年的开销）
-    const bars = ys.flatMap((r) => [r.x.inc, r.x.out]).filter((v) => v !== null && Number.isFinite(v));
-    const bmax = Math.max(1.2, ...bars), bh = (v) => Math.max(1, v / bmax * (B1 - B0)), w2 = Math.max(4, Math.min(16, colW * 0.24));
-    g += '<line class="sp-lgrid one" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + f1(B1 - bh(1)) + '" y2="' + f1(B1 - bh(1)) + '"/><text class="mn-ax sp-lax" x="' + (padL - 8) + '" y="' + f1(B1 - bh(1) + 4) + '">×1</text>';
-    g += '<line class="sp-lbase" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + B1 + '" y2="' + B1 + '"/>';
-    ys.forEach((r, i) => {
-      if (r.x.inc !== null) g += '<rect class="sp-linc' + (r.early ? " early" : "") + '" x="' + f1(cx(i) - w2 - 1.5) + '" y="' + f1(B1 - bh(r.x.inc)) + '" width="' + f1(w2) + '" height="' + f1(bh(r.x.inc)) + '" rx="2"/>';
-      if (r.x.out !== null) g += '<rect class="sp-lout' + (r.early ? " early" : "") + '" x="' + f1(cx(i) + 1.5) + '" y="' + f1(B1 - bh(r.x.out)) + '" width="' + f1(w2) + '" height="' + f1(bh(r.x.out)) + '" rx="2"/>';
+      let piece = "";
+      if (r.x.inc !== null) for (const st of Y.cairn(px(r.x.inc), sw, r.y * 31 + 7)) piece += '<path class="sp-st t' + st.tone + '" d="' + st.d + '"/>' + (st.hl ? '<path class="sp-sth" d="' + st.hl + '"/>' : "");
+      if (r.x.out !== null) for (const dr of Y.drips(px(r.x.out), dw, r.y * 17 + 3)) piece += '<path class="sp-dr" d="' + dr.d + '"/>' + (dr.hl ? '<path class="sp-drh" d="' + dr.hl + '"/>' : "");
+      if (piece) g += '<g class="sp-lyear' + (r.early ? " early" : "") + '" transform="translate(' + f1(cx(i)) + " " + AX + ')">' + piece + "</g>";
       g += '<text class="mn-ax sp-lyr' + (r.y === cfg.base ? " base" : "") + '" x="' + f1(cx(i)) + '" y="' + L0 + '">' + (colW < 34 ? "’" + String(r.y).slice(2) : r.y) + "</text>";
       g += '<text class="mn-ax sp-lcpi" x="' + f1(cx(i)) + '" y="' + L1 + '">' + (r.y === cfg.base ? "base" : Y.rateIn(cfg, r.y) + "%") + "</text>";
     });
-    g += '<text class="sp-lpart" x="' + padL + '" y="' + (B0 - 10) + '">Income and spending</text>';
-    g += '<rect class="sp-lcol" data-lcol x="0" y="' + (T0 - 22) + '" width="' + f1(colW) + '" height="' + (L1 - T0 + 30) + '" rx="6" visibility="hidden"/>';
+    // 结余的线：一段段（中间哪年没账就断开），平滑地穿过每一点；基准年以前那截是虚的。底下垫一道底色当描边，压在石头、水滴上也看得清
+    const runs = [];
+    let run = [];
+    ys.forEach((r, i) => { if (r.x.bal === null) { if (run.length) runs.push(run); run = []; } else run.push({ x: cx(i), y: AX - px(r.x.bal), r }); });
+    if (run.length) runs.push(run);
+    const bi = ys.findIndex((r) => r.y === cfg.base), xb = bi >= 0 ? cx(bi) : padL;
+    g += '<defs><clipPath id="sp-lcl-a"><rect x="0" y="0" width="' + f1(xb) + '" height="' + H + '"/></clipPath><clipPath id="sp-lcl-b"><rect x="' + f1(xb) + '" y="0" width="' + f1(W - xb) + '" height="' + H + '"/></clipPath></defs>';
+    for (const pts of runs) {
+      const d = Y.smooth(pts);
+      g += '<path class="sp-blh" d="' + d + '"/><path class="sp-bl early" clip-path="url(#sp-lcl-a)" d="' + d + '"/><path class="sp-bl" clip-path="url(#sp-lcl-b)" d="' + d + '"/>';
+      for (const p of pts) g += '<circle class="sp-bd ' + (p.r.x.bal >= 0 ? "up" : "down") + '" cx="' + f1(p.x) + '" cy="' + f1(p.y) + '" r="3.6"/>';
+    }
+    g += '<rect class="sp-lcol" data-lcol x="0" y="' + (T0 - 24) + '" width="' + f1(colW) + '" height="' + (L1 - T0 + 32) + '" rx="6" visibility="hidden"/>';
     ys.forEach((r, i) => { g += '<rect class="sp-lhit" data-i="' + i + '" x="' + f1(padL + colW * i) + '" y="0" width="' + f1(colW) + '" height="' + H + '"/>'; });
     // 底下的说明（灰色小字）：基准年以前为什么淡、尺子是哪一年、哪几年的年底总数没认出来
     const notes = [];
-    if (ys.some((r) => r.early && r.x.out !== null)) notes.push("Before " + cfg.base + " rent wasn't in the ledger, so those years look better than they were (faded).");
+    if (ys.some((r) => r.early && r.x.out !== null)) notes.push("Before " + cfg.base + " rent wasn't in the ledger, so those years look better than they were (faded, dashed).");
     if (R.unitYear !== cfg.base) notes.push("Nothing spent in " + cfg.base + " yet — ×1 is what " + R.unitYear + " cost.");
     const bad = ys.filter((r) => r.bad.length);
     if (bad.length) notes.push("Couldn't read part of the year-end total for " + bad.map((r) => r.y + " (“" + esc(r.bad.join(", ")) + "”)").join(", ") + ".");
-    box.innerHTML = '<figure class="sp-chart sp-lfig"><figcaption><div><h3>Balance, year by year</h3><p class="sp-lede">Income minus spending each year, in ' + cfg.base + " money (inflation " + cfg.cpi + "% a year unless set) at fixed rates. ×1 = what a year cost in " + R.unitYear +
+    box.innerHTML = '<figure class="sp-chart sp-lfig"><figcaption><div><h3>Balance, year by year</h3><p class="sp-lede">Income stacked up, spending dripping down, and what was left weaving between — in ' + cfg.base + " money (inflation " + cfg.cpi + "% a year unless set) at fixed rates. ×1 = what a year cost in " + R.unitYear +
       ". Rest on a year for the real amounts.</p></div>" +
-      '<div class="sp-legend" aria-hidden="true"><span><i class="bu"></i>Saved</span><span><i class="bd2"></i>Spent more than earned</span><span><i class="ic"></i>Income</span><span><i class="ou"></i>Spent</span>' +
+      '<div class="sp-legend" aria-hidden="true"><span>' + MINI.stone + "Income</span><span>" + MINI.drop + "Spent</span><span>" + MINI.line + "Balance</span>" +
       '<button type="button" class="sp-link" data-act="set-years">Edit years</button></div></figcaption>' +
-      '<div class="sp-lwrap"><svg class="mn-chart sp-lchart" data-lchart viewBox="0 0 ' + W + " " + H + '" width="' + W + '" height="' + H + '" tabindex="0" role="img" aria-label="Balance each year from ' + lo + " to " + ys[n - 1].y + ", above or below zero, with income and spending below, as multiples of what " + R.unitYear + ' cost. Use the left and right arrow keys to read each year.">' + g + "</svg>" +
+      '<div class="sp-lwrap"><svg class="mn-chart sp-lchart" data-lchart viewBox="0 0 ' + W + " " + H + '" width="' + W + '" height="' + H + '" tabindex="0" role="img" aria-label="Income above the line and spending below it for each year from ' + lo + " to " + ys[n - 1].y + ", with the balance weaving around the line, as multiples of what " + R.unitYear + ' cost. Use the left and right arrow keys to read each year.">' + g + "</svg>" +
       '<div class="sp-ltip" data-ltip role="status" aria-live="polite" hidden></div></div>' +
       (notes.length ? '<p class="sp-lnote">' + notes.join(" ") + "</p>" : "") + "</figure>";
     if (LIFE.i >= n) LIFE.i = -1;
@@ -239,8 +252,8 @@ export function createSpending() {
     const where = r.homes.map((h) => esc(h.place)).join(" → ");
     const net = Object.fromEntries(Object.entries(r.net).filter(([, v]) => v));
     tip.innerHTML = '<p class="sp-lth"><b class="mn-num">' + r.y + "</b>" + (where ? "<span>" + where + "</span>" : "") + "</p><table>" +
-      row("Balance", esc(Y.bagText(net, true)), Y.signedTimes(r.x.bal === null ? null : Math.round(r.x.bal * 100) / 100), r.x.bal === null ? "" : r.x.bal >= 0 ? "in" : "out") +
-      row("Income", esc(Y.bagText(r.inc)), Y.times(r.x.inc), "in") + row("Spent", esc(Y.bagText(r.out)), Y.times(r.x.out)) +
+      row("Income", esc(Y.bagText(r.inc)), Y.times(r.x.inc), "in") + row("Spent", esc(Y.bagText(r.out)), Y.times(r.x.out), "out") +
+      row("Balance", esc(Y.bagText(net, true)), Y.signedTimes(r.x.bal === null ? null : Math.round(r.x.bal * 100) / 100), "bal") +
       (r.total ? row("Year-end total", esc(Y.bagText(r.total)), Y.times(r.x.total)) : "") + "</table>" +
       '<p class="sp-lcp">' + (r.y === cfg.base ? "Base year" : "Inflation that year " + Y.rateIn(cfg, r.y) + "% · ×" + r.f.toFixed(3) + " to " + cfg.base + " money") + " · fixed rates · ×1 = " + R.unitYear + "’s spending" +
       (r.early ? " · rent not recorded yet" : "") + "</p>";

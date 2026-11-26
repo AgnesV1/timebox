@@ -75,3 +75,21 @@ test("nothing entered: no years; axis ticks are tidy multiples", () => {
   assert.equal(Y.signedTimes(0), "0");
   assert.deepEqual(Y.ticksAround(0.8), [-1, -0.5, 0, 0.5, 1]);
 });
+
+test("drawing: stones stack up to the income, drops hang down to the spending, the line never overshoots a turn", () => {
+  const ys = (d) => [...d.matchAll(/-?\d+(?:\.\d+)?/g)].map(Number).filter((_, i) => i % 2 === 1);
+  const stones = Y.cairn(90, 50, 2021);
+  assert.ok(stones.length >= 3 && stones.length <= 6);
+  const all = stones.flatMap((s) => ys(s.d));
+  assert.ok(Math.min(...all) > -92 && Math.min(...all) < -85, "the top stone reaches the height");
+  assert.ok(Math.max(...all) < 2, "nothing below the axis");
+  assert.deepEqual(Y.cairn(90, 50, 2021), stones, "the same year draws the same stones");
+  assert.deepEqual(Y.cairn(1, 50, 1), [], "nothing earned: no stones");
+  const drops = Y.drips(70, 30, 2021), dy = drops.flatMap((x) => ys(x.d));
+  assert.ok(Math.min(...dy) >= 0 && Math.max(...dy) <= 70.01, "drops stay between the axis and the spending");
+  // 线：经过每一点；在高点、低点平平拐回来（控制点和那一点一样高）
+  const d = Y.smooth([{ x: 0, y: 0 }, { x: 10, y: -20 }, { x: 20, y: 15 }, { x: 30, y: 5 }]);
+  assert.match(d, /^M0 0C/);
+  assert.match(d, / [\d.]+ -20 10 -20C/, "a peak: the curve arrives flat");
+  assert.equal(Y.smooth([{ x: 0, y: 1 }]), "M0 1");
+});

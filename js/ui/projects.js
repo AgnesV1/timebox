@@ -1,4 +1,4 @@
-// 项目页。右边一栏是 North star 那段字和 Goals | Ideas（js/ui/goals.js；Ideas = 灵感池，见 js/ui/ideas.js），贴着顶；下面说的都是左边的计划。
+// 项目页。右边一栏是 Goals | Ideas（js/ui/goals.js；Ideas = 灵感池，见 js/ui/ideas.js），贴着顶；左边最底下是生态圈（js/ui/eco.js）；下面说的都是左边的计划。
 // 左边按「项目」分区（项目 = 大类 = 计划的 group），够宽时再分两栏（左 Build、Work，右别的），
 // 清单里的大类一直都在（空的也在）；区头 Rename 可以改名、换颜色、并进别的大类。
 // 计划只有一种：名字；拖到哪天（about N a week 只是参考数）；Notes；Pool。2026-11-22 起编辑框里不再选「固定星期几」，
@@ -25,14 +25,15 @@ import { esc, on, icon } from "../dom.js";
 import { fmtShort, fmtHours, WEEKDAYS, MONTHS } from "../dates.js";
 import { groupsOf, chainHTML, toast } from "./common.js";
 import { openModal, closeModal, modalSheet, fillingDate } from "./modal.js";
-import { goalsHTML, northHTML } from "./goals.js";
+import { goalsHTML } from "./goals.js";
+import { ecoHTML } from "./eco.js";
 import { openRepeat } from "./repeat.js";
 
 let editing = "";
 let draft = null;      // 新建时还没存的：{ group, name, place, color, rule, notes, start, deadline }
 const openArchived = new Set();   // 哪些大类的归档展开着（大类的名字）
 let renaming = null;   // 正在改名的项目（group 名字）
-let serveMore = false; // 编辑框的 Serves 里，之后几年和 North star 的目标也列出来
+let serveMore = false; // 编辑框的 Serves 里，之后几年和生态圈（最上面一层）的目标也列出来
 let openItem = "";     // 编辑框 Pool 里展开着的那一项
 let notesOpen = false; // Notes 展开着
 let paste = null;      // 粘贴整份：{ text, later: { 分区名: 她点过的 Later } }
@@ -161,14 +162,13 @@ function groupHead(c, name, n, empty, track, last, more = {}) {
 }
 
 
-// 页头：标题和「+ New plan」；下面单独一条 North star（横跨两栏，js/ui/goals.js 的 northHTML）。再下面两栏：左边是各个项目（.pj-plans），
+// 页头：标题和「+ New plan」。下面两栏：左边是各个项目（.pj-plans），最底下是生态圈（js/ui/eco.js，2026-11-26 取代了页头下面那条 North star），
 // 右边一栏是 Goals | Ideas（js/ui/goals.js），滚的时候贴着顶
 export function projectsHTML(c) {
   const groups = groupsOf(c.projects, { all: true });
   const last = lastContactDate();
   return '<div class="projects"><header class="page-head"><div><h2>Projects</h2></div>' +
     '<div class="tools"><button type="button" class="btn cta" data-act="new-project">' + icon("plus") + " New plan</button></div></header>" +
-    '<div class="pj-north">' + northHTML() + "</div>" +
     '<div class="pj-wrap"><div class="pj-plans">' +
     (c.projects.length ? "" : '<p class="hint pintro">A project is an area of your life. Tasks can sit right on it, or under a plan inside it: a plan is one row on a day, timed as a whole, with a pool of things you drag in when you like.</p>') +
     columns(groups.map((g) => {
@@ -178,7 +178,7 @@ export function projectsHTML(c) {
       return { name: g.name, html: '<section class="pgroup" data-group="' + esc(g.name) + '">' + groupHead(c, g.name, live.length, !g.subs.length, track, last, { gone: old.length, shown }) +
         (live.length ? '<div class="pgrid">' + live.map((p) => cardHTML(c, p)).join("") + "</div>" : "") +
         (shown ? '<div class="pgrid closed">' + old.map((p) => cardHTML(c, p)).join("") + "</div>" : "") + "</section>" };
-    })) + "</div>" + goalsHTML(c) + "</div></div>";
+    })) + ecoHTML() + "</div>" + goalsHTML(c) + "</div></div>";
 }
 
 // 项目那一块再分两栏（之前定的）：左边宽的是 Build、Work（GR.ORDER 的前两个），右边窄的是别的（一句话 + 14 天方块的那种）。
@@ -353,7 +353,7 @@ function pasteHTML(c, p) {
 // ---------- 编辑框本身 ----------
 
 // 为哪些目标服务（目标板那边的连线也能拖着连，见 js/ui/links.js）：近期的目标（这个月、这个季度、下个季度、今年）做成小签，点一下连上 / 断开；
-// 「More goals」再列出之后几年和 North star 的（已经连着的一直在）。下面一行是现在的链条——计划自己一个都没连的，用它所在项目连着的
+// 「More goals」再列出之后几年和生态圈那一层的（已经连着的一直在）。下面一行是现在的链条——计划自己一个都没连的，用它所在项目连着的
 function servesHTML(p) {
   const goals = store.goals();
   if (!goals.length) return "";

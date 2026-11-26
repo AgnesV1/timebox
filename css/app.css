@@ -2082,52 +2082,7 @@ body.phone .mcoming { margin-top: 14px; padding: 2px 0 0; }
 .goals.pj-rail { position: sticky; top: 16px; display: flex; flex-direction: column; min-width: 0; max-height: calc(100vh - 32px); padding: 12px 14px 0; border: var(--b); border-radius: 14px; background: var(--bg); box-shadow: var(--hard); }
 @container (max-width: 640px) { .pj-wrap { grid-template-columns: minmax(0, 1fr); } .goals.pj-rail { position: relative; top: 0; order: -1; max-height: none; margin-bottom: 18px; } }
 .goals .hint { margin: 10px 2px 4px; }
-/* North star：页头下面单独一条，横跨两栏（她 10-31 说从右栏挪到最上面：整页宽一行一百多个字，一般两三行就写完）。
-   不套框：左边一小列标题，中间那段字，右边 Edit（鼠标移上来才出来）和 More / Less；底下一条细线。框出来的词是一条条目标（括号只在改的时候看得到） */
-.pj-north { margin: 0 0 18px; }
-.ns { position: relative; display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: start; gap: 4px 18px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.ns h3 { display: flex; align-items: center; gap: 6px; height: 23.6px; margin: 0; font: 700 12.5px var(--display); white-space: nowrap; }
-.ns-tools { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; align-self: stretch; gap: 2px; }
-.ns-tools .link { font-size: 12.5px; white-space: nowrap; }
-.ns-tools [data-act="ns-edit"] { opacity: 0; transition: opacity .15s; }
-.ns:hover .ns-tools [data-act="ns-edit"], .ns-tools [data-act="ns-edit"]:focus-visible { opacity: 1; }
-@media (hover: none) { .ns-tools [data-act="ns-edit"] { opacity: 1; } }
-.ns:not(.open):not(.long) .ns-more { display: none; }   /* 两行放得下就不要 More */
-.ns.editing { grid-template-columns: max-content minmax(0, 1fr); }
-.ns-edit { min-width: 0; }
-@container (max-width: 640px) {
-  .ns { grid-template-columns: minmax(0, 1fr) max-content; }
-  .ns-text { grid-column: 1 / -1; grid-row: 2; }
-  .ns-tools { flex-direction: row; gap: 12px; }
-  .ns.editing { grid-template-columns: minmax(0, 1fr); }
-}
-/* 平时只露两行，里面还能滚；底下还有字的时候（.more，js/ui/goals.js 量的）最后那一截淡出，More 整段放开（.open）。
-   拖连线的时候（.projects.lk-drag）也整段放开，框出来的词都露出来、放得上去；悬停画线时不放开（会挪位置），藏着的词换成重点（.ns-focus）。
-   右边留几像素：框出来的词碰到行尾时，右边框不会被切掉 */
-.ns-text { max-height: calc(1.75em * 2 + 2px); margin: 0; padding-right: 6px; overflow-y: auto; overscroll-behavior: contain; font-size: 14px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; scrollbar-width: none; transition: opacity .16s; }   /* 不做展开的过渡：拖连线时要马上量到展开后的位置 */
-.ns-text::-webkit-scrollbar { display: none; }
-.ns-text.more { -webkit-mask-image: linear-gradient(#000 calc(100% - 1.5em), transparent); mask-image: linear-gradient(#000 calc(100% - 1.5em), transparent); }
-.ns.open .ns-text, .projects.lk-drag .ns-text { max-height: none; -webkit-mask-image: none; mask-image: none; }
-/* 悬停画线时连着的词被这两行挡住了（js/ui/links.js 的 focusNorth）：盖一层一样大的 .ns-focus，里面只放那一句 / 那一小段 / 那几个词；
-   原来那段藏起来（visibility，鼠标也不接），线走开就拿掉这一层、原来那段淡回来 */
-.ns.focus .ns-text { visibility: hidden; opacity: 0; }
-.ns-focus { position: absolute; margin: 0; overflow: hidden; font-size: 14px; line-height: 1.75; overflow-wrap: anywhere; pointer-events: none; animation: ns-focus .16s ease both; }
-.ns-focus .ns-gap { margin: 0 .3em; color: var(--muted); }
-.ns-focus .ns-sep { margin: 0 .4em; color: var(--muted); }
-@keyframes ns-focus { from { opacity: 0; } }
-.ns-text.empty { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
-.ns-g { display: inline; margin: 0 1px; padding: 1px 4px; border: 1.5px solid var(--ink); border-radius: 5px; font-weight: 600; -webkit-box-decoration-break: clone; box-decoration-break: clone; cursor: pointer; transition: background-color .15s; }
-.ns-g.done { color: var(--muted); text-decoration: line-through; }
-.ns-g.miss { color: var(--muted); }   /* 没实现：淡下去，不划掉（和做到了分开） */
-.ns-g.ghost { border-style: dashed; border-color: var(--muted); cursor: text; }
-@media (hover: hover) { .ns-g:hover { background: color-mix(in srgb, var(--accent) 40%, transparent); } }
-[data-theme="dark"] .ns-g { border-color: color-mix(in srgb, var(--accent) 75%, transparent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 22%, transparent); }
-@media (hover: hover) { [data-theme="dark"] .ns-g:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); } }
-.ns-in { display: block; width: 100%; min-height: 96px; max-height: 40vh; padding: 6px 8px; border: var(--b-ctl); border-radius: 8px; font: 14px/1.65 var(--body); resize: vertical; }
-.ns-bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-.ns-bar .btn { padding: 4px 11px; font-size: 12.5px; }
-.ns-bar .btn:disabled { opacity: .45; cursor: default; }
-.ns-tip { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); }
+@keyframes ns-focus { from { opacity: 0; } }   /* 折起来的目标悬停时露出来那一下（.gl.fold.lk-unfold）；名字是 North star 那段字留下来的 */
 .gstar { flex-shrink: 0; width: 12px; font-size: 10px; font-style: normal; line-height: 1; text-align: center; color: var(--hot); }
 [data-theme="dark"] .gstar { color: var(--accent); text-shadow: 0 0 8px var(--accent); }
 /* Goals | Ideas，下面那一块自己滚 */
@@ -2301,21 +2256,21 @@ html.fx-off .lk-dot { animation: none; }
 @media (hover: hover) { [data-theme="dark"] .lk-h:hover { background: var(--accent); } }
 [data-theme="dark"] .lk-x { border-color: var(--edge); background: var(--surface); }
 /* 悬停时没关系的淡下去；拖的时候能连的亮着（虚线框），吸上去的实线框，连上的闪一下 */
-.projects :is(.goals .gl, .pj-north .ns-g, .pgroup, .pcard, .g-rep) { transition: opacity .16s; }
-.projects.lk-dim :is(.goals .gl, .pj-north .ns-g):not(.lk-on), .projects.lk-dim .pgroup:not(.lk-has), .projects.lk-dim .pgroup.lk-has :is(.pcard, .g-rep):not(.lk-on),
-.projects.lk-drag :is(.goals .gl, .pj-north .ns-g):not(.lk-can, .lk-src), .projects.lk-drag .pcard:not(.lk-can, .lk-src), .projects.lk-drag .g-rep:not(.lk-can, .lk-src),
+.projects :is(.goals .gl, .pj-eco :is(.eco-n, .eco-o), .pgroup, .pcard, .g-rep) { transition: opacity .16s; }
+.projects.lk-dim :is(.goals .gl, .pj-eco :is(.eco-n, .eco-o)):not(.lk-on), .projects.lk-dim .pgroup:not(.lk-has), .projects.lk-dim .pgroup.lk-has :is(.pcard, .g-rep):not(.lk-on),
+.projects.lk-drag :is(.goals .gl, .pj-eco :is(.eco-n, .eco-o)):not(.lk-can, .lk-src), .projects.lk-drag .pcard:not(.lk-can, .lk-src), .projects.lk-drag .g-rep:not(.lk-can, .lk-src),
 .projects.lk-drag .pg-top:not(.lk-can, .lk-src) h3 { opacity: .35; }
-/* 连着的：青柠荧光笔（她 10-21 从三个样子里挑的甲）——目标只涂字那一截（.gtx），North star 里的词整个框涂满；North star 里不是词的字变灰、底下不淡出。
+/* 连着的：青柠荧光笔（她 10-21 从三个样子里挑的甲）——目标只涂字那一截（.gtx），生态圈的块整块描一圈青柠、名字涂满，图下面的小签整个涂满。
    夜里和 .chip.on 一样：淡青柠底 + 青柠字 + 一圈光 */
-.projects.lk-dim .goals .gl.lk-on .gtx, .projects.lk-dim .pj-north .ns-g.lk-on { background: var(--accent); color: var(--accent-ink); }
-[data-theme="dark"] .projects.lk-dim .goals .gl.lk-on .gtx, [data-theme="dark"] .projects.lk-dim .pj-north .ns-g.lk-on { background: rgba(204, 255, 0, .16); color: var(--accent); box-shadow: 0 0 12px rgba(204, 255, 0, .35); }
-.projects.lk-dim .pj-north :is(.ns-text, .ns-focus) { color: var(--muted); }
-.projects.lk-dim .pj-north .ns-text.more { -webkit-mask-image: none; mask-image: none; }
+.projects.lk-dim .goals .gl.lk-on .gtx, .projects.lk-dim .pj-eco .eco-o.lk-on, .projects.lk-dim .pj-eco .eco-n.lk-on .eco-t { background: var(--accent); color: var(--accent-ink); }
+[data-theme="dark"] .projects.lk-dim .goals .gl.lk-on .gtx, [data-theme="dark"] .projects.lk-dim .pj-eco .eco-o.lk-on, [data-theme="dark"] .projects.lk-dim .pj-eco .eco-n.lk-on .eco-t { background: rgba(204, 255, 0, .16); color: var(--accent); box-shadow: 0 0 12px rgba(204, 255, 0, .35); }
+.projects.lk-dim .pj-eco .eco-n.lk-on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--accent); }
+[data-theme="dark"] .projects.lk-dim .pj-eco .eco-n.lk-on { border-color: var(--accent); box-shadow: 0 0 16px rgba(204, 255, 0, .35); }
 .lk-can { outline: 1.5px dashed color-mix(in srgb, var(--ink) 45%, transparent); outline-offset: 2px; border-radius: 6px; }
 .pcard.lk-can { outline-offset: 4px; border-radius: 12px; }
 .lk-snap { outline: 2px solid var(--ink); }
-.gl.lk-snap, .g-rep.lk-snap, .ns-g.lk-snap { background-color: color-mix(in srgb, var(--accent) 22%, transparent); }
-.ns-g.lk-can { border-radius: 5px; }
+.gl.lk-snap, .g-rep.lk-snap, .eco-n.lk-snap, .eco-o.lk-snap { background-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+.eco-n.lk-can { border-radius: 999px; outline-offset: 4px; }
 [data-theme="dark"] .lk-can { outline-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 [data-theme="dark"] .lk-snap { outline-color: var(--accent); }
 .lk-landed { animation: lk-landed .6s cubic-bezier(.16, 1, .3, 1); }
@@ -2870,3 +2825,163 @@ html.fx-off .dock.run::after { display: none; }
 [data-theme="dark"] :is(.today-main, .pcard, .goals) > .edge-glow { display: block; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
   background: radial-gradient(150px circle at var(--mx, -999px) var(--my, -999px), rgba(204, 255, 0, .9), transparent 70%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+
+/* ---------- 白板（Obsidian 的 .canvas，js/canvas.js）：Mindmap 页（js/ui/boards.js）2026-11-26 ----------
+   她在 Obsidian 里画的思维导图，导进来只看不改。卡片照 Obsidian 的样子：细边圆角卡，带颜色的卡边框是那个颜色、底子淡淡一层；线从边的中点出去，带箭头。
+   六种预设色用 Obsidian 自己的那一套（白天、夜里各一套），--cv1 ~ --cv6；她自己写的 #hex 原样用。
+   白板那一块就是这一页的主卡片（粗边 + 硬影子，夜里细边），里面没有别的框。 */
+:root, [data-theme="light"] { --cv1: #E93147; --cv2: #EC7500; --cv3: #E0AC00; --cv4: #08B94E; --cv5: #00BFBC; --cv6: #7852EE; }
+[data-theme="dark"] { --cv1: #FB464C; --cv2: #E9973F; --cv3: #E0DE71; --cv4: #44CF6E; --cv5: #53DFDD; --cv6: #A882FF; }
+.mindmap { display: flex; flex-direction: column; min-width: 0; }
+.mm-bar { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; min-width: 0; }
+.mm-tabs { display: flex; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.mm-tabs::-webkit-scrollbar { display: none; }
+.mm-tab { flex: none; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mm-ren { flex: none; width: 200px; padding: 3px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
+.mm-acts { display: flex; align-items: center; gap: 12px; flex: none; }
+.mm-acts .msub { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.mm-view { position: relative; height: calc(100dvh - 150px); min-height: 360px; overflow: hidden; border: var(--b); border-radius: 16px; background: var(--card); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); box-shadow: var(--hard);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; outline-offset: 3px; }
+.mm-view.grab { cursor: grabbing; }
+.mm-view.mm-empty { display: grid; place-items: center; cursor: default; touch-action: auto; user-select: text; -webkit-user-select: text; }
+.mm-hello { max-width: 440px; padding: 24px; text-align: center; }
+.mm-hello p { margin: 0 0 10px; line-height: 1.55; }
+.mm-hello .hint { color: var(--muted); font-size: 12.5px; }
+.mm-hello .btn { margin-top: 6px; }
+.mindmap.drop-on .mm-view { outline: 2px dashed var(--ink); }
+[data-theme="dark"] .mindmap.drop-on .mm-view { outline-color: var(--accent); }
+.mm-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.mm-ctl { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; background: var(--bg); box-shadow: 0 0 0 1px var(--line); cursor: default; }
+.mm-ctl .icon-btn { width: 30px; height: 30px; font-size: 16px; }
+.mm-pct { min-width: 52px; padding: 4px 6px; border: 0; border-radius: 999px; background: none; font-size: 12.5px; font-weight: 600; }
+@media (hover: hover) { .mm-pct:hover { background: var(--surface); } }
+body.phone .mm-view { height: calc(100dvh - 190px); border-radius: 14px; }
+body.phone .mm-bar { flex-wrap: wrap; gap: 6px 12px; }
+body.phone .mm-acts { width: 100%; justify-content: flex-end; }
+body.phone .mm-ren { font-size: 16px; }
+
+/* 卡片和线（Mindmap 页的白板；生态圈有自己的一套，见下一段） */
+.cv-n { position: absolute; box-sizing: border-box; border-radius: 10px; }
+.cv-text, .cv-file, .cv-link { overflow: hidden; padding: 10px 14px; border: 1.5px solid color-mix(in srgb, var(--ink) 26%, transparent); background: var(--bg); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; cursor: auto; }
+.cv-n.tint { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 9%, var(--bg)); }
+[data-theme="dark"] .cv-n.tint:not(.cv-group) { box-shadow: 0 0 14px color-mix(in srgb, var(--cc) 22%, transparent); }
+.cv-group { border: 1.5px solid color-mix(in srgb, var(--ink) 16%, transparent); background: color-mix(in srgb, var(--ink) 3%, transparent); }
+.cv-group.tint { background: color-mix(in srgb, var(--cc) 6%, transparent); }
+.cv-glabel { position: absolute; left: 0; bottom: 100%; margin-bottom: 6px; padding: 2px 10px; border-radius: 8px; background: var(--tonal); font-size: 16px; font-weight: 600; white-space: nowrap; }
+.cv-group.tint .cv-glabel { background: color-mix(in srgb, var(--cc) 22%, var(--bg)); }
+.cv-file, .cv-link { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.cv-file .cv-fi { font-size: 20px; }
+.cv-file small { color: var(--muted); font-size: 11px; }
+.cv-link a { color: var(--blue); }
+.cv-lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.cv-e path { fill: none; stroke: color-mix(in srgb, var(--ink) 42%, transparent); stroke-width: 2.5; stroke-linecap: round; }
+.cv-e .cv-ah { fill: color-mix(in srgb, var(--ink) 42%, transparent); stroke: none; }
+.cv-e.tint path { stroke: var(--cc); }
+.cv-e.tint .cv-ah { fill: var(--cc); stroke: none; }
+.cv-lbl { position: absolute; transform: translate(-50%, -50%); max-width: 260px; padding: 2px 8px; overflow: hidden; border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 12.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.cv-lbl.tint { color: var(--cc); }
+/* 卡片上的 Markdown */
+.cv-md > div { min-height: 1.5em; }
+.cv-md .md-gap { min-height: .6em; }
+.cv-md .md-h { font-weight: 700; line-height: 1.3; margin: .2em 0; }
+.cv-md .md-h1 { font-size: 20px; }
+.cv-md .md-h2 { font-size: 18px; }
+.cv-md .md-h3 { font-size: 16px; }
+.cv-md .md-li { display: flex; gap: 6px; padding-left: calc(var(--in, 0) * 16px); }
+.cv-md .md-li > i { flex: none; min-width: .8em; color: var(--muted); font-style: normal; }
+.cv-md .md-task.done { color: var(--muted); }
+.cv-md .md-q { padding-left: 10px; border-left: 3px solid color-mix(in srgb, var(--ink) 20%, transparent); color: var(--muted); }
+.cv-md .md-hr { margin: .5em 0; border: 0; border-top: 1px solid var(--line); }
+.cv-md code, .cv-md .md-pre { padding: 0 4px; border-radius: 4px; background: var(--tonal); font: 12.5px/1.5 "JetBrains Mono", ui-monospace, monospace; }
+.cv-md .md-pre { margin: .3em 0; padding: 6px 8px; white-space: pre-wrap; }
+.cv-md mark { padding: 0 2px; background: var(--accent); color: var(--accent-ink); }
+.cv-md .md-wl { color: var(--blue); }
+.cv-md .md-file { color: var(--muted); }
+.cv-md a { color: var(--blue); }
+
+/* ---------- 生态圈（Projects 页最下面，js/ui/eco.js）2026-11-26：取代了页头下面那条 North star ----------
+   她贴的那张图：中间一池水（蓄水池，水位从底下涨上来），四周是几块（胶囊形），线分五种。图从 Obsidian 白板导进来，位置照她画的，按这一栏的宽度缩放（--k，最大原大小）。
+   不套框：一个小标题、一排切换侧重的分段开关（只有一种就只写名字）、右边 Import / Replace / Remove；底下一条细线隔开上面的项目。
+   线的五种颜色是她点名要的（贴的图里就是）：主线 --blue（粗、带箭头、夜里发光）、进水 --ok、漏水 --warn、协同细虚线（墨色）、保底点线（灰）。只在这一块里用。 */
+.pj-eco { margin: 8px 0 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+.pj-eco.drop-on { outline: 2px dashed var(--ink); outline-offset: 6px; border-radius: 12px; }
+[data-theme="dark"] .pj-eco.drop-on { outline-color: var(--accent); }
+.eco-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 14px; }
+.eco-head h3 { margin: 0; font: 700 14px var(--display); }
+.eco-name { color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.eco-tools { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.eco-tools .link { opacity: 0; transition: opacity .15s; }
+.pj-eco:hover .eco-tools .link, .eco-tools .link:focus-visible, .pj-eco.none .eco-tools .link { opacity: 1; }
+@media (hover: none) { .eco-tools .link { opacity: 1; } }
+.pj-eco .hint { max-width: 720px; margin: 0 0 12px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.eco-fit { position: relative; height: calc(var(--h) * var(--k, 1) * 1px); container-type: inline-size; }
+.eco-world { position: absolute; top: 0; left: max(0px, calc((100% - var(--w) * var(--k, 1) * 1px) / 2)); transform: scale(var(--k, 1)); transform-origin: 0 0; }
+.eco-lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+/* 一块 = 最上面一层的一条目标：胶囊形，名字 + 小字；主线指着的那块描蓝、底子淡淡一层蓝（她图里的 4. 增长） */
+.eco-n { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 18px; border: 1.5px solid color-mix(in srgb, var(--ink) 55%, transparent); border-radius: 999px; background: var(--bg); text-align: center; outline-offset: 4px; }
+.eco-t { padding: 1px 4px; border-radius: 4px; font-size: 16px; font-weight: 600; line-height: 1.3; }
+.eco-s { color: var(--muted); font-size: 14px; line-height: 1.3; }
+.eco-n.done .eco-t { color: var(--muted); text-decoration: line-through; }
+.eco-n.laser { border: 2px solid var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--bg)); }
+[data-theme="dark"] .eco-n { border-color: #3A3A52; background: color-mix(in srgb, var(--bg) 80%, transparent); }
+[data-theme="dark"] .eco-n.laser { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 14%, var(--bg)); box-shadow: 0 0 18px color-mix(in srgb, var(--blue) 35%, transparent), inset 0 0 12px color-mix(in srgb, var(--blue) 18%, transparent); }
+[data-theme="light"] .eco-n.laser { box-shadow: 3px 3px 0 var(--edge); }
+/* 蓄水池：圆角方块，外面一圈虚线；水从底下涨到 --lv，水面一条亮线；名字、大大的百分数、小字 */
+.eco-pool { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow: hidden; border: 2px solid var(--ink); border-radius: 28px; background: var(--bg); text-align: center; outline: 2px dashed color-mix(in srgb, var(--ink) 55%, transparent); outline-offset: 6px; }
+.eco-water { position: absolute; left: 0; right: 0; bottom: 0; height: var(--lv); background: color-mix(in srgb, var(--blue) 22%, var(--bg)); border-top: 2px solid color-mix(in srgb, var(--blue) 70%, transparent); transition: height .8s var(--ease); }
+.eco-pool > :not(.eco-water) { position: relative; text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg); }   /* 水面那条线从字中间穿过时，字还看得清 */
+.eco-pt { font-size: 16px; font-weight: 600; }
+.eco-lv { font: 600 44px/1.05 var(--num); letter-spacing: -.02em; }
+.eco-ps { color: var(--muted); font-size: 14px; }
+[data-theme="dark"] .eco-pool { border-color: #D8D8E4; outline-color: rgba(244, 244, 248, .6); background: #101018; }
+[data-theme="dark"] .eco-water { background: linear-gradient(color-mix(in srgb, var(--blue) 30%, #1B2350), #1B2350); border-top-color: color-mix(in srgb, var(--blue) 80%, transparent); box-shadow: 0 -6px 18px color-mix(in srgb, var(--blue) 25%, transparent); }
+[data-theme="dark"] .eco-ps { color: #A9ACC8; }
+[data-theme="dark"] .eco-pool > :not(.eco-water) { text-shadow: 0 0 4px #101018, 0 0 8px #101018; }
+/* 线：一条底线 + 流动的那层小点（主线、进水、漏水），箭头实心 */
+.eco-e path { fill: none; stroke-linecap: round; }
+.eco-e { --lc: color-mix(in srgb, var(--ink) 55%, transparent); }
+.eco-e .eco-ln { stroke: var(--lc); stroke-width: 2; }
+.eco-e .eco-ah { fill: var(--lc); stroke: none; }
+.eco-e.k-laser { --lc: var(--blue); }
+.eco-e.k-laser .eco-ln { stroke-width: 6; }
+.eco-e.k-inflow { --lc: var(--ok); }
+.eco-e.k-inflow .eco-ln, .eco-e.k-leak .eco-ln { stroke-width: 3; }
+.eco-e.k-leak { --lc: var(--warn); }
+.eco-e.k-synergy .eco-ln { stroke-dasharray: 6 6; stroke-width: 1.75; }
+.eco-e.k-baseline { --lc: color-mix(in srgb, var(--ink) 42%, transparent); }
+.eco-e.k-baseline .eco-ln { stroke-dasharray: 0 7; stroke-width: 3; }
+.eco-e .eco-fl { stroke: color-mix(in srgb, var(--lc) 35%, var(--bg)); stroke-width: 2; stroke-dasharray: 2 16; animation: eco-flow 1.3s linear infinite; }
+.eco-e.k-laser .eco-fl { stroke-width: 2.5; stroke: color-mix(in srgb, var(--lc) 30%, #FFFFFF); }
+[data-theme="dark"] .eco-e.k-laser .eco-ln { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--blue) 70%, transparent)); }
+@keyframes eco-flow { from { stroke-dashoffset: 18; } to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .eco-e .eco-fl { display: none; } .eco-water { transition: none; } }
+html.fx-off .eco-e .eco-fl { display: none; }
+/* 线上的小签：她写的字，原样 */
+.eco-chip { position: absolute; transform: translate(-50%, -50%); padding: 2px 9px; border-radius: 999px; background: var(--bg); box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--kc, var(--ink)) 55%, transparent); font: 600 14px var(--num); white-space: nowrap; }
+.eco-chip.k-laser { --kc: var(--blue); }
+.eco-chip.k-inflow { --kc: var(--ok); }
+.eco-chip.k-leak { --kc: var(--warn); color: var(--warn-text); }
+[data-theme="dark"] .eco-chip { background: #0E0E16; box-shadow: 0 0 0 1px color-mix(in srgb, var(--kc, var(--ink)) 45%, transparent); }
+[data-theme="dark"] .eco-chip.k-laser { background: color-mix(in srgb, var(--blue) 16%, #0E0E16); color: #D6F7FF; }
+[data-theme="dark"] .eco-chip.k-inflow { background: color-mix(in srgb, var(--ok) 12%, #0E0E16); color: #CFFFE2; }
+.eco-grp { position: absolute; box-sizing: border-box; border: 1px dashed color-mix(in srgb, var(--ink) 25%, transparent); border-radius: 18px; }
+.eco-grp span { position: absolute; left: 14px; top: -10px; padding: 0 6px; background: var(--page); color: var(--muted); font-size: 12.5px; }
+.eco-note { position: absolute; box-sizing: border-box; overflow: hidden; padding: 4px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+/* 图例：只列这张图里有的几种，一行排开，线的样子和图里一样 */
+.eco-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; margin: 18px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line); list-style: none; color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.eco-legend li { display: inline-flex; align-items: center; gap: 8px; }
+.eco-sw { width: 28px; height: 8px; overflow: visible; }
+.eco-sw path { fill: none; stroke-linecap: round; stroke: color-mix(in srgb, var(--ink) 55%, transparent); stroke-width: 2; }
+.eco-sw.k-laser path { stroke: var(--blue); stroke-width: 5; }
+.eco-sw.k-inflow path { stroke: var(--ok); stroke-width: 3; }
+.eco-sw.k-leak path { stroke: var(--warn); stroke-width: 3; }
+.eco-sw.k-synergy path { stroke-dasharray: 4 4; }
+.eco-sw.k-baseline path { stroke: color-mix(in srgb, var(--ink) 42%, transparent); stroke-dasharray: 0 5; stroke-width: 3; }
+/* 不在图上的最上面一层目标：一排小签；悬停一样画线，× 删掉 */
+.eco-also { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 14px 0 0; font-size: 12.5px; }
+.eco-also > span:first-child { margin-right: 4px; color: var(--muted); font-weight: 600; }
+.eco-o { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--tonal); font-weight: 600; }
+.eco-o.done { color: var(--muted); text-decoration: line-through; }
+.eco-ox { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 14px; line-height: 1; opacity: 0; transition: opacity .15s; }
+.eco-o:hover .eco-ox, .eco-ox:focus-visible { opacity: 1; }
+@media (hover: none) { .eco-ox { opacity: 1; } }

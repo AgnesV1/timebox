@@ -1,5 +1,5 @@
-// 苦昼短：入口。管页面切换（#today / #calendar / #projects / #stats / #meals / #shop / #reading / #friends / #spending / #settings）、主题、同步时机、整页重画。
-// 手机（≤760px）只有「今天」、下次采购的单子、阅读和设置；电脑有侧栏、日历和任务池、项目、统计、备餐。两边底部都有计时浮条。
+// 苦昼短：入口。管页面切换（#today / #calendar / #projects / #mindmap / #stats / #meals / #shop / #reading / #friends / #spending / #settings）、主题、同步时机、整页重画。
+// 手机（≤760px）只有「今天」、下次采购的单子、阅读、思维导图（Mindmap）和设置；电脑有侧栏、日历和任务池、项目、统计、备餐。两边底部都有计时浮条。
 
 import * as store from "./store.js";
 import * as sync from "./sync.js";
@@ -20,6 +20,8 @@ import { initRepeat } from "./ui/repeat.js";
 import { initGoals, goalDrop, goalsAfterRender } from "./ui/goals.js";
 import { initLinks, afterRender as linksAfterRender } from "./ui/links.js";
 import { initIdeas, ideasPhoneHTML } from "./ui/ideas.js";
+import { mindmapHTML, initBoards, boardsAfterRender } from "./ui/boards.js";
+import { initEco, ecoAfterRender } from "./ui/eco.js";
 import { settingsHTML, initSettings } from "./ui/settings.js";
 import { initEditor, refreshEditor } from "./ui/editor.js";
 import { initDnd } from "./ui/dnd.js";
@@ -39,7 +41,7 @@ import { animateNext, animateSoft, takeTransition, nameParts, dusk, measurePills
 import { lookAt, nextTurn } from "./day.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
-const VIEWS = ["today", "calendar", "projects", "stats", "meals", "shop", "reading", "ideas", "friends", "spending", "settings"];
+const VIEWS = ["today", "calendar", "projects", "mindmap", "stats", "meals", "shop", "reading", "ideas", "friends", "spending", "settings"];
 const side = document.getElementById("side");
 const main = document.getElementById("main");
 const pool = document.getElementById("pool");
@@ -48,7 +50,7 @@ const dock = document.getElementById("dock");
 function route() {
   let v = location.hash.replace("#", "").split("/")[0] || "today";
   if (!VIEWS.includes(v)) v = "today";
-  if (phoneMQ.matches && v !== "settings" && v !== "reading" && v !== "shop" && v !== "ideas") v = "today";
+  if (phoneMQ.matches && v !== "settings" && v !== "reading" && v !== "shop" && v !== "ideas" && v !== "mindmap") v = "today";
   if (v === "ideas" && !phoneMQ.matches) v = "projects";   // #ideas 是手机上查灵感的那一页；电脑上灵感在 Projects 页里
   return v;
 }
@@ -93,7 +95,7 @@ function sidebarHTML(c, view) {
   // 四段，各管各的事：排时间的那四页 / 备餐 / 阅读 / 人。不写标题、不铺底色，只靠段和段之间的空隙分开；
   // 每段的图标是那个大类的油画色（排时间 = Build、备餐 = Chores、阅读 = Leisure、人 = Friends），大类改了颜色这里跟着变
   const tint = (name, fallback) => store.groups().find((g) => g.name === name)?.color || fallback;
-  const blocks = [["todo", "Build", "#3E8E6E", [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", projectAlerts(c) || ""], ["stats", "Stats", ""]]],
+  const blocks = [["todo", "Build", "#3E8E6E", [["today", "Today", todayOpen || ""], ["calendar", "Calendar", ""], ["projects", "Projects", projectAlerts(c) || ""], ["mindmap", "Mindmap", ""], ["stats", "Stats", ""]]],
     ["meals", "Chores", "#6A3A22", [["meals", "Meals", deals || ""]]], ["read", "Leisure", "#E07A2B", [["reading", "Reading", ""]]], ["friends", "Friends", "#8B62AE", [["friends", "Friends", friendsDue(c.today) || ""]]],
     ["money", "", "#3F62B5", [["spending", "Spending", ""]]]];   // 记账：不是大类，用油画的那个蓝
   // 当前页那一项底下垫一块青柠（.snav-pill）：换页时它从旧的那项滑到新的那项（换页过渡里有名字，css 里 snav-pill）
@@ -196,7 +198,7 @@ function draw() {
   side.innerHTML = phone ? "" : sidebarHTML(c, view);
   if (!phone) spend.view(view === "spending");   // 电脑看着 Spending 时每次同步都带上记账（js/spend.js 的 due；手机上是拉下来那页自己说）
   if (view === "spending") showDesk();
-  else main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : view === "ideas" ? ideasPhoneHTML(c) : view === "friends" ? friendsHTML(c) : todayHTML(c, phone);
+  else main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "mindmap" ? mindmapHTML(phone) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : view === "ideas" ? ideasPhoneHTML(c) : view === "friends" ? friendsHTML(c) : todayHTML(c, phone);
   placePills();
   marquees(main);   // 手机今天页展开那一行放不下的「For …」链：自己滚
   if (document.startViewTransition) nameParts(main, true);
@@ -224,7 +226,9 @@ function draw() {
   refreshEditor();
   refreshProjectEditor();
   goalsAfterRender();   // 右栏滚回原来的地方（要在连线重画之前，线才量得对）
+  ecoAfterRender();     // 生态圈按那一栏的宽度缩放（也在连线之前）
   linksAfterRender();
+  boardsAfterRender();   // Mindmap 页：白板放回原来看的地方
   refreshMealEditor();
   refreshFriendEditor();
   restoreKeep(kept);   // 弹层也画完了再放回去
@@ -307,6 +311,8 @@ initRepeat();
 initGoals(render);
 initLinks();
 initIdeas(render);
+initBoards(render);
+initEco();
 initSettings();
 initEditor();
 initDnd((payload, target) => (target.startsWith("gcol:") ? goalDrop(payload, target) : target.startsWith("m") ? mealDrop(payload, target) : handleDrop(payload, target)));

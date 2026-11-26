@@ -90,14 +90,16 @@ console.log("→ current:", g.logs.join(" | "));
     goal("n2", "French as a second home", "north", "", ""),
     goal("y4", "Live and work in French", "year", ym(y + 4, 12), "n2"),
     goal("y1", "C1 French certificate", "year", ym(y + 1, 12), "y4"),
-    goal("y2", "Freelance on the side", "year", ym(y + 2, 12), "n1"),
+    goal("y2", "Freelance on the side", "year", ym(y + 2, 12), "e4"),
+    // 生态圈里连着线的那四块（下面导入的那两张图），最上面一层
+    goal("e1", "丰富体验", "north", "", ""), goal("e2", "人际关系", "north", "", ""), goal("e3", "稳定生活", "north", "", ""), goal("e4", "增长", "north", "", ""),
     goal("t1", "Pass B2 (DELF)", "year", ym(y, 12), "y1", ["p:seed-b2"].concat(m4 ? ["p:" + m4.id] : [])),
     goal("t2", "Half marathon under 2h", "year", ym(y, 12), "n1", ["g:Fitness"], "Fitness"),
     goal("q1", "Mock exam ≥ 70 / 100", "quarter", ym(y, q * 3), "t1", ["p:seed-b2"]),
     goal("q2", "Ship the Q4 report on time", "quarter", ym(y, q * 3), "", ["p:seed-q4"], "Work"),
     goal("q3", "Launch the portfolio", "quarter", q === 4 ? ym(y + 1, 3) : ym(y, q * 3 + 3), "y2", ["p:seed-port"], "Build"),
     goal("m1", "Finish Module #4", "month", ym(y, m), "q1", m4 ? ["p:" + m4.id] : []),
-    goal("m2", "See friends every two weeks", "month", ym(y, m), "n1", ["g:Friends"], "Friends"),
+    goal("m2", "See friends every two weeks", "month", ym(y, m), "e2", ["g:Friends"], "Friends"),
     goal("q0", "Mock exam ≥ 60 / 100", "quarter", ym(pq.y, pq.q * 3), "t1", ["p:seed-b2"], "", ym(pq.y, pq.q * 3)),
     goal("m0", "Finish Module #3", "month", ym(pm.y, pm.m), Math.ceil(pm.m / 3) === q && pm.y === y ? "q1" : "q0", ["p:seed-b2"], "", ym(pm.y, pm.m)),
     goal("m9", "Read two French novels", "month", ym(pm.y, pm.m), "t1", [], "Leisure")
@@ -108,6 +110,52 @@ console.log("→ current:", g.logs.join(" | "));
   // Projects 右栏最上面那一段字：[ ] 里的就是上面那两条 North star
   const north = { key: "north-star", value: { text: "What I'm steering by: [A steady, curious life] — slow mornings to read and write, work that keeps teaching me something, and [French as a second home]. Money is a tool, not the point." }, updated: 4 };
   g.post({ secret: S, push: { rows: { projects: plans.map((p) => p.row), items: plans.flatMap((p) => p.items), settings: [...goals, north], tasks } } });
+}
+
+// 白板：Mindmap 页的两块思维导图，Projects 页最下面的生态圈（两种侧重）。存的样子和网页导入的一样：头一行 + 切成几段的身子（js/store/boards.js）
+{
+  const { CHUNK } = await import("../js/store/boards.js");
+  const C = await import("../js/canvas.js");
+  const rows = (id, meta, raw, at) => {
+    const canvas = C.compact(raw), str = JSON.stringify(canvas), n = Math.max(1, Math.ceil(str.length / CHUNK)), v = "seed" + id;
+    return [{ key: "board:" + id, value: { ...meta, v, parts: n, at: Date.UTC(2026, 10, at) }, updated: 5 },
+      ...Array.from({ length: n }, (_, k) => ({ key: "board:" + id + "#" + k, value: { v, s: str.slice(k * CHUNK, (k + 1) * CHUNK) }, updated: 5 }))];
+  };
+  const card = (id, x, y, text, more = {}) => ({ id, type: "text", x, y, width: 260, height: 120, text, ...more });
+  const ecoNodes = (level, sub) => [
+    card("eco-a", -470, -300, "2. 丰富体验\n即时回血口"), card("eco-d", 230, -300, "4. 增长\nLaser Beam"),
+    card("eco-b", -470, 200, "1. 人际关系\n情绪安全网"), card("eco-c", 230, 200, "3. 稳定生活\n体能进水口"),
+    { id: "eco-p", type: "text", x: -125, y: -90, width: 250, height: 200, text: "整体蓄水池\n" + level + "%\n" + sub }
+  ];
+  const edge = (id, a, b, label, more = {}) => ({ id, fromNode: a, toNode: b, ...(label ? { label } : {}), ...more });
+  const breakThrough = { nodes: ecoNodes(78, "定向高耗 · 整体平衡"), edges: [
+    edge("f1", "eco-a", "eco-p", "进水 10%"), edge("f2", "eco-p", "eco-d", "主线 55%"), edge("f3", "eco-b", "eco-p", "保底 15%", { toEnd: "none" }), edge("f4", "eco-c", "eco-p", "进水 20%"),
+    edge("f5", "eco-a", "eco-d", "", { fromSide: "top", toSide: "top" }), edge("f6", "eco-c", "eco-d", "", { fromSide: "right", toSide: "right" })] };
+  const overload = { nodes: ecoNodes(34, "抽得比进得快"), edges: [
+    edge("f1", "eco-a", "eco-p", "进水 5%"), edge("f2", "eco-p", "eco-d", "主线 70%"),
+    edge("f7", "eco-p", "eco-c", "漏水 15%"), edge("f8", "eco-p", "eco-b", "过载 5%")] };
+  const goalsOf = { "eco-a": "e1", "eco-b": "e2", "eco-c": "e3", "eco-d": "e4" };
+  const life = { nodes: [
+    { id: "g-health", type: "group", x: -620, y: 120, width: 520, height: 330, label: "Health", color: "4" },
+    { id: "c", type: "text", x: -150, y: -60, width: 300, height: 120, text: "# 2027\nWhat a good year looks like", color: "6" },
+    { id: "w", type: "text", x: 320, y: -260, width: 280, height: 160, text: "## Work\n- [x] Ship the Q4 report\n- [ ] Portfolio **live**\n- Freelance on the side", color: "5" },
+    { id: "f", type: "text", x: 320, y: 60, width: 280, height: 130, text: "## French\n1. B2 in February\n2. C1 by ==December==" },
+    { id: "h1", type: "text", x: -590, y: 160, width: 220, height: 110, text: "Run 3× a week\n> slow is fine" },
+    { id: "h2", type: "text", x: -340, y: 300, width: 220, height: 110, text: "Sleep by 23:30" },
+    { id: "file", type: "file", x: -590, y: 310, width: 220, height: 90, file: "Notes/Training plan.md" },
+    { id: "lnk", type: "link", x: 320, y: 250, width: 280, height: 70, url: "https://www.france-education-international.fr" },
+    { id: "p", type: "text", x: -620, y: -300, width: 300, height: 130, text: "## People\nSee friends every two weeks; call home on Sundays ([[People|everyone]])", color: "2" }
+  ], edges: [
+    edge("1", "c", "w", "money"), edge("2", "c", "f"), edge("3", "c", "g-health", "", { color: "4" }), edge("4", "c", "p", "", { color: "2" }),
+    edge("5", "f", "lnk", "", { toEnd: "none" }), edge("6", "h1", "h2", "same mornings", { fromSide: "right", toSide: "top" })] };
+  const notes = { nodes: [{ id: "a", type: "text", x: 0, y: 0, width: 320, height: 140, text: "### Thinking in Systems\nStocks change only through their flows. Delays mean the level lags." },
+    { id: "b", type: "text", x: 420, y: 0, width: 300, height: 140, text: "### The Four Burners\nTo be successful you have to cut off one of your burners." }], edges: [edge("1", "a", "b", "same idea")] };
+  g.post({ secret: "CHANGE_ME", push: { rows: { settings: [
+    ...rows("seedeco1", { name: "破局侧重", kind: "eco", file: "破局侧重.canvas", order: 1, goals: goalsOf }, breakThrough, 24),
+    ...rows("seedeco2", { name: "过载警示", kind: "eco", file: "过载警示.canvas", order: 2, goals: goalsOf }, overload, 24),
+    ...rows("seedmap1", { name: "Life map", kind: "map", file: "Maps/Life map.canvas", order: 1 }, life, 25),
+    ...rows("seedmap2", { name: "Reading notes", kind: "map", file: "Reading notes.canvas", order: 2 }, notes, 20)
+  ] } } });
 }
 
 // FAKE_WORST=1（tools/look.mjs --worst）：再造一份极端数据，看名字很长、一天很多条、只有一两个字的时候界面撑不撑得住

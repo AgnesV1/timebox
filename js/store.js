@@ -23,6 +23,7 @@ import ideaStore from "./store/ideas.js";
 import scoreStore from "./store/scores.js";
 import quadStore from "./store/quads.js";
 import listStore from "./store/lists.js";
+import boardStore from "./store/boards.js";
 
 const KEY = "kuzhouduan-v1";
 const OLD_KEY = "timebox-v1";
@@ -846,6 +847,8 @@ export const { quads, quadOf, quadBoard, addQuad, moveQuad, editQuad, doneQuad, 
 
 export const { itemCfg, setItemCfg, setPlanNotes, setSectionLater, rowOf, ensureRow, placeItem, moveLine, moveBlock, blockToPool, tickLine, tickStep, backToPool, settleLists, addPoolLines, planShape, planText, pastePlan, adoptLists, adoptSteps } = listStore(core);
 
-export const { goals, saveGoal, deleteGoal, setParent, linkGoal, renameGoalRef, ensureNorthStar, northStar, saveNorth } = goalStore(core);
+export const { goals, saveGoal, deleteGoal, setParent, linkGoal, renameGoalRef, ensureNorthStar } = goalStore(core);
+// 白板（Mindmap 页）和 Projects 页最下面的生态圈：.canvas 导进来，切段存在 Settings 里；生态圈连着线的那几块就是最上面一层的目标
+export const { boards, board, importBoard, renameBoard, deleteBoard } = boardStore({ ...core, goals });
 export const { readPlan, addReadPlan, moveReadPlan, removeReadPlan } = readPlanStore(core);
 export const { meals, mealPrefs, saveMeal, deleteMeal, saveWeek, setMealDay, checkDeal, addMealExamples, importMeals, clearMealExamples, addDishes, dishToBox } = mealStore(core);

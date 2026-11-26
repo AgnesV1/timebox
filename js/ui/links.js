@@ -1,15 +1,15 @@
 // Projects 页（电脑）上「谁为谁服务」的连线。页面上盖一层 SVG，鼠标点得穿；只在悬停、拖的时候画。
-// 悬停一条目标 / North star 里框出来的词 / 一个项目的头 / 一张计划卡（停一下，路过不算）：跟它有关的线一条条从它这儿飞出去（每条隔 40ms），
+// 悬停一条目标 / 生态圈里的一块（页面最下面，2026-11-26 取代了原来的 North star 那段字）/ 一个项目的头 / 一张计划卡（停一下，路过不算）：跟它有关的线一条条从它这儿飞出去（每条隔 40ms），
 //   用键盘（Tab）停在它们上面也一样（不出拖的把手——拖本来就要鼠标）；Esc、焦点离开 Projects 页就收起，
-//   画完以后，线上一道流光一直朝「为了谁」那头跑：计划 / 项目 → 目标 → 上级 → … → North star。没关系的目标、卡片淡下去，
-//   连着的目标和 North star 里的词涂上青柠荧光笔（她 10-21 从三个样子里挑的）。连着的都要看得见：折在「+N more」里的露出来，
-//   右栏滚走了的滚过去（悬停的在左边时），North star 那两行里被挡住的词，框里暂时换成那一句 / 那一小段 / 只列词（focusNorth）。
+//   画完以后，线上一道流光一直朝「为了谁」那头跑：计划 / 项目 → 目标 → 上级 → … → 生态圈里的那一块（最上面一层，span: north）。没关系的目标、卡片淡下去，
+//   连着的目标和生态圈的块涂上青柠荧光笔（她 10-21 从三个样子里挑的）。连着的都要看得见：折在「+N more」里的露出来，
+//   右栏滚走了的滚过去（悬停的在左边时）。
 //   目标：往上一路到顶，往下是挂在它下面的（一层层）和为它们服务的项目、计划；
 //   计划：它连着的目标（自己没连的，看它所在的项目连着的），再一路往上；项目：它连着的，加上它下面自己连了目标的计划。
 // 线就是两头直接连的一条三次贝塞尔，斜着飞过去，压着字也没关系（只在鼠标停着的时候有）：
 //   左边的计划卡 → 右栏的目标：从朝着对方的那一边出去，两头水平，中间一道斜的 S；
 //   都在右栏里的（目标 → 上级）：两头都从左边进出，往左鼓成一个 C，不压目标的字；
-//   接到页头下面那条 North star 里的词（她 10-31 挪到最上面了）：从下面接进那个词的底边——右栏里的从左边出去再往上拐，左边的从顶上出去；
+//   接到页面最下面的生态圈里的一块：从上面接进那一块的顶边——右栏里的从左边出去再往下拐，左边的从底下出去；
 //   右栏里滚走了、看不见的那头：压到能看见的那一截的边上，那头的小圆点画成空心的。
 // 每条线：一条很淡的细虚线当轨迹，上面一小截亮的（流光）沿着线跑到头，停一下，再从头出来；跑到「为了谁」那头时小圆点跳一下。
 //   白天墨色，粉、蓝两版错开一点（丝网印套色，和换页的标题一个路子）；夜里项目的霓虹色，底下一条宽的淡的当光（不用滤镜）。
@@ -20,7 +20,7 @@
 // 左边的（计划卡、项目的头、↻ 那几行）用鼠标选中了（出了拖的把手那个小圆点）就拿住，不轻易换、不轻易收（她 10-27 说的：太容易消失、会漂到别的线上）：
 //   要停住才选中，挪着路过的不算；拿住以后路过别的不换——在一个没连着的上面停住 REST 才换成它，连着的（亮着的）不换；
 //   鼠标在这一套占的那一片里（线的外框，加上它自己和亮着的那些）就一直在，出了那一片 HOLD 才收；点它自己、点亮着的（不是上面的按钮）也不收。
-//   右栏里的目标、最上面 North star 里的词照旧：停一下就换，离线远了一会儿就收。
+//   右栏里的目标、生态圈里的块照旧：停一下就换，离线远了一会儿就收。
 // 拖一下建链接：悬停时旁边出一个小圆圈，从它拖出去，一条线跟着鼠标飞；能连的地方亮着，经过时吸过去，松手就连上。拖到右栏的上下沿，右栏自己滚。
 //   目标拖到目标 = 设成它的上级（一条只有一个上级，会换掉原来的；会连成环的不亮）；目标 ↔ 计划 / 项目 = 这个计划 / 项目为这条目标服务。
 //   不拖也能连：计划编辑框里的 Serves（js/ui/projects.js），改目标文字时的 Part of（js/ui/goals.js）。
@@ -30,9 +30,8 @@ import * as store from "../store.js";
 import * as G from "../goals.js";
 import * as GR from "../groups.js";
 import * as E from "../engine.js";
-import { esc } from "../dom.js";
 
-const NODE = ".goals .gl[data-goal], .pj-north .ns-g[data-goal], .pgroup[data-group] > .pg-top:not(.editing), .pcard[data-project], .g-rep[data-project]";
+const NODE = ".goals .gl[data-goal], .pj-eco .eco-n[data-goal], .pj-eco .eco-o[data-goal], .pgroup[data-group] > .pg-top:not(.editing), .pcard[data-project], .g-rep[data-project]";
 const fine = matchMedia("(hover: hover) and (pointer: fine)");
 const still = matchMedia("(prefers-reduced-motion: reduce)");
 const NS = "http://www.w3.org/2000/svg";
@@ -65,7 +64,7 @@ function keyOf(el) {
 }
 
 // 页面上代表它的元素。目标折在「+N more」里（画着但藏着，.fold）：平时用那个按钮代替，悬停时露出来了（.lk-unfold）、拖着连线时那一段整段展开，就是它自己；
-// North star 里的词：框里换成了重点（.ns-focus）就是那里面的那个；
+// 最上面一层的目标：生态圈里的那一块，不在图上的就是图下面那一排小签（.eco-o）；
 // 切到了 Ideas：用「Goals」那个按钮。收进往期的目标不会问到这里（related 已经越过它们）
 function elOf(key, cols) {
   const root = page();
@@ -75,7 +74,7 @@ function elOf(key, cols) {
     const id = CSS.escape(key.slice(5)), col = cols.get(key.slice(5));
     const gl = q('.goals .gl[data-goal="' + id + '"]');
     if (gl && (!gl.classList.contains("fold") || gl.classList.contains("lk-unfold") || root.classList.contains("lk-drag"))) return gl;
-    return q('.pj-north .ns-focus [data-fgoal="' + id + '"]') || q('.pj-north .ns-g[data-goal="' + id + '"]') ||
+    return q('.pj-eco .eco-n[data-goal="' + id + '"]') || q('.pj-eco .eco-o[data-goal="' + id + '"]') ||
       (col && (q('.goals [data-col="' + col + '"] .gmore') || q('.goals [data-col="' + col + '"] h4'))) || q('.goals .rail-tabs [data-v="goals"]');
   }
   if (key.startsWith("g:")) return q('.pgroup[data-group="' + CSS.escape(key.slice(2)) + '"] > .pg-top:not(.editing)');
@@ -194,16 +193,18 @@ function sample({ p0, c1, c2, p3 }, n = 24) {
 
 // 两个框之间的一条线（框是 { l, t, r, b }，坐标随意，只要两个一样）。rail = 两头都在右栏里。y0 / y1 = 线头的高度（不给就是正中）
 //   都在右栏里：两头从左边进出，往左鼓成 C；左右隔开：从朝着对方的那一边出去，两头水平，中间一道斜的 S；上下叠着（窗口窄了，右栏挪到上面）：从上下沿出去。
-//   north = B 是最上面那条 North star 里的词：从下面接进它的底边中间（y1 压过边的话跟着往上挪）；"side"（A 在右栏里）从 A 的左边出去先往左再往上，"top" 从 A 的顶上出去
+//   north = B 是最上面一层的目标（生态圈里的一块）：竖着接进它。B 在下面（生态圈在页面最下面）就从上面接进它的顶边，在上面就从下面接进底边（y1 压过边的话跟着挪）；
+//   "side"（A 在右栏里）从 A 的左边出去先往左再拐，"top" 从 A 朝着 B 的那条边（上沿或下沿）出去
 export function curve(A, B, { rail = false, north = "", y0, y1 } = {}) {
   const ya = y0 ?? (A.t + A.b) / 2, yb = y1 ?? (B.t + B.b) / 2;
   if (north) {
-    const p3 = { x: (B.l + B.r) / 2, y: yb + (B.b - B.t) / 2 + 3 };
-    const p0 = north === "side" ? { x: A.l - 3, y: ya } : { x: (A.l + A.r) / 2, y: A.t - 2 };
+    const down = (B.t + B.b) / 2 > (A.t + A.b) / 2, s = down ? -1 : 1, h = (B.b - B.t) / 2;
+    const p3 = { x: (B.l + B.r) / 2, y: yb + s * (h + 3) };
+    const p0 = north === "side" ? { x: A.l - 3, y: ya } : { x: (A.l + A.r) / 2, y: down ? A.b + 2 : A.t - 2 };
     const k = clamp(Math.abs(p0.y - p3.y) * 0.5, 24, 160);
-    const c1 = north === "side" ? { x: p0.x - clamp(Math.abs(p0.y - p3.y) * 0.3, 24, 120), y: p0.y } : { x: p0.x, y: p0.y - k };
-    // 词在右栏正上方：沿着右栏左边那道缝上去，再斜着接进词里，不从右栏的目标上竖着穿过
-    return { p0, c1, c2: { x: north === "side" ? Math.min(p3.x, c1.x) : p3.x, y: p3.y + k }, p3 };
+    const c1 = north === "side" ? { x: p0.x - clamp(Math.abs(p0.y - p3.y) * 0.3, 24, 120), y: p0.y } : { x: p0.x, y: p0.y - s * k };
+    // 在右栏正上方 / 正下方：沿着右栏左边那道缝走，再斜着接进去，不从右栏的目标上竖着穿过
+    return { p0, c1, c2: { x: north === "side" ? Math.min(p3.x, c1.x) : p3.x, y: p3.y + s * k }, p3 };
   }
   if (rail) {
     const p0 = { x: A.l - 3, y: ya }, p3 = { x: B.l - 3, y: yb }, k = clamp(Math.abs(p3.y - p0.y) * 0.28, 18, 80);
@@ -248,7 +249,6 @@ function rectOf(el) { return toPage(el.getBoundingClientRect(), layer.getBoundin
 // 目标那一行只算到字的末尾（不然一栏宽的空白也算进去）；项目的头只算名字；框出来的词折行了，算它第一行那一截
 function boxOf(el) {
   if (el.classList.contains("pg-top") && el.querySelector("h3")) return rectOf(el.querySelector("h3"));
-  if (el.classList.contains("ns-g")) { const r = el.getClientRects()[0]; return r ? toPage(r, layer.getBoundingClientRect()) : rectOf(el); }
   const b = rectOf(el), t = el.classList.contains("gl") && !el.classList.contains("editing") && el.querySelector(".gt");
   if (t) {
     const range = document.createRange();
@@ -259,26 +259,26 @@ function boxOf(el) {
   return b;
 }
 
-// 线头的高度：计划卡是标题那一行，别的是正中。在右栏里滚走了（或 North star 那段字收起来、滚走了）：压到能看见的那一截的边上，clip = 那头画成空心。
-// 最上面那条 North star 跟着页面滚出了窗口：压到窗口上沿
+// 线头的高度：计划卡是标题那一行，别的是正中。在右栏里滚走了：压到能看见的那一截的边上，clip = 那头画成空心。
+// 页面最下面的生态圈还在窗口下面（没滚到）：压到窗口下沿
 function endOf(el) {
   const b = boxOf(el);
   let y = el.classList.contains("pcard") ? Math.min((b.t + b.b) / 2, b.t + 14) : (b.t + b.b) / 2, clip = false;
-  const sc = el.closest(".rail-body, .ns-text, .ns-focus");
+  const sc = el.closest(".rail-body");
   if (sc) {
     const r = rectOf(sc), lo = r.t + 5, hi = r.b - 5;
     if (y < lo || y > hi) { y = clamp(y, lo, hi); clip = true; }
   }
-  if (el.closest(".pj-north")) {
-    const top = -layer.getBoundingClientRect().top + 6;
-    if (y < top) { y = top; clip = true; }
+  if (el.closest(".pj-eco")) {
+    const bottom = innerHeight - layer.getBoundingClientRect().top - 6;
+    if (y > bottom) { y = bottom; clip = true; }
   }
   return { b, y, clip };
 }
 
-// 两头是谁决定线怎么走：有一头是最上面 North star 里的词 = 从下面接进它（另一头在右栏里就从左边出去）；都在右栏里 = 往左鼓的 C；别的 curve 自己看
+// 两头是谁决定线怎么走：有一头是生态圈里的一块 = 竖着接进它（另一头在右栏里就从左边出去）；都在右栏里 = 往左鼓的 C；别的 curve 自己看
 export function route(A, B, a, b, ys = {}) {
-  const na = Boolean(a?.closest?.(".pj-north")), nb = Boolean(b?.closest?.(".pj-north"));
+  const na = Boolean(a?.closest?.(".pj-eco")), nb = Boolean(b?.closest?.(".pj-eco"));
   if (nb && !na) return curve(A, B, { north: a?.closest?.(".pj-rail") ? "side" : "top", ...ys });
   if (na && !nb) { const c = curve(B, A, { north: b?.closest?.(".pj-rail") ? "side" : "top", y0: ys.y1, y1: ys.y0 }); return { p0: c.p3, c1: c.c2, c2: c.c1, p3: c.p0 }; }
   return curve(A, B, { rail: Boolean(a?.closest?.(".pj-rail") && b?.closest?.(".pj-rail")), ...ys });
@@ -324,11 +324,9 @@ function paint(key, { fly = true } = {}) {
   const base = colorOf(key);
   const lit = new Set([key]), keep = new Set();
   let n = 0, streaks = 0;
-  // 先让连着的看得见（都在量位置之前）：折在「+N more」里的露出来；North star 里被挡住的词换成重点（悬停的就是 North star 里的词时不换，它本来就看得见）
+  // 先让连着的看得见（都在量位置之前）：折在「+N more」里的露出来
   const list = related(key).sort((a, b) => a.at - b.at), ends = new Set([key, ...list.flatMap((e) => [e.from, e.to])]);
-  const north = new Set(goals.filter((g) => g.span === "north").map((g) => "goal:" + g.id));
   unfold(root, ends, cur?.el);
-  focusNorth(root, north.has(key) ? [] : [...ends].filter((k) => north.has(k)).map((k) => k.slice(5)));
   for (const e of list) {
     const a = elOf(e.from, cols), b = elOf(e.to, cols);
     if (!a || !b || a === b) continue;
@@ -358,7 +356,7 @@ function paint(key, { fly = true } = {}) {
   }
   for (const [id, x] of edges) if (!keep.has(id)) drop(id, x);
   fit();
-  // 有关系的亮着（css 给目标和 North star 的词涂荧光笔），别的淡下去（一条线都没有的时候不淡）
+  // 有关系的亮着（css 给目标和生态圈的块涂荧光笔），别的淡下去（一条线都没有的时候不淡）
   root.querySelectorAll(".lk-on, .lk-has").forEach((el) => el.classList.remove("lk-on", "lk-has"));
   const rows = [];
   if (keep.size) {
@@ -368,7 +366,7 @@ function paint(key, { fly = true } = {}) {
       el?.closest(".pgroup")?.classList.add("lk-has");
       if (el?.classList.contains("gl")) rows.push(el);
     }
-  } else { unfocusNorth(root); unfold(root, new Set(), null); }
+  } else unfold(root, new Set(), null);
   root.classList.toggle("lk-dim", Boolean(keep.size));
   if (fly && rows.length) reveal(root, cur?.el, rows);
 }
@@ -392,50 +390,6 @@ function unfold(root, ends, el) {
     b.textContent = out ? "+" + (all - out) + " more" : b.dataset.t;
     b.hidden = out > 0 && out === all;
   }
-}
-
-// 这个词在那段字的框里整个看得见（折了行的话，最后一截也要在框里）
-function shows(box, el) {
-  const rs = el?.getClientRects();
-  if (!rs?.length) return false;
-  const r = box.getBoundingClientRect();
-  return rs[0].top >= r.top - 1 && rs[rs.length - 1].bottom <= r.bottom + 1;
-}
-
-// North star 那段平时只露两行。连着的词有被挡住的（在第二行下面、被滚走了、折了行露一半）：框里暂时换成重点——
-//   只连着一个词：那一句；一句放不下就那一小段（先带上前面一小段），再放不下就只剩这个词；连着两三个词：只列这几个词（她说的）。
-// 盖在原来那段字上面，一样大（下面的目标不跳）；原来那段藏起来（也不接鼠标），线走开就换回来（unfocusNorth）
-function focusNorth(root, ids) {
-  const ns = root.querySelector(".pj-north .ns"), txt = ns?.querySelector(".ns-text:not(.empty)");
-  if (!txt || !ids.length || ids.every((id) => shows(txt, txt.querySelector('.ns-g[data-goal="' + CSS.escape(id) + '"]')))) { unfocusNorth(root); return; }
-  const sig = [...ids].sort().join(" "), place = (el) => Object.assign(el.style, { top: txt.offsetTop + "px", left: txt.offsetLeft + "px", width: txt.clientWidth + "px", height: txt.clientHeight + "px" });
-  let ov = ns.querySelector(".ns-focus");
-  if (ov?.dataset.k === sig) { place(ov); return; }   // 已经换好了（滚动、窗口变了以后再画一遍）：只跟着挪
-  const text = store.northStar(), phrases = G.parseNorth(text), north = store.goals().filter((g) => g.span === "north");
-  const at = G.matchNorth(phrases, north).ids, byId = new Map(north.map((g) => [g.id, g]));
-  const keep = phrases.map((p, i) => i).filter((i) => ids.includes(at[i]));
-  if (!keep.length) { unfocusNorth(root); return; }
-  if (!ov) {
-    ov = document.createElement("div");
-    ov.className = "ns-focus";
-    ov.setAttribute("aria-hidden", "true");
-    ns.appendChild(ov);
-  }
-  place(ov);
-  // 框里的词和原来那段一个样子（.ns-g），只是不接鼠标、带的是 data-fgoal（不算能悬停、能连的那种）
-  const word = (i) => { const g = byId.get(at[i]); return (g ? '<span class="ns-g' + (g.done ? " done" : g.miss ? " miss" : "") + '" data-fgoal="' + esc(g.id) + '">' : '<span class="ns-g ghost">') + esc(phrases[i].text) + "</span>"; };
-  const html = (parts) => parts.map((x) => (x.gap ? '<span class="ns-gap">…</span>' : x.sep ? '<span class="ns-sep">·</span>' : x.i !== undefined ? word(x.i) : esc(x.text))).join("");
-  for (const [level, pad] of keep.length > 1 ? [["word"]] : [["sentence"], ["clause", 1], ["clause"], ["word"]]) {
-    ov.innerHTML = html(G.northFocus(text, phrases, keep, level, pad));
-    if (ov.scrollHeight <= ov.clientHeight + 1) break;
-  }
-  ov.dataset.k = sig;
-  ns.classList.add("focus");
-}
-
-function unfocusNorth(root) {
-  root?.querySelector(".pj-north .ns-focus")?.remove();
-  root?.querySelector(".pj-north .ns.focus")?.classList.remove("focus");
 }
 
 // 右栏滚走了、看不见的连着的目标：悬停的在左边（计划卡、项目名）时，右栏滚过去（刚飞出去那一下，一次）。
@@ -491,10 +445,9 @@ function placeHandle(el) {
   if (!el) { handle.classList.remove("on"); return; }
   // 项目的头：名字后面紧跟着一行小字，放在那行字（和风险的点）后面
   const tail = el.classList.contains("pg-top") && [...el.querySelectorAll(":scope > .pg-meta, :scope > .health")].pop();
-  const rects = el.classList.contains("ns-g") ? el.getClientRects() : null;   // 框出来的词折行了：放在最后一截后面
-  const b = boxOf(el), t = tail ? rectOf(tail) : rects?.length ? toPage(rects[rects.length - 1], layer.getBoundingClientRect()) : b;
-  // 计划卡：上沿正中；框出来的词（夹在一段字中间）：右上角，不压后面的字；别的：字后面
-  const p = el.classList.contains("pcard") ? { x: (b.l + b.r) / 2, y: b.t } : rects?.length ? { x: t.r, y: t.t } : { x: t.r + 10, y: (b.t + b.b) / 2 };
+  const b = boxOf(el), t = tail ? rectOf(tail) : b;
+  // 计划卡、生态圈的块：上沿正中；别的：字后面
+  const p = el.classList.contains("pcard") || el.classList.contains("eco-n") ? { x: (b.l + b.r) / 2, y: b.t } : { x: t.r + 10, y: (b.t + b.b) / 2 };
   handle.style.left = p.x + "px";
   handle.style.top = p.y + "px";
   handle.classList.add("on");
@@ -515,7 +468,7 @@ function clearLines(now) {
   const root = page();
   root?.classList.remove("lk-dim");
   root?.querySelectorAll(".lk-on, .lk-has").forEach((el) => el.classList.remove("lk-on", "lk-has"));
-  if (root) { unfocusNorth(root); unfold(root, new Set(), null); }
+  if (root) unfold(root, new Set(), null);
   if (!layer) return;
   cutX.classList.remove("on");
   const clear = () => { for (const [id, x] of edges) { edges.delete(id); x.g.remove(); } fit(); svg.classList.remove("out"); };
@@ -537,7 +490,7 @@ function close(now = false) {
 const keep = () => { clearTimeout(closeT); closeT = 0; };
 const later = (ms = GRACE) => { if (!closeT) closeT = setTimeout(() => close(), ms); };
 // 用鼠标选中的、在左边的：拿住
-const held = () => Boolean(cur && !cur.kb && !cur.el.closest(".pj-rail, .pj-north"));
+const held = () => Boolean(cur && !cur.kb && !cur.el.closest(".pj-rail, .pj-eco"));
 
 // 停在 key 上 ms 以后画它。still：离开始等的那一点挪远了 STILL 就从头等（路过的不算，要停住）；不然换了一个才从头等
 function wait(key, n, ms, still) {
@@ -631,7 +584,7 @@ function onMove() {
     if (cur?.key === key || (hold && n.classList.contains("lk-on"))) { want = ""; clearTimeout(wantT); keep(); const o = layer.getBoundingClientRect(); showCut(nearEnd(mx - o.left, my - o.top)); return; }
     if (cutX) showCut(null);
     if (hold) wait(key, n, REST, true);
-    else wait(key, n, DWELL, !n.closest(".pj-rail, .pj-north"));
+    else wait(key, n, DWELL, !n.closest(".pj-rail, .pj-eco"));
     if (cur) keep();
     return;
   }
@@ -674,7 +627,7 @@ function startDrag(e) {
     if (k && canLink(goals, from, k)) { can.set(n, k); n.classList.add("lk-can"); }
   }
   el.classList.add("lk-src");
-  // 展开（css：最上面 North star 那段放开、右栏各段折起来的目标露出来），能连的才都看得到、放得上去。
+  // 展开（css：右栏各段折起来的目标露出来），能连的才都看得到、放得上去。
   // 展开以后拖的那一个会往下挪：在右栏里就把右栏往下滚同样多，别的把页面往下滚同样多，它就留在手指底下（松手后两样都滚回去）
   const body = page()?.querySelector(".goals .rail-body"), top0 = el.getBoundingClientRect().top, scroll0 = body?.scrollTop || 0, page0 = scrollY;
   page()?.classList.add("lk-drag");
@@ -700,7 +653,7 @@ function startDrag(e) {
 
 // 屏幕坐标（这条线画在一层固定的 svg 上）
 function screenBox(el) {
-  const r = el.classList.contains("ns-g") ? el.getClientRects()[0] || el.getBoundingClientRect() : (el.classList.contains("pg-top") && el.querySelector("h3") || el).getBoundingClientRect();
+  const r = (el.classList.contains("pg-top") && el.querySelector("h3") || el).getBoundingClientRect();
   return { l: r.left, t: r.top, r: r.right, b: r.bottom };
 }
 
@@ -823,7 +776,7 @@ export function initLinks() {
   addEventListener("focusout", (e) => { if (cur?.kb && !page()?.contains(e.relatedTarget)) close(); });
   document.documentElement.addEventListener("mouseleave", () => { if (!drag) close(); });
   addEventListener("hashchange", () => close(true));
-  // 窗口变了、滚动了（页面、右栏、North star 那段字）：每帧最多重算一次位置，不重新飞
+  // 窗口变了、滚动了（页面、右栏）：每帧最多重算一次位置，不重新飞
   let raf = 0;
   const again = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { if (cur && !drag && onPage()) { paint(cur.key, { fly: false }); if (!cur.kb) placeHandle(cur.el); if (cutX) showCut(null); } }); };
   addEventListener("resize", again);

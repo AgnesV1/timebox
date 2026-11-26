@@ -3,7 +3,7 @@
 //     miss: "YYYY-MM"（没实现，哪个月定下的；她 2026-11-22 夜要的：只要一种、不分失败 / 放弃 / 改了范围，「到底为什么没实现再说」；和 done 只会有一个）, order,
 //     up: 上级目标的 id（一条只有一个上级，可以一层层往上串）, by: ["g:项目名", "p:计划 id"]（哪些项目 / 计划为它服务，多对多） }
 // 栏目按「今天」现算（她 2026-11-05 晚重排的），每栏管一段月份：This month、Next month；This quarter 只在本季第一个月出现，管第三个月；
-//   This year 只在今年还剩月份时出现，管前面几栏之后到 12 月；再加明年（Next year）和之后三年，最后一栏 North star（没有日期）。
+//   This year 只在今年还剩月份时出现，管前面几栏之后到 12 月；再加明年（Next year）和之后三年，最后一栏是最上面一层（没有日期；以前叫 North star，现在是 Projects 页最下面生态圈里的那几块）。
 //   月、季、年目标都一样：按截止月落进管那个月的那一栏。截止月过去了就过期（isOld，做没做完都一样），不再进栏，收进最底下的「往期」
 //   （past，按季度看，只放过期的）；连线和「For …」链条也越过它们，接到往上第一条还在的（visibleSet / lift）。比最后一个年份还远的先放在那一年（ahead）。
 // 对齐的链条：每天的任务 → 它的计划（没有计划就是它的项目）→ 服务的目标 → 上级 → 再上级……（见最下面的 chainsFor）
@@ -37,7 +37,7 @@ export function columns(today) {
   // 明年叫 Next year（小字写年份），再往后三年直接写年份：今年是 2026 就是 Next year 2027 → 2028 → 2029 → 2030。
   // 12 月时明年 1 月已经归 Next month 了（排在前面的栏先接）
   for (let k = 1; k <= YEARS_AHEAD; k++) cols.push({ key: "y" + (y + k), span: "year", y: y + k, from: (y + k) * 12, to: (y + k) * 12 + 11, title: k === 1 ? "Next year" : String(y + k), sub: k === 1 ? String(y + 1) : "", due: ymOf(y + k, 12), far: true });
-  cols.push({ key: "north", span: "north", y: Infinity, from: null, to: null, title: "North star", sub: "", due: "", far: true });
+  cols.push({ key: "north", span: "north", y: Infinity, from: null, to: null, title: "Ecosystem", sub: "", due: "", far: true });   // 最上面一层：以前叫 North star，2026-11-26 起是 Projects 页最下面生态圈里的那几块
   return cols;
 }
 
@@ -56,7 +56,7 @@ export const closed = (g) => Boolean(g?.done || g?.miss);
 // 标「做到了 / 没实现」时记哪个月：这个月；已经过期的（往期里补标）记它原定的那个月
 export const settleMonth = (g, today) => (isOld({ ...g, done: "", miss: "" }, today) ? String(g.due).slice(0, 7) : String(today).slice(0, 7));
 
-// 过期了没有：它那个月已经过去了（月、季、年目标都一样）。North star、没写期限的永远不过期
+// 过期了没有：它那个月已经过去了（月、季、年目标都一样）。最上面一层（生态圈）、没写期限的永远不过期
 export function isOld(g, today) {
   return spanOf(g) !== "north" && Boolean(monthOfGoal(g)) && monthOf(monthOfGoal(g)) < monthOf(today);
 }
@@ -124,7 +124,7 @@ export function chainUp(goals, id, vis = null) {
   return out;
 }
 
-// 还在上面那几段（或 North star）里的目标：没过期的
+// 还在上面那几段（或生态圈）里的目标：没过期的
 export const visibleSet = (goals, today) => new Set(goals.filter((g) => !isOld(g, today)).map((g) => g.id));
 // 越过收掉的：自己还看得见就是自己，不然往上找第一条看得见的（绕回来就停）；一条都没有 = null
 export function lift(goals, id, vis, at = byId(goals)) {
@@ -171,93 +171,4 @@ export function chainsFor(goals, list, vis = null) {
   const key = (c) => c.map((g) => g.id).join(">");
   const keys = chains.map(key);
   return chains.filter((c, i) => keys.indexOf(key(c)) === i && !keys.some((k, j) => j !== i && k.length > keys[i].length && k.endsWith(">" + keys[i])));
-}
-
-// ---------- North star 那一段字 ----------
-// Projects 页右栏最上面是一段长文字（存在 Settings 的 north-star），[方括号] 里的每个词就是一条 North star 目标
-// （span: "north"，还是 goal:<id> 那一行，所以上级、服务这些链接都不用改）。括号本身只在改字的时候看得到。
-
-const plain = (t) => String(t || "").replace(/[[\]]/g, "").replace(/\s+/g, " ").trim();
-
-// 文字里框出来的词，按先后：[{ text, start, end }]（start / end 含括号）。空括号、没配对的括号、跨行的不算
-export function parseNorth(text) {
-  const out = [], re = /\[([^[\]\n]*)\]/g, s = String(text ?? "");
-  for (let m = re.exec(s); m; m = re.exec(s)) {
-    const t = plain(m[1]);
-    if (t) out.push({ text: t, start: m.index, end: m.index + m[0].length });
-  }
-  return out;
-}
-
-// 每个词对上哪条 North star 目标：先找字一模一样的，剩下的按先后对上（改了措辞还是原来那条，链接不丢）。
-// → { ids: [目标 id，对不上 = ""（要新建）], left: [文字里已经没有了的目标] }
-export function matchNorth(phrases, north) {
-  const ids = phrases.map(() => ""), used = new Set();
-  phrases.forEach((p, i) => {
-    const g = north.find((x) => !used.has(x.id) && plain(x.text) === p.text);
-    if (g) { ids[i] = g.id; used.add(g.id); }
-  });
-  const rest = north.filter((g) => !used.has(g.id));
-  phrases.forEach((p, i) => { if (!ids[i] && rest.length) { const g = rest.shift(); ids[i] = g.id; used.add(g.id); } });
-  return { ids, left: north.filter((g) => !used.has(g.id)) };
-}
-
-// 悬停画线时，连着的词被 North star 那个三行的框挡住了：框里暂时只放「重点」（js/ui/links.js 的 focusNorth）。
-// keep = 要留的词（parseNorth 的下标）；level：
-//   "sentence" = 带着这些词的那几句；"clause" = 那几小段（按逗号、冒号切；破折号不切，它常常就是引出那个词的），
-//   pad = 每一小段再往前多带几段（前文比后文更能说明这个词是什么）；"word" = 只列这几个词（她说连着两三个词的时候就这样）。
-// 不会切在框里面（框里的词可以带逗号）。返回一段段：{ text }（原文，空白收成一个空格）、{ i }（第几个词，框里的别的词也照样给）、
-//   { gap: true }（省掉的地方，画成 …）、{ sep: true }（只列词时词和词之间，画成 ·）
-const SENTENCE = /[.!?;]+["'”’)]*\s+|[。！？；]+["'”’）」]*|\n+/g;
-const CLAUSE = /[.!?;,:]+["'”’)]*\s+|[。！？；，、：]+["'”’）」]*|\n+/g;
-export function northFocus(text, phrases, keep, level = "sentence", pad = 0) {
-  const s = String(text ?? ""), want = [...new Set(keep)].filter((i) => phrases[i]).sort((a, b) => a - b);
-  if (!want.length) return [];
-  if (level === "word") return want.flatMap((i, k) => (k ? [{ sep: true }, { i }] : [{ i }]));
-  const inside = (at) => phrases.some((p) => at > p.start && at < p.end);
-  const cuts = [0];
-  for (const m of s.matchAll(level === "clause" ? CLAUSE : SENTENCE)) {
-    const at = m.index + m[0].length;
-    if (!inside(m.index) && at > cuts[cuts.length - 1] && at < s.length) cuts.push(at);
-  }
-  cuts.push(s.length);
-  const units = cuts.slice(0, -1).map((a, k) => ({ a, b: cuts[k + 1] }));
-  const kept = units.map(() => false);
-  units.forEach((u, k) => {
-    if (want.some((i) => phrases[i].start >= u.a && phrases[i].start < u.b)) for (let j = Math.max(0, k - pad); j <= k; j++) kept[j] = true;
-  });
-  // 挨着的几段连成一截；截和截之间、开头结尾省掉的地方是 …
-  const runs = [];
-  kept.forEach((on, k) => {
-    if (!on) return;
-    const last = runs[runs.length - 1];
-    if (last && last.to === k - 1) last.to = k;
-    else runs.push({ from: k, to: k });
-  });
-  const out = [];
-  runs.forEach((r, n) => {
-    const a = units[r.from].a, b = units[r.to].b, before = n > 0 || r.from > 0, after = r.to < units.length - 1;
-    const part = [];
-    let at = a;
-    phrases.forEach((p, i) => { if (p.start >= a && p.start < b) { part.push({ text: s.slice(at, p.start) }, { i }); at = p.end; } });
-    part.push({ text: s.slice(at, b) });
-    for (const x of part) if (x.text !== undefined) x.text = x.text.replace(/\s+/g, " ");
-    part[0].text = part[0].text?.replace(/^\s+/, "") ?? part[0].text;
-    const end = part[part.length - 1];
-    end.text = end.text.replace(after ? /[\s,，、:：;；—–-]+$/ : /\s+$/, "");
-    if (before) out.push({ gap: true });
-    out.push(...part.filter((x) => x.text === undefined || x.text));
-    if (after && n === runs.length - 1) out.push({ gap: true });
-  });
-  return out;
-}
-
-// 这一段该显示（和打开来改）的字：存过的那段；没存过就用现有的 North star 目标一条一行拼起来。
-// 文字里对不上的目标（别的设备上新加的、从年份那栏搬过来的）补在最后，一条都不藏
-export function northText(stored, goals) {
-  const north = goals.filter((g) => g.span === "north");
-  const line = (g) => "[" + plain(g.text) + "]";
-  if (typeof stored !== "string") return north.map(line).join("\n");
-  const { left } = matchNorth(parseNorth(stored), north);
-  return left.length ? (stored ? stored + "\n" : "") + left.map(line).join("\n") : stored;
 }

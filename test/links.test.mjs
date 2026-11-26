@@ -32,7 +32,7 @@ test("stacked boxes (narrow window): out of the bottom, into the top", () => {
   assert.equal(c.c1.x, c.p0.x);
 });
 
-test("a North star word in the band at the top: lines come up into its bottom edge", () => {
+test("a top-level goal: lines come up into a card above, and down into an ecosystem card below", () => {
   const word = { l: 600, t: 100, r: 760, b: 124 };
   const fromRail = L.curve({ l: 1100, t: 600, r: 1300, b: 622 }, word, { north: "side" });
   assert.deepEqual([fromRail.p0.x, fromRail.p0.y], [1097, 611], "a goal in the rail leaves from its left side");
@@ -44,6 +44,14 @@ test("a North star word in the band at the top: lines come up into its bottom ed
   assert.equal(L.curve({ l: 1100, t: 600, r: 1300, b: 622 }, word, { north: "side", y1: 140 }).p3.y, 155, "a hidden word: the end follows the clamped height");
   const above = L.curve({ l: 1100, t: 600, r: 1300, b: 622 }, { l: 1150, t: 100, r: 1300, b: 124 }, { north: "side" });
   assert.equal(above.c2.x, above.c1.x, "a word right above the rail: up the gap beside the rail, not straight through its goals");
+  // 生态圈在页面最下面：从上面接进那一块的顶边
+  const eco = { l: 400, t: 1400, r: 640, b: 1480 };
+  const down = L.curve({ l: 1100, t: 600, r: 1300, b: 622 }, eco, { north: "side" });
+  assert.deepEqual([down.p3.x, down.p3.y], [520, 1397], "into the middle of the card's top edge");
+  assert.ok(down.c2.x === down.p3.x && down.c2.y < down.p3.y, "arriving straight down");
+  const plan = L.curve({ l: 200, t: 300, r: 500, b: 380 }, eco, { north: "top" });
+  assert.deepEqual([plan.p0.x, plan.p0.y], [350, 382], "a plan card above leaves from its bottom");
+  assert.equal(L.curve({ l: 1100, t: 600, r: 1300, b: 622 }, eco, { north: "side", y1: 894 }).p3.y, 851, "below the window: the end sits at the clamped height");
 });
 
 test("the streak keeps the same speed on long and short lines", () => {

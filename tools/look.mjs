@@ -92,7 +92,7 @@ async function seedLeisure(page) {
 function clipAudit() {
   const out = [], seen = new Set();
   const skip = (el) => el.closest(".gdue.dflt, .sp-sr, .sr-only, #sky, .fx, .lk-layer, svg, [hidden], [aria-hidden='true']");
-  const meant = (el) => el.matches(".mn, .mn-inner, .mn-hs, .mn-rw, .chain.mq, .phone-day .chain");
+  const meant = (el) => el.matches(".mn, .mn-inner, .mn-hs, .mn-rw, .chain.mq, .phone-day .chain, .mm-view");   // .mm-view：Mindmap 的白板，本来就是挪着看的
   const label = (el) => el.tagName.toLowerCase() + (el.classList[0] ? "." + el.classList[0] : "") + (el.parentElement?.classList[0] ? " in ." + el.parentElement.classList[0] : "");
   const say = (kind, el, text, extra) => { const k = kind + "|" + label(el) + "|" + text; if (!seen.has(k)) { seen.add(k); out.push(kind + "  " + label(el) + "  “" + text + "”  " + extra); } };
   for (const el of document.body.querySelectorAll("*")) {
@@ -144,6 +144,7 @@ const pullTo = (dy, release = false, wait = 0) => async (page) => {
 };
 const SHOTS = [
   { device: "phone", name: "today", hash: "today" },
+  { device: "phone", name: "mindmap", hash: "mindmap" },
   { device: "phone", name: "today-open", hash: "today", act: tap(".row .task") },
   // 加任务那一排点「项目」小签：从它那里长出来的下拉
   { device: "phone", name: "today-pick", hash: "today", act: async (page) => { await page.locator('.dayview form[data-add] input[name="title"]').first().click(); await page.waitForTimeout(300); await tap(".dayview form[data-add] .pj-pick")(page); } },
@@ -181,10 +182,16 @@ const SHOTS = [
   { device: "desk", name: "projects-plan", hash: "projects", act: async (page) => { await tap('.pcard[data-project="seed-b2"] .pname')(page); await page.waitForTimeout(300); await tap(".project-editor .ls-it")(page); } },
   { device: "desk", name: "projects-edit-goal", hash: "projects", act: tap('.goals .gl[data-goal="q1"] .gt') },
   { device: "desk", name: "projects-add-goal", hash: "projects", act: async (page) => { await hover('.goals [data-col="nmonth"] h4', 300)(page); await tap('.goals [data-col="nmonth"] .gplus')(page); await page.keyboard.type("Run 10k #Fitness"); } },
-  { device: "desk", name: "projects-hover-north", hash: "projects", act: hover('.pj-north .ns-g[data-goal="n2"]', 1600) },
-  { device: "desk", name: "projects-north-edit", hash: "projects", act: async (page) => { await tap('.pj-north .ns-g[data-goal="n2"]')(page); await page.keyboard.press("Control+End"); await page.keyboard.type(" Write every week.", { delay: 5 }); await page.keyboard.down("Shift"); for (let i = 0; i < 17; i++) await page.keyboard.press("ArrowLeft"); await page.keyboard.up("Shift"); await page.waitForTimeout(200); } },
   { device: "desk", name: "projects-ideas", hash: "projects", act: tap('.goals [data-act="rail-tab"][data-v="ideas"]') },
   // 往期：最底下那一行点开（上个月、上一季过期的目标都在这里）。上一张切到了 Ideas（记在这台设备上），先切回 Goals
+  // 生态圈（Projects 页最下面）：滚到它；悬停「增长」那一块（右栏里挂在它下面的目标飞线下来）；切到第二种侧重
+  { device: "desk", name: "projects-eco", hash: "projects", act: async (page) => { await page.locator(".pj-eco").first().scrollIntoViewIfNeeded(); await page.waitForTimeout(300); } },
+  { device: "desk", name: "projects-eco-hover", hash: "projects", act: async (page) => { await page.locator(".pj-eco").first().scrollIntoViewIfNeeded(); await hover('.pj-eco .eco-n[data-goal="e4"]', 1600)(page); } },
+  { device: "desk", name: "projects-eco-mode", hash: "projects", act: async (page) => { await page.locator(".pj-eco").first().scrollIntoViewIfNeeded(); await tap('.pj-eco [data-act="eco-mode"]:not(.on)')(page); await page.locator(".pj-eco").first().scrollIntoViewIfNeeded(); await page.waitForTimeout(300); } },
+  // Mindmap 页：第一块（Life map）适合大小；放大一点挪一挪；第二块
+  { device: "desk", name: "mindmap", hash: "mindmap" },
+  { device: "desk", name: "mindmap-zoom", hash: "mindmap", act: async (page) => { for (let i = 0; i < 3; i++) await tap('.mindmap [data-act="mm-zoom"][data-z="1"]')(page); await page.waitForTimeout(200); } },
+  { device: "desk", name: "mindmap-second", hash: "mindmap", act: tap('.mindmap .mm-tab:not(.on)') },
   { device: "desk", name: "projects-past", hash: "projects", act: async (page) => { await tap('.goals [data-act="rail-tab"][data-v="goals"]')(page); await page.locator('.goals [data-act="past-toggle"]').first().scrollIntoViewIfNeeded(); await tap('.goals [data-act="past-toggle"]')(page); await page.locator(".goals .gpast").first().scrollIntoViewIfNeeded(); await page.waitForTimeout(200); } },
   { device: "desk", name: "plan-editor", hash: "projects", act: tap('.pcard[data-project="seed-b2"] .pname') },
   { device: "desk", name: "stats", hash: "stats" },

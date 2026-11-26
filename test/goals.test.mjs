@@ -21,7 +21,7 @@ test("columns are worked out from today: this month, next month, the quarter's t
   assert.deepEqual(oct.slice(0, 3).map((c) => [c.title, c.sub, c.due]), [["This month", "Oct", "2026-10"], ["Next month", "Nov", "2026-11"], ["This quarter", "Q4", "2026-12"]]);
   assert.deepEqual(G.columns("2026-12-10").slice(0, 2).map((c) => [c.sub, c.due]), [["Dec", "2026-12"], ["Jan 2027", "2027-01"]], "next month across the new year says which year");
   const jan = G.columns("2027-01-03");
-  assert.deepEqual(jan.slice(4).map((c) => c.title), ["Next year", "2029", "2030", "2031", "North star"], "next year has a name, the three after it are numbers");
+  assert.deepEqual(jan.slice(4).map((c) => c.title), ["Next year", "2029", "2030", "2031", "Ecosystem"], "next year has a name, the three after it are numbers");
   assert.equal(jan[4].sub, "2028", "Next year says which year in small type");
   assert.equal(jan.find((c) => c.key === "year").due, "2027-12");
 });
@@ -116,7 +116,7 @@ test("North star: no date, never late, always the last column", () => {
   const goals = [g("calm", "north", ""), g("y30", "year", "2030-12")];
   const b = G.board(goals, "2026-10-11");
   assert.deepEqual(colsOf(b).north, ["calm"]);
-  assert.equal(b.cols.at(-1).title, "North star");
+  assert.equal(b.cols.at(-1).title, "Ecosystem");
   assert.equal(b.cols.flatMap((c) => c.items).find((x) => x.goal.id === "calm").when, "");
   assert.deepEqual(colsOf(G.board(goals, "2031-03-01")).north, ["calm"], "years later it's still there");
 });

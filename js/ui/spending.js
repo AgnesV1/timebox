@@ -148,10 +148,10 @@ export function createSpending() {
 
 
   // ---------- All years：跨年份的那张图（js/years.js 算；她 2026-11-26 定的样子） ----------
-  //   上面一块：每年年底的余额（实线和点，填了才有）和账本推出来的余额（淡虚线），纵轴是「基准年的几倍」，基准那条 ×1 虚线；点上面小字是比上一年涨跌了几成。
-  //   下面一块：每年的收入（青绿）和支出（钴蓝）两根柱子，各自和基准年比；基准年以前的支出柱淡一点（那时候房租没记全）。
-  //   最底下两行：年份，和那一年按多少 CPI 折的（灰色小字）。底色一段段是住在哪，左上角写地名。
-  //   停在某一年（鼠标、或者 Tab 到图上用 ← →）：那一列亮一点，旁边浮出那一年的真实数字——当时的币种原样，再附上折成几倍、乘了多少 CPI。
+  //   上面一块：每年的结余（收入 − 支出）围着中间那条轴上下——挣得比花得多往上（青绿），只花不挣、花得比挣得多往下（钴蓝；橙色只给超预算）。
+  //   下面一块：每年的收入（青绿）和支出（钴蓝）两根柱子。两块用同一把尺子：×1 = 基准年一年的开销，按 CPI、固定汇率折过。
+  //   基准年以前的柱子淡一点（那时候房租没记全：支出偏少、结余偏多）。最底下两行：年份，和那一年的 CPI（灰色小字）。底色一段段是住在哪。
+  //   停在某一年（鼠标、或者 Tab 到图上用 ← →）：那一列亮一点，旁边浮出那一年的真实数字——当时的币种原样，再附上几倍、CPI 乘了多少。
   const yearsCfg = () => store.setting("spend-years") || {};
   function saveYears(patch, msg) {
     store.setSetting("spend-years", { ...yearsCfg(), ...patch });
@@ -159,16 +159,15 @@ export function createSpending() {
     if (msg) toast(msg);
   }
   const LIFE = { i: -1, data: null };
-  const pctText = (c) => (c >= 0 ? "+" : "−") + Math.round(Math.abs(c) * 100) + "%";
   function renderLife() {
     const box = $("[data-life]");
     if (!box) return;
     const R = Y.build(SP.entries(), yearsCfg(), today()), cfg = R.cfg, ys = R.years;
     LIFE.data = R;
-    if (!ys.length) { box.innerHTML = '<p class="sp-empty">Nothing recorded yet — the years show up as you add transactions, or year-end totals in <button type="button" class="sp-link" data-act="set-years">Settings → Years</button>.</p>'; return; }
-    const W = Math.max(560, Math.round(box.clientWidth || 900)), padL = 44, padR = 12;
-    // 上面那块随宽度高一点（200–300），下面柱子那块固定
-    const T0 = 30, T1 = T0 + Math.round(Math.min(300, Math.max(200, W * 0.24))), B0 = T1 + 28, B1 = B0 + 90, L0 = B1 + 20, L1 = L0 + 16, H = L1 + 10;
+    if (!ys.length || !(R.unit > 0)) { box.innerHTML = '<p class="sp-empty">Nothing to compare yet — the years show up once there\'s spending in them.</p>'; return; }
+    const W = Math.max(560, Math.round(box.clientWidth || 900)), padL = 52, padR = 12;
+    // 上面那块随宽度高一点（180–260），下面柱子那块固定
+    const T0 = 30, T1 = T0 + Math.round(Math.min(260, Math.max(180, W * 0.2))), B0 = T1 + 30, B1 = B0 + 96, L0 = B1 + 20, L1 = L0 + 16, H = L1 + 10;
     const n = ys.length, lo = ys[0].y, colW = (W - padL - padR) / n, cx = (i) => padL + colW * (i + 0.5);
     const xAt = (y, m) => padL + colW * (y - lo + (m - 1) / 12), f1 = (v) => Math.round(v * 10) / 10;
     let g = "";
@@ -182,48 +181,44 @@ export function createSpending() {
       if (k > 0 && a > padL + 1) g += '<line class="sp-lsep" x1="' + f1(a) + '" x2="' + f1(a) + '" y1="' + (T0 - 22) + '" y2="' + B1 + '"/>';
       if (b - a > 46) g += '<text class="sp-lplace" x="' + f1(a + 7) + '" y="' + (T0 - 8) + '">' + esc(h.place) + "</text>";
     });
-    // 上面：余额
-    const vals = ys.flatMap((r) => [r.x.total, r.x.ledger]).filter((v) => v !== null && Number.isFinite(v));
-    const tk = Y.ticks(Math.max(1.2, ...vals), Math.min(0, ...vals)), t0 = tk[0], tN = tk[tk.length - 1];
-    const yv = (v) => T1 - (v - t0) / (tN - t0 || 1) * (T1 - T0);
-    for (const v of tk) g += '<line class="sp-lgrid' + (v === 1 ? " one" : "") + '" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + f1(yv(v)) + '" y2="' + f1(yv(v)) + '"/><text class="mn-ax sp-lax" x="' + (padL - 8) + '" y="' + f1(yv(v) + 4) + '">' + Y.times(v) + "</text>";
-    // ×1（基准年）那条虚线一定要有：刻度隔得大（×0、×2、×4）时单独补上
-    if (!tk.includes(1)) g += '<line class="sp-lgrid one" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + f1(yv(1)) + '" y2="' + f1(yv(1)) + '"/><text class="mn-ax sp-lax" x="' + (padL - 8) + '" y="' + f1(yv(1) + 4) + '">×1</text>';
-    const path = (key) => { let d = "", on = false; ys.forEach((r, i) => { const v = r.x[key]; if (v === null || !Number.isFinite(v)) { if (key === "ledger") on = false; return; } d += (on ? "L" : "M") + f1(cx(i)) + " " + f1(yv(v)); on = true; }); return d; };
-    const ld = path("ledger"), td = path("total");
-    if (ld) g += '<path class="sp-lledger" d="' + ld + '"/>';
-    if (td) g += '<path class="sp-lline" d="' + td + '"/>';
+    const bw = Math.max(5, Math.min(30, colW * 0.42));
+    // 上面：结余，围着中轴（0）上下对称
+    const bals = ys.map((r) => r.x.bal).filter((v) => v !== null && Number.isFinite(v));
+    const tk = Y.ticksAround(Math.max(0, ...bals.map(Math.abs))), top = tk[tk.length - 1], mid = (T0 + T1) / 2;
+    const yb = (v) => mid - v / top * (T1 - T0) / 2;
+    for (const v of tk) g += '<line class="sp-lgrid' + (v === 0 ? " axis" : "") + '" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + f1(yb(v)) + '" y2="' + f1(yb(v)) + '"/><text class="mn-ax sp-lax" x="' + (padL - 8) + '" y="' + f1(yb(v) + 4) + '">' + Y.signedTimes(v) + "</text>";
     ys.forEach((r, i) => {
-      if (r.x.total === null) return;
-      const y = yv(r.x.total);
-      g += '<circle class="sp-ldot" cx="' + f1(cx(i)) + '" cy="' + f1(y) + '" r="4.5"/>';
-      if (r.change !== null) g += '<text class="sp-lchg ' + (r.change >= 0 ? "up" : "down") + '" x="' + f1(cx(i)) + '" y="' + f1(y - 11) + '">' + pctText(r.change) + "</text>";
+      const v = r.x.bal;
+      if (v === null) return;
+      const y = yb(v), h = Math.max(1.5, Math.abs(y - mid)), up = v >= 0;
+      g += '<rect class="sp-lbal ' + (up ? "up" : "down") + (r.early ? " early" : "") + '" x="' + f1(cx(i) - bw / 2) + '" y="' + f1(up ? mid - h : mid) + '" width="' + f1(bw) + '" height="' + f1(h) + '" rx="3"/>';
+      g += '<text class="sp-lval ' + (up ? "up" : "down") + '" x="' + f1(cx(i)) + '" y="' + f1(up ? mid - h - 6 : mid + h + 14) + '">' + Y.signedTimes(Math.round(v * 100) / 100) + "</text>";
     });
-    // 下面：收入、支出两根柱子，各自和基准年比
+    // 下面：收入、支出两根柱子，同一把尺子（×1 = 基准年一年的开销）
     const bars = ys.flatMap((r) => [r.x.inc, r.x.out]).filter((v) => v !== null && Number.isFinite(v));
-    const bmax = Math.max(1.2, ...bars), bh = (v) => Math.max(1, v / bmax * (B1 - B0)), bw = Math.max(4, Math.min(16, colW * 0.26));
+    const bmax = Math.max(1.2, ...bars), bh = (v) => Math.max(1, v / bmax * (B1 - B0)), w2 = Math.max(4, Math.min(16, colW * 0.24));
     g += '<line class="sp-lgrid one" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + f1(B1 - bh(1)) + '" y2="' + f1(B1 - bh(1)) + '"/><text class="mn-ax sp-lax" x="' + (padL - 8) + '" y="' + f1(B1 - bh(1) + 4) + '">×1</text>';
     g += '<line class="sp-lbase" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + B1 + '" y2="' + B1 + '"/>';
     ys.forEach((r, i) => {
-      if (r.x.inc !== null) g += '<rect class="sp-linc" x="' + f1(cx(i) - bw - 1.5) + '" y="' + f1(B1 - bh(r.x.inc)) + '" width="' + f1(bw) + '" height="' + f1(bh(r.x.inc)) + '" rx="2"/>';
-      if (r.x.out !== null) g += '<rect class="sp-lout' + (r.early ? " early" : "") + '" x="' + f1(cx(i) + 1.5) + '" y="' + f1(B1 - bh(r.x.out)) + '" width="' + f1(bw) + '" height="' + f1(bh(r.x.out)) + '" rx="2"/>';
+      if (r.x.inc !== null) g += '<rect class="sp-linc' + (r.early ? " early" : "") + '" x="' + f1(cx(i) - w2 - 1.5) + '" y="' + f1(B1 - bh(r.x.inc)) + '" width="' + f1(w2) + '" height="' + f1(bh(r.x.inc)) + '" rx="2"/>';
+      if (r.x.out !== null) g += '<rect class="sp-lout' + (r.early ? " early" : "") + '" x="' + f1(cx(i) + 1.5) + '" y="' + f1(B1 - bh(r.x.out)) + '" width="' + f1(w2) + '" height="' + f1(bh(r.x.out)) + '" rx="2"/>';
       g += '<text class="mn-ax sp-lyr' + (r.y === cfg.base ? " base" : "") + '" x="' + f1(cx(i)) + '" y="' + L0 + '">' + (colW < 34 ? "’" + String(r.y).slice(2) : r.y) + "</text>";
       g += '<text class="mn-ax sp-lcpi" x="' + f1(cx(i)) + '" y="' + L1 + '">' + (r.y === cfg.base ? "base" : Y.rateIn(cfg, r.y) + "%") + "</text>";
     });
+    g += '<text class="sp-lpart" x="' + padL + '" y="' + (B0 - 10) + '">Income and spending</text>';
     g += '<rect class="sp-lcol" data-lcol x="0" y="' + (T0 - 22) + '" width="' + f1(colW) + '" height="' + (L1 - T0 + 30) + '" rx="6" visibility="hidden"/>';
     ys.forEach((r, i) => { g += '<rect class="sp-lhit" data-i="' + i + '" x="' + f1(padL + colW * i) + '" y="0" width="' + f1(colW) + '" height="' + H + '"/>'; });
-    // 底下的说明（灰色小字）：基准年以前的支出为什么淡、×1 是哪一年、哪几年的余额没认出来
+    // 底下的说明（灰色小字）：基准年以前为什么淡、尺子是哪一年、哪几年的年底总数没认出来
     const notes = [];
-    if (ys.some((r) => r.early && r.x.out !== null)) notes.push("Before " + cfg.base + " rent wasn't in the ledger, so those spending bars are faded.");
-    if (!ys.some((r) => r.x.total !== null)) notes.push('No year-end totals yet: the dashed line is only what the ledger adds up to. <button type="button" class="sp-link" data-act="set-years">Add them in Settings → Years</button>');
-    else if (R.base.totalFrom && R.base.totalFrom !== cfg.base) notes.push("No year-end total for " + cfg.base + " — ×1 on the balance line is " + R.base.totalFrom + "’s.");
+    if (ys.some((r) => r.early && r.x.out !== null)) notes.push("Before " + cfg.base + " rent wasn't in the ledger, so those years look better than they were (faded).");
+    if (R.unitYear !== cfg.base) notes.push("Nothing spent in " + cfg.base + " yet — ×1 is what " + R.unitYear + " cost.");
     const bad = ys.filter((r) => r.bad.length);
-    if (bad.length) notes.push("Couldn't read part of " + bad.map((r) => r.y + " (“" + esc(r.bad.join(", ")) + "”)").join(", ") + ".");
-    box.innerHTML = '<figure class="sp-chart sp-lfig"><figcaption><div><h3>Year by year</h3><p class="sp-lede">In ' + cfg.base + " money (CPI " + cfg.cpi + "% a year unless set), at fixed rates, as a multiple of " + cfg.base +
+    if (bad.length) notes.push("Couldn't read part of the year-end total for " + bad.map((r) => r.y + " (“" + esc(r.bad.join(", ")) + "”)").join(", ") + ".");
+    box.innerHTML = '<figure class="sp-chart sp-lfig"><figcaption><div><h3>Balance, year by year</h3><p class="sp-lede">Income minus spending each year, in ' + cfg.base + " money (inflation " + cfg.cpi + "% a year unless set) at fixed rates. ×1 = what a year cost in " + R.unitYear +
       ". Rest on a year for the real amounts.</p></div>" +
-      '<div class="sp-legend" aria-hidden="true"><span><i class="ln"></i>Year-end total</span><span><i class="lg"></i>From the ledger</span><span><i class="ic"></i>Income</span><span><i class="ou"></i>Spent</span>' +
+      '<div class="sp-legend" aria-hidden="true"><span><i class="bu"></i>Saved</span><span><i class="bd2"></i>Spent more than earned</span><span><i class="ic"></i>Income</span><span><i class="ou"></i>Spent</span>' +
       '<button type="button" class="sp-link" data-act="set-years">Edit years</button></div></figcaption>' +
-      '<div class="sp-lwrap"><svg class="mn-chart sp-lchart" data-lchart viewBox="0 0 ' + W + " " + H + '" width="' + W + '" height="' + H + '" tabindex="0" role="img" aria-label="Year-end total, income and spending from ' + lo + " to " + ys[n - 1].y + ", as multiples of " + cfg.base + '. Use the left and right arrow keys to read each year.">' + g + "</svg>" +
+      '<div class="sp-lwrap"><svg class="mn-chart sp-lchart" data-lchart viewBox="0 0 ' + W + " " + H + '" width="' + W + '" height="' + H + '" tabindex="0" role="img" aria-label="Balance each year from ' + lo + " to " + ys[n - 1].y + ", above or below zero, with income and spending below, as multiples of what " + R.unitYear + ' cost. Use the left and right arrow keys to read each year.">' + g + "</svg>" +
       '<div class="sp-ltip" data-ltip role="status" aria-live="polite" hidden></div></div>' +
       (notes.length ? '<p class="sp-lnote">' + notes.join(" ") + "</p>" : "") + "</figure>";
     if (LIFE.i >= n) LIFE.i = -1;
@@ -240,17 +235,17 @@ export function createSpending() {
     col.setAttribute("x", hit.getAttribute("x"));
     col.setAttribute("width", hit.getAttribute("width"));
     col.setAttribute("visibility", "visible");
-    const cfg = R.cfg, row = (name, real, x, cls = "") => '<tr class="' + cls + '"><th>' + name + '</th><td class="mn-num">' + real + '</td><td class="mn-num sp-lx">' + Y.times(x) + "</td></tr>";
+    const cfg = R.cfg, row = (name, real, x, cls = "") => '<tr class="' + cls + '"><th>' + name + '</th><td class="mn-num">' + real + '</td><td class="mn-num sp-lx">' + x + "</td></tr>";
     const where = r.homes.map((h) => esc(h.place)).join(" → ");
     const net = Object.fromEntries(Object.entries(r.net).filter(([, v]) => v));
     tip.innerHTML = '<p class="sp-lth"><b class="mn-num">' + r.y + "</b>" + (where ? "<span>" + where + "</span>" : "") + "</p><table>" +
-      row("Year-end total", r.total ? esc(Y.bagText(r.total)) : '<span class="sp-lmiss">not entered</span>', r.x.total) +
-      row("Income", esc(Y.bagText(r.inc)), r.x.inc, "in") + row("Spent", esc(Y.bagText(r.out)), r.x.out, "out") +
-      row("Saved (ledger)", Object.keys(net).length ? (Object.values(net).every((v) => v >= 0) ? "+" : "") + esc(Y.bagText(net)) : "—", r.x.ledger) + "</table>" +
-      '<p class="sp-lcp">' + (r.y === cfg.base ? "Base year: ×1" : "Inflation that year " + Y.rateIn(cfg, r.y) + "% · ×" + r.f.toFixed(3) + " to " + cfg.base + " money") + " · fixed rates" +
-      (r.change !== null ? " · total " + pctText(r.change) + " in real terms" : "") + (r.early ? " · rent not recorded yet" : "") + "</p>";
+      row("Balance", esc(Y.bagText(net, true)), Y.signedTimes(r.x.bal === null ? null : Math.round(r.x.bal * 100) / 100), r.x.bal === null ? "" : r.x.bal >= 0 ? "in" : "out") +
+      row("Income", esc(Y.bagText(r.inc)), Y.times(r.x.inc), "in") + row("Spent", esc(Y.bagText(r.out)), Y.times(r.x.out)) +
+      (r.total ? row("Year-end total", esc(Y.bagText(r.total)), Y.times(r.x.total)) : "") + "</table>" +
+      '<p class="sp-lcp">' + (r.y === cfg.base ? "Base year" : "Inflation that year " + Y.rateIn(cfg, r.y) + "% · ×" + r.f.toFixed(3) + " to " + cfg.base + " money") + " · fixed rates · ×1 = " + R.unitYear + "’s spending" +
+      (r.early ? " · rent not recorded yet" : "") + "</p>";
     tip.hidden = false;
-    const wrap = tip.parentElement, x = Number(hit.getAttribute("x")) * (svg.clientWidth / (Number(svg.getAttribute("width")) || 1)), w = Number(hit.getAttribute("width")) * (svg.clientWidth / (Number(svg.getAttribute("width")) || 1));
+    const wrap = tip.parentElement, k = svg.clientWidth / (Number(svg.getAttribute("width")) || 1), x = Number(hit.getAttribute("x")) * k, w = Number(hit.getAttribute("width")) * k;
     const right = x + w + 10, tw = tip.offsetWidth;
     tip.style.left = (right + tw > wrap.clientWidth ? Math.max(0, x - tw - 10) : right) + "px";
   }
@@ -267,6 +262,22 @@ export function createSpending() {
   });
 
   // 齿轮里的 Years：基准年、默认 CPI；每年一行（住在哪、年底总余额、那一年的 CPI）；住在哪、固定汇率折起来
+  // 每处住的地方那段时间里，账记成了哪种钱：和那地方的钱不一样的，一个按钮一口气改过来（金额不动，只换币种；提示条能撤销）
+  function checkHTML(cfg) {
+    const rows = Y.recordsByHome(SP.entries(), cfg.homes).filter((x) => x.total);
+    if (!rows.length) return "";
+    // 「2018–2019」「2020–2023.08」「2023.09 on」：到哪个月为止（下一段开始的前一个月）
+    const ym = (v) => (v.endsWith("-01") ? v.slice(0, 4) : v.replace("-", "."));
+    const before = (v) => { const [y, m] = v.split("-").map(Number); return m === 1 ? String(y - 1) : y + "." + String(m - 1).padStart(2, "0"); };
+    const when = (x) => (x.to ? (ym(x.from) === before(x.to) ? ym(x.from) : ym(x.from) + "–" + before(x.to)) : ym(x.from) + " on");
+    return '<h4 class="sp-ych">Records in each place</h4><p class="msub">Each record keeps the currency it was typed in. If a place\'s records were typed in its money but saved as another currency, fix them here: only the currency changes, not the amounts.</p>' +
+      '<table class="mtable sp-ycheck"><tbody>' + rows.map((x) => {
+        const mine = x.home.cur, other = Object.entries(x.by).filter(([k]) => k !== mine).sort((a, b) => b[1].length - a[1].length);
+        const what = Object.entries(x.by).sort((a, b) => b[1].length - a[1].length).map(([k, ids]) => ids.length + " " + curLabel(k)).join(" · ");
+        return "<tr><td>" + esc(x.home.place) + ' <span class="msub">' + esc(when(x)) + '</span></td><td class="msub">' + esc(what) + '</td><td class="r">' +
+          (other.length ? other.map(([k, ids]) => '<button type="button" class="btn" data-sact="ycur" data-from="' + x.from + '" data-to="' + esc(x.to) + '" data-was="' + k + '" data-cur="' + mine + '">Mark the ' + ids.length + " " + esc(curLabel(k)) + " as " + esc(curLabel(mine)) + "</button>").join(" ") : '<span class="msub">All ' + esc(curLabel(mine)) + " ✓</span>") + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
   function yearsSetHTML() {
     const raw = yearsCfg(), cfg = Y.settings(raw), t = todayP();
     const first = SP.entries().reduce((m, e) => Math.min(m, Number(String(e.d).slice(0, 4)) || m), t.y);
@@ -282,8 +293,9 @@ export function createSpending() {
     return '<p class="msub">The <b>All years</b> chart puts every year in ' + cfg.base + " money: adjusted for inflation (CPI), converted at the fixed rates below, then drawn as a multiple of " + cfg.base + ". Resting on a year shows the real amounts in the currencies they were in.</p>" +
       '<div class="sp-setrow"><label>Base year (×1) <select data-ybase>' + years.map((y) => "<option" + (y === cfg.base ? " selected" : "") + ">" + y + "</option>").join("") + "</select></label>" +
       '<label>Inflation <input class="num sp-bv sp-yn" data-ycpi value="' + cfg.cpi + '" inputmode="decimal" aria-label="Inflation a year (%)"> % a year, unless a year says otherwise</label></div>' +
-      '<table class="mtable sp-ytab"><thead><tr><th>Year</th><th>Lived in</th><th>Year-end total <span class="msub">every account, any currencies</span></th><th class="r">Inflation</th></tr></thead><tbody>' + years.map(rowOf).join("") + "</tbody></table>" +
+      '<table class="mtable sp-ytab"><thead><tr><th>Year</th><th>Lived in</th><th>Year-end total <span class="msub">optional · every account, any currencies</span></th><th class="r">Inflation</th></tr></thead><tbody>' + years.map(rowOf).join("") + "</tbody></table>" +
       '<p class="msub">A total without a currency is in the money of the place you lived at the end of that year. “52k”, “3万 RMB”, “¥30,000 + A$2,000” all work.</p>' +
+      checkHTML(cfg) +
       '<details class="sp-paste"><summary>Where you lived</summary><p class="msub">One line per move: when (year, or year.month), where, and its currency. It shades the chart and names the years above.</p>' +
       '<textarea data-yhomes rows="5" spellcheck="false">' + esc(cfg.homesText) + '</textarea><div class="sp-setrow"><button type="button" class="btn" data-sact="yhomes">Save</button><button type="button" class="btn ghosty" data-sact="yhreset">Back to the default</button></div></details>' +
       '<details class="sp-paste"><summary>Fixed rates for this chart</summary><p class="msub">Only for All years, so exchange-rate swings don\'t look like your money changing. Everything is in RMB.</p>' +
@@ -688,6 +700,13 @@ export function createSpending() {
       else if (act === "addcat") addCat(sheet.querySelector("[data-newcat]"));
       else if (act === "yhomes") { saveYears({ homes: sheet.querySelector("[data-yhomes]").value }, "Saved where you lived"); }
       else if (act === "yhreset") { saveYears({ homes: Y.DEFAULT_HOMES }, "Back to the default places"); renderSet(); }
+      else if (act === "ycur") {
+        const x = Y.recordsByHome(SP.entries(), Y.settings(yearsCfg()).homes).find((h) => h.from === b.dataset.from && h.to === b.dataset.to), ids = x?.by[b.dataset.was] || [];
+        if (!ids.length) return;
+        const before = SP.setCurMany(Object.fromEntries(ids.map((id) => [id, b.dataset.cur])));
+        renderSet();
+        toast("Marked " + ids.length + " records as " + curLabel(b.dataset.cur), () => { SP.setCurMany(before); renderSet(); });
+      }
       else if (act === "ecb") {
         const note = sheet.querySelector("[data-ecbr]");
         note.textContent = "Getting today's rates…";

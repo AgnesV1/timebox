@@ -547,17 +547,16 @@
 [data-theme="light"] .mn-phone .mn-hem { filter: drop-shadow(0 4px 7px rgba(11, 11, 11, .13)); }
 
 /* ---------- All years（Spending 页 Month / Year 旁边第三个，js/ui/spending.js 的 renderLife；她 2026-11-26 要的）----------
-   整块换成一张跨年份的图：上面年底余额（钴蓝实线 + 点，账本推出来的那条是淡虚线），下面每年收入（青绿）和支出（钴蓝）两根柱子；
-   纵轴只写「基准年的几倍」，×1 那条虚线亮一点；底色一段段是住在哪（隔一段深一点，左上角地名）；最底下年份，再下面一行灰色小字是那一年的 CPI。
-   涨了的那一小行字是青绿，跌了是灰（橙色只给超预算，这里不用）。停在一年上：那一列铺一层淡光，旁边浮起磨砂的一张小卡，写真实的数。 */
+   整块换成一张跨年份的图：上面每年的结余围着中轴上下（挣得比花得多往上 = 青绿，花得比挣得多往下 = 钴蓝；橙色只给超预算，这里不用），
+   下面每年的收入（青绿）和支出（钴蓝）两根柱子。两块同一把尺子，只写倍数（×1 = 基准年一年的开销），×1 那条虚线亮一点，中轴实线；
+   底色一段段是住在哪（隔一段深一点，左上角地名）；最底下年份，再下面一行灰色小字是那一年的 CPI。基准年以前的柱子淡（房租没记全）。
+   停在一年上：那一列铺一层淡光，旁边浮起磨砂的一张小卡，写真实的数。 */
 .spend .sp-life { display: none; margin-top: 18px; }
 .spend.life .sp-life { display: block; }
 .spend.life :is(.sp-kpis, .sp-body, .sp-find, .sp-nb[data-act="prev"], .sp-nb[data-act="next"]) { display: none; }
 .spend .sp-lfig figcaption { align-items: flex-start; }
-.spend .sp-legend .lg { height: 0; border-top: 1.5px dashed color-mix(in srgb, var(--mn-blue) 70%, transparent); border-radius: 0; }
-.spend .sp-legend .ln { background: var(--mn-blue); }
-.spend.life .sp-legend .ln { height: 3px; }
-.spend .sp-legend .ic { background: var(--mn-green); }
+.spend .sp-legend .bu, .spend .sp-legend .ic { background: var(--mn-green); }
+.spend .sp-legend .bd2 { background: var(--mn-blue); }
 .spend .sp-legend .ou { background: var(--mn-blue); opacity: .75; }
 .spend .sp-legend .sp-link { font-size: 11px; }
 .spend .sp-lwrap { position: relative; }
@@ -569,17 +568,18 @@
 .spend .mn-chart .sp-lplace { fill: var(--mn-mute); font-weight: 600; }
 .spend .sp-lgrid { stroke: var(--mn-trk); }
 .spend .sp-lgrid.one { stroke: color-mix(in srgb, var(--mn-ink) 45%, transparent); stroke-dasharray: 4 4; }
+.spend .sp-lgrid.axis { stroke: color-mix(in srgb, var(--mn-ink) 70%, transparent); stroke-width: 1.5; }
+.spend .sp-lbal.up { fill: var(--mn-green); }
+.spend .sp-lbal.down { fill: var(--mn-blue); }
+.spend .mn-chart .sp-lval { text-anchor: middle; font-family: "JetBrains Mono", ui-monospace, monospace; }
+.spend .mn-chart .sp-lval.up { fill: var(--mn-green); }
+.spend .mn-chart .sp-lval.down { fill: var(--mn-blue); }
+.spend .mn-chart .sp-lpart { fill: var(--mn-mute); font-weight: 600; }
+.spend :is(.sp-lbal, .sp-linc, .sp-lout).early { opacity: .45; }
 .spend .mn-chart .sp-lax { text-anchor: end; }
 .spend .sp-lbase { stroke: var(--mn-rng); }
-.spend .sp-lline { fill: none; stroke: var(--mn-blue); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
-.spend .sp-lledger { fill: none; stroke: color-mix(in srgb, var(--mn-blue) 60%, transparent); stroke-width: 1.5; stroke-dasharray: 5 5; }
-.spend .sp-ldot { fill: var(--mn-blue); stroke: var(--mn-dot-ring); stroke-width: 1.5; }
-.spend .mn-chart .sp-lchg { text-anchor: middle; font-weight: 600; }
-.spend .mn-chart .sp-lchg.up { fill: var(--mn-green); }
-.spend .mn-chart .sp-lchg.down { fill: var(--mn-mute); }
 .spend .sp-linc { fill: var(--mn-green); }
 .spend .sp-lout { fill: var(--mn-blue); opacity: .75; }
-.spend .sp-lout.early { opacity: .3; }
 .spend .mn-chart .sp-lyr { text-anchor: middle; }
 .spend .mn-chart .sp-lyr.base { fill: var(--mn-ink); font-weight: 600; }
 .spend .mn-chart .sp-lcpi { text-anchor: middle; fill: var(--mn-faint); }
@@ -598,6 +598,7 @@
 .spend .sp-ltip td { padding: 3px 0; text-align: right; white-space: nowrap; }
 .spend .sp-ltip td.sp-lx { padding-left: 12px; color: var(--mn-mute); font-size: 11px; }
 .spend .sp-ltip tr.in td:not(.sp-lx) { color: var(--mn-green); }
+.spend .sp-ltip tr.out td:not(.sp-lx) { color: var(--mn-blue); }
 .spend .sp-lmiss { color: var(--mn-mute); font-family: inherit; font-size: 11px; }
 .spend .sp-lcp { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: var(--mn-mute); }
 .sp-set .sp-ytab td { vertical-align: middle; }
@@ -605,3 +606,6 @@
 .sp-set .sp-yt.bad { border-color: var(--warn); }
 .sp-set .sp-yn { width: 64px; }
 .sp-set .sp-ybase td:first-child { font-weight: 700; }
+.sp-set .sp-ych { margin: 18px 0 4px; font-size: 13px; }
+.sp-set .sp-ycheck td { vertical-align: middle; }
+.sp-set .sp-ycheck .btn { padding: 4px 10px; font-size: 12.5px; }

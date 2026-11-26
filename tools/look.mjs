@@ -214,7 +214,8 @@ const SHOTS = [
   // All years：2017 年起每月一笔收入、一笔支出（澳币、港币、人民币、加币），几年的年底余额；停在 2023 年（年中搬家）；齿轮的 Years
   { device: "desk", name: "spending-life", hash: "spending", act: async (page) => { await seedYears(page); await tap('.spend [data-seg="mode"] [data-v="life"]')(page); await page.waitForTimeout(600); } },
   { device: "desk", name: "spending-life-hover", hash: "spending", act: async (page) => { await seedYears(page); await tap('.spend [data-seg="mode"] [data-v="life"]')(page); await page.waitForTimeout(400); await page.locator('.spend .sp-lchart [data-i="6"]').hover({ force: true }); await page.waitForTimeout(300); } },
-  { device: "desk", name: "spending-life-set", hash: "spending", act: async (page) => { await seedYears(page); await tap('.spend [data-seg="mode"] [data-v="life"]')(page); await tap('.spend [data-act="set-years"]')(page); } },
+  // 齿轮的 Years：2019 年几笔录成了加币（币种没换），Records in each place 里出一个按钮改成港币
+  { device: "desk", name: "spending-life-set", hash: "spending", act: async (page) => { await seedYears(page); await page.evaluate(async () => { const SP = await import("/js/spend.js"); if (!SP.entries().some((e) => e.n === "typed as CAD")) SP.addMany([1, 2, 3].map((k) => ({ d: "2019-0" + k + "-20", v: -30000, c: "Food", n: "typed as CAD" }))); }); await tap('.spend [data-seg="mode"] [data-v="life"]')(page); await tap('.spend [data-act="set-years"]')(page); await page.locator(".sp-set .sp-ycheck").scrollIntoViewIfNeeded(); await page.waitForTimeout(200); } },
   { device: "desk", name: "reading", hash: "reading", act: seedReading },
   { device: "desk", name: "reading-add", hash: "reading", act: async (page) => { await seedReading(page); await page.locator(".yl-in").click(); await page.waitForTimeout(300); } },
   { device: "desk", name: "settings", hash: "settings" },
@@ -231,10 +232,11 @@ async function seedYears(page) {
   await page.evaluate(async () => {
     const SP = await import("/js/spend.js"), store = await import("/js/store.js");
     if (SP.entries().some((e) => e.d.startsWith("2017-"))) return;
-    const plan = { 2017: ["aud", 2500, 1800], 2018: ["hkd", 11000, 8200], 2019: ["hkd", 13000, 9600], 2020: ["cny", 9000, 5200], 2021: ["cny", 18000, 11000], 2022: ["cny", 21000, 12500], 2024: ["cad", 5200, 3900], 2025: ["cad", 5600, 4100] };
+    // 好几年只花不挣（读书、刚搬家）：结余在中轴下面
+    const plan = { 2017: ["aud", 600, 1800], 2018: ["hkd", 2000, 8200], 2019: ["hkd", 6000, 9600], 2020: ["cny", 9000, 5200], 2021: ["cny", 14000, 11000], 2022: ["cny", 16500, 12500], 2024: ["cad", 3500, 3900], 2025: ["cad", 5600, 4100] };
     const rows = [];
     for (let y = 2017; y <= 2025; y++) for (let m = 1; m <= 12; m++) {
-      const [cur, inc, out] = y === 2023 ? (m <= 8 ? ["cny", 22000, 13000] : ["cad", 4800, 3600]) : plan[y];
+      const [cur, inc, out] = y === 2023 ? (m <= 8 ? ["cny", 16000, 13000] : ["cad", 1500, 3600]) : plan[y];
       const d = y + "-" + String(m).padStart(2, "0") + "-";
       rows.push({ d: d + "01", v: inc * 100, c: "Salary", n: "", cur }, { d: d + "15", v: -Math.round(out * (0.9 + ((y * 7 + m * 13) % 20) / 100)) * 100, c: "Food", n: "month", cur });
     }

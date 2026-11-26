@@ -1,8 +1,10 @@
-// 跨年份的那张图（Spending 页的 All years，js/ui/spending.js）：每年年底的总余额怎么涨跌，下面是每年的收入、支出。纯计算，不碰页面。
+// 跨年份的那张图（Spending 页的 All years，js/ui/spending.js）：每年的结余（收入 − 支出）围着中间一条轴上下，下面是每年的收入、支出。纯计算，不碰页面。
 // 她 2026-11-26 定的：
-//   · 余额是每年年底自己填的总数（各账户加起来，可以几种钱：「52000 CAD + 30000 RMB」）；账本推出来的（年年收入减支出累加）只当一条淡线对照。
-//   · 图上不写钱数，只写「基准年的几倍」：先按 CPI 折成基准年的钱，再按固定汇率换成同一种钱，再除以基准年。基准年默认 2021
-//     （那年开始全年自己生活；之前很多年没记房租，支出偏少）。鼠标停住才看真实的数（当时的币种原样）。
+//   · 结余就是账本里每年的 Balance（收入 − 支出）。她很多年只花不挣，所以画成围着 0 那条中轴上下的柱子（她说的），不画一条累计的线。
+//   · 图上不写钱数，只写倍数：先按 CPI 折成基准年的钱，再按固定汇率换成同一种钱，再除以「基准年一年花了多少」（×1 = 基准年一年的开销）。
+//     结余、收入、支出用同一个尺子，上下两块对得上。基准年默认 2021（那年开始全年自己生活；之前很多年没记房租，支出偏少、结余偏多）。
+//     鼠标停住才看真实的数（当时的币种原样）。
+//   · 年底的总余额（各账户加起来，可以几种钱：「52000 CAD + 30000 RMB」）可填可不填，只在停住时的那张小卡里出现。
 //   · CPI 默认每年 4%，哪一年不一样可以单独填（填的是住在那里那一年的通胀）；图上用灰色小字标出每年乘了多少。
 //   · 汇率固定（不跟着每天的汇率走，免得汇率涨跌看起来像钱变了）：默认 1 港币 = 0.9 人民币、1 澳币 = 1 加币 = 5 人民币（1 人民币 = 0.2 澳币 / 加币）；
 //     别的几种钱按 js/money.js 的粗略汇率接到加币上。都能在设置里改。
@@ -54,10 +56,11 @@ export function addTo(bag, v, cur) { bag[cur] = (bag[cur] || 0) + v; return bag;
 // 按固定汇率换成人民币（分）
 export const pivot = (bag, rates) => Object.entries(bag).reduce((s, [k, v]) => s + v * (rates[k] || 1), 0);
 // 真实的数，当时的币种原样：「A$32,000 + ¥1,200」；大的在前
-export function bagText(bag) {
+// signed = 结余那种：每一种钱各带 + / −，用 · 隔开（「+¥24,520 · −$8,760」：那年在国内存下来、到了加拿大花出去）
+export function bagText(bag, signed = false) {
   const list = Object.entries(bag || {}).filter(([, v]) => v).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   if (!list.length) return "—";
-  return list.map(([k, v]) => (v < 0 ? "−" : "") + curInfo(k).sym + (Math.abs(v) / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })).join(" + ");
+  return list.map(([k, v]) => (v < 0 ? "−" : signed ? "+" : "") + curInfo(k).sym + (Math.abs(v) / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })).join(signed ? " · " : " + ");
 }
 
 // ---------- 住在哪 ----------
@@ -105,9 +108,9 @@ export function cpiFactor(cfg, y) {
 // ---------- 一年一行 ----------
 
 // entries：记账的每一笔（{ d, v 分（负 = 支出）, cur }）；today = "2026-11-26"
-// → { years: [{ y, homes, inc, out, net（几种钱分开）, total（填的，或 null）, totalText, bad, f（CPI 乘几）, real: { inc, out, total, ledger }（基准年的钱，人民币分）,
-//      x: { inc, out, total, ledger }（基准年的几倍，没有 = null）, change（比上一个有余额的年份涨了几成，实际购买力）, early（比基准年早：房租没记全）}],
-//      base: { inc, out, total, ledger }（基准年那几个数，没有 = 0） }
+// → { years: [{ y, homes, inc, out, net（几种钱分开）, total（填的，或 null）, totalText, bad, f（CPI 乘几）, real: { inc, out, bal, total }（基准年的钱，人民币分）,
+//      x: { bal, inc, out, total }（基准年一年开销的几倍，没有 = null）, early（比基准年早：房租没记全）}],
+//      unit（尺子：基准年一年的开销，人民币分）, unitYear（尺子是哪一年的，基准年没账时是别的年份） }
 export function build(entries, raw, today) {
   const cfg = settings(raw), nowY = Number(String(today).slice(0, 4));
   const by = new Map();
@@ -120,7 +123,7 @@ export function build(entries, raw, today) {
     addTo(r.net, v, cur);
   }
   for (const y of Object.keys(cfg.totals)) row(Number(y));
-  if (!by.size) return { cfg, years: [], base: { inc: 0, out: 0, total: 0, ledger: 0 } };
+  if (!by.size) return { cfg, years: [], unit: 0, unitYear: null };
   const ys = [...by.keys()].filter((y) => y <= nowY + 1), lo = Math.min(...ys, cfg.base), hi = Math.max(...ys);
   const years = [];
   for (let y = lo; y <= hi; y++) {
@@ -129,35 +132,21 @@ export function build(entries, raw, today) {
     const total = t && t.parts.length ? t.parts.reduce((bag, p) => addTo(bag, p.v, p.cur), {}) : null;
     const f = cpiFactor(cfg, y);
     years.push({ ...r, homes, total, totalText: cfg.totals[String(y)] || "", bad: t?.bad || [], f, early: y < cfg.base,
-      real: { inc: pivot(r.inc, cfg.rates) * f, out: pivot(r.out, cfg.rates) * f, total: total ? pivot(total, cfg.rates) * f : null, ledger: null } });
+      real: { inc: pivot(r.inc, cfg.rates) * f, out: pivot(r.out, cfg.rates) * f, bal: 0, total: total ? pivot(total, cfg.rates) * f : null } });
   }
-  // 账本推出来的余额：上一个填了余额的年份的数，加上之后每年的收入减支出（都按基准年的钱）。每碰到一个填了的年份就从它重新起算，
-  // 所以每一年的实线和虚线差多少 = 那一年账本外面的进出（投资涨跌、转账、没记的）；一年都没填，就从 0 一直累加
-  const first = years.findIndex((r) => r.real.total !== null);
-  let run = first >= 0 ? years[first].real.total : 0;
-  years.forEach((r, i) => {
-    const net = pivot(r.net, cfg.rates) * r.f;
-    if (first >= 0 && i < first) return;
-    if (first < 0 || i > first) run += net;
-    r.real.ledger = run;
-    if (r.real.total !== null) run = r.real.total;
-  });
-  const b = years.find((r) => r.y === cfg.base);
-  // 基准年没填余额：用离它最近的那一年的余额当 ×1（并说一声）
-  const tb = b?.real.total ?? nearest(years, cfg.base)?.real.total ?? null;
-  const base = { inc: b?.real.inc || 0, out: b?.real.out || 0, total: tb || 0, ledger: b?.real.ledger || tb || 0, totalFrom: b?.real.total != null ? cfg.base : nearest(years, cfg.base)?.y || null };
-  const x = (v, d) => (v === null || v === undefined || !(d > 0) ? null : v / d);
-  let prev = null;
+  // 尺子：基准年一年花了多少（那年没有支出，就用离它最近、有支出的那一年）
+  const b = years.find((r) => r.y === cfg.base && r.real.out > 0) || years.filter((r) => r.real.out > 0).sort((p, q) => Math.abs(p.y - cfg.base) - Math.abs(q.y - cfg.base) || q.y - p.y)[0] || null;
+  const unit = b ? b.real.out : 0, x = (v) => (v === null || v === undefined || !(unit > 0) ? null : v / unit);
   for (const r of years) {
-    r.x = { inc: r.real.inc ? x(r.real.inc, base.inc) : null, out: r.real.out ? x(r.real.out, base.out) : null, total: x(r.real.total, base.total), ledger: x(r.real.ledger, base.total || base.ledger) };
-    r.change = r.real.total !== null && prev && prev.real.total > 0 ? r.real.total / prev.real.total - 1 : null;
-    if (r.real.total !== null) prev = r;
+    const has = r.real.inc || r.real.out;
+    r.real.bal = r.real.inc - r.real.out;
+    r.x = { bal: has ? x(r.real.bal) : null, inc: r.real.inc ? x(r.real.inc) : null, out: r.real.out ? x(r.real.out) : null, total: x(r.real.total) };
   }
-  return { cfg, years, base };
+  return { cfg, years, unit, unitYear: b ? b.y : null };
 }
-const nearest = (years, y) => years.filter((r) => r.real.total !== null).sort((a, b) => Math.abs(a.y - y) - Math.abs(b.y - y) || b.y - a.y)[0] || null;
 
-// 「×1.32」
+// 「×1.32」；signed = 结余那种，带 + / −（「+×0.3」「−×0.12」）
+export const signedTimes = (v) => (v === null || v === undefined ? "—" : v === 0 ? "0" : (v > 0 ? "+" : "−") + times(Math.abs(v)));
 export const times = (v) => (v === null || v === undefined ? "—" : "×" + (Math.abs(v) >= 10 ? v.toFixed(0) : String(Number(v.toFixed(2)))));
 // 纵轴的刻度：0 到最大值之间挑 4、5 个整齐的倍数（×0.5、×1、×1.5…）
 export function ticks(max, min = 0) {
@@ -166,5 +155,28 @@ export function ticks(max, min = 0) {
   const out = [];
   for (let v = Math.floor(Math.min(0, min) / step) * step; v <= max + step * 0.5; v += step) out.push(Math.round(v * 1000) / 1000);
   return out;
+}
+// 围着 0 上下对称的刻度（结余那一块）：[-1, -0.5, 0, 0.5, 1] 这样
+export function ticksAround(maxAbs) {
+  const m = Math.max(0.25, maxAbs), raw = m / 2, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((v) => v >= raw - 1e-12), n = Math.ceil(m / step - 1e-9);
+  return Array.from({ length: 2 * n + 1 }, (_, i) => Math.round((i - n) * step * 1000) / 1000);
+}
+
+// 每一处住的地方那段时间里，账都记成了哪种钱：[{ home, from, to（不含）, total, by: { cur: [id…] } }]。
+// 和那地方的钱不一样的，Years 设置里给一个按钮一口气改过来（金额不动）
+export function recordsByHome(entries, homes) {
+  return homes.map((h, k) => {
+    const to = homes[k + 1]?.from || "9999-99", from = k === 0 ? "0000-00" : h.from, by = {};
+    let total = 0;
+    for (const e of entries || []) {
+      const ym = String(e.d).slice(0, 7);
+      if (ym < from || ym >= to) continue;
+      const cur = isCur(e.cur) ? e.cur : "cad";
+      (by[cur] = by[cur] || []).push(e.id);
+      total++;
+    }
+    return { home: h, from: h.from, to: homes[k + 1]?.from || "", total, by };
+  });
 }
 export const CUR_KEYS = CURS.map((c) => c.k);

@@ -84,6 +84,22 @@ export function restore(e) {
   change(() => { S.entries[n.id] = n; S.put[n.id] = n.u; delete S.del[n.id]; });
   return n;
 }
+// 一批改「记的是哪种钱」，金额不动、只换标签（她 2026-11-26：2018–2019 在香港记的是港币的数，录的时候币种没换）。
+// changes = { id: cur }；返回原来的 { id: cur }，撤销时原样再调一次
+export function setCurMany(changes) {
+  const before = {};
+  change(() => {
+    let u = Date.now();
+    for (const [id, cur] of Object.entries(changes)) {
+      const e = S.entries[id];
+      if (!e || !isCur(cur)) continue;
+      before[id] = isCur(e.cur) ? e.cur : "cad";
+      const n = withCur({ ...e, u: u++ }, cur);
+      S.entries[id] = n; S.put[id] = n.u;
+    }
+  });
+  return before;
+}
 export function removeMany(ids) {
   change(() => { for (const id of ids) { if (!S.entries[id]) continue; delete S.entries[id]; delete S.put[id]; S.del[id] = Date.now(); } });
 }

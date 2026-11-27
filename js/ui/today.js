@@ -582,7 +582,11 @@ export function initToday(rerender) {
   on(document, "click", ".dayview .row.plan.virtual", (e, row) => {
     if (e.target.closest("button, input, textarea, select, label, a, [data-drag-row]") || row.dataset.date < store.today()) return;
     focus = store.ensureRow(row.dataset.plan, row.dataset.date);
-    if (row.dataset.date === store.today()) pick(focus);
+    if (row.dataset.date === store.today()) {
+      pick(focus);
+      // 手机：和点任务一样，浮条长成挡板
+      if (document.body.classList.contains("phone")) openSheet();
+    }
     rerender();
   });
 

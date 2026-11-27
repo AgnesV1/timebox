@@ -19,7 +19,7 @@ import * as R from "../routines.js";
 import * as L from "../lists.js";
 import { heroHTML, stripHTML, colorOf, badgeOf, projectOptions, pickable, pickTarget, segHTML, toast, STATUS, ballHTML, taskChainHTML, groupsOf } from "./common.js";
 import { openTaskEditor } from "./editor.js";
-import { pickedId, pick, timeable, elapsed } from "./timer.js";
+import { pickedId, pick, timeable, elapsed, openSheet } from "./timer.js";
 import { animateNext, slideDay } from "../motion.js";
 import { cheer } from "../fx.js";
 import { openMenu } from "./select.js";
@@ -61,16 +61,18 @@ export function timeEditing() { return timeEdit; }
 export function timeRangeHTML(x) {
   return x.from ? '<button type="button" class="tm-at num" data-act="time-edit" data-tid="' + x.id + '" title="Change the times">' + esc(x.from) + "–" + esc(x.to) + "</button> · " : "";
 }
-function timesHTML(c, t, list, form) {
+// offer：手机上「+ time」只放在计时记录后面（她 2026-11-28：不常用，别和 Done / Delay / Drop 挤一排）；一段都还没有时单独一行
+function timesHTML(c, t, list, form, offer = false) {
   const run = store.timer();
   const live = run?.taskId === t.id;
   const canLog = t.status === "done" || t.status === "delay";
-  if (!list.length && !live) return "";
+  const more = (canLog || offer) && !form ? '<button type="button" class="tm more-time" data-act="time-more">+ time</button>' : "";
+  if (!list.length && !live) return offer && more ? '<div class="times">' + more + "</div>" : "";
   return '<div class="times">' + (live ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : "") +
     list.map((x) => (timeEdit === x.id && x.from ? timeEditHTML(x, t) : '<span class="tm">' + timeRangeHTML(x) + fmtMin(x.min) +
       '<button type="button" class="tm-x" data-act="time-del" data-tid="' + x.id + '" aria-label="Delete this time">×</button></span>')).join("") +
     (list.length > 1 ? '<span class="tm sum">= ' + fmtMin(store.timeTotal(t.id)) + "</span>" : "") +
-    (canLog && !form ? '<button type="button" class="tm more-time" data-act="time-more">+ time</button>' : "") + "</div>";
+    more + "</div>";
 }
 
 // 补记用了多久：填「用了几小时几分、几点结束」记一段。标了 Done 还没记过的直接出来（预填预计分钟）；别的点「+ time」才出来
@@ -131,7 +133,7 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
     '<button type="button" class="chip mv" data-act="row-move" data-to="-1" aria-label="Move up" title="Move up (Alt+↑)"' + (k > 0 ? "" : " disabled") + ">↑</button>" +
     '<button type="button" class="chip mv" data-act="row-move" data-to="1" aria-label="Move down" title="Move down (Alt+↓)"' + (k < tasks.length - 1 ? "" : " disabled") + ">↓</button></span>" : "";
   const chips = '<div class="chips' + (open ? "" : " hov") + '">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
-    (open && t.status === "delay" && !list.length && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") + mv + "</div>";
+    (open && !phone && t.status === "delay" && !list.length && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") + mv + "</div>";
   const total = store.timeTotal(t.id);
   const side = open ? "" : '<span class="rside">' +
     (running ? '<span class="tm live"><i></i><b class="num" data-since="' + run.start + '">' + elapsed(run.start) + "</b></span>" : total ? '<span class="num">' + fmtMin(total) + "</span>" : "") +
@@ -148,7 +150,7 @@ function rowHTML(c, t, tasks, phone = false, openId = "") {
     (!open && withText(t.id) ? ' <span class="wth">' + esc(withText(t.id)) + "</span>" : "") +
     (t.desc && !desc ? '<span class="more"> ⋯</span>' : "") + "</div>" + side +
     (phone ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") +
-    "</div>" + (open ? taskChainHTML(t, 2) + timesHTML(c, t, list, form) : "") +
+    "</div>" + (open ? taskChainHTML(t, 2) + timesHTML(c, t, list, form, phone && t.status === "delay") : "") +
     (desc ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Details">' + esc(t.desc || "") + "</textarea>" : "") +
     (open || !phone ? chips : "") +
     (open && meetable(t) ? taskMeetHTML(t.id) : "") +
@@ -208,7 +210,7 @@ function planRowHTML(c, b, tasks, phone, openId) {
     (live.length ? '<b class="ls-cnt num">' + done + "/" + live.length + "</b>" : "") + (t?.status ? '<b class="stw">' + STATUS_WORD[t.status] + "</b>" : "") + "</span>";
   // 状态按钮：电脑上收着时停上去浮出来，展开了一直在；手机上只有展开的那一行有
   const chips = t ? '<div class="chips' + (open ? "" : " hov") + '">' + STATUS.map(([s, label]) => '<button type="button" class="chip' + (t.status === s ? " on" : "") + '" data-act="status" data-s="' + s + '">' + label + "</button>").join("") +
-    (open && t.date <= c.today && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") +
+    (open && !phone && t.date <= c.today && !form ? '<button type="button" class="chip ghost" data-act="time-more">+ time</button>' : "") +
     (open && notes ? '<button type="button" class="chip ghost" data-act="ls-notes" aria-expanded="' + (notesShown === t.id) + '">Plan notes</button>' : "") + "</div>" : "";
   const ids = [t?.id, ...lines.map((x) => x.id)].filter(Boolean).join(" ");
   return '<div class="row plan st-' + (t?.status || "open") + (t?.optional ? " opt" : "") + (fresh ? " enter" : "") + (picked ? " picked" : "") + (running ? " running" : "") + (open ? " open" : "") + (t ? "" : " virtual") + '"' + (t ? ' data-id="' + t.id + '"' : "") +
@@ -219,7 +221,7 @@ function planRowHTML(c, b, tasks, phone, openId) {
     (t?.deep ? ' <span class="dp" title="Deep work">◆ Deep</span>' : "") + (t?.desc && !(open && openDesc.has(t.id)) ? '<span class="more"> ⋯</span>' : "") + "</div>" + side +
     (phone || !t ? "" : '<button class="icon-btn" type="button" data-act="edit" aria-label="Edit task">' + icon("more") + "</button>") + "</div>" +
     (lines.length ? '<div class="ls-lines">' + lines.map((x) => lineHTML(x, phone)).join("") + "</div>" : "") +
-    (open ? taskChainHTML(t, 2) + timesHTML(c, t, list, form) : "") +
+    (open ? taskChainHTML(t, 2) + timesHTML(c, t, list, form, phone && t.date <= c.today) : "") +
     (open && openDesc.has(t.id) ? '<textarea class="desc" data-act="desc-input" data-keep="desc-' + t.id + '" placeholder="Notes for this day">' + esc(t.desc || "") + "</textarea>" : "") +
     (open || !phone ? chips : "") +
     (open && notesShown === t.id && notes ? '<div class="ls-pnotes">' + esc(notes) + "</div>" : "") +
@@ -588,6 +590,8 @@ export function initToday(rerender) {
   on(document, "click", ".dayview .row[data-id]", (e, row) => {
     if (e.target.closest("button, input, textarea, select, label, a, [data-drag-row]")) return;
     const id = row.dataset.id, c = store.ctx();
+    // 手机：点一个任务，底下的浮条长成挡板（能计时的、或者正在计时的时候；js/ui/timer.js）
+    if (document.body.classList.contains("phone") && (timeable(store.get("tasks", id), c.today) || store.timer())) openSheet();
     if (!row.classList.contains("open")) {
       focus = id;
       if (timeable(store.get("tasks", id), c.today) && pickedId(c) !== id) pick(id);

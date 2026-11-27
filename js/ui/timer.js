@@ -12,7 +12,13 @@ import { cheer } from "../fx.js";
 
 let picked = "";     // 这台设备上选中的任务
 let stopped = null;  // 刚停下的那段 {taskId, min}：浮条上给 Done / Delay
-let atEdit = "";     // 浮条上正在改的钟点：since = 其实几点开始的 / stop = 其实几点就停了
+let atEdit = "";     // 浮条上正在改的钟点：since = 其实几点开始的 / stop = 其实几点就停了 / both = 手机挡板上那一个 ⏱，开始、停的钟点一起改
+// 手机（她 2026-11-28）：浮条平时是矮矮的一行；点了一个任务，它往上长成一块挡板（sheet），计时的那些都在上面、地方宽；
+// 往下划、点到挡板和任务行以外的地方就缩回那一行。电脑不变
+let sheet = false, wasSheet = false;
+export const sheetOpen = () => sheet;
+export function openSheet() { sheet = true; }
+export function closeSheet() { if (!sheet) return false; sheet = false; if (atEdit === "both") atEdit = ""; return true; }
 const TITLE = document.title;
 
 // 能计时的：今天的、还没做完的（Delay 的也可以接着做）。计划下面那几项（便条）不单独计时，时间记在计划那一行上
@@ -53,9 +59,34 @@ function atForm(kind, value) {
 }
 
 // extra = 换掉 Deep 按钮的那一块（计时的是 Chore 键那条时，main.js 递进来四个记号）；返回 null 就照旧是 Deep
-export function dockHTML(c, onToday, extra = () => null) {
+// 手机的挡板上那一个 ⏱：「其实几点开始的」「其实几点就停了」放在一起（她说 Since 可以并进闹钟那个按钮）
+function atBothForm(since) {
+  return '<form class="dk-at both" data-at="both" autocomplete="off"><label><span>Started</span><input type="time" name="since" value="' + since + '" data-keep="dock-at-since" aria-label="Started at"></label>' +
+    '<label><span>Stopped</span><input type="time" name="at" value="" data-keep="dock-at-stop" aria-label="Stopped at (leave empty to keep timing)"></label>' +
+    '<button type="submit" class="btn">Save</button><button type="button" class="link" data-act="at-x">Cancel</button></form>';
+}
+
+// 手机的浮条：收起来一行（mini），点了任务是挡板（sheet；刚长出来那一次带 .rise，从底下升上来）
+function phoneDock(rt, run) {
+  const open = sheet, rise = open && !wasSheet ? " rise" : "";
+  wasSheet = open;
+  const grab = '<i class="dk-grab" aria-hidden="true"></i>';
+  if (rt) {
+    const time = '<span class="dk-time num" data-since="' + run.start + '">' + elapsed(run.start) + "</span>", stopBtn = '<button type="button" class="dk-btn stop" data-act="timer-stop"><i class="sq"></i>Stop</button>';
+    if (!open) return '<div class="dock run mini" style="--bar:' + colorOf(rt) + '"><i class="pulse" aria-hidden="true"></i><div class="dk-main">' + titleOf(rt) + "</div>" + time + stopBtn + "</div>";
+    const since = store.clockOf(run.start);
+    return '<div class="dock run sheet' + rise + '" style="--bar:' + colorOf(rt) + '">' + grab + '<i class="pulse" aria-hidden="true"></i><div class="dk-main">' + titleOf(rt) + "</div>" + time +
+      '<div class="dk-tools"><button type="button" class="dk-clock' + (atEdit === "both" ? " on" : "") + '" data-act="at-edit" data-v="both" aria-expanded="' + (atEdit === "both") + '" aria-label="Started at ' + since + ' — change when it started or stopped" title="Started at ' + since + ' — change when it started or stopped">⏱ <span>' + since + "</span></button>" +
+      deepBtn(rt) + '<button type="button" class="icon-btn dk-x" data-act="timer-discard" aria-label="Discard this timer" title="Discard">×</button>' + stopBtn + "</div>" +
+      (atEdit === "both" ? atBothForm(since) : "") + "</div>";
+  }
+  return "";
+}
+
+export function dockHTML(c, onToday, extra = () => null, phone = false) {
   const run = store.timer();
   const rt = run && store.get("tasks", run.taskId);
+  if (phone && rt) return phoneDock(rt, run);
   if (rt) {
     const p = pickedId(c);
     const next = p && p !== rt.id && onToday ? store.get("tasks", p) : null;
@@ -84,6 +115,14 @@ export function dockHTML(c, onToday, extra = () => null) {
   if (!onToday) return "";
   const t = store.get("tasks", pickedId(c));
   if (!t) return "";
+  if (phone) {
+    const open = sheet, rise = open && !wasSheet ? " rise" : "";
+    wasSheet = open;
+    const start = '<button type="button" class="dk-btn start" data-act="timer-start" data-id="' + t.id + '"><i class="tri"></i>Start</button>';
+    if (!open) return '<div class="dock idle mini" style="--bar:' + colorOf(t) + '"><i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected' + selectedText(t) + "</span>" + titleOf(t) + "</div>" + start + "</div>";
+    return '<div class="dock idle sheet' + rise + '" style="--bar:' + colorOf(t) + '"><i class="dk-grab" aria-hidden="true"></i><i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected' + selectedText(t) + "</span>" + titleOf(t) + "</div>" +
+      '<div class="dk-tools">' + deepBtn(t) + start + "</div></div>";
+  }
   return '<div class="dock idle" style="--bar:' + colorOf(t) + '">' +
     '<i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected' + selectedText(t) + "</span>" + titleOf(t) + "</div>" + deepBtn(t) +
     '<button type="button" class="dk-btn start" data-act="timer-start" data-id="' + t.id + '"><i class="tri"></i>Start</button></div>';
@@ -126,15 +165,32 @@ export function initTimer(rerender) {
     if (r?.min) toast("Logged " + fmtMin(r.min) + " on the last one");
     rerender();
   });
-  on(document, "click", "[data-act=timer-stop]", () => { atEdit = ""; stop(); rerender(); });
+  on(document, "click", "[data-act=timer-stop]", () => { atEdit = ""; sheet = false; stop(); rerender(); });
+  // 手机的挡板：往下划（按住往下拖 40 以上）、点到挡板和任务行以外的地方，缩回那一行
+  let swipe = null;
+  on(document, "pointerdown", "#dock .dock.sheet", (e) => { swipe = e.target.closest("input, button, select, label") ? null : { y: e.clientY }; });
+  addEventListener("pointerup", (e) => { if (swipe && e.clientY - swipe.y > 40 && closeSheet()) { animateNext(); rerender(); } swipe = null; });
+  document.addEventListener("pointerdown", (e) => {
+    if (!sheet || !document.body.classList.contains("phone") || e.target.closest?.("#dock, .dayview .row, .menu, #modal, #toast")) return;
+    if (closeSheet()) { animateNext(); rerender(); }
+  }, true);
   on(document, "click", "#dock [data-act=at-edit]", (e, el) => {
     atEdit = atEdit === el.dataset.v ? "" : el.dataset.v;
     rerender();
-    if (atEdit) requestAnimationFrame(() => setTimeout(() => document.querySelector(".dk-at [name=at]")?.focus(), 0));
+    if (atEdit && atEdit !== "both") requestAnimationFrame(() => setTimeout(() => document.querySelector(".dk-at [name=at]")?.focus(), 0));
   });
   on(document, "click", "#dock [data-act=at-x]", () => { atEdit = ""; rerender(); });
   on(document, "submit", ".dk-at", (e, form) => {
     e.preventDefault();
+    if (form.dataset.at === "both") {
+      // 手机挡板上的 ⏱：先改开始的钟点（改了才动），停的钟点填了就按它停；没填就接着计时
+      const since = form.since.value, at = form.at.value, run = store.timer();
+      if (since && run && since !== store.clockOf(run.start) && !store.setTimerStart(since)) { toast("That's later than now"); return; }
+      atEdit = "";
+      if (at) stop(at);
+      rerender();
+      return;
+    }
     const v = form.at.value;
     if (!v) { form.at.focus(); return; }
     if (form.dataset.at === "stop") stop(v);

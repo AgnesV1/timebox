@@ -26,7 +26,7 @@ import { settingsHTML, initSettings } from "./ui/settings.js";
 import { initEditor, refreshEditor } from "./ui/editor.js";
 import { initDnd } from "./ui/dnd.js";
 import { statsHTML, initStats } from "./ui/stats.js";
-import { dockHTML, initTimer, tick } from "./ui/timer.js";
+import { dockHTML, initTimer, tick, sheetOpen, closeSheet } from "./ui/timer.js";
 import { choreDockHTML, initChores } from "./ui/chores.js";
 import { initScores } from "./ui/scores.js";
 import { initQuads } from "./ui/quads.js";
@@ -211,7 +211,9 @@ function draw() {
   pool.hidden = !showPool;
   pool.innerHTML = showPool ? poolHTML(c) : "";
   const hadDock = document.body.classList.contains("has-dock");
-  dock.innerHTML = dockHTML(c, view === "today" && shownDate() === c.today && (!phone || Boolean(store.local().url)), (t) => (store.isChore(t) ? choreDockHTML() : null));
+  if (view !== "today") closeSheet();   // 手机的挡板只在今天页上展开
+  dock.innerHTML = dockHTML(c, view === "today" && shownDate() === c.today && (!phone || Boolean(store.local().url)), (t) => (store.isChore(t) ? choreDockHTML() : null), phone);
+  document.body.classList.toggle("sheet-open", phone && sheetOpen() && Boolean(dock.querySelector(".sheet")));   // 挡板开着：今天页底下那个圆盘让开
   document.body.classList.toggle("has-dock", Boolean(dock.innerHTML));
   document.body.classList.toggle("timing", Boolean(store.timer()));   // 地平线（白天的网点、夜里的霓虹网格地面）只在有任务正在计时的时候出现
   if (!hadDock) dock.firstElementChild?.classList.add("enter");   // 只在浮条刚出现时滑上来，重画时不闪

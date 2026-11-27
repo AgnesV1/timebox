@@ -186,7 +186,7 @@ body.phone.timing #sky .hz-grid { opacity: .35; }
 .sky-tide svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .sky-tide path { vector-effect: non-scaling-stroke; }
 /* 手机上底下有计时浮条时，潮水那么矮会整个被它挡住：把水面抬到浮条上沿，水从浮条后面漫出来、再退回它后面 */
-body.phone.has-dock .sky-tide { bottom: calc(var(--dock-h, 0px) - 16px + env(safe-area-inset-bottom)); }
+body.phone.has-dock .sky-tide { bottom: calc(var(--dock-h, 0px) - 16px + env(safe-area-inset-bottom)); transition: bottom .38s var(--ease); }   /* 潮水贴着浮条 / 挡板的上沿（--dock-h 每次重画量），挡板升起来时跟着走 */
 .sky-meteor { height: 1.3px; border-radius: 2px; background: linear-gradient(to right, rgba(190, 244, 255, 0), rgba(233, 251, 255, .95)); transform-origin: 100% 50%; }
 @keyframes sky-blink { 0%, 16% { opacity: 1; } 17%, 100% { opacity: .12; } }
 
@@ -3076,16 +3076,35 @@ body.phone .add-more { gap: 10px; }
 /* 底下的计时浮条：Start / Stop 和 ◆ 都 44 高，两个按钮之间空 12 */
 body.phone .dock { gap: 12px; }
 body.phone .dk-btn { min-height: 44px; padding: 0 15px; font-size: 16px; }
-/* 计时中（2026-11-27 晚她说左边太挤：「Since 17:28」折成两行、名字只剩「Re…」）：手机上分两行，字号、颜色都不变。
-   第一行：点、完整的任务名（长的折成两行再省略）、走着的时间；第二行（.dk-tools）：◆ Deep、⏱（其实早停了）、×（扔掉这次计时，提示条能撤销）靠左，
-   Stop 单独靠右，手指不会从 Stop 滑到 × */
-body.phone .dock.run { row-gap: 10px; }
-body.phone .dock.run .dk-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-body.phone .dock.run .dk-tools { display: flex; flex-basis: 100%; align-items: center; gap: 12px; }
-body.phone .dock.run .dk-tools > *, body.phone .dock.run > .dk-time { order: 0; }
-body.phone .dock.run .dk-tools > .dk-btn.stop { margin-left: auto; }
-body.phone .dock.run .dk-tools .dk-early { width: 44px; height: 44px; }
-body.phone .dock.run .dk-tools .dk-x { width: 44px; height: 44px; margin: 0; }
+/* 手机的浮条（她 2026-11-28）：平时是矮矮的一行（.mini）——计时中：点、任务名、走着的时间、Stop；选中时：Selected、任务名、Start。
+   点了一个任务，它往上长成一块挡板（.sheet，js/ui/timer.js）：地方宽，计时的都在上面——第一行点、完整的任务名、时间；
+   第二行 ⏱ 12:09（几点开始的；开始、停的钟点都在这一个里改）、◆ Deep、×（扔掉这次计时，提示条能撤销）靠左，Stop / Start 单独靠右。
+   顶上一道小横杠：往下划就缩回那一行，点到挡板和任务行以外也缩回。挡板开着时今天页底下那个圆盘让开 */
+body.phone .dock.mini { flex-wrap: nowrap; gap: 10px; padding: 7px 7px 7px 14px; }
+body.phone .dock.mini .dk-title { white-space: nowrap; }
+body.phone .dock.mini .dk-time { font-size: 20px; }
+body.phone .dock.mini .dk-btn { min-height: 40px; padding: 0 14px; }
+body.phone .dock.sheet { position: relative; flex-wrap: wrap; row-gap: 14px; padding: 20px 14px 14px 18px; border-radius: 24px; }
+body.phone .dock.sheet .dk-grab { position: absolute; top: 7px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 22%, transparent); }
+body.phone .dock.sheet .dk-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+body.phone .dock.sheet .dk-time { font-size: 28px; }
+body.phone .dock.sheet .dk-tools { display: flex; flex-basis: 100%; align-items: center; gap: 10px; }
+body.phone .dock.sheet .dk-tools > *, body.phone .dock:is(.mini, .sheet) > .dk-time, body.phone .dock.mini > .dk-btn { order: 0; }   /* 电脑那一行的先后（order）在手机上不用 */
+body.phone .dock.sheet .dk-tools > .dk-btn { margin-left: auto; padding: 0 18px; }
+body.phone .dock.sheet .dk-tools .dk-x { width: 44px; height: 44px; margin: 0; }
+body.phone .dk-clock { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 1px solid transparent; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+body.phone .dk-clock span { font-family: var(--num); }
+body.phone .dk-clock.on { background: var(--accent); color: var(--accent-ink); }
+[data-theme="dark"] body.phone .dk-clock.on { background: rgba(204, 255, 0, .12); border-color: var(--accent); color: var(--accent); }
+body.phone .dk-at.both { display: flex; flex-basis: 100%; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+body.phone .dk-at.both label { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+body.phone .dk-at.both input { min-height: 40px; font-size: 16px; }
+body.phone .dk-at.both .btn { min-height: 40px; padding: 0 16px; }
+body.phone .dock.rise { animation: sheet-rise .38s var(--spring) both; }
+@keyframes sheet-rise { from { transform: translateY(28px); opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { body.phone .dock.rise { animation: fade-in .2s ease both; } }
+@keyframes fade-in { from { opacity: 0; } }
+body.phone.sheet-open #sun { opacity: 0; pointer-events: none; transition: opacity .2s; }
 /* 手机上别的小签（阅读、Mindmap、设置里的那些）：36 高、字 14，点的范围上下各多 4 */
 body.phone .chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 0 13px; font-size: 14px; }
 body.phone .chip::after { content: ""; position: absolute; inset: -4px 0; }

@@ -76,3 +76,38 @@ test("what drifts down by day follows the month", () => {
   assert.deepEqual([9, 10, 11].map(by), ["autumn", "autumn", "autumn"]);
   assert.deepEqual([12, 1, 2].map(by), ["winter", "winter", "winter"]);
 });
+
+// 白天的飞机穿云（2026-11-26）：尾迹断开的那一两截、飞机自己淡下去的那一两次
+test("cloud gaps sit inside the trail, apart from each other and from both ends", () => {
+  for (let seed = 1; seed < 200; seed++) {
+    const gaps = K.cloudGaps(seeded(seed));
+    assert.ok(gaps.length >= 1 && gaps.length <= 2);
+    for (const g of gaps) assert.ok(g.at >= 0.12 && g.at + g.w <= 0.82 + 1e-9, JSON.stringify(gaps));
+    if (gaps.length === 2) assert.ok(gaps[1].at >= gaps[0].at + gaps[0].w + 0.12 - 1e-9);
+  }
+});
+
+test("the trail fades from nothing at the tail to its darkest at the nose, almost gone inside a cloud", () => {
+  const stops = K.trailStops([{ at: 0.3, w: 0.1 }]);
+  assert.deepEqual(stops[0], [0, 0]);
+  assert.deepEqual(stops.at(-1), [1, K.HEAD]);
+  for (let i = 1; i < stops.length; i++) assert.ok(stops[i][0] >= stops[i - 1][0], "offsets never go back");
+  assert.ok(stops.filter(([x]) => x >= 0.3 && x <= 0.4).every(([, o]) => o <= 0.05));
+  assert.ok(stops.every(([, o]) => o >= 0 && o <= K.HEAD));
+});
+
+test("the plane dims once or twice while it crosses, and starts and ends fully there", () => {
+  for (let seed = 1; seed < 200; seed++) {
+    const keys = K.dimKeys(30000, seeded(seed));
+    assert.equal(keys[0].offset, 0);
+    assert.equal(keys.at(-1).offset, 1);
+    assert.equal(keys[0].opacity, 1);
+    assert.equal(keys.at(-1).opacity, 1);
+    for (let i = 1; i < keys.length; i++) assert.ok(keys[i].offset >= keys[i - 1].offset, JSON.stringify(keys));
+    const dips = keys.filter((k) => k.opacity < 1).length / 2;
+    assert.ok(dips >= 1 && dips <= 2);
+  }
+  // 很短的一趟放不下就不淡（不会排出倒着走的关键帧）
+  const short = K.dimKeys(1200, seeded(3));
+  for (let i = 1; i < short.length; i++) assert.ok(short[i].offset >= short[i - 1].offset);
+});

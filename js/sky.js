@@ -1,5 +1,6 @@
 // 底图上偶尔经过的小东西（挂在 #sky 里，从侧栏、卡片、计时浮条后面过；#sky 是 js/fx.js 建的）：
-//   飞机，3–5 分钟一趟：白天是高空的一个小点拖两道长尾迹；夜里是红眼航班——一闪一闪的红灯加一颗小白灯
+//   飞机，3–5 分钟一趟：白天是高空的一个墨蓝小点拖两道铅笔画的长尾迹，像在云层里穿：尾迹断开一两截、飞机自己也会淡下去一两秒（她 2026-11-26 要的）；
+//     夜里是红眼航班——一闪一闪的红灯加一颗小白灯
 //   潮水，6–10 分钟一次：又宽又矮的一片水贴着底边从右下角斜着滑进来、再退回去，一次两道；夜里是荧光海
 //   少见的那样，10–15 分钟一次：白天按季节飘东西（春嫩叶、夏康乃馨、秋枫叶、冬雪花，有风时一两片会打个小旋）；夜里一阵流星雨
 // 各管各的（2026-10-17 她说的「随机性的美」）：每样按自己的节奏来，撞上了就一起出现，不再一次只放一样。
@@ -30,6 +31,43 @@ export function turn(now, due, rnd = Math.random, can = ORDER) {
 // 几月飘什么（月份 1–12，用这台设备的当地日期）
 export const seasonOf = (month) => (month >= 3 && month <= 4 ? "spring" : month >= 5 && month <= 8 ? "summer" : month >= 9 && month <= 11 ? "autumn" : "winter");
 
+// ---------- 白天的飞机穿云（只算数，test/sky.test.mjs） ----------
+// 云在哪：尾迹上一两段（从尾巴 0 到机头 1 量），at = 开始，w = 多长；两段不挨着，都离机头和尾巴远一点
+export function cloudGaps(rnd = Math.random) {
+  const n = rnd() < 0.55 ? 1 : 2, out = [];
+  for (let i = 0; i < n; i++) {
+    const w = 0.08 + rnd() * 0.08, lo = i ? out[0].at + out[0].w + 0.12 : 0.12, hi = 0.82 - w;
+    if (lo >= hi) break;
+    out.push({ at: lo + rnd() * (hi - lo) * (n > 1 && !i ? 0.45 : 1), w });
+  }
+  return out;
+}
+// 尾迹的浓淡（渐变的几站：[位置, 不透明度]）：尾巴 0 → 机头最浓；云那几段软软地淡到几乎没有
+export const HEAD = 0.85;
+const fade = (x) => HEAD * Math.pow(Math.max(0, Math.min(1, x)), 0.9);
+export function trailStops(gaps) {
+  const out = [[0, 0]], soft = 0.05;
+  for (const g of gaps) {
+    out.push([g.at - soft, fade(g.at - soft)], [g.at, 0.04], [g.at + g.w, 0.04], [g.at + g.w + soft, fade(g.at + g.w + soft)]);
+  }
+  out.push([1, HEAD]);
+  return out.map(([x, o]) => [Number(x.toFixed(3)), Number(o.toFixed(3))]);
+}
+// 飞机自己穿进云里：一趟 ms 毫秒里淡下去一两次，每次 1.5–3 秒，淡到 15%；→ WAAPI 的关键帧（只动 opacity）
+export function dimKeys(ms, rnd = Math.random) {
+  const n = rnd() < 0.5 ? 1 : 2, keys = [{ opacity: 1, offset: 0 }];
+  let from = 0.12;
+  for (let i = 0; i < n; i++) {
+    const len = (1500 + rnd() * 1500) / ms, room = 0.88 - len - from;
+    if (room <= 0) break;
+    const a = from + rnd() * room * (n > 1 && !i ? 0.5 : 1), ramp = len * 0.3;
+    keys.push({ opacity: 1, offset: a }, { opacity: 0.15, offset: a + ramp }, { opacity: 0.15, offset: a + len - ramp }, { opacity: 1, offset: a + len });
+    from = a + len + 0.05;
+  }
+  keys.push({ opacity: 1, offset: 1 });
+  return keys.map((k) => ({ opacity: k.opacity, offset: Number(k.offset.toFixed(4)) }));
+}
+
 // ---------- 画 ----------
 
 const reduce = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
@@ -53,7 +91,7 @@ function piece(cls, html = "") {
 
 // 一样东西沿一条略斜的直线横穿，头朝前（尾迹拖在后面），speed 是每秒多少像素；返回要多久（毫秒）。
 // 元素本身头在右端、绕着头转向（css 的 transform-origin），所以位置都按「头在哪」算：从一边屏幕外进来，整个出了另一边才算完
-function cross(cls, html, speed) {
+function cross(cls, html, speed, more) {
   const el = piece(cls, html), W = innerWidth, H = innerHeight, w = el.offsetWidth, ltr = R() < 0.5;
   const y0 = H * (0.1 + R() * 0.45), y1 = y0 + (R() * 0.12 - 0.09) * H;
   const x0 = ltr ? -20 : W + 20, x1 = ltr ? W + w + 20 : -w - 20;
@@ -61,7 +99,24 @@ function cross(cls, html, speed) {
   const at = (x, y) => ({ transform: "translate(" + (x - w).toFixed(0) + "px," + y.toFixed(0) + "px)" + turnTo });
   const ms = Math.round(Math.hypot(x1 - x0, y1 - y0) / speed * 1000);
   el.animate([at(x0, y0), at(x1, y1)], { duration: ms, easing: "linear" }).onfinish = () => el.remove();
+  more?.(el, ms);
   return ms;
+}
+
+// 白天的飞机：两道铅笔尾迹（略抖的两条线，墨蓝，从尾巴到机头由淡到浓，中间被云断开一两截）+ 机头一个墨蓝小点；横穿时穿进云里淡下去一两次。
+// 铅笔质感：毛边（feTurbulence + feDisplacementMap）+ 纸面的颗粒（第二层噪点当成透明度挖掉一些），写法照 Spending 的 All years 那条结余线（js/ui/spending.js 的 #sp-pencil）
+const TRAIL = 170, INK = "#1E2F5C";
+function plane() {
+  const id = "sky-p" + (++serial), stops = trailStops(cloudGaps(R));
+  const wob = (y) => { const j = () => (R() - 0.5).toFixed(2); return "M0 " + y + "Q" + (TRAIL * 0.3).toFixed(0) + " " + (y + Number(j())).toFixed(2) + " " + (TRAIL * 0.55).toFixed(0) + " " + (y + Number(j()) * 0.6).toFixed(2) + "T" + TRAIL + " " + y; };
+  const svg = '<svg class="sky-trail" width="' + TRAIL + '" height="11" viewBox="0 0 ' + TRAIL + ' 11" aria-hidden="true"><defs>' +
+    '<linearGradient id="' + id + 'g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="' + TRAIL + '" y2="0">' + stops.map(([x, o]) => '<stop offset="' + x + '" stop-color="' + INK + '" stop-opacity="' + o + '"/>').join("") + "</linearGradient>" +
+    '<filter id="' + id + 'f" x="-2%" y="-60%" width="104%" height="220%" color-interpolation-filters="sRGB">' +
+    '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="' + (1 + Math.floor(R() * 90)) + '" result="wob"/><feDisplacementMap in="SourceGraphic" in2="wob" scale="1.6" xChannelSelector="R" yChannelSelector="G" result="rough"/>' +
+    '<feTurbulence type="fractalNoise" baseFrequency="1.9" numOctaves="1" seed="' + (1 + Math.floor(R() * 90)) + '" result="grain"/><feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  2.4 0 0 0 -0.4" result="tooth"/>' +
+    '<feComposite in="rough" in2="tooth" operator="in"/></filter></defs>' +
+    '<g fill="none" stroke="url(#' + id + 'g)" stroke-width="1.4" stroke-linecap="round" filter="url(#' + id + 'f)"><path d="' + wob(3.5) + '"/><path d="' + wob(7.5) + '"/></g></svg>';
+  return cross("sky-plane", svg + '<span class="sky-dot"></span>', 45, (el, ms) => el.animate(dimKeys(ms, R), { duration: ms, easing: "linear" }));
 }
 
 // 四季飘的东西：n 几片，size 多宽（px），secs 从顶落到底要几秒，sway 左右摆多少，spin 一路转多少度，colors 三套颜色，svg 画一片
@@ -182,7 +237,7 @@ function tide(dark) {
 }
 
 const SHOWS = {
-  plane: () => cross("sky-plane", '<span class="sky-trails"><b></b><b></b></span><span class="sky-dot"></span>', 45),
+  plane,
   redeye: () => cross("sky-redeye", '<span class="sky-red"></span><span class="sky-white"></span>', 38),
   fall, meteors,
   tide: (how) => tide(how ? how === "night" : night())

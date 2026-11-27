@@ -9,6 +9,7 @@
 
 import * as SP from "../spend.js";
 import * as M from "../money.js";
+import * as Y from "../years.js";
 import * as store from "../store.js";
 import { esc, icon } from "../dom.js";
 import { slideFrom } from "../motion.js";
@@ -91,7 +92,14 @@ export function monthLeft() {
   const left = B - M.counted(M.sumOf(IX(), { y: now.y, m: now.m }, "month"));
   return { text: (left < 0 ? "−" : "") + M.curInfo(M.showing()).sym + Math.round(Math.abs(left) / 100).toLocaleString("en-US"), over: left < 0 };
 }
-// 记一笔、同步回来以后：页面上所有「… left」（今天页 Spend 左边那个）换成新的数，不用整页重画
+// 从第一笔账起到今天一共结余多少（她 2026-11-26 要的：手机今天页 Spend 下面一行很浅的字，就是电脑 Spending → All years 顶上那个数）。
+// 和 js/ui/spending.js 的 All years 同一个算法（js/years.js 的 totalSince）：到今天为止、提前记的不算、换成这台设备看的那种钱、今天的汇率；整数块钱。一笔都没有 = null
+export function balanceSince() {
+  const show = SP.show(), RT = RATES(), t = Y.totalSince(SP.entries(), today(), (v, cur) => M.convert(v, cur, show, RT));
+  if (!t) return null;
+  return { from: t.from, text: (t.net < 0 ? "−" : "+") + M.curInfo(show).sym + Math.round(Math.abs(t.net) / 100).toLocaleString("en-US") };
+}
+// 记一笔、同步回来以后：页面上所有「… left」（今天页 Spend 左边那个）和 Spend 下面那行结余换成新的数，不用整页重画
 export function paintLefts() {
   const x = monthLeft();
   for (const el of document.querySelectorAll("[data-mleft]")) {
@@ -100,7 +108,13 @@ export function paintLefts() {
     el.firstChild.textContent = x.text;
     el.classList.toggle("over", x.over);
   }
+  const b = balanceSince();
+  for (const el of document.querySelectorAll("[data-mbal]")) {
+    el.hidden = !b;
+    if (b) el.innerHTML = balanceText(b);
+  }
 }
+export const balanceText = (b) => "Balance since " + b.from + " <b>" + esc(b.text) + "</b>";
 // 一笔的金额：照记的那种钱写；和看的那种不一样时，后面小字是换算过的
 export const amtOf = (e) => M.signed(e.v, M.curOf(e));
 export const convOf = (e) => (M.curOf(e) === SP.show() ? "" : "≈ " + M.signed(M.convert(e.v, M.curOf(e), SP.show(), RATES())));

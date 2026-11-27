@@ -21,10 +21,13 @@ const current = () => { const list = maps(); return list.find((b) => b.id === st
 // ---------- 画一块白板（世界坐标 = 白板自己的坐标减去左上角，四周留 40） ----------
 
 const px = (v) => Math.round(v) + "px";
+// 卡片的高度是 Obsidian 里的高度当下限（min-height）：字放不下就撑高，不截掉（她 2026-11-26 说长的字显示不全）；分组照原样
 function nodeHTML(n, B) {
-  const box = "left:" + px(n.x - B.x) + ";top:" + px(n.y - B.y) + ";width:" + px(n.width) + ";height:" + px(n.height) + (n.color ? ";--cc:" + C.cssColor(n.color) : "");
+  const grp = n.type === "group";
+  // style 后面顺手带上 data-n（量高度时按它找回是哪一块，见 measure）
+  const box = "left:" + px(n.x - B.x) + ";top:" + px(n.y - B.y) + ";width:" + px(n.width) + ";" + (grp ? "height:" : "min-height:") + px(n.height) + (n.color ? ";--cc:" + C.cssColor(n.color) : "") + '" data-n="' + esc(n.id);
   const cls = "cv-n cv-" + n.type + (n.color ? " tint" : "");
-  if (n.type === "group") return '<div class="' + cls + '" style="' + box + '">' + (n.label ? '<span class="cv-glabel">' + esc(n.label) + "</span>" : "") + "</div>";
+  if (grp) return '<div class="' + cls + '" style="' + box + '">' + (n.label ? '<span class="cv-glabel">' + esc(n.label) + "</span>" : "") + "</div>";
   if (n.type === "file") {
     const parts = String(n.file || "").split("/"), name = parts.pop() || "file", img = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i.test(name);
     return '<div class="' + cls + '" style="' + box + '"><span class="cv-fi" aria-hidden="true">' + (img ? "🖼" : "📄") + "</span><span>" + esc(name.replace(/\.md$/i, "") + (n.subpath || "")) + "</span>" + (parts.length ? "<small>" + esc(parts.join("/")) + "</small>" : "") + "</div>";
@@ -36,8 +39,11 @@ function nodeHTML(n, B) {
   return '<div class="' + cls + '" style="' + box + '"><div class="cv-md">' + C.md(n.text) + "</div></div>";
 }
 
-export function worldHTML(canvas) {
-  const B = C.bounds(canvas, 40), at = new Map(canvas.nodes.map((n) => [n.id, n]));
+// 量过的卡片高度：白板（同一次导入是同一个对象）→ { 卡片 id: 高 }。量一次就记住，之后重画直接按撑高的画，不会先画错再跳
+const grownBy = new WeakMap();
+
+export function worldHTML(raw) {
+  const canvas = C.withHeights(raw, grownBy.get(raw)), B = C.bounds(canvas, 40), at = new Map(canvas.nodes.map((n) => [n.id, n]));
   let lines = "", labels = "";
   for (const e of canvas.edges) {
     const a = at.get(e.fromNode), b = at.get(e.toNode);
@@ -45,7 +51,7 @@ export function worldHTML(canvas) {
     const g = C.edgeGeo(a, b, e), st = e.color ? ' style="--cc:' + C.cssColor(e.color) + '"' : "";
     lines += '<g class="cv-e' + (e.color ? " tint" : "") + '"' + st + '><path d="' + g.d + '"/>' +
       (e.toEnd !== "none" ? '<path class="cv-ah" d="' + C.arrowPath(g.p3, g.a3) + '"/>' : "") + (e.fromEnd === "arrow" ? '<path class="cv-ah" d="' + C.arrowPath(g.p0, g.a0) + '"/>' : "") + "</g>";
-    if (e.label) labels += '<span class="cv-lbl' + (e.color ? " tint" : "") + '" style="left:' + px(g.mid.x - B.x) + ";top:" + px(g.mid.y - B.y) + (e.color ? ";--cc:" + C.cssColor(e.color) : "") + '">' + esc(e.label) + "</span>";
+    if (e.label) labels += '<span class="cv-lbl' + (e.color ? " tint" : "") + '" title="' + esc(e.label) + '" style="left:' + px(g.mid.x - B.x) + ";top:" + px(g.mid.y - B.y) + (e.color ? ";--cc:" + C.cssColor(e.color) : "") + '">' + esc(e.label) + "</span>";
   }
   return '<div class="mm-world" style="width:' + px(B.w) + ";height:" + px(B.h) + '" data-w="' + Math.round(B.w) + '" data-h="' + Math.round(B.h) + '">' +
     '<svg class="cv-lines" width="' + Math.round(B.w) + '" height="' + Math.round(B.h) + '" viewBox="' + Math.round(B.x) + " " + Math.round(B.y) + " " + Math.round(B.w) + " " + Math.round(B.h) + '" aria-hidden="true">' + lines + "</svg>" +
@@ -91,13 +97,14 @@ function apply(view, v) {
   const pct = view.querySelector(".mm-pct");
   if (pct) pct.textContent = Math.round(v.k * 100) + "%";
 }
-function fitOf(view) {
+// 整块放得下（右下角百分比、键盘 0）；open = 第一次打开时看哪里（字太小就停在 90%、对准中间，见 js/canvas.js 的 openView）
+function fitOf(view, open = false) {
   const w = view.querySelector(".mm-world"), r = view.getBoundingClientRect();
   if (!w || !r.width) return { k: 1, tx: 0, ty: 0 };
-  const W = Number(w.dataset.w) || 1, H = Number(w.dataset.h) || 1, k = Math.max(MIN, Math.min(1.25, r.width / W, r.height / H));
-  return { k, tx: (r.width - W * k) / 2, ty: (r.height - H * k) / 2 };
+  const W = Number(w.dataset.w) || 1, H = Number(w.dataset.h) || 1;
+  return open ? C.openView(W, H, r.width, r.height) : C.fitView(W, H, r.width, r.height, MIN);
 }
-const state = (view) => views.get(view.dataset.board) || fitOf(view);
+const state = (view) => views.get(view.dataset.board) || fitOf(view, true);
 function set(view, v) { views.set(view.dataset.board, v); apply(view, v); }
 // 以 (cx, cy)（相对白板框）为中心缩放到 k
 function zoomAt(view, k, cx, cy) {
@@ -108,7 +115,25 @@ function zoomAt(view, k, cx, cy) {
 // 整页重画完：放回这块原来看的地方（没看过就适合大小）
 export function boardsAfterRender() {
   const view = viewEl();
-  if (view) apply(view, state(view));
+  if (!view) return;
+  apply(view, state(view));
+  const b = current();
+  if (b?.canvas && !grownBy.has(b.canvas)) document.fonts.ready.then(() => measure(view, b));
+}
+
+// 量卡片实际多高（字体到了以后）：比 Obsidian 里高的记下来，按撑高的重画这一块（线、线上的字、整块多大跟着变）
+function measure(view, b) {
+  if (!view.isConnected || grownBy.has(b.canvas)) return;
+  const grown = {};
+  for (const el of view.querySelectorAll(".mm-world > .cv-n[data-n]")) {
+    const n = b.canvas.nodes.find((x) => x.id === el.dataset.n);
+    if (n && n.type !== "group" && el.offsetHeight > n.height + 1) grown[n.id] = el.offsetHeight;
+  }
+  grownBy.set(b.canvas, grown);
+  if (!Object.keys(grown).length) return;
+  const w = view.querySelector(".mm-world");
+  if (w) w.outerHTML = worldHTML(b.canvas);
+  apply(view, state(view));
 }
 
 // ---------- 导入 ----------

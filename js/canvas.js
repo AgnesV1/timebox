@@ -69,6 +69,33 @@ export function bounds(canvas, pad = 0) {
   return { x: l - pad, y: t - pad, w: r - l + pad * 2, h: b - t + pad * 2 };
 }
 
+// ---------- 打开时看哪里（Mindmap 页，js/ui/boards.js） ----------
+// 整块放得下的比例（最大 125%，最小 MIN），居中
+export function fitView(W, H, vw, vh, min = 0.08) {
+  const k = Math.max(min, Math.min(1.25, vw / W, vh / H));
+  return { k, tx: (vw - W * k) / 2, ty: (vh - H * k) / 2 };
+}
+// 第一次打开（她 2026-11-26：导进来字自动变小、看不清）：整块放得下时字还够大（≥ 90%，14px 的字在屏幕上 ≥ 12.6px）就照旧放下整块；
+// 不然停在 90%、对准白板中间（比 100% 多看到一圈，字也看得清），要看全貌点右下角的百分比（或按 0）
+export const READABLE = 0.9;
+export function openView(W, H, vw, vh) {
+  const f = fitView(W, H, vw, vh), k = READABLE;
+  return f.k >= k ? f : { k, tx: (vw - W * k) / 2, ty: (vh - H * k) / 2 };
+}
+// 卡片在这里排出来比 Obsidian 里高（字体不一样、字多）：卡片撑高，线和线上的字按撑高以后的大小重算。
+// grown = { 卡片 id: 量到的高 }；只会变高，不会变矮；没变的原样返回同一个对象
+export function withHeights(canvas, grown) {
+  if (!grown || !Object.keys(grown).length) return canvas;
+  let changed = false;
+  const nodes = canvas.nodes.map((n) => {
+    const h = grown[n.id];
+    if (n.type === "group" || !(h > n.height)) return n;
+    changed = true;
+    return { ...n, height: Math.ceil(h) };
+  });
+  return changed ? { ...canvas, nodes } : canvas;
+}
+
 // ---------- 线怎么走（和 Obsidian 一样：从边的中点出去，两头顺着边的法线方向，中间一道三次贝塞尔） ----------
 
 const NORMAL = { top: [0, -1], right: [1, 0], bottom: [0, 1], left: [-1, 0] };

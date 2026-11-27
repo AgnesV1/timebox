@@ -141,3 +141,28 @@ test("store: importing an ecosystem turns its linked cards into top-level goals,
   store.deleteBoard(second.id);
   assert.equal(north().length, 4, "removing a diagram keeps its goals");
 });
+
+// 打开时看哪里（2026-11-26：导进来字自动变小、看不清）
+test("a board that fits at a readable size opens whole; a bigger one opens at 90% on its middle", () => {
+  const small = C.openView(800, 500, 1200, 750);
+  assert.equal(small.k, 1.25);   // 小的照旧放大到最多 125%
+  const near = C.openView(1300, 700, 1200, 750);
+  assert.ok(near.k >= C.READABLE && near.k < 1);
+  const big = C.openView(1641, 503, 1200, 750);   // 一块横着很长的
+  assert.deepEqual(big, { k: 0.9, tx: (1200 - 1641 * 0.9) / 2, ty: (750 - 503 * 0.9) / 2 });
+  // 「整块放得下」照旧能缩得很小
+  assert.ok(C.fitView(1641 * 10, 503, 1200, 750).k < 0.1);
+  assert.ok(C.fitView(1e6, 1e6, 1200, 750).k >= 0.08);
+});
+
+test("cards taller here than in Obsidian grow, and the lines follow the new size", () => {
+  const cv = { nodes: [{ id: "a", type: "text", x: 0, y: 0, width: 100, height: 60 }, { id: "g", type: "group", x: -20, y: -20, width: 300, height: 200 }, { id: "b", type: "text", x: 0, y: 200, width: 100, height: 60 }], edges: [] };
+  assert.equal(C.withHeights(cv, {}), cv);
+  assert.equal(C.withHeights(cv, { a: 40 }), cv, "never shrinks");
+  const g = C.withHeights(cv, { a: 92.4, g: 500 });
+  assert.equal(g.nodes[0].height, 93);
+  assert.equal(g.nodes[1].height, 200, "groups keep their size");
+  assert.equal(g.nodes[2], cv.nodes[2]);
+  assert.equal(C.anchor(g.nodes[0], "bottom").y, 93);
+  assert.equal(cv.nodes[0].height, 60, "the stored board is untouched");
+});

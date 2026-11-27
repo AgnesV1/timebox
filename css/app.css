@@ -176,9 +176,9 @@ body.phone.timing #sky .hz-grid { opacity: .35; }
    流星（头在右端，尾巴淡出去）；潮水（贴在右下角的一片，画在 1000 × 100 的格子里横向拉开，线宽不跟着拉） */
 .sky-ev { position: absolute; left: 0; top: 0; will-change: transform; }
 .sky-plane, .sky-redeye { display: flex; align-items: center; transform-origin: 100% 50%; }
-.sky-trails { display: flex; flex-direction: column; gap: 3px; }
-.sky-trails b { display: block; width: 130px; height: 1px; background: linear-gradient(to left, rgba(11, 11, 11, .36), rgba(11, 11, 11, 0)); }
-.sky-dot { width: 4px; height: 4px; margin-left: 1px; border-radius: 50%; background: rgba(11, 11, 11, .6); }
+/* 白天的飞机：铅笔画的两道墨蓝尾迹（js/sky.js 的 plane，颜色和断开的云在 SVG 里）+ 机头一个墨蓝小点 */
+.sky-trail { display: block; overflow: visible; }
+.sky-dot { width: 4px; height: 4px; margin-left: -1px; border-radius: 50%; background: rgba(30, 47, 92, .85); }
 .sky-red { width: 3px; height: 3px; border-radius: 50%; background: #FF2D4A; animation: sky-blink 1.2s steps(1) infinite; }
 .sky-white { width: 2px; height: 2px; margin-left: 3px; border-radius: 50%; background: #F4F4F8; opacity: .8; }
 .sky-fall svg { display: block; width: 100%; }
@@ -399,22 +399,28 @@ body:not(.phone) .page-head { min-height: 34px; }
 .phead .l { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .phead h1 { margin: 0; font: 700 18px/1 var(--display); letter-spacing: -.01em; white-space: nowrap; cursor: pointer; }
 /* 手机：今天前后各 5 天的日期条 */
-.phead .r { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.pset { width: 34px; height: 34px; margin-right: -6px; color: var(--ink); }
-.pset .ic { width: 20px; height: 20px; }
-.pread { display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; height: 30px; padding: 0 10px 0 8px; border: 1px solid transparent; border-radius: 999px; background: transparent; font-size: 12.5px; font-weight: 700; text-decoration: none; color: var(--ink); }
-.pread .ic { width: 16px; height: 16px; }
-.pread.pico { justify-content: center; width: 30px; padding: 0; }
+/* 右边那排图标（2026-11-26 她说堆在一起）：日期是这一行的主角，图标退一步——一样大（齿轮也是）、淡墨色、挨紧一点；🛒 上的数字照旧墨色（那是要看的信息） */
+.phead .r { display: flex; align-items: center; gap: 0; min-width: 0; }
+.pset { width: 32px; height: 32px; margin-right: -7px; color: var(--muted); }
+.pset .ic { width: 17px; height: 17px; }
+.pread { display: inline-flex; flex-shrink: 0; align-items: center; gap: 4px; height: 32px; padding: 0 9px 0 8px; border: 1px solid transparent; border-radius: 999px; background: transparent; font-size: 12.5px; font-weight: 700; text-decoration: none; color: var(--muted); }
+.pread .ic { width: 17px; height: 17px; }
+.pread:active, .pset:active { color: var(--ink); }
+.phead .r .ic { stroke-width: 1.6; }
+.pread.pico { justify-content: center; width: 32px; padding: 0; }
 .phone-settings .card { padding: 16px; }
 .phone-settings .btns .btn { flex: 1; }
 .hint.look-hint { margin: 0 0 8px; }
-.psync { display: inline-grid; place-items: center; flex-shrink: 0; width: 24px; height: 30px; padding: 0; border: 0; background: none; }
-.psync::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+/* 同步的小点：跟在日期和日月后面，小一点（点的区域还是够大） */
+.psync { display: inline-grid; place-items: center; flex-shrink: 0; width: 20px; height: 30px; margin-left: -4px; padding: 0; border: 0; background: none; }
+.psync::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
 .psync.wait::before { background: var(--muted); }
 .psync.bad::before { background: var(--warn); }
 .daystrip { position: relative; display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 3px; margin: 0 -6px 8px; }
 .dpill { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; padding: 4px 0 5px; border: 1.5px solid transparent; border-radius: 12px; background: none; font-size: 11px; font-weight: 600; color: var(--muted); }
-.dpill b { font: 700 16px/1.2 var(--num); color: var(--ink); }
+.dpill b { font: 600 16px/1.2 var(--num); color: var(--ink); }
+/* 日期条的数退一档（2026-11-26 手机层级）：顶上的日期是主角，只有今天和选中的那天是粗的 */
+.dpill.today b, .dpill.on b { font-weight: 700; }
 .dpill i { width: 6px; height: 6px; margin-top: 2px; border-radius: 50%; }
 .dpill i.all { background: var(--ink); }
 .dpill i.some { background: linear-gradient(90deg, var(--ink) 50%, transparent 50%); box-shadow: inset 0 0 0 1.5px var(--ink); }
@@ -1480,14 +1486,18 @@ body.phone .tm-edit .dk-deep span { display: inline; }
 .tm-edit .dk-deep { min-height: 30px; padding: 4px 11px; }
 body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
 /* 手机：加任务那一块右下角的 Spend（js/ui/today.js），和 ◆ Deep / Idea 一样的淡底小签，带钱包图标 */
-.add-spendw { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 8px; }
+/* 2026-11-26 她说 Spend 小一点、矮一点、和上面的加任务拉开：比 Add 矮一截、字小一档、往下空出来，读起来是加任务之外的另一件小事 */
+.add-spendw { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px; }
 /* Spend 左边：当月预算还剩多少，灰的（正好 0 也是灰的）；超了才是警示色 */
 .add-left { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .add-left b { font-weight: 600; }
 .add-left.over { color: var(--warn-text); }
-.add-spend { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 13px 0 11px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 700; color: var(--ink); }
-.add-spend .ic { width: 17px; height: 17px; }
+.add-spend { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 11px 0 9px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.add-spend .ic { width: 15px; height: 15px; }
 .add-spend:active { transform: scale(.96); }
+/* Spend 下面一行：从第一笔起一共结余多少（Spending → All years 顶上那个数）。很浅、比 left 还淡，存在感低（她说的） */
+.add-bal { margin: 6px 2px 0 0; color: var(--muted); font-size: 11px; text-align: right; opacity: .6; }
+.add-bal b { font-weight: 600; }
 /* 手机：加任务时选项目 = 一个淡底小签（和 ◆ Deep 一样），带那个项目的色点；点了从它那里长出一个下拉（js/ui/today.js 的 openPicker） */
 .pj-pick { display: inline-flex; align-items: center; gap: 7px; max-width: 58%; min-height: 38px; padding: 0 10px 0 12px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 700; color: var(--muted); }
 .pj-pick.set { color: var(--ink); }
@@ -2062,8 +2072,8 @@ body.phone .rpick { padding: 8px 6px; }
 .mfr-row input, .mfr-row select { width: 100%; min-width: 0; font-size: 12.5px; }
 
 /* 手机：顶栏的 🛒 和 #shop 页 */
-.pshop { padding: 0 9px 0 8px; }
-.pshop span { font: 700 12.5px var(--num); }
+.pshop { padding: 0 8px 0 7px; }
+.pshop span { font: 700 12.5px var(--num); color: var(--ink); }
 body.phone .shop-page { padding-bottom: 90px; }
 body.phone .nextshop { margin: 4px 0 0; }
 body.phone .nextshop > header { margin-bottom: 12px; }
@@ -2862,7 +2872,7 @@ body.phone .mm-ren { font-size: 16px; }
 
 /* 卡片和线（Mindmap 页的白板；生态圈有自己的一套，见下一段） */
 .cv-n { position: absolute; box-sizing: border-box; border-radius: 10px; }
-.cv-text, .cv-file, .cv-link { overflow: hidden; padding: 10px 14px; border: 1.5px solid color-mix(in srgb, var(--ink) 26%, transparent); background: var(--bg); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; cursor: auto; }
+.cv-text, .cv-file, .cv-link { overflow: hidden; padding: 8px 12px; border: 1.5px solid color-mix(in srgb, var(--ink) 26%, transparent); background: var(--bg); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; cursor: auto; }
 .cv-n.tint { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 9%, var(--bg)); }
 [data-theme="dark"] .cv-n.tint:not(.cv-group) { box-shadow: 0 0 14px color-mix(in srgb, var(--cc) 22%, transparent); }
 .cv-group { border: 1.5px solid color-mix(in srgb, var(--ink) 16%, transparent); background: color-mix(in srgb, var(--ink) 3%, transparent); }
@@ -2878,7 +2888,8 @@ body.phone .mm-ren { font-size: 16px; }
 .cv-e .cv-ah { fill: color-mix(in srgb, var(--ink) 42%, transparent); stroke: none; }
 .cv-e.tint path { stroke: var(--cc); }
 .cv-e.tint .cv-ah { fill: var(--cc); stroke: none; }
-.cv-lbl { position: absolute; transform: translate(-50%, -50%); max-width: 260px; padding: 2px 8px; overflow: hidden; border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 12.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+/* 线上的字：长的换行（最多三行、居中），不再一行截成「…」（她 2026-11-26 说长的显示不全）；三行还放不下的停上去看全文 */
+.cv-lbl { position: absolute; transform: translate(-50%, -50%); display: -webkit-box; width: max-content; max-width: 220px; padding: 2px 8px; overflow: hidden; border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 12.5px; font-weight: 600; line-height: 1.35; text-align: center; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .cv-lbl.tint { color: var(--cc); }
 /* 卡片上的 Markdown */
 .cv-md > div { min-height: 1.5em; }

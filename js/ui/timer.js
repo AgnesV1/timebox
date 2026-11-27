@@ -60,7 +60,7 @@ export function dockHTML(c, onToday, extra = () => null) {
     const p = pickedId(c);
     const next = p && p !== rt.id && onToday ? store.get("tasks", p) : null;
     // 按钮包在 .dk-tools 里：电脑上它是 display: contents（还是一行，顺序靠 css 的 order 和以前一样）；
-    // 手机上是第二行——第一行留给点、完整的任务名和走着的时间，不再挤成「Re…」（她 2026-11-27 说计时中左边太挤）。
+    // 手机上计时中是第二行——第一行留给点、完整的任务名和走着的时间，不再挤成「Re…」（她 2026-11-27 说计时中左边太挤）。
     // 第二行：◆、⏱、× 靠左，Stop 单独靠右，扔掉计时的 × 不和 Stop 挨着
     return '<div class="dock run" style="--bar:' + colorOf(rt) + '">' +
       '<i class="pulse" aria-hidden="true"></i><div class="dk-main"><button type="button" class="dk-k dk-since' + (atEdit === "since" ? " on" : "") + '" data-act="at-edit" data-v="since" title="Started earlier? Change the time">Since ' + store.clockOf(run.start) + "</button>" + titleOf(rt) + "</div>" +
@@ -77,16 +77,16 @@ export function dockHTML(c, onToday, extra = () => null) {
   if (st && st.status !== "done") {
     return '<div class="dock logged" style="--bar:' + colorOf(st) + '">' +
       '<div class="dk-main"><span class="dk-k">Logged ' + fmtMin(stopped.min) + "</span>" + titleOf(st) + "</div>" +
-      '<div class="dk-tools"><button type="button" class="dk-btn" data-act="dock-status" data-s="done">Done</button>' +
+      '<button type="button" class="dk-btn" data-act="dock-status" data-s="done">Done</button>' +
       '<button type="button" class="dk-btn ghost" data-act="dock-status" data-s="delay">Delay</button>' +
-      '<button type="button" class="icon-btn dk-x" data-act="dock-close" aria-label="Close">×</button></div></div>';
+      '<button type="button" class="icon-btn dk-x" data-act="dock-close" aria-label="Close">×</button></div>';
   }
   if (!onToday) return "";
   const t = store.get("tasks", pickedId(c));
   if (!t) return "";
   return '<div class="dock idle" style="--bar:' + colorOf(t) + '">' +
-    '<i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected' + selectedText(t) + "</span>" + titleOf(t) + "</div>" +
-    '<div class="dk-tools">' + deepBtn(t) + '<button type="button" class="dk-btn start" data-act="timer-start" data-id="' + t.id + '"><i class="tri"></i>Start</button></div></div>';
+    '<i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected' + selectedText(t) + "</span>" + titleOf(t) + "</div>" + deepBtn(t) +
+    '<button type="button" class="dk-btn start" data-act="timer-start" data-id="' + t.id + '"><i class="tri"></i>Start</button></div>';
 }
 
 // 「Selected · 30 min planned」；计划那一行写下面还没勾的几项加起来大概多久

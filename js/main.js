@@ -13,7 +13,7 @@ import { toast, ballHTML } from "./ui/common.js";
 import * as L from "./lists.js";
 import { initModal, closeModal, describe, focusAgain } from "./ui/modal.js";
 import { initSelect } from "./ui/select.js";
-import { todayHTML, initToday, shownDate, showDate, marquees, phoneStrip } from "./ui/today.js";
+import { todayHTML, initToday, shownDate, showDate, marquees } from "./ui/today.js";
 import { calendarHTML, poolHTML, initCalendar, handleDrop } from "./ui/calendar.js";
 import { projectsHTML, initProjects, refreshProjectEditor, projectAlerts } from "./ui/projects.js";
 import { initRepeat } from "./ui/repeat.js";
@@ -201,7 +201,6 @@ function draw() {
   else main.innerHTML = view === "calendar" ? calendarHTML(c) : view === "projects" ? projectsHTML(c) : view === "mindmap" ? mindmapHTML(phone) : view === "stats" ? statsHTML(c) : view === "meals" ? mealsHTML(c) : view === "shop" ? shopHTML(c, phone) : view === "settings" ? settingsHTML(phone) : view === "reading" ? readingHTML(phone) : view === "ideas" ? ideasPhoneHTML(c) : view === "friends" ? friendsHTML(c) : todayHTML(c, phone);
   placePills();
   marquees(main);   // 手机今天页展开那一行放不下的「For …」链：自己滚
-  if (phone) phoneStrip(main);   // 手机的日期条能左右滑：放回原来滚到的地方，选中的那天看得见
   if (document.startViewTransition) nameParts(main, true);
   rollNumbers();
   // 打开阅读页：同步时顺便拉一次阅读表格的列表（查重用）

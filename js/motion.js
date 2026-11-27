@@ -108,29 +108,62 @@ export function rollNumbers() {
 
 // ---------- 换页 / 翻天时的标题 ----------
 // 夜里：标题的字先是一串乱码，从左到右一个个解出来（0.4 秒）；白天：粉、蓝两版错开着落下来对准（丝网印套色，样子在 css 的 .reg）
-const GLYPHS = "<>/\\_=+*#01░▒";
+// 中途整页重画（同步拉回来、进阅读页顺手同步一次……）会把标题换成新的一份：以前乱码就此断掉、直接露出原字，看着像没这个效果。
+// 现在记着解到第几格 / 套色落了多久，重画完 titleKeep() 在新标题上接着来（2026-11-28 修）
+const GLYPHS = "<>/\\_=+*#01░▒", N = 14, REG_MS = 550;
+const esc = (c) => c.replace(/[<>&]/g, (x) => "&#" + x.charCodeAt(0) + ";");
+let decoding = null, settling = null;   // { text, f } / { text, at }
+const headOf = () => document.querySelector("#main .page-head h2");
+const textNode = (h, text) => [...h.childNodes].find((n) => n.nodeType === 3 && (text === undefined ? n.textContent.trim() : n.textContent === text));
+function wrap(h, text) {
+  const node = h && textNode(h, text);
+  if (!node) return null;
+  const box = document.createElement("span");
+  box.className = "scr";
+  node.replaceWith(box);
+  return box;
+}
+function decodeStep() {
+  const d = decoding;
+  if (!d) return;
+  const box = headOf()?.querySelector(":scope > .scr") || wrap(headOf(), d.text);
+  if (!box) { decoding = null; return; }   // 已经换到别的页了
+  d.f++;
+  if (d.f < N) {
+    box.innerHTML = [...d.text].map((c, i) => (c === " " || i < d.f * d.text.length / N ? esc(c) : "<b>" + esc(GLYPHS[Math.random() * GLYPHS.length | 0]) + "</b>")).join("");
+    setTimeout(decodeStep, 30);
+  } else { box.replaceWith(document.createTextNode(d.text)); decoding = null; }
+}
 export function titleIn() {
-  const h = document.querySelector("#main .page-head h2");
+  const h = headOf();
+  decoding = settling = null;
   if (!h || quiet()) return;
   if (document.documentElement.dataset.theme !== "dark") {
     h.classList.remove("reg");
     void h.offsetWidth;
     h.classList.add("reg");
+    settling = { text: textNode(h)?.textContent, at: performance.now() };
     return;
   }
-  const node = [...h.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+  const node = textNode(h);
   if (!node) return;
-  const text = node.textContent, box = document.createElement("span"), N = 14;
-  box.className = "scr";
-  node.replaceWith(box);
-  let f = 0;
-  const step = () => {
-    f++;
-    box.innerHTML = [...text].map((c, i) => (c === " " || i < f * text.length / N ? c.replace(/[<>&]/g, (x) => "&#" + x.charCodeAt(0) + ";") : "<b>" + GLYPHS[Math.random() * GLYPHS.length | 0].replace(/[<>&]/g, (x) => "&#" + x.charCodeAt(0) + ";") + "</b>")).join("");
-    if (f < N && box.isConnected) setTimeout(step, 30);
-    else if (box.isConnected) box.replaceWith(document.createTextNode(text));
-  };
-  step();
+  decoding = { text: node.textContent, f: 0 };
+  decodeStep();
+}
+// 每次重画完调（js/main.js 的 draw）：标题还是同一句，就把没放完的接上——套色从已经过去的那一刻接着落，乱码在下一格接着解
+export function titleKeep() {
+  const h = headOf();
+  if (!h) return;
+  if (decoding && !h.querySelector(":scope > .scr")) {
+    const box = wrap(h, decoding.text);
+    if (box) box.innerHTML = [...decoding.text].map((c, i) => (c === " " || i < decoding.f * decoding.text.length / N ? esc(c) : "<b>" + esc(GLYPHS[Math.random() * GLYPHS.length | 0]) + "</b>")).join("");
+    else decoding = null;
+  }
+  if (settling) {
+    const gone = performance.now() - settling.at;
+    if (gone >= REG_MS || textNode(h)?.textContent !== settling.text) { settling = null; return; }
+    if (!h.classList.contains("reg")) { h.style.animationDelay = -gone.toFixed(0) + "ms"; h.classList.add("reg"); }
+  }
 }
 
 // ---------- 夜里主卡片的边跟着鼠标亮 ----------

@@ -170,7 +170,9 @@ export function initTimer(rerender) {
   let swipe = null;
   on(document, "pointerdown", "#dock .dock.sheet", (e) => { swipe = e.target.closest("input, button, select, label") ? null : { y: e.clientY }; });
   addEventListener("pointerup", (e) => { if (swipe && e.clientY - swipe.y > 40 && closeSheet()) { animateNext(); rerender(); } swipe = null; });
-  document.addEventListener("pointerdown", (e) => {
+  // 等这一下点完（click）再收：按下去的时候就重画的话，手指底下那颗按钮被换掉，弹簧按不下去、这一下也可能点不着（2026-11-28 修）。
+  // 重画是下一帧的事，被点的那颗自己的 click 先跑；划着滚页面不算点，挡板留着
+  document.addEventListener("click", (e) => {
     if (!sheet || !document.body.classList.contains("phone") || e.target.closest?.("#dock, .dayview .row, .menu, #modal, #toast")) return;
     if (closeSheet()) { animateNext(); rerender(); }
   }, true);

@@ -37,7 +37,7 @@ import { renderSun, initSun } from "./ui/sun.js";
 import { createSpending } from "./ui/spending.js";
 import { initIsland, refreshIsland, closeIsland } from "./ui/island.js";
 import { fxChanged, paintLefts } from "./ui/money.js";
-import { animateNext, animateSoft, takeTransition, nameParts, dusk, measurePills, placePills, glidePills, rollNumbers, titleIn, initEdgeGlow } from "./motion.js";
+import { animateNext, animateSoft, takeTransition, nameParts, dusk, measurePills, placePills, glidePills, rollNumbers, titleIn, titleKeep, initEdgeGlow } from "./motion.js";
 import { lookAt, nextTurn } from "./day.js";
 
 const phoneMQ = matchMedia("(max-width: 760px)");
@@ -203,6 +203,7 @@ function draw() {
   marquees(main);   // 手机今天页展开那一行放不下的「For …」链：自己滚
   if (document.startViewTransition) nameParts(main, true);
   rollNumbers();
+  titleKeep();   // 换页标题的乱码 / 套色放到一半被重画打断：接着放完（js/motion.js）
   // 打开阅读页：同步时顺便拉一次阅读表格的列表（查重用）
   reading.want(view === "reading");
   if (view === "reading" && lastView !== "reading" && sync.configured()) sync.sync();

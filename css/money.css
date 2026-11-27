@@ -618,3 +618,13 @@
 .sp-set .sp-ych { margin: 18px 0 4px; font-size: 13px; }
 .sp-set .sp-ycheck td { vertical-align: middle; }
 .sp-set .sp-ycheck .btn { padding: 4px 10px; font-size: 12.5px; }
+
+/* ---------- 手机拉下来的记账：好点一点（她 2026-11-27：好点、少误触、字大一点）----------
+   面板自己的字照旧四档（22 / 15 / 13 / 11），只把小按钮的点的范围撑开：画出来的不变，::after 往外撑到 44；
+   ‹ › 和右上的三个图标之间本来就空着，撑开以后也不会互相碰到。 */
+.mn-phone :is(.mn-ic, .mn-curb) { position: relative; }   /* .mn-now 本来就是 absolute 的，不动它 */
+.mn-phone .mn-ic::after { content: ""; position: absolute; inset: -6px -4px; }
+.mn-phone .mn-ic.mn-sm::after { inset: -8px; }
+.mn-phone .mn-curb::after { content: ""; position: absolute; inset: -11px -6px; }
+.mn-phone .mn-now::after { content: ""; position: absolute; inset: -8px; }
+.mn-phone .mn-seg > button { padding: 9px 0; }

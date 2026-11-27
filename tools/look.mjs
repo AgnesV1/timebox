@@ -92,7 +92,7 @@ async function seedLeisure(page) {
 function clipAudit() {
   const out = [], seen = new Set();
   const skip = (el) => el.closest(".gdue.dflt, .sp-sr, .sr-only, #sky, .fx, .lk-layer, svg, [hidden], [aria-hidden='true']");
-  const meant = (el) => el.matches(".mn, .mn-inner, .mn-hs, .mn-rw, .chain.mq, .phone-day .chain, .mm-view");   // .mm-view：Mindmap 的白板，本来就是挪着看的
+  const meant = (el) => el.matches(".mn, .mn-inner, .mn-hs, .mn-rw, .chain.mq, .phone-day .chain, .mm-view, .daystrip");   // .daystrip：手机的日期条，2026-11-27 起本来就左右滑   // .mm-view：Mindmap 的白板，本来就是挪着看的
   const label = (el) => el.tagName.toLowerCase() + (el.classList[0] ? "." + el.classList[0] : "") + (el.parentElement?.classList[0] ? " in ." + el.parentElement.classList[0] : "");
   const say = (kind, el, text, extra) => { const k = kind + "|" + label(el) + "|" + text; if (!seen.has(k)) { seen.add(k); out.push(kind + "  " + label(el) + "  “" + text + "”  " + extra); } };
   for (const el of document.body.querySelectorAll("*")) {

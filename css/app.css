@@ -543,8 +543,11 @@ body:not(.phone) .page-head { min-height: 34px; }
 .ls-more { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 6px 23px; font-size: 12.5px; color: var(--muted); }
 .ls-more > span { white-space: pre-line; }   /* 备注可能有好几行（步骤并进来的） */
 .ls-pnotes { margin: 8px 0 4px; padding: 8px 10px; max-height: 340px; overflow: auto; border-radius: 10px; background: var(--tonal); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; }
-body.phone .ls-ln, body.phone .ls-step { min-height: 30px; font-size: 14px; }
-body.phone .ls-cb { width: 19px; height: 19px; font-size: 12.5px; }
+/* 手机：一项一行至少 44 高（手指点得准）、字 16；勾选框画 22、点的范围 44（::after 往外撑 11），和名字之间空 14，点名字不会勾上（2026-11-27） */
+body.phone .ls-ln, body.phone .ls-step { min-height: 44px; gap: 14px; font-size: 16px; }
+body.phone .ls-step { font-size: 14px; }
+body.phone .ls-cb { width: 22px; height: 22px; font-size: 14px; }
+body.phone .ls-cb::after { inset: -11px; }
 /* 状态怎么画（和日历一个说法）：Done = 灰 + 划掉，Delay = 只划掉，Drop = 只灰 */
 .st-done .task { color: var(--muted); text-decoration: line-through; }
 .st-delay .task { text-decoration: line-through; }
@@ -1463,14 +1466,16 @@ body:has(#main :is(input, textarea, select):focus) #toast { bottom: calc(22px + 
 .chip.mv:disabled { opacity: .35; cursor: default; }
 [data-theme="light"] .row .chip.mv:not(.on) { background: transparent; }
 @media (hover: hover) { .chip.mv:not(:disabled):hover { background: var(--tonal); color: var(--ink); } }
-/* 手机：展开那一行的 Done / Delay / Drop 是小药丸：26px 高、12px 字、宽度跟字、靠左（她说再小一点、字也小点）；
-   看着小，点的范围往上下各多 7px，还是好按。手机上没有 ↑ ↓（按住左边的分钟数拖） */
-body.phone .row.open .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 9px; }
-body.phone .row.open .chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 26px; padding: 0 11px; font-size: 12.5px; }
-body.phone .row.open .chip::after { content: ""; position: absolute; inset: -7px -2px; }
+/* 手机：展开那一行的 Done / Delay / Drop（2026-11-27 她要好点、少误触、字大一点；以前是 26px 的小药丸）：36px 高、14px 字，
+   点的范围上下各多 4px 到 44、左右多 5px；药丸之间空 12px，撑出去的那一圈也碰不到。Drop 会把事情扔掉，单独靠到最右边，不和 Delay 挨着。
+   手机上没有 ↑ ↓（按住左边的分钟数拖） */
+body.phone .row.open .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
+body.phone .row.open .chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 0 15px; font-size: 14px; }
+body.phone .row.open .chip::after { content: ""; position: absolute; inset: -4px -5px; }
+body.phone .row.open .chip[data-s="drop"] { order: 2; margin-left: auto; }
 body.phone .tm { padding-top: 0; padding-bottom: 0; }
-body.phone .tm-x { width: 32px; height: 32px; font-size: 17px; }
-body.phone .tm.sum, body.phone .tm.more-time { min-height: 32px; }
+body.phone .tm-x { width: 44px; height: 44px; font-size: 18px; }   /* 删一段计时：点的范围 44（2026-11-27） */
+body.phone .tm.sum, body.phone .tm.more-time { min-height: 44px; font-size: 14px; }
 /* ◆ Deep：加任务时的开关、浮条上的按钮。亮着 = 黑底青柠字（和 Optional 标签、守住线的状态一个写法） */
 .deep-tog { position: relative; display: inline-flex; cursor: pointer; }
 .deep-tog input { position: absolute; inset: 0; opacity: 0; }
@@ -1479,24 +1484,26 @@ body.phone .tm.sum, body.phone .tm.more-time { min-height: 32px; }
 [data-theme="dark"] .deep-tog input:checked + span, [data-theme="dark"] .dk-deep.on { border-color: var(--accent); background: transparent; }
 .deep-tog input:focus-visible + span { outline: 2px solid var(--blue); outline-offset: 2px; }
 .dk-deep { min-height: 34px; flex-shrink: 0; }
-body.phone .dk-deep { min-width: 38px; min-height: 38px; justify-content: center; padding: 0 10px; }
+body.phone .dk-deep { min-width: 44px; min-height: 44px; justify-content: center; padding: 0 10px; }
 body.phone .dk-deep span { display: none; }
 /* 时间块改钟点那一小块里的 ◆ Deep（js/ui/today.js 的 timeEditHTML）：手机上也带字，不然只剩一个 ◆ 看不出是什么 */
 body.phone .tm-edit .dk-deep span { display: inline; }
 .tm-edit .dk-deep { min-height: 30px; padding: 4px 11px; }
-body.phone .deep-tog span { min-height: 38px; font-size: 14px; }
+body.phone .deep-tog span { min-height: 44px; padding: 0 14px; font-size: 14px; }
 /* 手机：加任务那一块右下角的 Spend（js/ui/today.js），和 ◆ Deep / Idea 一样的淡底小签，带钱包图标 */
-/* 2026-11-26 她说 Spend 小一点、矮一点、和上面的加任务拉开：比 Add 矮一截、字小一档、往下空出来，读起来是加任务之外的另一件小事 */
-.add-spendw { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px; }
+/* 2026-11-26 她说 Spend 小一点、矮一点、和上面的加任务拉开：比 Add 矮一截、往下空出来，读起来是加任务之外的另一件小事。
+   2026-11-27 好点一点：画出来 36 高、字 14，点的范围 ::after 撑到 44；和 Add 那一行空 22，手指不会从 Add 滑到 Spend */
+.add-spendw { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 22px; }
 /* Spend 左边：当月预算还剩多少，灰的（正好 0 也是灰的）；超了才是警示色 */
-.add-left { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.add-left { font-size: 14px; color: var(--muted); white-space: nowrap; }
 .add-left b { font-weight: 600; }
 .add-left.over { color: var(--warn-text); }
-.add-spend { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 11px 0 9px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 12.5px; font-weight: 600; color: var(--ink); }
-.add-spend .ic { width: 15px; height: 15px; }
+.add-spend { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px 0 11px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 600; color: var(--ink); }
+.add-spend::after { content: ""; position: absolute; inset: -4px; }
+.add-spend .ic { width: 17px; height: 17px; }
 .add-spend:active { transform: scale(.96); }
 /* Spend 下面一行：从第一笔起一共结余多少（Spending → All years 顶上那个数）。很浅、比 left 还淡，存在感低（她说的） */
-.add-bal { margin: 6px 2px 0 0; color: var(--muted); font-size: 11px; text-align: right; opacity: .6; }
+.add-bal { margin: 8px 2px 0 0; color: var(--muted); font-size: 12.5px; text-align: right; opacity: .6; }
 .add-bal b { font-weight: 600; }
 /* 手机：加任务时选项目 = 一个淡底小签（和 ◆ Deep 一样），带那个项目的色点；点了从它那里长出一个下拉（js/ui/today.js 的 openPicker） */
 .pj-pick { display: inline-flex; align-items: center; gap: 7px; max-width: 58%; min-height: 38px; padding: 0 10px 0 12px; border: 0; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 700; color: var(--muted); }
@@ -3015,3 +3022,72 @@ html.fx-off .eco-e .eco-fl { display: none; }
 .eco-ox { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 14px; line-height: 1; opacity: 0; transition: opacity .15s; }
 .eco-o:hover .eco-ox, .eco-ox:focus-visible { opacity: 1; }
 @media (hover: none) { .eco-ox { opacity: 1; } }
+
+/* ---------- 手机：好点、少误触、字大一档（她 2026-11-27）----------
+   三条规矩：① 点得到的范围至少 44 高（画出来的可以小一点，靠 ::after 或 padding 撑出去）；② 挨着的两样之间空出来，手指偏一点也不会点到隔壁；
+   ③ 会丢东西的（Drop、删除）不和常用的挨着。字整体往上挪一档（还在六档里：11 → 12.5、12.5 → 14、14 → 16），输入框本来就 16px 起。
+   顶栏那五个图标：日期是主角、占了左边，右边只放得下 36 宽 × 44 高一个，图标画 20、互相不重叠。 */
+/* 顶栏：日期、日月、同步的小点都撑到 44 高；右边五个图标各 36 × 44 */
+body.phone .phead { padding-top: calc(4px + var(--top)); padding-bottom: 8px; }
+body.phone .phead h1 { padding: 13px 0; margin: -13px 0; }
+body.phone .phead .ball { position: relative; }
+body.phone .phead .ball::after { content: ""; position: absolute; inset: -11px -4px; }
+body.phone .psync { width: 24px; height: 44px; margin-left: -2px; }
+body.phone .phead .r :is(.pread, .pset) { width: 36px; height: 44px; margin: 0; padding: 0; justify-content: center; border-radius: 12px; }
+body.phone .phead .r .pread.pshop { width: auto; min-width: 36px; padding: 0 6px; gap: 3px; font-size: 12.5px; }
+body.phone .phead .r .ic { width: 20px; height: 20px; }
+body.phone .phead .r :is(.pread, .pset):active { background: var(--tonal); }
+/* 别的页顶上的「‹ Today」：44 高 */
+body.phone .phead .nav { min-height: 44px; padding: 0 12px 0 4px; margin-left: -4px; font-size: 14px; }
+/* 日期条：以前 11 天挤在一屏、每格 31 宽、只隔 3px，容易点到隔壁那天。现在每格 46 宽、隔 4px，左右滑着看前后五天；
+   画的时候选中的那天放在看得见的地方（js/ui/today.js 的 phoneStrip），两头淡出一点，看得出还能滑 */
+body.phone .daystrip { grid-template-columns: repeat(11, 46px); grid-auto-flow: column; gap: 4px; margin: 0 -16px 10px; padding: 0 16px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; scroll-padding-inline: 16px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); }
+body.phone .daystrip::-webkit-scrollbar { display: none; }
+body.phone .dpill { min-height: 60px; padding: 6px 0 7px; font-size: 12.5px; touch-action: manipulation; }
+body.phone .dpill b { font-size: 18px; }
+body.phone .daystrip .dmark { left: calc(16px + var(--k) * 50px); width: 46px; }
+body.phone .stripmeta { font-size: 14px; }
+/* Chore 键（▶ 那个小圆）：画 16、点的范围 44 */
+body.phone .chore-key::after { content: ""; position: absolute; inset: -8px; }
+body.phone .chore { font-size: 14px; }
+/* 每一行：上下多空一点，字 16；左边的分钟数、项目名、For … 链各大一档 */
+body.phone .row { padding-top: 12px; padding-bottom: 12px; }   /* 只动上下：选中、展开的那一行左右各有 8px 的边，不能盖掉 */
+body.phone .task { font-size: 16px; line-height: 1.4; }
+body.phone .est { width: 34px; }
+body.phone .est b { font-size: 14px; }
+body.phone :is(.pj, .tag) { font-size: 12.5px; }
+body.phone .rside { font-size: 14px; }
+body.phone .chain { font-size: 14px; }
+body.phone .chain :is(.ch-for, .ch-more) { font-size: 12.5px; }
+body.phone :is(.ls-sz, .ls-cnt, .ls-more, .ls-pnotes) { font-size: 14px; }
+body.phone .ls-ln .ls-tx small { font-size: 12.5px; }
+body.phone .ls-more { margin-left: 36px; }
+body.phone .why, body.phone .empty { font-size: 14px; }
+/* 加任务那一行：三样都 44 高，中间空 10 */
+body.phone .add-main { gap: 10px; }
+body.phone .add-main :is(input, .btn) { min-height: 44px; }
+body.phone .add-more { gap: 10px; }
+/* 底下的计时浮条：Start / Stop 和 ◆ 都 44 高，两个按钮之间空 12 */
+body.phone .dock { gap: 12px; }
+body.phone .dk-btn { min-height: 44px; padding: 0 15px; font-size: 16px; }
+/* 手机上别的小签（阅读、Mindmap、设置里的那些）：36 高、字 14，点的范围上下各多 4 */
+body.phone .chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 0 13px; font-size: 14px; }
+body.phone .chip::after { content: ""; position: absolute; inset: -4px 0; }
+body.phone :is(.hint, .msub) { font-size: 14px; }
+body.phone .settings .btn, body.phone .reading .btn { min-height: 44px; padding: 0 16px; font-size: 14px; }
+/* Mindmap：Rename / Replace / Delete 撑到 44 高、互相空 18；右下角缩放的按钮 44 */
+body.phone .mm-acts { gap: 18px; }
+body.phone .mm-acts .link { position: relative; font-size: 14px; }
+body.phone .mm-acts .link::after { content: ""; position: absolute; inset: -13px -8px; }   /* 字下面那道线（夜里是画在底边上的）不能跟着撑高，点的范围用 ::after 撑到 44 */
+body.phone .mm-acts .msub { font-size: 12.5px; }
+body.phone .mm-ctl .icon-btn { width: 44px; height: 44px; font-size: 18px; }
+body.phone .mm-pct { min-width: 60px; min-height: 44px; font-size: 14px; }
+/* 别的几页：分段开关、阅读的三个表情、设置里的勾选、每页右上的主按钮，都撑到 44 */
+body.phone .seg > button { min-height: 36px; padding: 0 14px; font-size: 14px; }
+body.phone .seg { padding: 4px; }
+body.phone .vibe { width: 48px; height: 44px; }
+body.phone .vibes { gap: 6px; }
+body.phone .check { min-height: 44px; margin: 0 0 8px; font-size: 16px; }
+body.phone .check input { width: 22px; height: 22px; }
+body.phone .page-head .btn { min-height: 44px; }

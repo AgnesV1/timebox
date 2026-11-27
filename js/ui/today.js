@@ -447,6 +447,20 @@ function phoneHTML(c) {
       : connectHTML()) + "</div>";
 }
 
+// 手机的日期条能左右滑（2026-11-27：每天一格 46 宽，一屏放不下 11 天）。整页重画会把它滚回最左：放回原来滚到的地方，
+// 选中的那天不在看得见的范围里就挪过去；第一次打开把选中的那天放正中。main.js 的 draw 每次画完调
+let stripX = null;
+export function phoneStrip(root) {
+  const s = root?.querySelector(".phone-day .daystrip");
+  if (!s) return;
+  const on = s.querySelector(".dpill.on") || s.querySelector(".dpill.today");
+  const center = () => (on ? on.offsetLeft + on.offsetWidth / 2 - s.clientWidth / 2 : 0);
+  s.scrollLeft = stripX === null ? center() : stripX;
+  if (on) { const l = on.offsetLeft - s.scrollLeft, r = l + on.offsetWidth; if (l < 16 || r > s.clientWidth - 16) s.scrollLeft = center(); }
+  stripX = s.scrollLeft;
+  s.onscroll = () => { stripX = s.scrollLeft; };
+}
+
 export function todayHTML(c, phone) {
   const d = shownDate();
   const x = dayParts(c, d);

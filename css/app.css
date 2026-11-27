@@ -186,7 +186,7 @@ body.phone.timing #sky .hz-grid { opacity: .35; }
 .sky-tide svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .sky-tide path { vector-effect: non-scaling-stroke; }
 /* 手机上底下有计时浮条时，潮水那么矮会整个被它挡住：把水面抬到浮条上沿，水从浮条后面漫出来、再退回它后面 */
-body.phone.has-dock .sky-tide { bottom: calc(var(--dock-h, 0px) - 16px + env(safe-area-inset-bottom)); transition: bottom .38s var(--ease); }   /* 潮水贴着浮条 / 挡板的上沿（--dock-h 每次重画量），挡板升起来时跟着走 */
+/* 手机上潮水也从屏幕最底下漫进来（2026-11-28 她说：不要抬到浮条中上方那么高）——浮条浮在水上，iPhone 底下 Home 条那一截正好是水。不再跟着 --dock-h 抬 */
 .sky-meteor { height: 1.3px; border-radius: 2px; background: linear-gradient(to right, rgba(190, 244, 255, 0), rgba(233, 251, 255, .95)); transform-origin: 100% 50%; }
 @keyframes sky-blink { 0%, 16% { opacity: 1; } 17%, 100% { opacity: .12; } }
 

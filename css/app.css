@@ -648,7 +648,7 @@ body.phone .ls-cb::after { inset: -6px; }
 .load.over7:not(.blink) i { box-shadow: 0 0 4px var(--hot); }
 [data-theme="dark"] .load.over7:not(.blink) i { box-shadow: 0 0 6px var(--warn); }
 @keyframes over7 { 0%, 60%, 100% { opacity: 0; } 76% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .load.over7.blink i::after { animation: none; } .load.over7 i { box-shadow: 0 0 4px var(--hot); } [data-theme="dark"] .load.over7 i { box-shadow: 0 0 6px var(--warn); } }
+@media (prefers-reduced-motion: reduce) { :root:not(.motion-on) .load.over7.blink i::after { animation: none; } :root:not(.motion-on) .load.over7 i { box-shadow: 0 0 4px var(--hot); } :root:not(.motion-on)[data-theme="dark"] .load.over7 i { box-shadow: 0 0 6px var(--warn); } }
 /* 日历上的任务 = 一张张便利贴：直角，纸按项目的颜色染淡，顶上一道细细的、深一点的同色胶条（1.5px，分得清上一张下一张），
    底边一点点纸的阴影（夜里是染了色的暗纸，只留胶条不要阴影）；不写时长（一天合计多少在格子头上） */
 .ev { --paper: #FFFEF2; position: relative; display: flex; align-items: flex-start; gap: 4px; padding: 6px 6px 4px; border-radius: 0; background: color-mix(in srgb, var(--c) 28%, var(--paper)); box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--c) 75%, var(--paper)), 0 1px 1px rgba(11, 11, 11, .06), 0 5px 6px -5px rgba(11, 11, 11, .35); font-size: 11px; line-height: 1.3; cursor: grab; }
@@ -1336,8 +1336,9 @@ body.phone .settings .page-head { margin-top: 4px; }
 .fx .ring { width: 28px; height: 28px; margin: -14px 0 0 -14px; border: 1px solid var(--hot); border-radius: 50%; }
 [data-theme="dark"] .fx .ring { border-color: var(--accent); box-shadow: 0 0 8px rgba(204, 255, 0, .35); }
 /* 系统要求减少动态：不挪、不转、不弹、不循环（关键帧动画都停，过渡只留下面这几样），淡入淡出和颜色变化留着——状态变了还看得出来 */
+/* 设置里勾了「系统要求减少动态时也照常动」（html.motion-on，2026-11-28 她要的）就不管这一条；下面几处同样 */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition-property: opacity, color, background-color, border-color, box-shadow, outline-color, fill, stroke !important; scroll-behavior: auto !important; }
+  :root:not(.motion-on), :root:not(.motion-on) *, :root:not(.motion-on) *::before, :root:not(.motion-on) *::after { animation: none !important; transition-property: opacity, color, background-color, border-color, box-shadow, outline-color, fill, stroke !important; scroll-behavior: auto !important; }
 }
 
 /* ---------- 过渡（js/motion.js）：点完按钮，行、进度条、浮条平滑挪到新样子；翻天时列表左右滑 ---------- */
@@ -2302,9 +2303,9 @@ html.fx-off .lk-dot { animation: none; }
 .lk-landed { animation: lk-landed .6s cubic-bezier(.16, 1, .3, 1); }
 @keyframes lk-landed { 30% { background-color: color-mix(in srgb, var(--accent) 45%, transparent); } }
 @media (prefers-reduced-motion: reduce) {
-  .lk.fly .lk-rev, .lk-dot, .lk.fly .lk-dot, .lk-landed { animation: none; }
-  .lk-s { display: none; }
-  .lk-t { stroke-dasharray: none; opacity: .55; }
+  :root:not(.motion-on) :is(.lk.fly .lk-rev, .lk-dot, .lk.fly .lk-dot, .lk-landed) { animation: none; }
+  :root:not(.motion-on) .lk-s { display: none; }
+  :root:not(.motion-on) .lk-t { stroke-dasharray: none; opacity: .55; }
 }
 
 /* ---------- 「For 计划 → 目标 → …」：今天页展开的那一行、任务编辑框、计划编辑框（js/ui/common.js 的 chainHTML） ---------- */
@@ -2788,7 +2789,7 @@ select.open { border-color: var(--edge); }
 [data-theme="dark"] .dock.run::after { filter: drop-shadow(0 0 3px var(--accent)); }
 @keyframes trail { to { --trail: 360deg; } }
 html.fx-off .dock.run::after { display: none; }
-@media (prefers-reduced-motion: reduce) { .dock.run::after { display: none; } }
+@media (prefers-reduced-motion: reduce) { :root:not(.motion-on) .dock.run::after { display: none; } }
 
 /* 大数字换数时一位一位滚（js/motion.js 的 rollNumbers）：原来的字留着撑住宽度和基线，滚的那几列浮在上面 */
 [data-roll] { position: relative; }
@@ -2996,7 +2997,7 @@ body.phone .mm-ren { font-size: 16px; }
 .eco-e.k-laser .eco-fl { stroke-width: 2.5; stroke: color-mix(in srgb, var(--lc) 30%, #FFFFFF); }
 [data-theme="dark"] .eco-e.k-laser .eco-ln { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lc) 70%, transparent)); }
 @keyframes eco-flow { from { stroke-dashoffset: 18; } to { stroke-dashoffset: 0; } }
-@media (prefers-reduced-motion: reduce) { .eco-e .eco-fl { display: none; } .eco-water { transition: none; } }
+@media (prefers-reduced-motion: reduce) { :root:not(.motion-on) .eco-e .eco-fl { display: none; } :root:not(.motion-on) .eco-water { transition: none; } }
 html.fx-off .eco-e .eco-fl { display: none; }
 /* 线上的小签：她写的字，原样 */
 .eco-chip { position: absolute; transform: translate(-50%, -50%); padding: 2px 9px; border-radius: 999px; background: var(--bg); box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--kc, var(--ink)) 55%, transparent); font: 600 14px var(--num); white-space: nowrap; }
@@ -3102,7 +3103,7 @@ body.phone .dk-at.both input { min-height: 40px; font-size: 16px; }
 body.phone .dk-at.both .btn { min-height: 40px; padding: 0 16px; }
 body.phone .dock.rise { animation: sheet-rise .38s var(--spring) both; }
 @keyframes sheet-rise { from { transform: translateY(28px); opacity: .5; } }
-@media (prefers-reduced-motion: reduce) { body.phone .dock.rise { animation: fade-in .2s ease both; } }
+@media (prefers-reduced-motion: reduce) { :root:not(.motion-on) body.phone .dock.rise { animation: fade-in .2s ease both; } }
 @keyframes fade-in { from { opacity: 0; } }
 body.phone.sheet-open #sun { opacity: 0; pointer-events: none; transition: opacity .2s; }
 /* 手机上别的小签（阅读、Mindmap、设置里的那些）：36 高、字 14，点的范围上下各多 4 */

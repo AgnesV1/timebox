@@ -26,6 +26,7 @@
 //   不拖也能连：计划编辑框里的 Serves（js/ui/projects.js），改目标文字时的 Part of（js/ui/goals.js）。
 // 位置只在悬停、拖、窗口变了、页面重画了、滚动了（右栏贴着顶，会挪）的时候量，每帧最多一次。只动 stroke-dashoffset、透明度和 transform。
 
+import { REDUCE } from "../calm.js";
 import * as store from "../store.js";
 import * as G from "../goals.js";
 import * as GR from "../groups.js";
@@ -33,7 +34,7 @@ import * as E from "../engine.js";
 
 const NODE = ".goals .gl[data-goal], .pj-eco .eco-n[data-goal], .pj-eco .eco-o[data-goal], .pgroup[data-group] > .pg-top:not(.editing), .pcard[data-project], .g-rep[data-project]";
 const fine = matchMedia("(hover: hover) and (pointer: fine)");
-const still = matchMedia("(prefers-reduced-motion: reduce)");
+const still = REDUCE;
 const NS = "http://www.w3.org/2000/svg";
 const DWELL = 110, GRACE = 280, STAGGER = 40, NEAR = 12;
 // 左边拿住的：换成别的要停住多久、出了那一片多久才收、停住时手抖多少还算停着、那一片四周放宽多少

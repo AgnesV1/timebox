@@ -1,6 +1,7 @@
 // 设置：连表格、每天能用多少时间、新的一天从几点开始、各个大类算不算数和每周的门槛、季度表（和每天打分的那几列）、阅读表格、外观、
 // 这台设备的存储（快满了可以归档）、导出备份（手机上只有外观和连表格）
 
+import { systemReduces } from "../calm.js";
 import * as store from "../store.js";
 import * as sync from "../sync.js";
 import * as spend from "../spend.js";
@@ -39,7 +40,11 @@ export function settingsHTML(phone) {
   // 白天夜里不在这儿选了：跟着钟点走，想换就点那颗日月（js/main.js）
   const look = '<section class="card"><h3>Look</h3>' +
     '<p class="hint look-hint">Day from 6:00, night from 18:00. Tap the sun or moon to switch until the next six o\'clock.</p>' +
-    '<label class="check"><input type="checkbox" data-local-check="fx"' + (l.fx !== false ? " checked" : "") + "> Sparkles and confetti</label></section>";
+    '<label class="check"><input type="checkbox" data-local-check="fx"' + (l.fx !== false ? " checked" : "") + "> Sparkles and confetti</label>" +
+    // 系统开着「减少动态」时，动效默认收着；勾上这个照常动（js/calm.js）。只在这台设备上
+    '<label class="check"><input type="checkbox" data-local-check="motion"' + (l.motion === true ? " checked" : "") + "> Keep animations when the system asks for reduced motion</label>" +
+    (systemReduces() ? '<p class="hint">This device is asking for reduced motion' + (l.motion === true ? ", and animations play anyway." : ", so springs, page changes and moving waves are paused.") + "</p>" : "") +
+    "</section>";
 
   const read = '<section class="card"><h3>Reading</h3>' +
     '<label class="field"><span>Link to your reading Sheet</span><input data-reading-url value="' + esc(store.setting("reading")?.url || "") + '" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false"></label>' +

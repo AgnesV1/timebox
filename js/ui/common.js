@@ -1,5 +1,6 @@
 // 几个页面都用得到的小块：颜色、安全线卡片、进度条、拖延账单、健康标签、提示条
 
+import { reduced } from "../calm.js";
 import * as E from "../engine.js";
 import * as G from "../goals.js";
 import * as store from "../store.js";
@@ -194,7 +195,7 @@ export function toast(msg, undoFn, label = "Undo") {
   // 走的时候往下沉着淡掉（css 的 #toast.out，0.2 秒）；系统要求减少动态就直接收
   function hide() {
     box.classList.remove("show");
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { box.hidden = true; return; }
+    if (reduced()) { box.hidden = true; return; }
     box.classList.add("out");
     setTimeout(() => { if (box.classList.contains("out")) { box.classList.remove("out"); box.hidden = true; } }, 200);
   }

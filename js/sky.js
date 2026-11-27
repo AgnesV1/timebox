@@ -7,6 +7,7 @@
 // 平时只挂一个定时器，没有常驻的动画；东西只动 transform / opacity，放完就拿掉。
 // （彩虹 / 极光不在天上随机出现了，改成点开时间饼图时在它后面浮现，在 js/ui/sun.js 和 css 的 .sun-halo）
 // 不放：页面在后台、系统要求减少动态、设置里关了动效。手机上只有潮水（手机的任务是直接铺在底色上的，天上那几样会搅在字里）。
+import { REDUCE } from "./calm.js";
 
 // ---------- 排班（只算数，test/sky.test.mjs） ----------
 
@@ -70,7 +71,7 @@ export function dimKeys(ms, rnd = Math.random) {
 
 // ---------- 画 ----------
 
-const reduce = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
+const reduce = REDUCE;
 const R = Math.random;
 const pick = ([a, b]) => a + (b - a) * R();
 let host = null, timer = 0, due = null, enabled = true, serial = 0;

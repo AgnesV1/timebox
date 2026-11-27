@@ -9,6 +9,7 @@ import * as Meal from "./meals.js";
 import { esc, on, icon, initDateTyping } from "./dom.js";
 import { paintPatterns } from "./patterns.js";
 import { initFx, setFx, confetti, refreshFxColors, tintSky } from "./fx.js";
+import { setMotion } from "./calm.js";
 import { toast, ballHTML } from "./ui/common.js";
 import * as L from "./lists.js";
 import { initModal, closeModal, describe, focusAgain } from "./ui/modal.js";
@@ -305,6 +306,7 @@ booted = true;
 initDateTyping();
 initFx();
 setFx(store.local().fx !== false);
+setMotion(store.local().motion === true);   // 系统要求减少动态时也照常动（设置里勾的，js/calm.js）
 initModal();
 initSelect();
 initToday(render);
@@ -332,7 +334,7 @@ initSun();
 let yearsSeen = JSON.stringify(store.setting("spend-years") || null);
 store.subscribe((meta) => {
   if (meta.pulled) { adoptGroups(); store.adoptMarks(); store.adoptColors(); store.settleIdeas(); store.adoptQuads(); store.adoptLists(); store.adoptSteps(); store.adoptWeekly(); store.repairWeekly(true); store.settleLists(); }
-  if (meta.local) setFx(store.local().fx !== false);
+  if (meta.local) { setFx(store.local().fx !== false); setMotion(store.local().motion === true); }
   if (!meta.quiet) render();
   else paintSync();
   if (meta.dirty) sync.queue();

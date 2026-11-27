@@ -7,6 +7,7 @@
 // 设定：Budget（从某月起每月多少）/ Categories（加、改名、藏、没用过的能删）/ Export（.md）/ Import a month / Currency（总数换成哪种看、汇率）。
 // 币种：每一笔是记的那种钱（流水里照原样写，旁边小字是换算过的）；总数、图表、类别占比、预算都换成「看的那种」（这台设备自己定，默认加币）。
 
+import { reduced } from "../calm.js";
 import * as SP from "../spend.js";
 import * as M from "../money.js";
 import * as Y from "../years.js";
@@ -18,7 +19,7 @@ import { slideFrom } from "../motion.js";
 const SPR = "linear(0, .029, .099, .192, .296, .399, .498, .588, .668, .737, .795, .844, .883, .915, .939, .959, .973, .984, .992, .997, 1.001, 1.003, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1)";
 // 进场：快出来、慢慢停稳（不冲过头）；出场：干脆一点，越走越快
 const ENTER = "cubic-bezier(.16, 1, .3, 1)", EXIT = "cubic-bezier(.4, 0, 1, 1)";
-const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const quiet = reduced;
 // 分段开关的滑块现在看得见的位置和宽度（正滑着也算），先停掉正在滑的那次，从这里接着滑
 export function pillNow(seg, pill) {
   const r = pill.getBoundingClientRect(), s = seg.getBoundingClientRect();

@@ -1,8 +1,9 @@
 // 用户亲手点了什么之后的那一次重画：用浏览器自带的 View Transitions，让任务行、进度条、浮条平滑挪到新的样子，
 // 而不是一闪就变。只有点按钮的地方先调 animateNext()；同步拉下来的重画、每秒的计时都不过渡。
 // 浏览器不支持、系统开了「减弱动态效果」时照常直接画。
+import { REDUCE } from "./calm.js";
 
-const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+const reduce = REDUCE;
 let want = "", at = 0;
 
 // kind："on" 普通（行挪位、淡入淡出）/ "page" 换页 / "next" "prev" 翻到后一天、前一天（列表左右滑）

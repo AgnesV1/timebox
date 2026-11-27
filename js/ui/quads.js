@@ -9,6 +9,7 @@
 // 整页重画的时候（同步拉下来之类）照这里记着的画回来：开着的「新写」框、正在改的那张、正拖着 / 正落下的那张（画成空位）。
 // 四格都空着时收成一行「Urgent / important · + Sort a task」（2026-11-22），点开才是四格。
 
+import { REDUCE } from "../calm.js";
 import * as store from "../store.js";
 import * as Q from "../quads.js";
 import { esc, on, icon } from "../dom.js";
@@ -17,7 +18,7 @@ import { openMenu } from "./select.js";
 
 const SPRING = "linear(0, .035, .121, .233, .354, .473, .582, .679, .761, .829, .883, .924, .956, .979, .994, 1.005, 1.011, 1.014, 1.015, 1.015, 1.014, 1.012, 1.01, 1.008, 1.007, 1.005, 1.004, 1.003, 1)";   // 同 css 的 --spring
 const POP = "linear(0, .053, .183, .351, .527, .693, .833, .944, 1.024, 1.074, 1.101, 1.108, 1.103, 1.089, 1.071, 1.051, 1.033, 1.018, 1.006, .998, .992, .989, .988, .989, .99, .992, .994, .996, 1)";   // 同 css 的 --spring-pop
-const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+const reduce = REDUCE;
 const calm = () => reduce.matches || document.documentElement.classList.contains("fx-off");   // 歪一下、压一下这些装饰也不放
 const NAMES = { do: "Urgent and important", plan: "Important, not urgent", quick: "Urgent, not important", drop: "Neither urgent nor important" };
 

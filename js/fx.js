@@ -3,11 +3,12 @@
 // 还有整站的底图（#sky，样子在 css 里）：白天蓝天白云，夜里三层星星；天色跟着钟点走；关掉动效时停住不动。
 // 底图上偶尔经过的飞机、花瓣、流星雨在 js/sky.js。
 
+import { reduced } from "./calm.js";
 import { initSky, setSky, clearSky } from "./sky.js";
 import { skyAt } from "./day.js";
 
 let layer = null, live = 0, enabled = true;
-const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reduce = reduced;
 
 let palette = null;
 function colors() {

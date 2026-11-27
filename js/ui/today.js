@@ -3,6 +3,7 @@
 // 计划（2026-10-25 起）：一个计划一天一行，整块计时；下面是这天从它 Pool 拖进来的几项，像便条（勾 = 这一次做了，有步骤的点开勾步骤）。
 // 手机上：看今天前后各 5 天的任务、给任务标结果、计时、加任务；右上角齿轮进去只有白天黑夜和连表格。计划都在电脑上做。
 
+import { reduced } from "../calm.js";
 import * as store from "../store.js";
 import * as sync from "../sync.js";
 import * as E from "../engine.js";
@@ -387,7 +388,7 @@ export function dayParts(c, d) {
 // 速度按宽度算（约 28px 一秒）；手指按住就停。系统要求减少动态：不滚，照旧能横着拖着看。main.js 每次重画完调一次
 const MQ_SPEED = 28;
 export function marquees(root = document) {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (reduced()) return;
   for (const p of root.querySelectorAll(".phone-day .row.open .chain:not(.ch-more):not(.mq)")) {
     if (p.scrollWidth <= p.clientWidth + 2) continue;
     const one = document.createElement("span");

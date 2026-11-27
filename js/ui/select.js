@@ -3,6 +3,7 @@
 // 选中后给原来的 <select> 赋值并发 input / change。手机和触屏还是系统自带的选择器。
 // 同一个样子还有一种不挂在 <select> 上的：openMenu(按钮, 清单, 选了以后做什么)——能拖的东西不用拖的做法（js/ui/dnd.js 的「Put on…」）就用它。
 
+import { reduced } from "../calm.js";
 import { esc } from "../dom.js";
 
 const fine = matchMedia("(hover: hover) and (pointer: fine)");
@@ -104,7 +105,7 @@ export function close() {
   (cur.sel || cur.anchor).classList.remove("open");
   // 收的时候缩一点淡掉（0.13 秒）再拿掉；系统要求减少动态就直接拿掉
   const el = cur.el;
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) el.remove();
+  if (reduced()) el.remove();
   else { el.classList.add("out"); setTimeout(() => el.remove(), 130); }
   cur = null;
 }

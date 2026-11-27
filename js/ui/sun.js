@@ -12,6 +12,7 @@
 // 落着的时候只有两圈环本身接手指（样式里 pointer-events: stroke），别的地方的点击穿过去给下面的列表；
 // 圆盘正下方（浮条上沿）一个小签：这一天做了多少深度（◆ Deep），设了每天的目标就带上目标。
 
+import { REDUCE } from "../calm.js";
 import * as store from "../store.js";
 import * as D from "../day.js";
 import * as E from "../engine.js";
@@ -23,7 +24,7 @@ import { colorOf } from "./common.js";
 import { neon } from "../groups.js";
 
 const RO = 98, RI = 72;   // 外圈、内圈的半径（viewBox ±120，圈宽 18）
-const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+const reduce = REDUCE;
 
 let host = null;
 let date = "";

@@ -523,7 +523,7 @@
 
 /* 系统要求减少动态：不挪、不转、不弹，淡入淡出和颜色变化留着（状态变了还看得出来） */
 @media (prefers-reduced-motion: reduce) {
-  .mn *, .mn-phone .mn-curtain, #mn-live, #mn-drop i { transition-property: opacity, color, background-color, border-color, box-shadow !important; animation: none !important; }
+  :root:not(.motion-on) :is(.mn *, .mn-phone .mn-curtain, #mn-live, #mn-drop i) { transition-property: opacity, color, background-color, border-color, box-shadow !important; animation: none !important; }
 }
 
 /* ---------- 白天（6–18 点，和苦昼短一样跟着钟点）：手机拉下来的面板、电脑 Spending 页都是白纸 ----------

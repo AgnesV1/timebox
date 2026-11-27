@@ -14,6 +14,7 @@
 // 颜色是记账那一套（奶白字、钴蓝、超了橙、收入青绿），控件的形状、大小照苦昼短的（药丸形的分段开关和按钮、32px 的图标按钮）。
 // 改了、删了都能在提示条上撤销（苦昼短的 toast）。这一页自己管自己：main.js 只在第一次进来时挂上，之后数据变了调 refresh。
 
+import { reduced } from "../calm.js";
 import * as SP from "../spend.js";
 import * as M from "../money.js";
 import * as store from "../store.js";
@@ -24,7 +25,7 @@ import { openModal, modalSheet } from "./modal.js";
 import { slideFrom } from "../motion.js";
 import { IX, cents, roll, kfmt, paceNote, paceTip, periodTitle, chartView, shownEntries, budgetsShown, amtOf, convOf, setShowCur, setRate, fetchRates, RATES, rateNote, curLabel, findText, fx, pillNow, springOf } from "./money.js";
 
-const quiet = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const quiet = reduced;
 const today = () => store.today();
 const todayP = () => M.parts(today());
 const visible = (kind) => SP.cats().filter((c) => c.kind === kind && !c.hidden).map((c) => c.name);

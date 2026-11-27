@@ -75,9 +75,9 @@ export function fitView(W, H, vw, vh, min = 0.08) {
   const k = Math.max(min, Math.min(1.25, vw / W, vh / H));
   return { k, tx: (vw - W * k) / 2, ty: (vh - H * k) / 2 };
 }
-// 第一次打开（她 2026-11-26：导进来字自动变小、看不清）：整块放得下时字还够大（≥ 90%，14px 的字在屏幕上 ≥ 12.6px）就照旧放下整块；
-// 不然停在 90%、对准白板中间（比 100% 多看到一圈，字也看得清），要看全貌点右下角的百分比（或按 0）
-export const READABLE = 0.9;
+// 第一次打开（她 2026-11-26：导进来字自动变小、看不清；「第一眼最好能看清，我可以自己拖」）：整块放得下而且不用缩小（≥ 100%）就照旧放下整块；
+// 不然按 100% 打开（卡片的字 16px，和 Obsidian 一样）、对准白板中间，要看全貌点右下角的百分比（或按 0）
+export const READABLE = 1;
 export function openView(W, H, vw, vh) {
   const f = fitView(W, H, vw, vh), k = READABLE;
   return f.k >= k ? f : { k, tx: (vw - W * k) / 2, ty: (vh - H * k) / 2 };

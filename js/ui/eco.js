@@ -1,6 +1,6 @@
 // Projects 页最下面的生态圈（她 2026-11-26 要的：取消 North star 那段字，换成「蓄水池 + 星型生态圈 + Laser Beam」那张图）。
 // 图在 Obsidian 白板里画（.canvas），导进来；一种侧重（破局 / 扎根 / 复利 / 过载警示……）一个文件，上面一排切换（记在这台设备上：local.ecoMode）。
-//   中间是蓄水池：水位画成从底下涨上来的一池水，数是她写在那块里的（「78%」）——以后从记的时间、做完的目标算，先手填。
+//   中间是蓄水池：水位画成从底下涨上来的一池水，按最近 7 天记的时间算（js/energy.js，她 2026-11-26 定的；那块里写的「78%」不再用）。
 //   四周连着线的那几块就是最上面一层的目标（span: north，原来 North star 里框出来的也是这一层）：右栏的目标、计划都能连到它们，悬停照样飞线（js/ui/links.js）。
 //   线按种类画（js/canvas.js 的 flowOf：看线上写的字，没字看颜色）：主线（Laser Beam）粗的蓝、协同细虚线、进水绿、保底点线、漏水红，线上那个小签就是她写的字；
 //   主线指着的那一块整块描成蓝的。底下一行图例，只列这张图里有的那几种。
@@ -10,6 +10,8 @@
 
 import * as store from "../store.js";
 import * as C from "../canvas.js";
+import { energy, energyText } from "../energy.js";
+import { addDays } from "../dates.js";
 import { esc, on } from "../dom.js";
 import { toast } from "./common.js";
 
@@ -27,7 +29,7 @@ function swatch(kind) {
 }
 
 // 一张生态圈
-function diagramHTML(b) {
+function diagramHTML(b, c) {
   const canvas = b.canvas, B = C.bounds(canvas, PAD), at = new Map(canvas.nodes.map((n) => [n.id, n]));
   const goals = new Map(store.goals().map((g) => [g.id, g]));
   const { pool, members, notes } = C.ecoParts(canvas);
@@ -43,23 +45,29 @@ function diagramHTML(b) {
       (e.fromEnd === "arrow" ? '<path class="eco-ah" d="' + C.arrowPath(g.p0, g.a0, f.kind === "laser" ? 13 : 10) + '"/>' : "");
     // 流动的那一层（主线、进水、漏水）：一串小点顺着线跑，看得出往哪流；减少动态、关了 Sparkles 就不跑
     const flow = f.kind === "laser" || f.kind === "inflow" || f.kind === "leak" ? '<path class="eco-fl" d="' + g.d + '"/>' : "";
-    lines += '<g class="eco-e k-' + f.kind + '"><path class="eco-ln" d="' + g.d + '"/>' + flow + head + "</g>";
-    if (e.label) chips += '<span class="eco-chip k-' + f.kind + '" style="left:' + px(g.mid.x - B.x) + ";top:" + px(g.mid.y - B.y) + '">' + esc(e.label) + "</span>";
+    // 她在 Obsidian 里给线上的颜色照用（2026-11-26：「我原本的色系比较多」）；线的粗细、虚实、流动照种类，没上色的线照旧按种类上色
+    const own = C.cssColor(e.color);
+    lines += '<g class="eco-e k-' + f.kind + '"' + (own ? ' style="--lc:' + own + '"' : "") + '><path class="eco-ln" d="' + g.d + '"/>' + flow + head + "</g>";
+    if (e.label) chips += '<span class="eco-chip k-' + f.kind + (own ? " tint" : "") + '" style="left:' + px(g.mid.x - B.x) + ";top:" + px(g.mid.y - B.y) + (own ? ";--kc:" + own : "") + '">' + esc(e.label) + "</span>";
   }
-  const box = (n) => "left:" + px(n.x - B.x) + ";top:" + px(n.y - B.y) + ";width:" + px(n.width) + ";height:" + px(n.height);
+  // 块的颜色也照 Obsidian 里的（边 + 淡淡的底）；没上色的照旧
+  const box = (n) => "left:" + px(n.x - B.x) + ";top:" + px(n.y - B.y) + ";width:" + px(n.width) + ";height:" + px(n.height) + (n.color ? ";--cc:" + C.cssColor(n.color) : "");
+  const tint = (n) => (n.color ? " tint" : "");
   const nodes = canvas.nodes.map((n) => {
     if (n === pool) {
-      const p = C.partsOf(n.text), lv = p.level === null ? null : Math.max(0, Math.min(100, p.level));
-      return '<div class="eco-pool" style="' + box(n) + '"' + (lv === null ? "" : ' role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + lv + '" aria-label="' + esc(p.title || "Reservoir") + '"') + ">" +
-        '<i class="eco-water" style="--lv:' + (lv ?? 0) + '%" aria-hidden="true"></i><span class="eco-pt">' + esc(p.title) + "</span>" +
-        (lv === null ? "" : '<b class="eco-lv num">' + esc(String(p.level)) + "%</b>") + (p.sub ? '<small class="eco-ps">' + esc(p.sub) + "</small>" : "") + "</div>";
+      // 水位不再手填，按最近 7 天记的时间算（js/energy.js，她 2026-11-26 定的）；停上去看怎么算出来的
+      const p = C.partsOf(n.text), x = poolEnergy(c), lv = x.level, why = energyText(x);
+      // 矮的那种（她的 energy pool 只有 125 × 50）：名字和水位排成一行，不然大数字把名字挤出去
+      return '<div class="eco-pool' + (n.height < 110 ? " small" : "") + '" style="' + box(n) + '" title="' + esc(why) + '" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + lv + '" aria-label="' + esc((p.title || "Reservoir") + ". " + why) + '">' +
+        '<i class="eco-water" style="--lv:' + lv + '%" aria-hidden="true"></i><span class="eco-pt">' + esc(p.title) + "</span>" +
+        '<b class="eco-lv num">' + lv + "%</b>" + (p.sub ? '<small class="eco-ps">' + esc(p.sub) + "</small>" : "") + "</div>";
     }
     if (member.has(n.id)) {
       const gid = b.goals[n.id], g = goals.get(gid), p = C.partsOf(n.text);
-      return '<div class="eco-n' + (laser.has(n.id) ? " laser" : "") + (g?.done ? " done" : "") + '"' + (g ? ' data-goal="' + esc(g.id) + '" tabindex="0"' : "") + ' style="' + box(n) + '">' +
+      return '<div class="eco-n' + (laser.has(n.id) ? " laser" : "") + (g?.done ? " done" : "") + tint(n) + '"' + (g ? ' data-goal="' + esc(g.id) + '" tabindex="0"' : "") + ' style="' + box(n) + '">' +
         '<span class="eco-t">' + esc(p.title) + "</span>" + (p.sub ? '<small class="eco-s">' + esc(p.sub) + "</small>" : "") + "</div>";
     }
-    if (n.type === "group") return '<div class="eco-grp" style="' + box(n) + '">' + (n.label ? "<span>" + esc(n.label) + "</span>" : "") + "</div>";
+    if (n.type === "group") return '<div class="eco-grp' + tint(n) + '" style="' + box(n) + '">' + (n.label ? "<span>" + esc(n.label) + "</span>" : "") + "</div>";
     if (notes.includes(n) && n.type === "text") return '<div class="eco-note" style="' + box(n) + '"><div class="cv-md">' + C.md(n.text) + "</div></div>";
     return "";
   }).join("");
@@ -68,7 +76,8 @@ function diagramHTML(b) {
     '<div class="eco-world" style="width:' + px(B.w) + ";height:" + px(B.h) + '">' +
     '<svg class="eco-lines" width="' + Math.round(B.w) + '" height="' + Math.round(B.h) + '" viewBox="' + Math.round(B.x) + " " + Math.round(B.y) + " " + Math.round(B.w) + " " + Math.round(B.h) + '" aria-hidden="true">' + lines + "</svg>" +
     nodes + chips + "</div></div>" +
-    (kinds.length ? '<ul class="eco-legend" aria-label="Legend">' + kinds.map((k) => "<li>" + swatch(k) + esc(LEGEND[k]) + "</li>").join("") + "</ul>" : "");
+    // 线带着自己的颜色时，图例只说粗细虚实（画成墨色），不然颜色对不上
+    (kinds.length ? '<ul class="eco-legend' + (canvas.edges.some((e) => e.color) ? " mono" : "") + '" aria-label="Legend">' + kinds.map((k) => "<li>" + swatch(k) + esc(LEGEND[k]) + "</li>").join("") + "</ul>" : "");
 }
 
 // 最上面一层、却不在任何一张图上的目标
@@ -77,16 +86,28 @@ function loose() {
   return store.goals().filter((g) => g.span === "north" && !on.has(g.id));
 }
 
-export function ecoHTML() {
+// 图下面那排小签：还有几样挂在它下面（下一层的目标 + 为它服务的计划 / 项目）。她 2026-11-26 说原来的大块不要了、拆到图上的小块里：
+// 悬停看是哪几样，一样样拖到图上的块，拖完数字没了再 × 删掉（删的时候还挂着的，下面那几条就没有上级了）
+const under = (g) => store.goals().filter((x) => x.up === g.id).length + (Array.isArray(g.by) ? g.by.length : 0);
+
+// 蓄水池的水位：到昨天为止的 7 天（社交看到昨天为止最近一次联系）
+function poolEnergy(c) {
+  const to = addDays(c.today, -1), last = Object.values(store.lastContact()).filter((d) => d && d <= to).sort().pop() || "";
+  return energy(c, { weekly: store.setting("weekly", {}), lastContact: last });
+}
+
+export function ecoHTML(c) {
   const list = ecos(), b = current(), rest = loose();
   const input = '<input type="file" class="eco-file" accept=".canvas,application/json" multiple hidden>';
   const restHTML = rest.length ? '<p class="eco-also"><span>' + (list.length ? "Not on the diagram" : "Top-level goals") + "</span>" +
-    rest.map((g) => '<span class="eco-o' + (g.done ? " done" : "") + '" data-goal="' + esc(g.id) + '" tabindex="0">' + esc(g.text) +
-      '<button type="button" class="eco-ox" data-act="eco-drop" aria-label="Delete goal: ' + esc(g.text) + '" title="Delete">×</button></span>').join("") + "</p>" : "";
+    rest.map((g) => { const n = under(g); return '<span class="eco-o' + (g.done ? " done" : "") + '" data-goal="' + esc(g.id) + '" tabindex="0"' +
+      (n ? ' title="' + n + (n > 1 ? " goals and plans still hang" : " goal or plan still hangs") + ' under it — hover to see them, drag each onto a card above, then delete this one"' : "") + ">" + esc(g.text) +
+      (n ? '<small class="eco-on num">' + n + "</small>" : "") +
+      '<button type="button" class="eco-ox" data-act="eco-drop" aria-label="Delete goal: ' + esc(g.text) + '" title="Delete">×</button></span>'; }).join("") + "</p>" : "";
   if (!b) {
     return '<section class="pj-eco none" aria-label="Ecosystem"><header class="eco-head"><h3>Ecosystem</h3>' +
       '<span class="eco-tools"><button type="button" class="btn" data-act="eco-import">Import .canvas</button>' + input + "</span></header>" +
-      '<p class="hint">Draw it on an Obsidian canvas: a card for each area of life, a reservoir card in the middle (call it 蓄水池 or reservoir and write its level, like 78%), ' +
+      '<p class="hint">Draw it on an Obsidian canvas: a card for each area of life, a reservoir card in the middle (call it 蓄水池, reservoir or pool — its level is worked out from the last 7 days of logged time), ' +
       "and arrows labelled with what they carry and their share — 主线 55%, 进水 10%, 保底 15%, 协同, 漏水 (or main, inflow, floor, synergy, leak). One file per emphasis. " +
       "Every card with an arrow becomes a top-level goal, so goals and plans can link up to it.</p>" + restHTML + "</section>";
   }
@@ -95,7 +116,7 @@ export function ecoHTML() {
   return '<section class="pj-eco" aria-label="Ecosystem"><header class="eco-head"><h3>Ecosystem</h3>' + tabs +
     '<span class="eco-tools"><button type="button" class="link" data-act="eco-import" title="Add another emphasis, or update one by importing its file again">Import</button>' +
     '<button type="button" class="link" data-act="eco-replace">Replace</button><button type="button" class="link" data-act="eco-del">Remove</button>' + input + "</span></header>" +
-    (b.canvas ? diagramHTML(b) : '<p class="hint">This diagram is still syncing.</p>') + restHTML + "</section>";
+    (b.canvas ? diagramHTML(b, c) : '<p class="hint">This diagram is still syncing.</p>') + restHTML + "</section>";
 }
 
 // 整页重画完：按这一栏的宽度缩放（css 拿 --k 乘），窗口变了再量

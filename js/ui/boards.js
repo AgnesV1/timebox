@@ -97,7 +97,7 @@ function apply(view, v) {
   const pct = view.querySelector(".mm-pct");
   if (pct) pct.textContent = Math.round(v.k * 100) + "%";
 }
-// 整块放得下（右下角百分比、键盘 0）；open = 第一次打开时看哪里（字太小就停在 90%、对准中间，见 js/canvas.js 的 openView）
+// 整块放得下（右下角百分比、键盘 0）；open = 第一次打开时看哪里（要缩小才放得下就按 100%、对准中间，见 js/canvas.js 的 openView）
 function fitOf(view, open = false) {
   const w = view.querySelector(".mm-world"), r = view.getBoundingClientRect();
   if (!w || !r.width) return { k: 1, tx: 0, ty: 0 };

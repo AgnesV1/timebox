@@ -178,7 +178,7 @@ export function projectsHTML(c) {
       return { name: g.name, html: '<section class="pgroup" data-group="' + esc(g.name) + '">' + groupHead(c, g.name, live.length, !g.subs.length, track, last, { gone: old.length, shown }) +
         (live.length ? '<div class="pgrid">' + live.map((p) => cardHTML(c, p)).join("") + "</div>" : "") +
         (shown ? '<div class="pgrid closed">' + old.map((p) => cardHTML(c, p)).join("") + "</div>" : "") + "</section>" };
-    })) + ecoHTML() + "</div>" + goalsHTML(c) + "</div></div>";
+    })) + ecoHTML(c) + "</div>" + goalsHTML(c) + "</div></div>";
 }
 
 // 项目那一块再分两栏（之前定的）：左边宽的是 Build、Work（GR.ORDER 的前两个），右边窄的是别的（一句话 + 14 天方块的那种）。

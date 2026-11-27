@@ -2872,14 +2872,16 @@ body.phone .mm-ren { font-size: 16px; }
 
 /* 卡片和线（Mindmap 页的白板；生态圈有自己的一套，见下一段） */
 .cv-n { position: absolute; box-sizing: border-box; border-radius: 10px; }
-.cv-text, .cv-file, .cv-link { overflow: hidden; padding: 8px 12px; border: 1.5px solid color-mix(in srgb, var(--ink) 26%, transparent); background: var(--bg); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; cursor: auto; }
+.cv-text, .cv-file, .cv-link { overflow: hidden; padding: 8px 12px; border: 1.5px solid color-mix(in srgb, var(--ink) 26%, transparent); background: var(--bg); font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; cursor: auto; }
 .cv-n.tint { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 9%, var(--bg)); }
 [data-theme="dark"] .cv-n.tint:not(.cv-group) { box-shadow: 0 0 14px color-mix(in srgb, var(--cc) 22%, transparent); }
 .cv-group { border: 1.5px solid color-mix(in srgb, var(--ink) 16%, transparent); background: color-mix(in srgb, var(--ink) 3%, transparent); }
 .cv-group.tint { background: color-mix(in srgb, var(--cc) 6%, transparent); }
 .cv-glabel { position: absolute; left: 0; bottom: 100%; margin-bottom: 6px; padding: 2px 10px; border-radius: 8px; background: var(--tonal); font-size: 16px; font-weight: 600; white-space: nowrap; }
 .cv-group.tint .cv-glabel { background: color-mix(in srgb, var(--cc) 22%, var(--bg)); }
-.cv-file, .cv-link { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+/* 卡片里的字一律居中（她 2026-11-26 说的「强制居中」），上下也居中；字号 16px，和 Obsidian 默认一样 */
+.cv-text, .cv-file, .cv-link { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; }
+.cv-text > .cv-md { width: 100%; }
 .cv-file .cv-fi { font-size: 20px; }
 .cv-file small { color: var(--muted); font-size: 11px; }
 .cv-link a { color: var(--blue); }
@@ -2895,15 +2897,18 @@ body.phone .mm-ren { font-size: 16px; }
 .cv-md > div { min-height: 1.5em; }
 .cv-md .md-gap { min-height: .6em; }
 .cv-md .md-h { font-weight: 700; line-height: 1.3; margin: .2em 0; }
-.cv-md .md-h1 { font-size: 20px; }
-.cv-md .md-h2 { font-size: 18px; }
-.cv-md .md-h3 { font-size: 16px; }
+.cv-md .md-h1 { font-size: 22px; }
+.cv-md .md-h2 { font-size: 20px; }
+.cv-md .md-h3 { font-size: 18px; }
 .cv-md .md-li { display: flex; gap: 6px; padding-left: calc(var(--in, 0) * 16px); }
 .cv-md .md-li > i { flex: none; min-width: .8em; color: var(--muted); font-style: normal; }
+/* 居中的卡片里：清单的行也居中、不缩进，引用不画左边那条竖线 */
+.cv-text .cv-md .md-li { justify-content: center; padding-left: 0; }
+.cv-text .cv-md .md-q { padding-left: 0; border-left: 0; }
 .cv-md .md-task.done { color: var(--muted); }
 .cv-md .md-q { padding-left: 10px; border-left: 3px solid color-mix(in srgb, var(--ink) 20%, transparent); color: var(--muted); }
 .cv-md .md-hr { margin: .5em 0; border: 0; border-top: 1px solid var(--line); }
-.cv-md code, .cv-md .md-pre { padding: 0 4px; border-radius: 4px; background: var(--tonal); font: 12.5px/1.5 "JetBrains Mono", ui-monospace, monospace; }
+.cv-md code, .cv-md .md-pre { padding: 0 4px; border-radius: 4px; background: var(--tonal); font: 14px/1.5 "JetBrains Mono", ui-monospace, monospace; }
 .cv-md .md-pre { margin: .3em 0; padding: 6px 8px; white-space: pre-wrap; }
 .cv-md mark { padding: 0 2px; background: var(--accent); color: var(--accent-ink); }
 .cv-md .md-wl { color: var(--blue); }
@@ -2933,10 +2938,16 @@ body.phone .mm-ren { font-size: 16px; }
 .eco-t { padding: 1px 4px; border-radius: 4px; font-size: 16px; font-weight: 600; line-height: 1.3; }
 .eco-s { color: var(--muted); font-size: 14px; line-height: 1.3; }
 .eco-n.done .eco-t { color: var(--muted); text-decoration: line-through; }
+/* 她在 Obsidian 里上了色的块（2026-11-26）：边是那个颜色，底子淡淡一层；主线指着的那块边更粗、底更浓，不再一律描蓝 */
+.eco-n.tint { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 12%, var(--bg)); }
+.eco-n.laser.tint { border: 2.5px solid var(--cc); background: color-mix(in srgb, var(--cc) 22%, var(--bg)); }
+.eco-grp.tint { border-color: color-mix(in srgb, var(--cc) 60%, transparent); background: color-mix(in srgb, var(--cc) 5%, transparent); }
 .eco-n.laser { border: 2px solid var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--bg)); }
 [data-theme="dark"] .eco-n { border-color: #3A3A52; background: color-mix(in srgb, var(--bg) 80%, transparent); }
 [data-theme="dark"] .eco-n.laser { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 14%, var(--bg)); box-shadow: 0 0 18px color-mix(in srgb, var(--blue) 35%, transparent), inset 0 0 12px color-mix(in srgb, var(--blue) 18%, transparent); }
 [data-theme="light"] .eco-n.laser { box-shadow: 3px 3px 0 var(--edge); }
+[data-theme="dark"] .eco-n.tint { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 14%, var(--bg)); }
+[data-theme="dark"] .eco-n.laser.tint { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 22%, var(--bg)); box-shadow: 0 0 18px color-mix(in srgb, var(--cc) 35%, transparent), inset 0 0 12px color-mix(in srgb, var(--cc) 18%, transparent); }
 /* 蓄水池：圆角方块，外面一圈虚线；水从底下涨到 --lv，水面一条亮线；名字、大大的百分数、小字 */
 .eco-pool { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow: hidden; border: 2px solid var(--ink); border-radius: 28px; background: var(--bg); text-align: center; outline: 2px dashed color-mix(in srgb, var(--ink) 55%, transparent); outline-offset: 6px; }
 .eco-water { position: absolute; left: 0; right: 0; bottom: 0; height: var(--lv); background: color-mix(in srgb, var(--blue) 22%, var(--bg)); border-top: 2px solid color-mix(in srgb, var(--blue) 70%, transparent); transition: height .8s var(--ease); }
@@ -2944,6 +2955,10 @@ body.phone .mm-ren { font-size: 16px; }
 .eco-pt { font-size: 16px; font-weight: 600; }
 .eco-lv { font: 600 44px/1.05 var(--num); letter-spacing: -.02em; }
 .eco-ps { color: var(--muted); font-size: 14px; }
+.eco-pool.small { flex-direction: row; flex-wrap: wrap; align-content: center; gap: 0 6px; padding: 2px 8px; }
+.eco-pool.small .eco-pt { font-size: 14px; }
+.eco-pool.small .eco-lv { font-size: 18px; line-height: 1.2; }
+.eco-pool.small .eco-ps { display: none; }
 [data-theme="dark"] .eco-pool { border-color: #D8D8E4; outline-color: rgba(244, 244, 248, .6); background: #101018; }
 [data-theme="dark"] .eco-water { background: linear-gradient(color-mix(in srgb, var(--blue) 30%, #1B2350), #1B2350); border-top-color: color-mix(in srgb, var(--blue) 80%, transparent); box-shadow: 0 -6px 18px color-mix(in srgb, var(--blue) 25%, transparent); }
 [data-theme="dark"] .eco-ps { color: #A9ACC8; }
@@ -2963,7 +2978,7 @@ body.phone .mm-ren { font-size: 16px; }
 .eco-e.k-baseline .eco-ln { stroke-dasharray: 0 7; stroke-width: 3; }
 .eco-e .eco-fl { stroke: color-mix(in srgb, var(--lc) 35%, var(--bg)); stroke-width: 2; stroke-dasharray: 2 16; animation: eco-flow 1.3s linear infinite; }
 .eco-e.k-laser .eco-fl { stroke-width: 2.5; stroke: color-mix(in srgb, var(--lc) 30%, #FFFFFF); }
-[data-theme="dark"] .eco-e.k-laser .eco-ln { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--blue) 70%, transparent)); }
+[data-theme="dark"] .eco-e.k-laser .eco-ln { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lc) 70%, transparent)); }
 @keyframes eco-flow { from { stroke-dashoffset: 18; } to { stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) { .eco-e .eco-fl { display: none; } .eco-water { transition: none; } }
 html.fx-off .eco-e .eco-fl { display: none; }
@@ -2972,9 +2987,11 @@ html.fx-off .eco-e .eco-fl { display: none; }
 .eco-chip.k-laser { --kc: var(--blue); }
 .eco-chip.k-inflow { --kc: var(--ok); }
 .eco-chip.k-leak { --kc: var(--warn); color: var(--warn-text); }
+.eco-chip.tint { color: color-mix(in srgb, var(--kc) 80%, var(--ink)); }
 [data-theme="dark"] .eco-chip { background: #0E0E16; box-shadow: 0 0 0 1px color-mix(in srgb, var(--kc, var(--ink)) 45%, transparent); }
 [data-theme="dark"] .eco-chip.k-laser { background: color-mix(in srgb, var(--blue) 16%, #0E0E16); color: #D6F7FF; }
 [data-theme="dark"] .eco-chip.k-inflow { background: color-mix(in srgb, var(--ok) 12%, #0E0E16); color: #CFFFE2; }
+[data-theme="dark"] .eco-chip.tint { background: color-mix(in srgb, var(--kc) 14%, #0E0E16); color: color-mix(in srgb, var(--kc) 45%, #FFFFFF); }
 .eco-grp { position: absolute; box-sizing: border-box; border: 1px dashed color-mix(in srgb, var(--ink) 25%, transparent); border-radius: 18px; }
 .eco-grp span { position: absolute; left: 14px; top: -10px; padding: 0 6px; background: var(--page); color: var(--muted); font-size: 12.5px; }
 .eco-note { position: absolute; box-sizing: border-box; overflow: hidden; padding: 4px; color: var(--muted); font-size: 14px; line-height: 1.5; }
@@ -2988,11 +3005,13 @@ html.fx-off .eco-e .eco-fl { display: none; }
 .eco-sw.k-leak path { stroke: var(--warn); stroke-width: 3; }
 .eco-sw.k-synergy path { stroke-dasharray: 4 4; }
 .eco-sw.k-baseline path { stroke: color-mix(in srgb, var(--ink) 42%, transparent); stroke-dasharray: 0 5; stroke-width: 3; }
+.eco-legend.mono .eco-sw path { stroke: color-mix(in srgb, var(--ink) 55%, transparent); }
 /* 不在图上的最上面一层目标：一排小签；悬停一样画线，× 删掉 */
 .eco-also { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 14px 0 0; font-size: 12.5px; }
 .eco-also > span:first-child { margin-right: 4px; color: var(--muted); font-weight: 600; }
 .eco-o { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--tonal); font-weight: 600; }
 .eco-o.done { color: var(--muted); text-decoration: line-through; }
+.eco-on { min-width: 16px; padding: 0 5px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--muted); font-size: 11px; font-weight: 600; text-align: center; }
 .eco-ox { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 14px; line-height: 1; opacity: 0; transition: opacity .15s; }
 .eco-o:hover .eco-ox, .eco-ox:focus-visible { opacity: 1; }
 @media (hover: none) { .eco-ox { opacity: 1; } }

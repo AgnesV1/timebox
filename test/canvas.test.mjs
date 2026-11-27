@@ -143,13 +143,13 @@ test("store: importing an ecosystem turns its linked cards into top-level goals,
 });
 
 // 打开时看哪里（2026-11-26：导进来字自动变小、看不清）
-test("a board that fits at a readable size opens whole; a bigger one opens at 90% on its middle", () => {
+test("a board that fits without shrinking opens whole; a bigger one opens at 100% on its middle", () => {
   const small = C.openView(800, 500, 1200, 750);
   assert.equal(small.k, 1.25);   // 小的照旧放大到最多 125%
-  const near = C.openView(1300, 700, 1200, 750);
-  assert.ok(near.k >= C.READABLE && near.k < 1);
+  const exact = C.openView(1200, 600, 1200, 750);
+  assert.equal(exact.k, 1);
   const big = C.openView(1641, 503, 1200, 750);   // 一块横着很长的
-  assert.deepEqual(big, { k: 0.9, tx: (1200 - 1641 * 0.9) / 2, ty: (750 - 503 * 0.9) / 2 });
+  assert.deepEqual(big, { k: 1, tx: (1200 - 1641) / 2, ty: (750 - 503) / 2 });
   // 「整块放得下」照旧能缩得很小
   assert.ok(C.fitView(1641 * 10, 503, 1200, 750).k < 0.1);
   assert.ok(C.fitView(1e6, 1e6, 1200, 750).k >= 0.08);

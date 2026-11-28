@@ -320,7 +320,7 @@ function wishKeyHTML(d) {
 // 名字后面带一段钟点（Reading 14:00-15:10）= 已经做完的，直接记成一条 Done。
 // 手机上多一个 Idea 开关：打开后 Add = 记进灵感池（不建任务），回电脑再归类、挑日子
 // ✨（2026-11-28）：点了这一行就变成写「显化」的一行字，Save = 排队送进阅读表格的 Manifest 页（日期 + 字），不建任务、不在这里留着。
-// 电脑上 ✨ 在这一行最左边，分钟框挪进点了才展开的那排；手机上 ✨ 在下面 Spend 的左边
+// 电脑上 ✨ 在这一行最左边，分钟框挪进点了才展开的那排；手机上 ✨ 在下面 Spend 那一行的最左边（她 11-28 又说靠左）
 function addHTML(c, d, phone = false) {
   const projects = pickable(c.projects);
   const target = addTarget[d] || "";
@@ -341,7 +341,7 @@ function addHTML(c, d, phone = false) {
     "</div>" + (phone ? "" : '<div class="idea-pick" data-idea-pick="' + d + '">' + pickHTML(d, document.querySelector('[data-keep="add-title-' + d + '"]')?.value || "") + "</div>") + "</form>" +
     // 手机：右下角记一笔（她要的）——点了从底下升起记账面板里那张记一笔的（js/ui/island.js 的 openEntry），不用先往下拉开记账
     // Spend 左边灰的：当月预算还剩多少（她 10-24 要的；没定预算不显示，超了才是橙的）。记了一笔以后 main.js 的 paintLefts 换数
-    (phone ? '<div class="add-spendw">' + ((x) => '<span class="add-left num' + (x?.over ? " over" : "") + '" data-mleft' + (x ? "" : " hidden") + "><b>" + esc(x?.text || "") + "</b> left</span>")(monthLeft()) + wishKeyHTML(d) + '<button type="button" class="add-spend" data-act="spend-new" aria-label="Add a transaction" title="Add a transaction">' + icon("spending") + "<span>Spend</span></button></div>" +
+    (phone ? '<div class="add-spendw">' + wishKeyHTML(d) + ((x) => '<span class="add-left num' + (x?.over ? " over" : "") + '" data-mleft' + (x ? "" : " hidden") + "><b>" + esc(x?.text || "") + "</b> left</span>")(monthLeft()) + '<button type="button" class="add-spend" data-act="spend-new" aria-label="Add a transaction" title="Add a transaction">' + icon("spending") + "<span>Spend</span></button></div>" +
       // 下面一行很浅的字：从第一笔起一共结余多少（电脑 Spending → All years 顶上那个数，她 11-26 要的），存在感比 left 还低
       ((b) => '<p class="add-bal num" data-mbal' + (b ? "" : " hidden") + ">" + (b ? balanceText(b) : "") + "</p>")(balanceSince()) : "");
 }

@@ -599,11 +599,14 @@ body.phone .ls-cb::after { inset: -6px; }
 .add-est .min { width: 56px; padding: 6px 4px; text-align: center; font-size: 12.5px; border: var(--b-ctl); }
 /* ✨ 键（js/ui/today.js 的 wishKeyHTML）：电脑在加任务那一行最左边，手机在 Spend 左边。淡底圆钮；开着 = 白天墨底、夜里青柠框；
    还有没送到阅读表格的（没网、表格里还是旧脚本）右上角一个玫红小点 */
-.wish-key { position: relative; flex-shrink: 0; align-self: center; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid transparent; border-radius: 50%; background: var(--tonal); font-size: 16px; line-height: 1; transition: transform .15s var(--ease); }
+.wish-key { position: relative; flex-shrink: 0; align-self: center; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: var(--blue); font-size: 16px; line-height: 1; transition: transform .15s var(--ease); }
+/* 底色（她 11-28）：白天宝蓝（和页面标题同一个 --blue），夜里淡玫红（和黑底、黄色的 ✨ 都分得开）；开着 = 外面再套一圈（白天墨色、夜里青柠光） */
+[data-theme="dark"] .wish-key { background: #F7B3D8; }
 .wish-key:active { transform: scale(.92); }
-.wish-key.on { border-color: var(--ink); background: var(--ink); }   /* 白天墨底（青柠底上黄色的 ✨ 看不清），和 ◆ Deep 开着一个写法 */
-[data-theme="dark"] .wish-key.on { border-color: var(--accent); background: rgba(204, 255, 0, .14); box-shadow: 0 0 10px rgba(204, 255, 0, .35); }
-.wish-key.waiting::before { content: ""; position: absolute; top: 1px; right: 1px; width: 7px; height: 7px; border-radius: 50%; background: var(--hot); }
+.wish-key.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
+[data-theme="dark"] .wish-key.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent), 0 0 12px rgba(204, 255, 0, .45); }
+.wish-key.waiting::before { content: ""; position: absolute; top: 0; right: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--hot); box-shadow: 0 0 0 2px var(--bg); }
+.add-spendw .wish-key { margin-right: auto; }   /* 手机：Spend 那一行的最左边 */
 body.phone .wish-key::after { content: ""; position: absolute; inset: -4px; }   /* 画 36、点的范围 44 */
 /* 写 ✨ 时：这一行只剩字和 Save；下面那排选项、灵感候选、分钟框都收起来，框描深一点 */
 .add.wish .add-more, .add.wish.open .add-more, .add.wish.open .idea-pick:not(:empty), .add.wish .add-main .min { display: none; }

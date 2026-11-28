@@ -200,16 +200,33 @@ const WORDS = [
   ["inflow", /进水|回血|补给|充电|inflow|recharge|refill/i],
   ["synergy", /协同|互哺|联动|synergy|co-?op|together/i]
 ];
-// 没写字的线看颜色：红 = 漏水、绿 = 进水、青 / 紫 = 主线、黄 / 橙 = 保底；没颜色 = 协同
-const BY_COLOR = { 1: "leak", 2: "baseline", 3: "baseline", 4: "inflow", 5: "laser", 6: "laser" };
+// 没写字的线看颜色：红 = 漏水、绿 = 进水、黄 / 橙 = 保底；没颜色 = 协同。
+// 青、紫以前也当主线；2026-11-27 她说颜色是分类（紫 = relationship），只有 [Laser Beam] 那几块之间才是主线（见 flowsOf），
+// 别的颜色的线就是一条细实线（plain：不流动、不进图例）
+const BY_COLOR = { 1: "leak", 2: "baseline", 3: "baseline", 4: "inflow" };
 
-// 一条线是哪一种、占多少：{ kind, pct（没写就是 null） }
+// 一条线自己看得出是哪一种、占多少：{ kind, pct（没写就是 null） }。整张图里的主线要用 flowsOf
 export function flowOf(e) {
   const label = String(e?.label || "");
   const hit = WORDS.find(([, re]) => re.test(label));
-  const kind = hit ? hit[0] : BY_COLOR[e?.color] || "synergy";
+  const kind = hit ? hit[0] : BY_COLOR[e?.color] || (e?.color ? "plain" : "synergy");
   const m = /(\d+(?:\.\d+)?)\s*%/.exec(label);
   return { kind, pct: m ? Number(m[1]) : null };
+}
+
+// 写了「Laser Beam」（或 [laser]）的卡片：她的主线就串在这几块上（Growth → language → work）
+const LASER_CARD = /laser\s*beam|\[\s*laser\s*\]/i;
+export const laserCards = (canvas) => new Set((canvas?.nodes || []).filter((n) => n.type === "text" && LASER_CARD.test(String(n.text || ""))).map((n) => n.id));
+
+// 整张图每条线是哪一种：Map(线 → { kind, pct })。线上写了字的照字算；没写字、两头都在主线上（Laser Beam 卡片，或者一头是蓄水池）的 = 主线；
+// 剩下的照 flowOf 看颜色
+export function flowsOf(canvas) {
+  const beam = laserCards(canvas), pool = ecoParts(canvas).pool?.id, on = (id) => beam.has(id) || (Boolean(pool) && id === pool);
+  return new Map((canvas?.edges || []).map((e) => {
+    const f = flowOf(e), worded = WORDS.some(([, re]) => re.test(String(e.label || "")));
+    if (!worded && e.fromNode !== e.toNode && on(e.fromNode) && on(e.toNode)) f.kind = "laser";
+    return [e, f];
+  }));
 }
 
 const POOL_RE = /蓄水池|水池|水库|reservoir|\bpool\b|\btank\b/i;
@@ -246,5 +263,8 @@ export function ecoParts(canvas) {
   return { pool, members, notes };
 }
 
-// 一个生态圈里出现了哪几种线（图例只列这些，按固定的顺序）
-export const kindsIn = (canvas) => KINDS.filter((k) => (canvas?.edges || []).some((e) => flowOf(e).kind === k));
+// 一个生态圈里出现了哪几种线（图例只列这些，按固定的顺序；细实线 plain 不列）
+export function kindsIn(canvas) {
+  const have = new Set([...flowsOf(canvas).values()].map((f) => f.kind));
+  return KINDS.filter((k) => have.has(k));
+}

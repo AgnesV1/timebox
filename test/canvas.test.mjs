@@ -86,6 +86,34 @@ test("ecosystem: the reservoir, its level, the kind and share of each flow, and 
   assert.ok(C.sameText("  Grow  Up", "grow up"));
 });
 
+test("ecosystem: the main line runs only between the Laser Beam cards (and from the reservoir); other coloured lines are plain", () => {
+  const n = (id, text, color) => ({ id, type: "text", x: 0, y: 0, width: 120, height: 60, text, ...(color ? { color } : {}) });
+  const e = (id, fromNode, toNode, more = {}) => ({ id, fromNode, toNode, ...more });
+  const c = C.compact({
+    nodes: [n("pool", "energy pool"), n("g", "Grow\n[Laser Beam]", "5"), n("w", "Job\n[Laser Beam]", "5"), n("l", "Words\n[Laser Beam]", "5"),
+      n("s", "Steady"), n("r", "People", "6"), n("k", "Kin", "6"), n("x", "Trips", "2"), n("h", "Home")],
+    edges: [
+      e("e1", "pool", "g", { label: " 55%", color: "5" }),   // 蓄水池 → Laser Beam 卡片：主线
+      e("e2", "g", "l", { color: "5" }), e("e3", "l", "w", { color: "5" }), e("e4", "g", "w", { color: "5" }),   // Laser Beam 卡片之间：主线
+      e("e5", "s", "g", { label: "collaboration", color: "5" }),   // 同样是青色，一头不是 Laser Beam：细实线
+      e("e6", "w", "h", { color: "5" }),
+      e("e7", "k", "r", { color: "6" }),   // 紫色：relationship 的分类色，不再是主线
+      e("e8", "s", "pool", { label: "+ 20%", color: "4" }),   // 绿：进水照旧
+      e("e9", "x", "r", { color: "2" }),   // 橙：保底照旧
+      e("e10", "h", "s"),   // 没颜色：协同照旧
+      e("e11", "s", "l", { label: "leak" })   // 写了字的照字算
+    ]
+  });
+  assert.deepEqual([...C.laserCards(c)].sort(), ["g", "l", "w"]);
+  const flows = C.flowsOf(c), kind = Object.fromEntries(c.edges.map((x) => [x.id, flows.get(x).kind]));
+  assert.deepEqual(kind, { e1: "laser", e2: "laser", e3: "laser", e4: "laser", e5: "plain", e6: "plain", e7: "plain", e8: "inflow", e9: "baseline", e10: "synergy", e11: "leak" });
+  assert.equal(flows.get(c.edges[0]).pct, 55);
+  assert.deepEqual(C.kindsIn(c), ["laser", "synergy", "inflow", "baseline", "leak"], "plain lines stay out of the legend");
+  assert.equal(C.flowOf({ color: "6" }).kind, "plain", "a coloured line on its own is just a line");
+  assert.equal(C.flowOf({ color: "#7A5CFF" }).kind, "plain");
+  assert.equal(C.flowOf({}).kind, "synergy");
+});
+
 test("store: a big board is split into parts under the cell limit and read back whole; re-importing the same file replaces it", async () => {
   console.warn = () => {};
   const store = await import("../js/store.js?boards");

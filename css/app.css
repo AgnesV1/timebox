@@ -1479,13 +1479,20 @@ body:has(#main :is(input, textarea, select):focus) #toast { bottom: calc(22px + 
 /* 手机：展开那一行的 Done / Delay / Drop（2026-11-27 她要好点、少误触、字大一点；以前是 26px 的小药丸）：36px 高、14px 字，
    点的范围上下各多 4px 到 44、左右多 5px；药丸之间空 12px，撑出去的那一圈也碰不到。Drop 会把事情扔掉，单独靠到最右边，不和 Delay 挨着。
    手机上没有 ↑ ↓（按住左边的分钟数拖） */
-body.phone .row.open .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+body.phone .row.open .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
 body.phone .row.open .chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 32px; padding: 0 15px; font-size: 14px; }
 body.phone .row.open .chip::after { content: ""; position: absolute; inset: -6px -4px; }   /* 画 32、点的范围还是 44 */
 body.phone .row.open .chip[data-s="drop"] { order: 2; margin-left: auto; }
-body.phone .tm { padding-top: 0; padding-bottom: 0; }
-body.phone .tm-x { width: 44px; height: 44px; font-size: 18px; }   /* 删一段计时：点的范围 44（2026-11-27） */
-body.phone .tm.sum, body.phone .tm.more-time { min-height: 44px; font-size: 14px; }
+/* 展开那一行的计时记录（2026-11-27 晚她说框框小一点、纯文字也行，上下空太多）：不铺底、不留内边距，就是一行字
+   「09:10–09:40 · 30m ×」；以前 × 是 44 × 44 的按钮，把每一段都撑到 46 高。现在 × 画 22，点的范围 28 × 40
+   （比别处的 44 小：她要紧凑；上下两段相隔 28，撑出去的那一圈不会叠到下一段的 × 上）。正在计时的那颗（.tm.live）照旧是青柠小药丸 */
+body.phone .times { gap: 6px 14px; margin-top: 2px; }
+body.phone .tm:not(.live) { padding: 0; background: none; font-size: 14px; }
+body.phone .tm-x { position: relative; width: 22px; height: 22px; font-size: 16px; }
+body.phone .tm-x::after { content: ""; position: absolute; inset: -3px -9px; }
+body.phone .tm.sum { padding: 0; font-size: 14px; }
+body.phone .tm.more-time { position: relative; padding: 0; font-size: 14px; }
+body.phone .tm.more-time::after { content: ""; position: absolute; inset: -6px -10px; }
 /* ◆ Deep：加任务时的开关、浮条上的按钮。亮着 = 黑底青柠字（和 Optional 标签、守住线的状态一个写法） */
 .deep-tog { position: relative; display: inline-flex; cursor: pointer; }
 .deep-tog input { position: absolute; inset: 0; opacity: 0; }
@@ -2959,12 +2966,17 @@ body.phone .mm-ren { font-size: 16px; }
 .eco-n.tint { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 12%, var(--bg)); }
 .eco-n.laser.tint { border: 2.5px solid var(--cc); background: color-mix(in srgb, var(--cc) 22%, var(--bg)); }
 .eco-grp.tint { border-color: color-mix(in srgb, var(--cc) 60%, transparent); background: color-mix(in srgb, var(--cc) 5%, transparent); }
-.eco-n.laser { border: 2px solid var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--bg)); }
+.eco-n.laser { border: 2.5px solid var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--bg)); }
 [data-theme="dark"] .eco-n { border-color: #3A3A52; background: color-mix(in srgb, var(--bg) 80%, transparent); }
-[data-theme="dark"] .eco-n.laser { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 14%, var(--bg)); box-shadow: 0 0 18px color-mix(in srgb, var(--blue) 35%, transparent), inset 0 0 12px color-mix(in srgb, var(--blue) 18%, transparent); }
-[data-theme="light"] .eco-n.laser { box-shadow: 3px 3px 0 var(--edge); }
 [data-theme="dark"] .eco-n.tint { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 14%, var(--bg)); }
-[data-theme="dark"] .eco-n.laser.tint { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 22%, var(--bg)); box-shadow: 0 0 18px color-mix(in srgb, var(--cc) 35%, transparent), inset 0 0 12px color-mix(in srgb, var(--cc) 18%, transparent); }
+/* 每块都带一点（她 2026-11-27 选「每块都有一点，主线最强」；以前只有主线指着的那块有，别的一点都没有）：
+   白天一道浅浅的贴纸投影、用自己的颜色（没上色的用墨色），夜里一圈淡光；主线那几块（.laser）白天整道墨色投影、夜里光最亮。
+   「硬投影只给主卡片」那条规矩，这里是她点名的例外 */
+[data-theme="light"] .eco-n { box-shadow: 2px 2px 0 color-mix(in srgb, var(--cc, var(--ink)) 45%, transparent); }
+[data-theme="light"] .eco-n.laser { box-shadow: 4px 4px 0 var(--edge); }
+[data-theme="dark"] .eco-n { box-shadow: 0 0 12px color-mix(in srgb, var(--cc, #8C8CC8) 30%, transparent); }
+[data-theme="dark"] .eco-n.laser { border-color: var(--cc, var(--blue)); background: color-mix(in srgb, var(--cc, var(--blue)) 22%, var(--bg));
+  box-shadow: 0 0 26px color-mix(in srgb, var(--cc, var(--blue)) 55%, transparent), inset 0 0 14px color-mix(in srgb, var(--cc, var(--blue)) 24%, transparent); }
 /* 蓄水池：圆角方块，外面一圈虚线；水从底下涨到 --lv，水面一条亮线；名字、大大的百分数、小字 */
 .eco-pool { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow: hidden; border: 2px solid var(--ink); border-radius: 28px; background: var(--bg); text-align: center; outline: 2px dashed color-mix(in srgb, var(--ink) 55%, transparent); outline-offset: 6px; }
 .eco-water { position: absolute; left: 0; right: 0; bottom: 0; height: var(--lv); background: color-mix(in srgb, var(--blue) 22%, var(--bg)); border-top: 2px solid color-mix(in srgb, var(--blue) 70%, transparent); transition: height .8s var(--ease); }
@@ -2986,7 +2998,10 @@ body.phone .mm-ren { font-size: 16px; }
 .eco-e .eco-ln { stroke: var(--lc); stroke-width: 2; }
 .eco-e .eco-ah { fill: var(--lc); stroke: none; }
 .eco-e.k-laser { --lc: var(--blue); }
-.eco-e.k-laser .eco-ln { stroke-width: 6; }
+/* 主线（2026-11-27 她要「最粗 + 流动方向明确显眼」）：10px（别的线最多 3px），上面一段段亮光顺着流（.eco-fl，见下面），箭头最大（eco.js 里 20）；
+   白天带一道墨色硬投影（和贴纸一个说法），夜里光晕 */
+.eco-e.k-laser .eco-ln { stroke-width: 10; }
+[data-theme="light"] .eco-e.k-laser .eco-ln { filter: drop-shadow(2px 2px 0 var(--edge)); }
 .eco-e.k-inflow { --lc: var(--ok); }
 .eco-e.k-inflow .eco-ln, .eco-e.k-leak .eco-ln { stroke-width: 3; }
 .eco-e.k-leak { --lc: var(--warn); }
@@ -2994,9 +3009,12 @@ body.phone .mm-ren { font-size: 16px; }
 .eco-e.k-baseline { --lc: color-mix(in srgb, var(--ink) 42%, transparent); }
 .eco-e.k-baseline .eco-ln { stroke-dasharray: 0 7; stroke-width: 3; }
 .eco-e .eco-fl { stroke: color-mix(in srgb, var(--lc) 35%, var(--bg)); stroke-width: 2; stroke-dasharray: 2 16; animation: eco-flow 1.3s linear infinite; }
-.eco-e.k-laser .eco-fl { stroke-width: 2.5; stroke: color-mix(in srgb, var(--lc) 30%, #FFFFFF); }
-[data-theme="dark"] .eco-e.k-laser .eco-ln { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lc) 70%, transparent)); }
+/* 主线上流的：一段段 10px 的亮光、间隔 26，0.9 秒走一格（从起点流向箭头），比别的线的小点亮、快、长 */
+.eco-e.k-laser .eco-fl { stroke-width: 4; stroke: rgba(255, 255, 255, .88); stroke-dasharray: 10 26; animation: eco-beam .9s linear infinite; }
+[data-theme="dark"] .eco-e.k-laser .eco-fl { stroke: color-mix(in srgb, var(--lc) 25%, #FFFFFF); filter: drop-shadow(0 0 3px #FFFFFF); }
+[data-theme="dark"] .eco-e.k-laser .eco-ln { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--lc) 80%, transparent)); }
 @keyframes eco-flow { from { stroke-dashoffset: 18; } to { stroke-dashoffset: 0; } }
+@keyframes eco-beam { from { stroke-dashoffset: 36; } to { stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) { :root:not(.motion-on) .eco-e .eco-fl { display: none; } :root:not(.motion-on) .eco-water { transition: none; } }
 html.fx-off .eco-e .eco-fl { display: none; }
 /* 线上的小签：她写的字，原样 */
@@ -3017,7 +3035,7 @@ html.fx-off .eco-e .eco-fl { display: none; }
 .eco-legend li { display: inline-flex; align-items: center; gap: 8px; }
 .eco-sw { width: 28px; height: 8px; overflow: visible; }
 .eco-sw path { fill: none; stroke-linecap: round; stroke: color-mix(in srgb, var(--ink) 55%, transparent); stroke-width: 2; }
-.eco-sw.k-laser path { stroke: var(--blue); stroke-width: 5; }
+.eco-sw.k-laser path { stroke: var(--blue); stroke-width: 7; }
 .eco-sw.k-inflow path { stroke: var(--ok); stroke-width: 3; }
 .eco-sw.k-leak path { stroke: var(--warn); stroke-width: 3; }
 .eco-sw.k-synergy path { stroke-dasharray: 4 4; }
@@ -3049,14 +3067,26 @@ body.phone .phead .r .ic { width: 20px; height: 20px; }
 body.phone .phead .r :is(.pread, .pset):active { background: var(--tonal); }
 /* 别的页顶上的「‹ Today」：44 高 */
 body.phone .phead .nav { min-height: 44px; padding: 0 12px 0 4px; margin-left: -4px; font-size: 14px; }
-/* 日期条（2026-11-27 晚她说要一眼看全）：11 天还是一屏放下、不用滑，字号照上一版（星期 12.5、日期 18）；
-   一格整高 52 都能点，格子之间 3px（宽度只够这么多） */
-body.phone .dpill { min-height: 52px; padding: 4px 0 5px; font-size: 12.5px; touch-action: manipulation; }
-body.phone .dpill b { font-size: 18px; }
-body.phone .stripmeta { font-size: 14px; }
-/* Chore 键（▶ 那个小圆）：画 16、点的范围 44 */
-body.phone .chore-key::after { content: ""; position: absolute; inset: -8px; }
+/* 日期条（2026-11-27 晚她说要一眼看全）：11 天还是一屏放下、不用滑；格子之间 3px（宽度只够这么多）。
+   同一天晚上她又说日期可以小一点：星期 11、日期 16（和电脑一样），一格约 48 高，整格都能点 */
+body.phone .dpill { min-height: 44px; padding: 2px 0 3px; font-size: 11px; touch-action: manipulation; }
+body.phone .dpill b { font-size: 16px; }
+body.phone .dpill i { margin-top: 1px; }
+/* 「x / y done」那一行（2026-11-27 晚）：不写 box 几小时了，右边是 Chore 键（js/ui/today.js 的 phoneHTML，原来在下面单独一行）。
+   .chore 拆开（display: contents）：键那一行靠右，放不下（计时中五个记号 + 时间 + 键）就整行换到下面；点合计展开的每一段另起一整行、靠右 */
+body.phone .stripmeta { flex-wrap: wrap; align-items: center; gap: 6px 10px; min-height: 32px; margin-bottom: 4px; font-size: 14px; }
+body.phone .stripmeta .chore { display: contents; font-family: var(--body); }
+body.phone .stripmeta .chore-line { margin-left: auto; font-family: var(--body); }
+body.phone .stripmeta .chore-each { flex-basis: 100%; margin: 0; font-family: var(--body); }
+/* Chore 键（▶ 那个小圆）：她要大一点——画 24（原来 16），字 14（原来写死 11 没跟上手机的 14），点的范围 44 */
+body.phone .chore-k { font-size: 14px; }
+body.phone .chore-key { width: 36px; height: 36px; margin: -6px -6px -6px -2px; }
+body.phone .chore-key::before { width: 24px; height: 24px; }
+body.phone .chore-key .tri { margin-left: 2.5px; border-top-width: 5px; border-bottom-width: 5px; border-left-width: 8px; }
+body.phone .chore-key .sq { width: 9px; height: 9px; border-radius: 2px; }
+body.phone .chore-key::after { content: ""; position: absolute; inset: -4px; }
 body.phone .chore { font-size: 14px; }
+body.phone .chore-time { font-size: 16px; }
 /* 每一行：上下多空一点，字 16；左边的分钟数、项目名、For … 链各大一档 */
 body.phone .row { padding-top: 8px; padding-bottom: 8px; }   /* 只动上下：选中、展开的那一行左右各有 8px 的边，不能盖掉（2026-11-27 晚她说太松，回到 8） */
 body.phone .task { font-size: 16px; line-height: 1.4; }
@@ -3078,32 +3108,31 @@ body.phone .add-more { gap: 10px; }
 body.phone .dock { gap: 12px; }
 body.phone .dk-btn { min-height: 44px; padding: 0 15px; font-size: 16px; }
 /* 手机的浮条（她 2026-11-28）：平时是矮矮的一行（.mini）——计时中：点、任务名、走着的时间、Stop；选中时：Selected、任务名、Start。
-   点了一个任务，它往上长成一块挡板（.sheet，js/ui/timer.js）：地方宽，计时的都在上面——第一行点、完整的任务名、时间；
-   第二行 ⏱ 12:09（几点开始的；开始、停的钟点都在这一个里改）、◆ Deep、×（扔掉这次计时，提示条能撤销）靠左，Stop / Start 单独靠右。
-   顶上一道小横杠：往下划就缩回那一行，点到挡板和任务行以外也缩回。挡板开着时今天页底下那个圆盘让开 */
-body.phone .dock.mini { flex-wrap: nowrap; gap: 10px; padding: 7px 7px 7px 14px; }
-body.phone .dock.mini .dk-title { white-space: nowrap; }
-body.phone .dock.mini .dk-time { font-size: 20px; }
-body.phone .dock.mini .dk-btn { min-height: 40px; padding: 0 14px; }
-body.phone .dock.sheet { position: relative; flex-wrap: wrap; row-gap: 14px; padding: 20px 14px 14px 18px; border-radius: 24px; }
-body.phone .dock.sheet .dk-grab { position: absolute; top: 7px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 22%, transparent); }
-body.phone .dock.sheet .dk-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-body.phone .dock.sheet .dk-time { font-size: 28px; }
-body.phone .dock.sheet .dk-tools { display: flex; flex-basis: 100%; align-items: center; gap: 10px; }
-body.phone .dock.sheet .dk-tools > *, body.phone .dock:is(.mini, .sheet) > .dk-time, body.phone .dock.mini > .dk-btn { order: 0; }   /* 电脑那一行的先后（order）在手机上不用 */
-body.phone .dock.sheet .dk-tools > .dk-btn { margin-left: auto; padding: 0 18px; }
-body.phone .dock.sheet .dk-tools .dk-x { width: 44px; height: 44px; margin: 0; }
-body.phone .dk-clock { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 1px solid transparent; border-radius: 999px; background: var(--tonal); font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; }
-body.phone .dk-clock span { font-family: var(--num); }
+   点了一个任务（.dk-open，js/ui/timer.js；别叫 .sheet，那是弹层的类）：原来往上长成一块两行的挡板，2026-11-27 晚她说太高、压成一整排，名字截短也行——
+   还是一行：● 名字… 时间 × ⏱ ◆ Stop（选中时 ● 名字… ◆ Start）。× 扔掉这次计时（提示条能撤销），挨着时间、离 Stop 远；
+   ⏱ 改几点开始 / 几点停，点了才在第二行出那个小表单。三颗小按钮画 34、点的范围 44 高。
+   往下划、点到浮条和任务行以外就收回只有 Stop 的那一行。开着时今天页底下那个圆盘让开 */
+body.phone .dock:is(.mini, .dk-open) { gap: 10px; padding: 7px 7px 7px 14px; }
+body.phone .dock.mini { flex-wrap: nowrap; }
+body.phone .dock:is(.mini, .dk-open) .dk-title { white-space: nowrap; }
+body.phone .dock:is(.mini, .dk-open) .dk-time { font-size: 20px; }
+body.phone .dock:is(.mini, .dk-open) > .dk-btn { min-height: 40px; padding: 0 14px; }
+body.phone .dock.dk-open { flex-wrap: wrap; row-gap: 10px; gap: 10px 6px; padding-left: 12px; }
+body.phone .dock.dk-open .dk-tools { display: flex; align-items: center; gap: 4px; }
+body.phone .dock.dk-open .dk-tools > *, body.phone .dock:is(.mini, .dk-open) > :is(.dk-time, .dk-btn) { order: 0; }   /* 电脑那一行的先后（order）在手机上不用 */
+body.phone .dock.dk-open .dk-tools > * { position: relative; display: inline-grid; place-items: center; width: 34px; min-width: 0; height: 34px; min-height: 0; margin: 0; padding: 0; border-radius: 50%; }
+body.phone .dock.dk-open .dk-tools > *::after { content: ""; position: absolute; inset: -5px -2px; }
+body.phone .dock.dk-open .dk-x { font-size: 20px; }
+body.phone .dk-clock { border: 1px solid transparent; background: var(--tonal); font-size: 16px; line-height: 1; color: var(--ink); }
 body.phone .dk-clock.on { background: var(--accent); color: var(--accent-ink); }
 [data-theme="dark"] body.phone .dk-clock.on { background: rgba(204, 255, 0, .12); border-color: var(--accent); color: var(--accent); }
 body.phone .dk-at.both { display: flex; flex-basis: 100%; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 body.phone .dk-at.both label { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
 body.phone .dk-at.both input { min-height: 40px; font-size: 16px; }
 body.phone .dk-at.both .btn { min-height: 40px; padding: 0 16px; }
-body.phone .dock.rise { animation: sheet-rise .38s var(--spring) both; }
-@keyframes sheet-rise { from { transform: translateY(28px); opacity: .5; } }
-@media (prefers-reduced-motion: reduce) { :root:not(.motion-on) body.phone .dock.rise { animation: fade-in .2s ease both; } }
+body.phone .dock.rise .dk-tools { animation: dk-tools-in .22s var(--ease) both; }   /* 刚点开：多出来的三颗按钮从右边淡进来 */
+@keyframes dk-tools-in { from { opacity: 0; transform: translateX(10px); } }
+@media (prefers-reduced-motion: reduce) { :root:not(.motion-on) body.phone .dock.rise .dk-tools { animation: fade-in .2s ease both; } }
 @keyframes fade-in { from { opacity: 0; } }
 body.phone.sheet-open #sun { opacity: 0; pointer-events: none; transition: opacity .2s; }
 /* 手机上别的小签（阅读、Mindmap、设置里的那些）：36 高、字 14，点的范围上下各多 4 */

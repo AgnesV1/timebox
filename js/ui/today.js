@@ -437,15 +437,17 @@ function phoneHTML(c) {
     // 选中的标记单独一个元素，压在选中那天的格子上（换天时它滑过去，见 js/motion.js 的 slideDay）
     '<i class="dmark" aria-hidden="true" style="--k:' + days.indexOf(d) + '"></i></nav>';
   const day = E.daySummary(c, d);
-  const lineText = day.rest ? "Rest day" : day.cap ? "box " + fmtHours(day.cap) : "";
-  const meta = '<div class="stripmeta' + (day.cap > 0 && day.planned > day.cap ? " over" : "") + '"><span>' + hoursOf(day.done) + " / " + fmtHours(day.planned) + " done</span><span>" + lineText + "</span></div>";
+  // 「x / y done」那一行（她 2026-11-27）：不再写「box 10h」（超了 box 这一行照旧变红）；右边放 Chore 键，原来它在下面单独一行，
+  // 挪上来、画大一点；Rest day 在它左边
+  const meta = '<div class="stripmeta' + (day.cap > 0 && day.planned > day.cap ? " over" : "") + '"><span>' + hoursOf(day.done) + " / " + fmtHours(day.planned) + " done</span>" +
+    (day.rest ? "<span>Rest day</span>" : "") + choreHTML(c, d) + "</div>";
   const bar = '<div class="strip">' + all.map(segHTML).join("") + "</div>";
   const toBuy = shopCount(c);   // 下次采购还剩几样（顶栏的 🛒）
   return '<div class="dayview phone-day" data-date="' + d + '">' +
     '<header class="phead"><div class="l"><h1 data-act="day-today">' + fmtDay(d) + "</h1>" + ballHTML() + '<button type="button" class="psync" data-sync-status aria-label="Sync"></button></div>' +
     // 右边一排（她 11-26 说顶上图标堆在一起）：一样大、淡墨色，挨紧一点，齿轮不再比别的大；同步的小点挪到日期这边（上面那个按钮）
     '<div class="r"><a class="pread pshop" href="#shop" aria-label="Next shop">' + icon("cart") + (toBuy ? "<span>" + toBuy + "</span>" : "") + '</a><a class="pread pico" href="#ideas" aria-label="Ideas">' + icon("idea") + '</a><a class="pread pico" href="#mindmap" aria-label="Mindmap">' + icon("mindmap") + '</a><a class="pread pico" href="#reading" aria-label="Reading">' + icon("reading") + "</a>" + '<a class="icon-btn pset" href="#settings" aria-label="Settings">' + icon("settings") + "</a></div></header>" + strip +
-    (store.local().url ? bar + meta + choreHTML(c, d) + '<div class="list" data-list="' + d + '">' +
+    (store.local().url ? bar + meta + '<div class="list" data-list="' + d + '">' +
       (tasks.length ? listRowsHTML(c, tasks, true, openId) : E.ghostsOn(c, d).length ? "" : '<div class="empty">' + (d < c.today ? "Nothing was planned this day." : "Nothing planned yet.") + "</div>") + ghostsHTML(c, d) + "</div>" + addHTML(c, d, true)
       : connectHTML()) + "</div>";
 }

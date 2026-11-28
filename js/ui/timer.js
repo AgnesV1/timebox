@@ -13,8 +13,9 @@ import { cheer } from "../fx.js";
 let picked = "";     // 这台设备上选中的任务
 let stopped = null;  // 刚停下的那段 {taskId, min}：浮条上给 Done / Delay
 let atEdit = "";     // 浮条上正在改的钟点：since = 其实几点开始的 / stop = 其实几点就停了 / both = 手机挡板上那一个 ⏱，开始、停的钟点一起改
-// 手机（她 2026-11-28）：浮条平时是矮矮的一行；点了一个任务，它往上长成一块挡板（sheet），计时的那些都在上面、地方宽；
-// 往下划、点到挡板和任务行以外的地方就缩回那一行。电脑不变
+// 手机（她 2026-11-28）：浮条平时是矮矮的一行；点了一个任务，计时的那些按钮也出来（sheet）。
+// 2026-11-27 晚她说长高的那块太占地方，改成还是一整排（名字截短），不再长高；
+// 往下划、点到浮条和任务行以外的地方就收回只有 Stop 的那一行。电脑不变
 let sheet = false, wasSheet = false;
 export const sheetOpen = () => sheet;
 export function openSheet() { sheet = true; }
@@ -66,19 +67,20 @@ function atBothForm(since) {
     '<button type="submit" class="btn">Save</button><button type="button" class="link" data-act="at-x">Cancel</button></form>';
 }
 
-// 手机的浮条：收起来一行（mini），点了任务是挡板（sheet；刚长出来那一次带 .rise，从底下升上来）
+// 手机的浮条：平时一行（mini）；点了任务还是一行，多出几颗按钮（sheet）。她 2026-11-27 晚说长出来的那块太高，
+// 压成一整排、名字截短也行：● 名字… 时间 × ⏱ ◆ Stop。× 扔掉这次计时，挨着时间、离 Stop 远一点；⏱ 只画图标，几点开始的在 title 里。
+// 刚多出来的那一次带 .rise：多出来的按钮淡入
 function phoneDock(rt, run) {
   const open = sheet, rise = open && !wasSheet ? " rise" : "";
   wasSheet = open;
-  const grab = '<i class="dk-grab" aria-hidden="true"></i>';
   if (rt) {
     const time = '<span class="dk-time num" data-since="' + run.start + '">' + elapsed(run.start) + "</span>", stopBtn = '<button type="button" class="dk-btn stop" data-act="timer-stop"><i class="sq"></i>Stop</button>';
     if (!open) return '<div class="dock run mini" style="--bar:' + colorOf(rt) + '"><i class="pulse" aria-hidden="true"></i><div class="dk-main">' + titleOf(rt) + "</div>" + time + stopBtn + "</div>";
-    const since = store.clockOf(run.start);
-    return '<div class="dock run sheet' + rise + '" style="--bar:' + colorOf(rt) + '">' + grab + '<i class="pulse" aria-hidden="true"></i><div class="dk-main">' + titleOf(rt) + "</div>" + time +
-      '<div class="dk-tools"><button type="button" class="dk-clock' + (atEdit === "both" ? " on" : "") + '" data-act="at-edit" data-v="both" aria-expanded="' + (atEdit === "both") + '" aria-label="Started at ' + since + ' — change when it started or stopped" title="Started at ' + since + ' — change when it started or stopped">⏱ <span>' + since + "</span></button>" +
-      deepBtn(rt) + '<button type="button" class="icon-btn dk-x" data-act="timer-discard" aria-label="Discard this timer" title="Discard">×</button>' + stopBtn + "</div>" +
-      (atEdit === "both" ? atBothForm(since) : "") + "</div>";
+    const since = store.clockOf(run.start), when = "Started at " + since + " — change when it started or stopped";
+    return '<div class="dock run dk-open' + rise + '" style="--bar:' + colorOf(rt) + '"><i class="pulse" aria-hidden="true"></i><div class="dk-main">' + titleOf(rt) + "</div>" + time +
+      '<div class="dk-tools"><button type="button" class="icon-btn dk-x" data-act="timer-discard" aria-label="Discard this timer" title="Discard">×</button>' +
+      '<button type="button" class="dk-clock' + (atEdit === "both" ? " on" : "") + '" data-act="at-edit" data-v="both" aria-expanded="' + (atEdit === "both") + '" aria-label="' + when + '" title="' + when + '">⏱</button>' +
+      deepBtn(rt) + "</div>" + stopBtn + (atEdit === "both" ? atBothForm(since) : "") + "</div>";
   }
   return "";
 }
@@ -120,8 +122,8 @@ export function dockHTML(c, onToday, extra = () => null, phone = false) {
     wasSheet = open;
     const start = '<button type="button" class="dk-btn start" data-act="timer-start" data-id="' + t.id + '"><i class="tri"></i>Start</button>';
     if (!open) return '<div class="dock idle mini" style="--bar:' + colorOf(t) + '"><i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected' + selectedText(t) + "</span>" + titleOf(t) + "</div>" + start + "</div>";
-    return '<div class="dock idle sheet' + rise + '" style="--bar:' + colorOf(t) + '"><i class="dk-grab" aria-hidden="true"></i><i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected' + selectedText(t) + "</span>" + titleOf(t) + "</div>" +
-      '<div class="dk-tools">' + deepBtn(t) + start + "</div></div>";
+    return '<div class="dock idle dk-open' + rise + '" style="--bar:' + colorOf(t) + '"><i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected' + selectedText(t) + "</span>" + titleOf(t) + "</div>" +
+      '<div class="dk-tools">' + deepBtn(t) + "</div>" + start + "</div>";
   }
   return '<div class="dock idle" style="--bar:' + colorOf(t) + '">' +
     '<i class="dot" aria-hidden="true"></i><div class="dk-main"><span class="dk-k">Selected' + selectedText(t) + "</span>" + titleOf(t) + "</div>" + deepBtn(t) +
@@ -168,7 +170,7 @@ export function initTimer(rerender) {
   on(document, "click", "[data-act=timer-stop]", () => { atEdit = ""; sheet = false; stop(); rerender(); });
   // 手机的挡板：往下划（按住往下拖 40 以上）、点到挡板和任务行以外的地方，缩回那一行
   let swipe = null;
-  on(document, "pointerdown", "#dock .dock.sheet", (e) => { swipe = e.target.closest("input, button, select, label") ? null : { y: e.clientY }; });
+  on(document, "pointerdown", "#dock .dock.dk-open", (e) => { swipe = e.target.closest("input, button, select, label") ? null : { y: e.clientY }; });
   addEventListener("pointerup", (e) => { if (swipe && e.clientY - swipe.y > 40 && closeSheet()) { animateNext(); rerender(); } swipe = null; });
   // 等这一下点完（click）再收：按下去的时候就重画的话，手指底下那颗按钮被换掉，弹簧按不下去、这一下也可能点不着（2026-11-28 修）。
   // 重画是下一帧的事，被点的那颗自己的 click 先跑；划着滚页面不算点，挡板留着

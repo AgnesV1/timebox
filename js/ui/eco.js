@@ -2,8 +2,9 @@
 // 图在 Obsidian 白板里画（.canvas），导进来；一种侧重（破局 / 扎根 / 复利 / 过载警示……）一个文件，上面一排切换（记在这台设备上：local.ecoMode）。
 //   中间是蓄水池：水位画成从底下涨上来的一池水，按最近 7 天记的时间算（js/energy.js，她 2026-11-26 定的；那块里写的「78%」不再用）。
 //   四周连着线的那几块就是最上面一层的目标（span: north，原来 North star 里框出来的也是这一层）：右栏的目标、计划都能连到它们，悬停照样飞线（js/ui/links.js）。
-//   线按种类画（js/canvas.js 的 flowOf：看线上写的字，没字看颜色）：主线（Laser Beam）粗的蓝、协同细虚线、进水绿、保底点线、漏水红，线上那个小签就是她写的字；
-//   主线指着的那一块整块描成蓝的。底下一行图例，只列这张图里有的那几种。
+//   线按种类画（js/canvas.js 的 flowsOf：看线上写的字；主线 = 写了 Laser Beam 的那几块之间、蓄水池到它们的线；没字看颜色）：
+//   主线（Laser Beam）最粗、一段段亮光顺着流、箭头最大，协同细虚线、进水绿、保底点线、漏水红，别的颜色细实线；线上那个小签就是她写的字。
+//   每块卡片都带一点光（夜里）/ 贴纸投影（白天），主线那几块最强（她 2026-11-27 选的）。底下一行图例，只列这张图里有的那几种。
 //   这几种颜色是她点名要的（贴的图里就是），只在 .pj-eco 里用，借的是现成的状态色：--blue、--ok、--warn。
 // 图按宽度缩放（最大原大小），整张图跟着 Projects 左边那一栏的宽度走。
 // 没在图上的最上面一层目标（以前 North star 里框的、图里删掉了的）：图下面一排小签，悬停一样能看到连着谁，× 删掉（提示条能撤销）。
@@ -33,21 +34,23 @@ function diagramHTML(b, c) {
   const canvas = b.canvas, B = C.bounds(canvas, PAD), at = new Map(canvas.nodes.map((n) => [n.id, n]));
   const goals = new Map(store.goals().map((g) => [g.id, g]));
   const { pool, members, notes } = C.ecoParts(canvas);
-  const laser = new Set(), member = new Set(members.map((n) => n.id));
-  let lines = "", chips = "";
+  // 主线卡片（发光最强）：写了 Laser Beam 的那几块，加上主线箭头指着的（2026-11-27 起主线只认 [Laser Beam] 那几块之间，见 C.flowsOf）
+  const flows = C.flowsOf(canvas), laser = C.laserCards(canvas), member = new Set(members.map((n) => n.id));
+  let lines = "", beams = "", chips = "";   // 主线最后画，压在别的线上面
   for (const e of canvas.edges) {
     const a = at.get(e.fromNode), z = at.get(e.toNode);
     if (!a || !z) continue;
-    const f = C.flowOf(e), g = C.edgeGeo(a, z, e, { bend: 0.35 });
+    const f = flows.get(e), g = C.edgeGeo(a, z, e, { bend: 0.35 }), ah = f.kind === "laser" ? 20 : 10;
     if (f.kind === "laser" && e.toEnd !== "none") laser.add(z.id);
     if (f.kind === "laser" && e.fromEnd === "arrow") laser.add(a.id);
-    const head = (e.toEnd !== "none" ? '<path class="eco-ah" d="' + C.arrowPath(g.p3, g.a3, f.kind === "laser" ? 13 : 10) + '"/>' : "") +
-      (e.fromEnd === "arrow" ? '<path class="eco-ah" d="' + C.arrowPath(g.p0, g.a0, f.kind === "laser" ? 13 : 10) + '"/>' : "");
-    // 流动的那一层（主线、进水、漏水）：一串小点顺着线跑，看得出往哪流；减少动态、关了 Sparkles 就不跑
+    const head = (e.toEnd !== "none" ? '<path class="eco-ah" d="' + C.arrowPath(g.p3, g.a3, ah) + '"/>' : "") +
+      (e.fromEnd === "arrow" ? '<path class="eco-ah" d="' + C.arrowPath(g.p0, g.a0, ah) + '"/>' : "");
+    // 流动的那一层（主线、进水、漏水）：一串小点（主线是一段段亮光）顺着线跑，看得出往哪流；减少动态、关了 Sparkles 就不跑
     const flow = f.kind === "laser" || f.kind === "inflow" || f.kind === "leak" ? '<path class="eco-fl" d="' + g.d + '"/>' : "";
     // 她在 Obsidian 里给线上的颜色照用（2026-11-26：「我原本的色系比较多」）；线的粗细、虚实、流动照种类，没上色的线照旧按种类上色
     const own = C.cssColor(e.color);
-    lines += '<g class="eco-e k-' + f.kind + '"' + (own ? ' style="--lc:' + own + '"' : "") + '><path class="eco-ln" d="' + g.d + '"/>' + flow + head + "</g>";
+    const svg = '<g class="eco-e k-' + f.kind + '"' + (own ? ' style="--lc:' + own + '"' : "") + '><path class="eco-ln" d="' + g.d + '"/>' + flow + head + "</g>";
+    if (f.kind === "laser") beams += svg; else lines += svg;
     if (e.label) chips += '<span class="eco-chip k-' + f.kind + (own ? " tint" : "") + '" style="left:' + px(g.mid.x - B.x) + ";top:" + px(g.mid.y - B.y) + (own ? ";--kc:" + own : "") + '">' + esc(e.label) + "</span>";
   }
   // 块的颜色也照 Obsidian 里的（边 + 淡淡的底）；没上色的照旧
@@ -74,7 +77,7 @@ function diagramHTML(b, c) {
   const kinds = C.kindsIn(canvas);
   return '<div class="eco-fit" style="--w:' + Math.round(B.w) + ";--h:" + Math.round(B.h) + (lastW ? ";--k:" + Math.min(1, lastW / B.w).toFixed(4) : "") + '">' +
     '<div class="eco-world" style="width:' + px(B.w) + ";height:" + px(B.h) + '">' +
-    '<svg class="eco-lines" width="' + Math.round(B.w) + '" height="' + Math.round(B.h) + '" viewBox="' + Math.round(B.x) + " " + Math.round(B.y) + " " + Math.round(B.w) + " " + Math.round(B.h) + '" aria-hidden="true">' + lines + "</svg>" +
+    '<svg class="eco-lines" width="' + Math.round(B.w) + '" height="' + Math.round(B.h) + '" viewBox="' + Math.round(B.x) + " " + Math.round(B.y) + " " + Math.round(B.w) + " " + Math.round(B.h) + '" aria-hidden="true">' + lines + beams + "</svg>" +
     nodes + chips + "</div></div>" +
     // 线带着自己的颜色时，图例只说粗细虚实（画成墨色），不然颜色对不上
     (kinds.length ? '<ul class="eco-legend' + (canvas.edges.some((e) => e.color) ? " mono" : "") + '" aria-label="Legend">' + kinds.map((k) => "<li>" + swatch(k) + esc(LEGEND[k]) + "</li>").join("") + "</ul>" : "");

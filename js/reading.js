@@ -4,6 +4,8 @@
 // 想看的可以标多想看（优先级，不是期限）：Soon = 这一两年 / 5 years = 五年内 / 不标。存在 Want 页的 Priority 那一列，表格里也能直接改。
 // 今天页也用它：加任务时能挑 Want 里的；任务标了 Done、名字在 Want 里，就问一句看完没有（wantOf / notYet）。
 // 要发的都先排队（没网也行，下次同步一起发）。缓存和排队都只在这台设备上（localStorage 单独一个 key），不进 Tasks 那些表。
+// ✨（她 2026-11-28 要的）：今天页 ✨ 写的一行「显化」也走这条队：发进阅读表格的 Manifest 页（日期 + 那行字），只写不读，
+// 表格收下就从队列里删掉，这台设备上不留（wish）。
 
 import { readLocal, writeLocal } from "./dom.js";
 
@@ -51,7 +53,7 @@ export function want(on = true) { wanted = on; }
 // 所有条目：排队还没发出去的排在前面（想看的 / 看完的），后面是表格里的。prio 都换成档位；刚点的优先级还排着队的，先叠上去
 function everything() {
   const ranks = new Map(R.pending.filter((x) => x.rank).map((x) => [titleKey(x.title), x.prio || ""]));
-  const all = [...R.pending.filter((x) => !x.rank).map((x) => (x.done
+  const all = [...R.pending.filter((x) => !x.rank && !x.wish).map((x) => (x.done
     ? { title: x.title, tab: x.type, want: false, when: x.year + " " + monthName(x.month), mark: x.mark, note: x.note, queued: true }
     : { title: x.title, tab: x.type, want: true, mark: x.vibe, note: x.note, prio: x.prio || "", queued: true })), ...R.rows.map((r) => ({ ...r, prio: r.want ? prioKey(r.prio) : "" }))];
   return ranks.size ? all.map((r) => (r.want && ranks.has(titleKey(r.title)) ? { ...r, prio: ranks.get(titleKey(r.title)) } : r)) : all;
@@ -90,7 +92,7 @@ export const wants = () => { const all = everything().filter((r) => r.want); ret
 export function setPrio(title, prio) {
   const k = titleKey(title);
   if (!k) return;
-  const mine = R.pending.find((x) => !x.done && !x.rank && titleKey(x.title) === k);
+  const mine = R.pending.find((x) => !x.done && !x.rank && !x.wish && titleKey(x.title) === k);
   if (mine) mine.prio = prio || "";
   else {
     R.pending = R.pending.filter((x) => !(x.rank && titleKey(x.title) === k));
@@ -118,6 +120,19 @@ export function log(entry) {
   return id;
 }
 
+// ✨ 一行显化：date = 写的那天（YYYY-MM-DD），text = 那行字。排队，下次同步发进阅读表格的 Manifest 页
+export function wish(text, date) {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  const id = "w" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  R.pending.push({ id, wish: true, date: String(date), text: t });
+  save();
+  emit();
+  return id;
+}
+// 还没送到表格的 ✨ 有几行（等着新脚本的也算）
+export const wishesWaiting = () => R.pending.filter((x) => x.wish).length;
+
 // 写不进去的那条（比如下拉里没有那一年）：不要了
 export function drop(id) {
   R.pending = R.pending.filter((x) => x.id !== id);
@@ -128,10 +143,12 @@ export function drop(id) {
 // 同步时带上：要发的（想看的 / 看完的分开）、要不要列表。没什么要做就不带。
 // 有东西要发的时候清单也一起要回来：表格写完再读，本机这份马上就是新的（在今天页记了看完的，那句「看完了吗」才会收起来）；
 // 上次没写进去、还卡着的那几条（why），等着新脚本的那几条（held）不算，免得每次同步都整本读一遍
+// ✨ 那几行不用把清单要回来（只写不读）；等着新脚本的 ✨（held）不单独发，跟着下一次要清单（10 分钟）一起再试
 export function request() {
-  const list = wanted || R.pending.some((x) => !x.why && !x.held) || Date.now() - (R.at || 0) > FRESH;
-  if (!R.pending.length && !list) return null;
-  return { add: R.pending.filter((x) => !x.done && !x.rank).map((x) => ({ ...x, prio: prioText(x.prio) })),
+  const list = wanted || R.pending.some((x) => !x.why && !x.held && !x.wish) || Date.now() - (R.at || 0) > FRESH;
+  if (!R.pending.some((x) => !(x.wish && x.held)) && !list) return null;
+  return { add: R.pending.filter((x) => !x.done && !x.rank && !x.wish).map((x) => ({ ...x, prio: prioText(x.prio) })),
+    wish: R.pending.filter((x) => x.wish).map((x) => ({ id: x.id, date: x.date, text: x.text })),
     rank: R.pending.filter((x) => x.rank).map((x) => ({ id: x.id, title: x.title, prio: prioText(x.prio) })),
     done: R.pending.filter((x) => x.done).map((x) => ({ id: x.id, title: x.title, tab: x.type, year: x.year, month: x.month, mark: x.mark, kind: x.kind, note: x.note })), list };
 }
@@ -164,10 +181,14 @@ export function apply(res, sent) {
       }
       for (const x of R.pending) if (x.rank) x.held = true;
     } else for (const x of R.pending) delete x.held;
+    // 发了 ✨、回来没有 wished：表格里还是认不得它的旧脚本，那几行留在这台设备上等着（held）
+    const oldWish = sent.wish?.length && !Array.isArray(res.wished);
+    for (const x of R.pending) if (x.wish) { if (oldWish) x.held = true; else delete x.held; }
     // 发了看完的、回来却没提这回事：也是旧脚本，那几条先留着
     R.error = sent.done?.length && !Array.isArray(res.logged) ? "Update Code.gs in your Sheet to log finished things"
-      : old && R.pending.some((x) => x.rank) ? "Update Code.gs in your Sheet to save priorities" : "";
-    const done = new Set([...(res.added || []), ...(res.logged || []), ...(res.ranked || []), ...(res.dupes || []).map((d) => d.id)]);
+      : old && R.pending.some((x) => x.rank) ? "Update Code.gs in your Sheet to save priorities"
+      : oldWish ? "Update Code.gs in your Sheet to save ✨ lines — they're waiting on this device" : "";
+    const done = new Set([...(res.added || []), ...(res.logged || []), ...(res.ranked || []), ...(res.wished || []), ...(res.dupes || []).map((d) => d.id)]);
     R.pending = R.pending.filter((x) => !done.has(x.id));
     // 要标的那条已经不在 Want 里了（看完了、在表格里删了）：这次改动不要了
     const gone = new Set((res.failed || []).map((f) => f.id));

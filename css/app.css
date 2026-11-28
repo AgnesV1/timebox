@@ -594,6 +594,21 @@ body.phone .ls-cb::after { inset: -6px; }
 .add-main input[name="title"] { flex: 1; border: var(--b-ctl); }
 .add-main .min { width: 64px; text-align: center; border: var(--b-ctl); }
 .add-main .btn { padding: 0 14px; }
+/* 电脑：分钟框挪进点了才展开的那排（2026-11-28，给最左边的 ✨ 腾地方），后面跟一个 min */
+.add-est { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.add-est .min { width: 56px; padding: 6px 4px; text-align: center; font-size: 12.5px; border: var(--b-ctl); }
+/* ✨ 键（js/ui/today.js 的 wishKeyHTML）：电脑在加任务那一行最左边，手机在 Spend 左边。淡底圆钮；开着 = 白天墨底、夜里青柠框；
+   还有没送到阅读表格的（没网、表格里还是旧脚本）右上角一个玫红小点 */
+.wish-key { position: relative; flex-shrink: 0; align-self: center; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid transparent; border-radius: 50%; background: var(--tonal); font-size: 16px; line-height: 1; transition: transform .15s var(--ease); }
+.wish-key:active { transform: scale(.92); }
+.wish-key.on { border-color: var(--ink); background: var(--ink); }   /* 白天墨底（青柠底上黄色的 ✨ 看不清），和 ◆ Deep 开着一个写法 */
+[data-theme="dark"] .wish-key.on { border-color: var(--accent); background: rgba(204, 255, 0, .14); box-shadow: 0 0 10px rgba(204, 255, 0, .35); }
+.wish-key.waiting::before { content: ""; position: absolute; top: 1px; right: 1px; width: 7px; height: 7px; border-radius: 50%; background: var(--hot); }
+body.phone .wish-key::after { content: ""; position: absolute; inset: -4px; }   /* 画 36、点的范围 44 */
+/* 写 ✨ 时：这一行只剩字和 Save；下面那排选项、灵感候选、分钟框都收起来，框描深一点 */
+.add.wish .add-more, .add.wish.open .add-more, .add.wish.open .idea-pick:not(:empty), .add.wish .add-main .min { display: none; }
+.add.wish .add-main input[name="title"] { border-color: var(--ink); }
+[data-theme="dark"] .add.wish .add-main input[name="title"] { border-color: var(--accent); }
 .add-more { display: none; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
 /* 这一排平时收着，开没开是 js 记着的（js/ui/today.js 的 addOpen）：焦点进表单时展开，点到外面 / 按 Esc 才收，重画不影响 */
 .add.open .add-more { display: flex; }

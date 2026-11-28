@@ -7,7 +7,7 @@ var SECRET = 'CHANGE_ME';
 // 类型 text / num / date / bool / json / status（Done / Delay / Drop）/ pstatus / clock（钟点 09:10，存成文字）。
 // 标记 calc = 脚本自己算，App 不写；hide = setup 时把这列藏起来（右键可取消隐藏）。
 var VERSION = 6;   // 页面和脚本对版本：页面不是这个版本就不收它的数据，免得新旧格式混在一起
-var REV = '2026-11-10';   // 这份脚本是哪天的（改 Code.gs 顺手更新）：部署完在浏览器开 exec 网址，核对表格里跑的是不是这版
+var REV = '2026-11-28';   // 这份脚本是哪天的（改 Code.gs 顺手更新）：部署完在浏览器开 exec 网址，核对表格里跑的是不是这版
 var T = {
   // 计时记录在 Times 一格里：「09:10-09:40 30m; 20m」。Project = 挂在哪个计划上（脚本填名字）；Group = 属于哪个大类（可以不挂计划、直接挂在大类上）
   tasks: { sheet: 'Tasks', key: 'id', main: 'title', cols: [
@@ -838,7 +838,30 @@ function migrate_() {
 var READING_TAB = 'Want';
 var READING_HEAD = ['Name', 'Type', 'Vibe', 'Note', 'Priority'];   // Priority：多想看（Soon / 5 years / 空着），网页里点的，这里也能直接改
 var NAME_HEADS = ['name', 'title', '名字', '书名', '名称', '标题'];
+// ✨ 显化（2026-11-28）：今天页 ✨ 写的一行字，追加进阅读表格单独一页 Manifest（没有就建），两列 Date | Text，新的在最下面。
+// 这一页只写不读：不进阅读的清单和查重，也不算一种（不出现在网页的页名里）
+var WISH_TAB = 'Manifest';
+var WISH_HEAD = ['Date', 'Text'];
 var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+// 把 ✨ 那几行接在 Manifest 页最下面。list = [{id, date: 'YYYY-MM-DD', text}] → 写进去了的 id
+function wishes_(book, list) {
+  var sh = book.getSheetByName(WISH_TAB);
+  if (!sh) {
+    sh = book.insertSheet(WISH_TAB);
+    sh.getRange(1, 1, 1, WISH_HEAD.length).setValues([WISH_HEAD]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  var rows = list.map(function (w) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(w.date || ''));
+    return [m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(), toCell_('text', String(w.text).trim())];
+  });
+  var start = Math.max(sh.getLastRow(), 1) + 1, need = start + rows.length - 1 - sh.getMaxRows();
+  if (need > 0) sh.insertRowsAfter(sh.getMaxRows(), need);
+  sh.getRange(start, 1, rows.length, 2).setValues(rows);
+  sh.getRange(start, 1, rows.length, 1).setNumberFormat('yyyy-mm-dd');
+  return list.map(function (w) { return w.id; });
+}
 
 function readingBook_() {
   var row = readAll_('settings').filter(function (r) { return r.id === 'reading'; })[0];
@@ -1027,9 +1050,9 @@ function finish_(book, d, all) {
   return {};
 }
 
-// req = { list: true, add: [{id, title, type, vibe, note, prio}], rank: [{id, title, prio}], done: [{id, title, tab, year, month, mark, kind, note}] }
-// rank = 改 Want 页里已有那一条的 Priority（prio 是要写进格子的字，空 = 清掉）
-// → { rows, types, kinds: {页名: [小类…]}, added: [id], logged: [id], dupes: [{id, title, tab}], failed: [{id, title, why}] }
+// req = { list: true, add: [{id, title, type, vibe, note, prio}], rank: [{id, title, prio}], done: [{id, title, tab, year, month, mark, kind, note}], wish: [{id, date, text}] }
+// rank = 改 Want 页里已有那一条的 Priority（prio 是要写进格子的字，空 = 清掉）；wish = ✨ 那几行，进 Manifest 页
+// → { rows, types, kinds: {页名: [小类…]}, added: [id], logged: [id], wished: [id], dupes: [{id, title, tab}], failed: [{id, title, why}] }
 function reading_(req) {
   var book = readingBook_();
   if (!book) return { error: 'no sheet' };
@@ -1037,6 +1060,7 @@ function reading_(req) {
   var scan = function (withKinds) {
     all = []; types = []; kinds = {};
     book.getSheets().forEach(function (sh) {
+      if (sh.getName() === WISH_TAB) return;   // ✨ 那一页不是读的东西
       var mine = sh.getName() === READING_TAB, h = readingHead_(sh), body = readingBody_(sh, h);
       if (!mine) types.push(sh.getName());
       readingRows_(sh, tz, h, body).forEach(function (r) { all.push({ r: r, sh: sh }); });
@@ -1047,8 +1071,11 @@ function reading_(req) {
   var dones = (req.done || []).filter(function (d) { return d && String(d.title || '').trim(); });
   var ranks = (req.rank || []).filter(function (k) { return k && String(k.title || '').trim(); });
   var writes = adds.length + dones.length + ranks.length > 0;
+  var wishes = (req.wish || []).filter(function (w) { return w && String(w.text || '').trim(); });
+  var wished = wishes.length ? wishes_(book, wishes) : [];
+  if (!writes && !req.list) return { added: [], dupes: [], logged: [], ranked: [], wished: wished, failed: [] };   // 只有 ✨：不用整本读一遍
   scan(Boolean(req.list) && !writes);
-  var out = { added: [], dupes: [], logged: [], ranked: [], failed: [] }, changed = false;
+  var out = { added: [], dupes: [], logged: [], ranked: [], wished: wished, failed: [] }, changed = false;
   if (adds.length) {
     var seen = {}, fresh = [], w = wantTab_(book);
     all.forEach(function (x) { if (!seen[titleKey_(x.r.title)]) seen[titleKey_(x.r.title)] = x.r; });

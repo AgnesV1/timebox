@@ -43,6 +43,7 @@ class Range {
   getValue() { return this.sh.cell(this.r, this.c); }
   setNumberFormat(f) { for (let j = 0; j < this.nc; j++) this.sh.fmt[this.c + j] = f; return this; }
   setDataValidation() { return this; }
+  setFontWeight() { return this; }
   clearDataValidations() { return this; }
 }
 

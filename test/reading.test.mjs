@@ -94,3 +94,24 @@ test("priority: a Sheet script that doesn't know about it keeps the change waiti
   assert.equal(reading.state().error, "");
   assert.equal(reading.state().pending.length, 0);
 });
+
+test("✨: a line waits on the device until the Sheet takes it, and never re-reads the list by itself", () => {
+  sheet([]);
+  assert.equal(reading.wish("   ", "2026-11-28"), "", "nothing to send");
+  const id = reading.wish("  A calm,   bright flat  ", "2026-11-28");
+  assert.equal(reading.wishesWaiting(), 1);
+  assert.deepEqual(reading.search("calm"), [], "not a reading entry");
+  const rq = reading.request();
+  assert.deepEqual(rq.wish, [{ id, date: "2026-11-28", text: "A calm, bright flat" }]);
+  assert.deepEqual(rq.add, []);
+  assert.equal(rq.list, false, "only ✨: no need for the list");
+  // 旧脚本：回来的没有 wished，这一行留着，不再每次同步都发
+  reading.apply({ added: [], dupes: [], logged: [], ranked: [], failed: [] }, rq);
+  assert.match(reading.state().error, /Update Code\.gs.*✨/);
+  assert.equal(reading.wishesWaiting(), 1);
+  assert.equal(reading.request(), null, "waits for the next list instead");
+  // 换了新脚本：收下了就从这台设备上拿掉
+  reading.apply({ added: [], dupes: [], logged: [], ranked: [], wished: [id], failed: [] }, { ...rq, wish: rq.wish });
+  assert.equal(reading.wishesWaiting(), 0);
+  assert.equal(reading.state().error, "");
+});

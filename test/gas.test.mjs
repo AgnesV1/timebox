@@ -335,6 +335,28 @@ test("reading: every tab is searched, new things go to a Want tab, duplicates ar
   assert.ok(!again.types.includes("Want"));
 });
 
+test("reading: ✨ lines go to a Manifest tab (date + text), which is never read back as a reading tab", () => {
+  const g = load(CODE);
+  g.sandbox.setup();
+  const url = "https://docs.google.com/spreadsheets/d/1ReadingSheetIdAbcdefghijklmnop/edit";
+  const book = g.spreadsheet("https://docs.google.com/spreadsheets/d/1ReadingSheetIdAbcdefghijklmnop");
+  const tv = book.insertSheet("TV");
+  [["Year", "Month", "Name"], [2025, "May", "Severance"]].forEach((r, i) => r.forEach((v, j) => tv.put(i + 1, j + 1, v)));
+  g.post({ secret: "CHANGE_ME", push: { rows: { settings: [{ key: "reading", value: { url }, updated: 1 }] } } });
+  const read = (reading) => g.post({ secret: "CHANGE_ME", reading }).reading;
+
+  const first = read({ wish: [{ id: "w1", date: "2026-11-28", text: "A calm, bright flat by the lake" }, { id: "w2", date: "2026-11-28", text: "   " }] });
+  assert.deepEqual(first.wished, ["w1"], "empty lines are skipped");
+  assert.equal(first.rows, undefined, "only ✨: the reading tabs aren't read");
+  const sh = book.getSheetByName("Manifest");
+  assert.deepEqual(sh.header(), ["Date", "Text"]);
+  const second = read({ list: true, wish: [{ id: "w3", date: "2026-11-29", text: "=IELTS 8" }] });
+  assert.deepEqual(second.wished, ["w3"]);
+  assert.deepEqual(sh.getRange(2, 1, 2, 2).getDisplayValues(), [["2026-11-28", "A calm, bright flat by the lake"], ["2026-11-29", "=IELTS 8"]], "new lines at the bottom");
+  assert.deepEqual(second.types, ["TV"], "Manifest isn't a reading tab");
+  assert.deepEqual(second.rows.map((r) => r.title), ["Severance"]);
+});
+
 test("reading: a priority on what's in Want — set when adding, changed later, cleared", () => {
   const g = load(CODE);
   g.sandbox.setup();

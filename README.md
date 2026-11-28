@@ -213,6 +213,10 @@ On the computer, the Reading page also has a **Rest of 2026** box on the far rig
 typing lists matches, clicking one adds it; Enter adds what you typed. Drag the handle on the left, or press Alt+↑ / ↓ on a row, to reorder; × removes (with undo).
 Anything the reading log marks as finished this year under the same name is struck through with its month; unfinished ones from last year carry over, marked "from 2025". The list lives in 苦昼短's Settings and syncs.
 
+**✨ on Today**: the ✨ key (far left of the add row on the computer, left of Spend on the phone) turns the add row into one line of text; Save sends it to a
+**Manifest** tab in the reading Sheet (created if missing, headers Date / Text, newest at the bottom) with today's date. It's write-only: 苦昼短 never reads the tab back,
+it isn't one of the reading tabs, and the line is kept on the device only until the Sheet has it (a small dot on ✨ means some are still waiting). Needs Code.gs from 2026-11-28.
+
 Apart from these cells, nothing in the Sheet is changed or deleted.
 Typing a title searches **every tab** (each tab's header row is the row that says Name, one entry per row below) and shows the tab, year and month, and emoji of matches;
 an identical name (ignoring case, spaces and title quotes) isn't added again. The Sheet is read again every time Reading opens, so edits made in the Sheet are found.

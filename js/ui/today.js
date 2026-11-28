@@ -41,6 +41,7 @@ let focus = "";   // 点开的那一行（四个状态按钮只在这一行）
 const addTarget = {};   // 加任务框里选的是哪个项目 / 计划（日期 → 下拉的值）：能选「和谁」的大类要多画一块
 const ideaDraft = {};   // 加任务框里从灵感池挑中的那条（日期 → 灵感 id）：任务建好后挂上去，池子里就划掉了
 let addOpen = "";       // 哪一天的加任务框展开着（下面那排选项）。自己记着，不靠焦点猜——见 initToday 里的 setAddOpen
+let wishOn = "";        // 哪一天的加任务框正在写 ✨（显化的一行字，送进阅读表格的 Manifest 页；她 2026-11-28 要的）
 let timeEdit = "";      // 正在改头尾的那一段（「任务 id#第几段」）
 const lineOpen = new Set();   // 点开了的那几项（看步骤、备注、Back to the pool）
 let notesShown = "";    // 哪一行把计划的 Notes 摊开了（那一行的任务 id）
@@ -308,18 +309,30 @@ function pickHTML(d, query) {
     (wants.length ? "<p>Want</p><ul>" + wants.map((r) => item("want-pick", "", r.title, r.tab, false)).join("") + "</ul>" : "");
 }
 
+// ✨ 键：开着时是青柠底；还有没送到阅读表格的（没网、表格里还是旧脚本）右上角一个小点
+function wishKeyHTML(d) {
+  const on = wishOn === d, n = reading.wishesWaiting();
+  const tip = on ? "Back to adding a task" : "Manifest: one line, saved to your reading Sheet" + (n ? " (" + n + " waiting to be sent)" : "");
+  return '<button type="button" class="wish-key' + (on ? " on" : "") + (n ? " waiting" : "") + '" data-act="wish" data-date="' + d + '" aria-pressed="' + on + '" aria-label="' + tip + '" title="' + tip + '">✨</button>';
+}
+
 // 加任务；电脑上多两个下拉：怎么重复、重复多久（一键排好整段时间）。◆ Deep = 这是要专心做的（选了计划就跟计划的默认）。
 // 名字后面带一段钟点（Reading 14:00-15:10）= 已经做完的，直接记成一条 Done。
 // 手机上多一个 Idea 开关：打开后 Add = 记进灵感池（不建任务），回电脑再归类、挑日子
+// ✨（2026-11-28）：点了这一行就变成写「显化」的一行字，Save = 排队送进阅读表格的 Manifest 页（日期 + 字），不建任务、不在这里留着。
+// 电脑上 ✨ 在这一行最左边，分钟框挪进点了才展开的那排；手机上 ✨ 在下面 Spend 的左边
 function addHTML(c, d, phone = false) {
   const projects = pickable(c.projects);
   const target = addTarget[d] || "";
   const people = store.groupByName(store.groupOf(pickTarget(target)))?.friends;
-  return '<form class="add' + (addOpen === d ? " open" : "") + '" data-add="' + d + '" autocomplete="off">' +
-    '<div class="add-main"><input name="title" data-keep="add-title-' + d + '" placeholder="' + (phone || d > c.today ? "Add a task" : "Add a task, or log one: Reading 14:00-15:10") + '" enterkeyhint="done">' +
-    '<input name="est" class="min num" data-keep="add-est-' + d + '" type="number" inputmode="numeric" value="30" min="5" step="5" aria-label="Minutes">' +
-    '<button class="btn cta" type="submit">Add</button></div>' +
-    '<div class="add-more">' + (phone ? pjChipHTML(projects, target, d) : '<select name="project" data-keep="add-plan-' + d + '" aria-label="Project or plan">' + projectOptions(projects, target) + "</select>") +
+  const wish = wishOn === d;
+  const est = '<input name="est" class="min num" data-keep="add-est-' + d + '" type="number" inputmode="numeric" value="30" min="5" step="5" aria-label="Minutes">';
+  const hint = wish ? "What are you manifesting?" : phone || d > c.today ? "Add a task" : "Add a task, or log one: Reading 14:00-15:10";
+  return '<form class="add' + (addOpen === d ? " open" : "") + (wish ? " wish" : "") + '" data-add="' + d + '" autocomplete="off">' +
+    '<div class="add-main">' + (phone ? "" : wishKeyHTML(d)) + '<input name="title" data-keep="add-title-' + d + '" placeholder="' + hint + '" enterkeyhint="' + (wish ? "send" : "done") + '"' + (wish ? ' maxlength="300"' : "") + ">" +
+    (phone ? est : "") + '<button class="btn cta" type="submit">' + (wish ? "Save" : "Add") + "</button></div>" +
+    '<div class="add-more">' + (phone ? "" : '<label class="add-est">' + est + "<span>min</span></label>") +
+    (phone ? pjChipHTML(projects, target, d) : '<select name="project" data-keep="add-plan-' + d + '" aria-label="Project or plan">' + projectOptions(projects, target) + "</select>") +
     (people ? withHTML("add:" + d) : "") +
     '<label class="deep-tog" title="Deep work: focused, one thing at a time"><input type="checkbox" name="deep" data-keep="add-deep-' + d + '"><span>◆ Deep</span></label>' +
     (phone ? '<label class="deep-tog" title="Save it to Ideas instead of adding a task"><input type="checkbox" name="idea" data-keep="add-idea-' + d + '"><span>Idea</span></label>' : '<select name="repeat" aria-label="Repeat"><option value="">Doesn\'t repeat</option><option value="daily">↻ Every day</option>' +
@@ -328,7 +341,7 @@ function addHTML(c, d, phone = false) {
     "</div>" + (phone ? "" : '<div class="idea-pick" data-idea-pick="' + d + '">' + pickHTML(d, document.querySelector('[data-keep="add-title-' + d + '"]')?.value || "") + "</div>") + "</form>" +
     // 手机：右下角记一笔（她要的）——点了从底下升起记账面板里那张记一笔的（js/ui/island.js 的 openEntry），不用先往下拉开记账
     // Spend 左边灰的：当月预算还剩多少（她 10-24 要的；没定预算不显示，超了才是橙的）。记了一笔以后 main.js 的 paintLefts 换数
-    (phone ? '<div class="add-spendw">' + ((x) => '<span class="add-left num' + (x?.over ? " over" : "") + '" data-mleft' + (x ? "" : " hidden") + "><b>" + esc(x?.text || "") + "</b> left</span>")(monthLeft()) + '<button type="button" class="add-spend" data-act="spend-new" aria-label="Add a transaction" title="Add a transaction">' + icon("spending") + "<span>Spend</span></button></div>" +
+    (phone ? '<div class="add-spendw">' + ((x) => '<span class="add-left num' + (x?.over ? " over" : "") + '" data-mleft' + (x ? "" : " hidden") + "><b>" + esc(x?.text || "") + "</b> left</span>")(monthLeft()) + wishKeyHTML(d) + '<button type="button" class="add-spend" data-act="spend-new" aria-label="Add a transaction" title="Add a transaction">' + icon("spending") + "<span>Spend</span></button></div>" +
       // 下面一行很浅的字：从第一笔起一共结余多少（电脑 Spending → All years 顶上那个数，她 11-26 要的），存在感比 left 还低
       ((b) => '<p class="add-bal num" data-mbal' + (b ? "" : " hidden") + ">" + (b ? balanceText(b) : "") + "</p>")(balanceSince()) : "");
 }
@@ -570,6 +583,13 @@ export function initToday(rerender) {
     else if (act === "day-next") go(addDays(shownDate(), 1));
     else if (act === "day-today") go(store.today());
     else if (act === "day-pick") go(el.dataset.date);
+    // ✨：这一行在加任务和写显化之间切换；切过去就把光标放进去
+    else if (act === "wish") {
+      const d = el.dataset.date;
+      wishOn = wishOn === d ? "" : d;
+      rerender();
+      if (wishOn) requestAnimationFrame(() => document.querySelector('[data-keep="add-title-' + d + '"]')?.focus());
+    }
   });
 
   // 电脑上：焦点在某一行里（⋯、状态按钮……）按 Alt+↑↓ = 往上 / 往下挪一格
@@ -627,7 +647,11 @@ export function initToday(rerender) {
   document.addEventListener("focusin", addTouched);
   document.addEventListener("pointerdown", addTouched, true);
   // 下拉开着的时候 Esc 先被它收走（js/ui/select.js，不往下传），到这里的都是表单自己的
-  on(document, "keydown", "form.add[data-add]", (e) => { if (e.key === "Escape" && addOpen) { document.activeElement?.blur?.(); setAddOpen(""); } });
+  on(document, "keydown", "form.add[data-add]", (e) => {
+    if (e.key !== "Escape") return;
+    if (wishOn) { wishOn = ""; rerender(); return; }   // 写 ✨ 时 Esc = 回到加任务
+    if (addOpen) { document.activeElement?.blur?.(); setAddOpen(""); }
+  });
 
   // 加任务时选了计划：Deep 跟着这个计划的默认；选的大类能选「和谁」就多画那一块
   on(document, "change", ".dayview form[data-add] select[name=project]", (e, el) => {
@@ -694,6 +718,17 @@ export function initToday(rerender) {
   on(document, "submit", ".dayview form[data-add]", (e, form) => {
     e.preventDefault();
     const f = new FormData(form);
+    // ✨：那行字排队送进阅读表格的 Manifest 页（日期 = 今天，哪一天的框都一样），不建任务；送到了这台设备上就不留
+    if (wishOn === form.dataset.add) {
+      const input = form.querySelector("[name=title]");
+      if (!reading.wish(f.get("title"), store.today())) { input?.focus(); return; }
+      if (input) input.value = "";
+      wishOn = "";
+      toast(store.setting("reading")?.url ? "✨ Saved — on its way to your reading Sheet" : "✨ Kept on this device — add your reading Sheet's link in Settings to send it");
+      rerender();
+      sync.soon();
+      return;
+    }
     let title = String(f.get("title") || "").trim();
     // 没写名字、选了计划或项目：就是那个计划 / 项目自己的一条（计划那天已经有那一行就是那一行）
     if (!title) {

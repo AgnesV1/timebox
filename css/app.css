@@ -3072,6 +3072,10 @@ body.phone .phead .nav { min-height: 44px; padding: 0 12px 0 4px; margin-left: -
 body.phone .dpill { min-height: 44px; padding: 2px 0 3px; font-size: 11px; touch-action: manipulation; }
 body.phone .dpill b { font-size: 16px; }
 body.phone .dpill i { margin-top: 1px; }
+/* 白天选中那天底下的短线：格子变矮后压到点上（她 2026-11-27 晚说删掉也行）。删了以后白天选别的日子就只剩数字变粗、看不出来，
+   所以换成一圈细墨框（和夜里霓虹框同一个位置，不压点）；夜里照旧 */
+body.phone .daystrip .dmark::after { display: none; }
+[data-theme="light"] body.phone .daystrip .dmark { border: 1.5px solid var(--ink); }
 /* 「x / y done」那一行（2026-11-27 晚）：不写 box 几小时了，右边是 Chore 键（js/ui/today.js 的 phoneHTML，原来在下面单独一行）。
    .chore 拆开（display: contents）：键那一行靠右，放不下（计时中五个记号 + 时间 + 键）就整行换到下面；点合计展开的每一段另起一整行、靠右 */
 body.phone .stripmeta { flex-wrap: wrap; align-items: center; gap: 6px 10px; min-height: 32px; margin-bottom: 4px; font-size: 14px; }
